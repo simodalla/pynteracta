@@ -1,0 +1,32 @@
+[tool.isort]
+profile = "black"
+default_section = "THIRDPARTY"
+known_first_party = ["pyintercata","config"]
+known_django = "django"
+sections = ["FUTURE","STDLIB","THIRDPARTY", "DJANGO", "FIRSTPARTY","LOCALFOLDER"]
+skip_glob = ["**/migrations/*.py"]
+
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \._venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | migrations
+    | \.sh
+  )
+)
+'''
