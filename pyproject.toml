@@ -1,7 +1,54 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyintercata"
+version = "0.1.1"
+description = "Call api of Intercata"
+readme = "README.md"
+authors = [{ name = "Simone Dalla", email = "simodalla@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["api",]
+dependencies = ["requests", "pyjwt[crypto]>=2.5.0"]
+requires-python = ">=3.9"
+
+    [project.optional-dependencies]
+    build = ["build", "twine"]
+    dev   = ["black", "bumpver", "isort", "mypy", "pytest", "time-machine", "responses", "faker", "pytest-mock"]
+
+    [project.scripts]
+    realpython = "pyntercata.__main__:main"
+
+    [project.urls]
+    repository    = "https://github.com/simodalla/pyntercata"
+
+[tool.bumpver]
+current_version = "0.1.1"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message  = "bump version {old_version} -> {new_version}"
+commit          = true
+tag             = true
+push            = false
+
+    [tool.bumpver.file_patterns]
+    "pyproject.toml" = [
+        'current_version = "{version}"',
+        'version = "{version}"',
+    ]
+    "src/pyntercata/__init__.py" = ["{version}"]
+    "src/pyntercata/__main__.py" = ["- pyntercata-playground v{version}"]
+
 [tool.isort]
 profile = "black"
 default_section = "THIRDPARTY"
-known_first_party = ["pyintercata","config"]
+known_first_party = ["pyntercata"]
 known_django = "django"
 sections = ["FUTURE","STDLIB","THIRDPARTY", "DJANGO", "FIRSTPARTY","LOCALFOLDER"]
 skip_glob = ["**/migrations/*.py"]

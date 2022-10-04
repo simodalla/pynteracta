@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 import pytest
 import time_machine
 
-from pyinteracta import urls as intercta_urls
-from pyinteracta.api import InteractaAPI
-from pyinteracta.exceptions import InteractaLoginError
+from pynteracta import urls as intercta_urls
+from pynteracta.api import InteractaAPI
+from pynteracta.exceptions import InteractaLoginError
 
 rome_tz = ZoneInfo("Europe/Rome")
 

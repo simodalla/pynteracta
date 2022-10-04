@@ -192,14 +192,6 @@ class InteractaAPI:
         self.access_token = result["accessToken"]
         return self.access_token
 
-    def print_debug_log(self, url, headers=None, data=None):
-        msg = f"DEBUG: call to url *{url}*"
-        if headers:
-            msg += f" with headers *{headers}*"
-        if data:
-            msg += f" with headers *{data}*"
-        print(msg)
-
     def get_list_community_posts(self, community_id, query_url=None, data={}):
         url = f"{self.base_url}/external/v2/communication/posts/data/community-list/{community_id}"
         if query_url:
@@ -211,29 +203,22 @@ class InteractaAPI:
     def get_post_detail(self, post_id):
         url = f"{self.base_url}/external/v2/communication/posts/data/post-detail-by-id/{post_id}"
         headers = self.authorized_header
-        # self.print_debug_log(url, headers=headers)
-        # response = requests.get(url, headers=headers)
         response = self.call_request("get", url, headers=headers)
         return response
 
     def create_post(self, community_id, **kwargs):
         url = f"{self.base_url}/external/v2/communication/posts/manage/create-post/{community_id}"
         headers = self.authorized_header
-        # self.print_debug_log(url, headers=headers)
         response = requests.get(url, headers=headers)
-        data = json.dumps(POST_CREATE_DATA.copy())
-        # print(data)
-        # response = requests.post(url, headers=headers, data=data)
-        response = self.call_request("post", url, headers=headers, data=data)
+        data = {}
+        for key, value in kwargs.items():
+            data[key] = value
+        # data = json.dumps(POST_CREATE_DATA.copy())
+        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
         return response
 
     def get_group_members(self, group_id, data={}):
         url = f"{self.base_url}/external/v2/admin/data/groups/{group_id}/members"
         headers = self.authorized_header
-        # self.print_debug_log(url, headers=headers)
-        # response = requests.post(url, headers=headers, data=json.dumps(data))
         response = self.call_request("post", url, headers=headers, data=json.dumps(data))
         return response
-
-
-# class Playg
