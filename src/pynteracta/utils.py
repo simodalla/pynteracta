@@ -1,10 +1,8 @@
+import os
+import subprocess
+from pathlib import Path
+
 from jwt.exceptions import InvalidTokenError
-
-
-def monk_validate_kid(self, kid) -> None:
-    if not isinstance(kid, str) and not isinstance(kid, int):
-        raise InvalidTokenError("Key ID header parameter must be a string or an int")
-
 
 #  ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion
 SERVICE_AUTH_HEADERS = {
@@ -28,8 +26,8 @@ SERVICE_AUTH_PAYLOAD = {
     "exp": "",
 }
 
-DEMO_SETTING = {
-    "base_url": "https://prod.development.lab.interacta.space/portal/api",
+PLAYGROUND_SETTINGS = {
+    "base_url": "https://prod.development.lab.interacta.space",
     "username": "interacta-test-api@interacta-prod",
     "password": "MyInteractaPl@yground!",
     "community": {
@@ -64,3 +62,45 @@ POST_CREATE_DATA = {
     "watcherUserIds": [4155, 3942, 4459],
     # "watcherGroupIds": [],
 }
+
+SESSION_ACCESS_TOKEN_FILENAME = ".pyintercata"
+
+
+def mock_validate_kid(self, kid) -> None:
+    if not isinstance(kid, str) and not isinstance(kid, int):
+        raise InvalidTokenError("Key ID header parameter must be a string or an int")
+
+
+def set_session_access_token(access_token: str):
+    try:
+        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        sak_file.write_text(access_token)
+    except Exception:
+        return False
+    return True
+
+
+def get_session_access_token():
+    try:
+        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        token = sak_file.read_text()
+    except Exception:
+        return None
+    return token
+
+
+def clean_session_access_token():
+    try:
+        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        sak_file.unlink()
+    except Exception:
+        return False
+    return True
+
+
+# def unset_shell_env(key):
+#     if os.name == "posix":
+#         exp = f"unset {key}"
+#     if os.name == "nt":
+#         exp = 'reg delete "HKCU\\Environment" /v {key} /f'
+#     subprocess.Popen(exp, shell=True).wait()

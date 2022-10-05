@@ -9,11 +9,11 @@ import jwt
 import requests
 
 from . import urls
-from .exceptions import InteractaLoginError
-from .utils import POST_CREATE_DATA, monk_validate_kid
+from .exceptions import InteractaError, InteractaLoginError
+from .utils import PLAYGROUND_SETTINGS, POST_CREATE_DATA, mock_validate_kid
 
 logger = logging.getLogger(__name__)
-jwt.api_jws.PyJWS._validate_kid = monk_validate_kid
+jwt.api_jws.PyJWS._validate_kid = mock_validate_kid
 
 
 class InteractaAPI:
@@ -50,6 +50,8 @@ class InteractaAPI:
         url = value if value else os.getenv("INTERACTA_BASEURL", None)
         if url and url.endswith("/"):
             url = url.rstrip("/")
+        if not url.endswith(urls.PORTAL_PATH):
+            url = f"{url}{urls.PORTAL_PATH}"
         self._base_url = url
 
     # SERVICE AUTH PAYLOAD PROPS
@@ -121,6 +123,8 @@ class InteractaAPI:
         response = request_method(url, **kwargs)
         if self._log_calls:
             self._record_log_call(url, kwargs, response)
+        if response.status_code != 200:
+            raise InteractaError(f"response: {response.status_code} {response.text}")
         return response
 
     def prepare_credentials_login(self, username: str, password: str):
@@ -193,12 +197,18 @@ class InteractaAPI:
         return self.access_token
 
     def get_list_community_posts(self, community_id, query_url=None, data={}):
-        url = f"{self.base_url}/external/v2/communication/posts/data/community-list/{community_id}"
+        url = f"{self.base_url}{urls.POSTDATA_2_COMMUNITY_LIST}{community_id}"
         if query_url:
             url += f"?{query_url}"
         headers = self.authorized_header
-        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
-        return response
+        try:
+            response = self.call_request("post", url, headers=headers, data=json.dumps(data))
+        except InteractaError as e:
+            raise e
+        result = response.json()
+        if "items" not in result:
+            pass
+        return result["items"]
 
     def get_post_detail(self, post_id):
         url = f"{self.base_url}/external/v2/communication/posts/data/post-detail-by-id/{post_id}"
@@ -222,3 +232,27 @@ class InteractaAPI:
         headers = self.authorized_header
         response = self.call_request("post", url, headers=headers, data=json.dumps(data))
         return response
+
+
+class PlaygroundApi(InteractaAPI):
+    def __init__(
+        self,
+        log_calls: bool = False,
+        log_call_responses: bool = False,
+    ):
+        super().__init__(
+            base_url=PLAYGROUND_SETTINGS["base_url"],
+            log_calls=log_calls,
+            log_call_responses=log_call_responses,
+        )
+
+    def bootstrap_token(self):
+        url, data = self.prepare_credentials_login(
+            username=PLAYGROUND_SETTINGS["username"],
+            password=PLAYGROUND_SETTINGS["password"],
+        )
+        token = self.login(url, data)
+        return token
+
+    def get_list_community_posts(self):
+        return super().get_list_community_posts(community_id=PLAYGROUND_SETTINGS["community"]["id"])
