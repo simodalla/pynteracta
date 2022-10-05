@@ -33,7 +33,9 @@ class TestInteractaAPI:
 
         api = InteractaAPI()
 
-        assert api.base_url == environment_params["INTERACTA_BASEURL"]
+        assert (
+            api.base_url == f'{environment_params["INTERACTA_BASEURL"]}{intercta_urls.PORTAL_PATH}'
+        )
         assert api.service_auth_key == environment_params["INTERACTA_SERVICE_AUTH_KEY"].encode()
         assert api.service_auth_jti == environment_params["INTERACTA_SERVICE_AUTH_JTI"]
         assert api.service_auth_iss == environment_params["INTERACTA_SERVICE_AUTH_ISS"]
@@ -44,11 +46,11 @@ class TestInteractaAPI:
 
         mocker.patch.dict(os.environ, {"INTERACTA_BASEURL": url}, clear=True)
         api = InteractaAPI()
-        assert api.base_url == "https://example.org"
+        assert api.base_url == f"https://example.org{intercta_urls.PORTAL_PATH}"
 
         mocker.patch.dict(os.environ, {}, clear=True)
         api = InteractaAPI(base_url=url)
-        assert api.base_url == "https://example.org"
+        assert api.base_url == f"https://example.org{intercta_urls.PORTAL_PATH}"
 
     @pytest.mark.parametrize(
         "env,expected",
@@ -73,7 +75,7 @@ class TestInteractaAPI:
         login_url, data = api.prepare_credentials_login(username=username, password=pwd)
         data = json.loads(data)
 
-        assert login_url == f"{url}{intercta_urls.LOGIN_CREDENTIAL}"
+        assert login_url == f"{url}{intercta_urls.PORTAL_PATH}{intercta_urls.LOGIN_CREDENTIAL}"
         assert data["username"] == username
         assert data["password"] == pwd
 
@@ -90,8 +92,9 @@ class TestInteractaAPI:
         login_url, data = api.prepare_service_login()
         data = json.loads(data)
 
-        assert (
-            login_url == f"{environment_params['INTERACTA_BASEURL']}{intercta_urls.LOGIN_SERVICE}"
+        assert login_url == (
+            f"{environment_params['INTERACTA_BASEURL']}"
+            f"{intercta_urls.PORTAL_PATH}{intercta_urls.LOGIN_SERVICE}"
         )
         assert "jwtAssertion" in data
         assert data["jwtAssertion"] == token
@@ -119,7 +122,7 @@ class TestInteractaAPI:
             api = InteractaAPI(base_url=url)
             api.login(url=url, data={})
 
-        assert f"url: {url} _" in str(excinfo.value)
+        assert f"url: {url}" in str(excinfo.value)
 
     def test_login_raise_exception_if_return_code_not_have_accessToken(
         self, faker, mocked_responses
@@ -131,4 +134,5 @@ class TestInteractaAPI:
             api = InteractaAPI(base_url=url)
             api.login(url=url, data={})
 
-        assert f"url: {url} _" in str(excinfo.value)
+        assert f"url: {url}" in str(excinfo.value)
+        assert "No accessToken" in str(excinfo.value)

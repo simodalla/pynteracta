@@ -1,8 +1,7 @@
-import os
-import subprocess
 from pathlib import Path
 
 from jwt.exceptions import InvalidTokenError
+from requests.models import Response
 
 #  ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion
 SERVICE_AUTH_HEADERS = {
@@ -98,9 +97,8 @@ def clean_session_access_token():
     return True
 
 
-# def unset_shell_env(key):
-#     if os.name == "posix":
-#         exp = f"unset {key}"
-#     if os.name == "nt":
-#         exp = 'reg delete "HKCU\\Environment" /v {key} /f'
-#     subprocess.Popen(exp, shell=True).wait()
+def format_response_error(response: Response) -> str:
+    return (
+        f"url: {response.url} - response {response.status_code}"
+        f" headers: {response.headers} content: {response.text}"
+    )

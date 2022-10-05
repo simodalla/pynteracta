@@ -9,8 +9,13 @@ import jwt
 import requests
 
 from . import urls
-from .exceptions import InteractaError, InteractaLoginError
-from .utils import PLAYGROUND_SETTINGS, POST_CREATE_DATA, mock_validate_kid
+from .exceptions import InteractaError, InteractaLoginError, InteractaResponseError
+from .utils import (
+    PLAYGROUND_SETTINGS,
+    POST_CREATE_DATA,
+    format_response_error,
+    mock_validate_kid,
+)
 
 logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid
@@ -48,10 +53,11 @@ class InteractaAPI:
     @base_url.setter
     def base_url(self, value: str) -> None:
         url = value if value else os.getenv("INTERACTA_BASEURL", None)
-        if url and url.endswith("/"):
-            url = url.rstrip("/")
-        if not url.endswith(urls.PORTAL_PATH):
-            url = f"{url}{urls.PORTAL_PATH}"
+        if url:
+            if url.endswith("/"):
+                url = url.rstrip("/")
+            if not url.endswith(urls.PORTAL_PATH):
+                url = f"{url}{urls.PORTAL_PATH}"
         self._base_url = url
 
     # SERVICE AUTH PAYLOAD PROPS
@@ -124,7 +130,7 @@ class InteractaAPI:
         if self._log_calls:
             self._record_log_call(url, kwargs, response)
         if response.status_code != 200:
-            raise InteractaError(f"response: {response.status_code} {response.text}")
+            raise InteractaResponseError(format_response_error(response))
         return response
 
     def prepare_credentials_login(self, username: str, password: str):
@@ -175,23 +181,21 @@ class InteractaAPI:
         return login_url, data
 
     def login(self, url, data):
-        response = self.call_request(
-            "post",
-            url,
-            headers={
-                "accept": "application/json",
-                "content-type": "application/json",
-            },
-            data=data,
-        )
-        log_request = (
-            f"url: {url} _ response: {response.status_code} - {response.headers} - {response.text}"
-        )
-        if not response.status_code == 200:
-            raise InteractaLoginError(log_request)
+        try:
+            response = self.call_request(
+                "post",
+                url,
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                },
+                data=data,
+            )
+        except InteractaResponseError as e:
+            raise InteractaLoginError(str(e))
         result = response.json()
         if "accessToken" not in result:
-            raise InteractaLoginError(log_request)
+            raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
 
         self.access_token = result["accessToken"]
         return self.access_token
