@@ -24,10 +24,10 @@ requires-python = ">=3.9"
     dev   = ["black", "bumpver", "isort", "mypy", "pytest", "time-machine", "responses", "faker", "pytest-mock"]
 
     [project.scripts]
-    realpython = "pyntercata.__main__:main"
+    realpython = "pynteracta.__main__:main"
 
     [project.urls]
-    repository    = "https://github.com/simodalla/pyntercata"
+    repository    = "https://github.com/simodalla/pynteracta"
 
 [tool.bumpver]
 current_version = "0.1.1"
@@ -42,13 +42,13 @@ push            = false
         'current_version = "{version}"',
         'version = "{version}"',
     ]
-    "src/pyntercata/__init__.py" = ["{version}"]
-    "src/pyntercata/__main__.py" = ["- pyntercata-playground v{version}"]
+    "src/pynteracta/__init__.py" = ["{version}"]
+    "src/pynteracta/__main__.py" = ["- pynteracta v{version}"]
 
 [tool.isort]
 profile = "black"
 default_section = "THIRDPARTY"
-known_first_party = ["pyntercata"]
+known_first_party = ["pynteracta"]
 known_django = "django"
 sections = ["FUTURE","STDLIB","THIRDPARTY", "DJANGO", "FIRSTPARTY","LOCALFOLDER"]
 skip_glob = ["**/migrations/*.py"]
