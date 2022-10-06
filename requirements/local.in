@@ -12,6 +12,7 @@ coverage==6.4.4  # https://github.com/nedbat/coveragepy
 black==22.8.0  # https://github.com/psf/black
 pylint==2.14.5  # https://github.com/PyCQA/pylint
 pre-commit==2.20.0  # https://github.com/pre-commit/pre-commit
+bumpver==2022.1118  # https://github.com/mbarkhau/bumpver
 
 # Testing
 # ------------------------------------------------------------------------------
