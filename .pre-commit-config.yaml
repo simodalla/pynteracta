@@ -1,0 +1,42 @@
+exclude: "docs|node_modules|migrations|.git|.tox"
+default_stages: [commit]
+fail_fast: true
+default_language_version:
+  python: python3.10
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/asottile/pyupgrade
+    hooks:
+      - id: pyupgrade
+        args: [--py310-plus]
+
+  - repo: https://github.com/psf/black
+    hooks:
+      - id: black
+
+  - repo: https://gitlab.com/pycqa/flake8
+    hooks:
+      - id: flake8
+        args: ["--config=setup.cfg"]
+        additional_dependencies:
+          - flake8-isort
+          - flake8-no-pep420
+          - flake8-print
+          - flake8-breakpoint
+
+  - repo: https://github.com/pycqa/isort
+    hooks:
+      - id: isort
+        name: isort (python)
+
+  # - repo: https://github.com/shellcheck-py/shellcheck-py
+  #   rev: v0.8.0.4
+  #   hooks:
+  #   - id: shellcheck
