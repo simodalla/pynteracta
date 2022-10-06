@@ -10,12 +10,7 @@ import requests
 
 from . import urls
 from .exceptions import InteractaError, InteractaLoginError, InteractaResponseError
-from .utils import (
-    PLAYGROUND_SETTINGS,
-    POST_CREATE_DATA,
-    format_response_error,
-    mock_validate_kid,
-)
+from .utils import PLAYGROUND_SETTINGS, format_response_error, mock_validate_kid
 
 logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid
@@ -196,7 +191,6 @@ class InteractaAPI:
         result = response.json()
         if "accessToken" not in result:
             raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
-
         self.access_token = result["accessToken"]
         return self.access_token
 

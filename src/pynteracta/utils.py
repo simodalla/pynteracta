@@ -3,7 +3,7 @@ from pathlib import Path
 from jwt.exceptions import InvalidTokenError
 from requests.models import Response
 
-#  ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion
+# ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion # noqa: E501
 SERVICE_AUTH_HEADERS = {
     # Sostituire con il valore "private_key_id" recuperato dal JSON delle credenziali
     # (Service Account). Attenzione che è un tipo JSON number, non una stringa.
@@ -47,7 +47,9 @@ POST_CREATE_DATA = {
     },
     "title": "titolo ticket da api n.2",
     # fmt: off
-    "description": "[{\"insert\":\"Questo è il mio primo post di Interacta e lo sto creando tramite le \"},{\"attributes\":{\"italic\":true},\"insert\":\"Interacta External API\"},{\"insert\":\".\\n\"}]",
+    "description": "[{\"insert\":\"Questo è il mio primo post di Interacta e lo sto creando" \
+    " tramite le \"},{\"attributes\":{\"italic\":true},\"insert\":\"Interacta External API\"}," \
+    "{\"insert\":\".\\n\"}]",
     # fmt: on
     "visibility": 1,
     # "acknowledgeTask": None,
