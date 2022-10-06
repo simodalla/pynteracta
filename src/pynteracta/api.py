@@ -221,7 +221,6 @@ class InteractaAPI:
         data = {}
         for key, value in kwargs.items():
             data[key] = value
-        # data = json.dumps(POST_CREATE_DATA.copy())
         response = self.call_request("post", url, headers=headers, data=json.dumps(data))
         return response
 

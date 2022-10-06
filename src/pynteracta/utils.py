@@ -35,35 +35,6 @@ PLAYGROUND_SETTINGS = {
     },
 }
 
-POST_CREATE_DATA = {
-    "customData": {
-        "1411": 27,
-        "1412": {"url": "www.google.com", "label": "testo url"},
-        "1413": None,
-        "1415": [3942, 4155],
-        "1416": "2022-10-08",
-        "1429": None,
-        "1454": None,
-    },
-    "title": "titolo ticket da api n.2",
-    # fmt: off
-    "description": "[{\"insert\":\"Questo è il mio primo post di Interacta e lo sto creando" \
-    " tramite le \"},{\"attributes\":{\"italic\":true},\"insert\":\"Interacta External API\"}," \
-    "{\"insert\":\".\\n\"}]",
-    # fmt: on
-    "visibility": 1,
-    # "acknowledgeTask": None,
-    # "linkPreview": None,
-    # "draft": False,
-    # "scheduledPublication": None,
-    # "workflowInitStateId": 501,
-    # "communityRelations": [],
-    # "announcement": False,
-    # "attachments": [],
-    "watcherUserIds": [4155, 3942, 4459],
-    # "watcherGroupIds": [],
-}
-
 SESSION_ACCESS_TOKEN_FILENAME = ".pyintercata"
 
 

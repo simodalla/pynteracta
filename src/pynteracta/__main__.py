@@ -96,7 +96,6 @@ def auth_service(
     base_url: str = typer.Argument("aaa", envvar="INTERACTA_BASEURL"),
     auth_key: str = typer.Argument("", envvar="INTERACTA_SERVICE_AUTH_KEY"),
 ):
-    # print(endpoint, auth_key)
     pass
 
 
