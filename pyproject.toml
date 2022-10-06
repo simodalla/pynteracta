@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyintercata"
-version = "0.1.1"
+version = "0.1.2"
 description = "Call api of Intercata"
 readme = "README.md"
 authors = [{ name = "Simone Dalla", email = "simodalla@gmail.com" }]
@@ -30,7 +30,7 @@ requires-python = ">=3.9"
     repository    = "https://github.com/simodalla/pynteracta"
 
 [tool.bumpver]
-current_version = "0.1.1"
+current_version = "0.1.2"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "bump version {old_version} -> {new_version}"
 commit          = true

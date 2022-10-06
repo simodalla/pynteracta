@@ -18,7 +18,7 @@ More information is available at:
 Version:
 --------
 
-- pynteracta v0.1.1
+- pynteracta v0.1.2
 """
 
 import os
