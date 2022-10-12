@@ -1,3 +1,4 @@
+# flake8: noqa
 """Pynteracta
 
 Usage:
@@ -30,30 +31,53 @@ from rich.prompt import Prompt
 from pynteracta import cli, utils
 from pynteracta.exceptions import InteractaLoginError
 
-app = typer.Typer()
+app = typer.Typer(help="")
+
+help_text_base_url = (
+    "URL di base ambiente di produzione. Se non valorizzato viene impostato dalla variabile "
+    "di ambiente INTERACTA_BASEURL o richiesta in input."
+)
+help_text_user = (
+    "Username per autenticazione username/password. Questo argomento viene"
+    " ignorato se è stato valorizzata l'opzione service_account_file."
+)
 
 
 @app.command()
 def playground():
-    rich.print("[cyan]Connessione al Playground di interacta...[cyan]")
+    """
+    Effettua il login e mostra la lista dei post presenti nell'ambiente demo Playgroud.
+
+    Leggi la documentazione -->
+    https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3641081900/Playground
+    """
+    rich.print("[cyan]Connessione all'ambiente Playground di Interacta...[cyan]")
     api = cli.CliPlaygroundApi()
     try:
-        token = api.bootstrap_token()
-        rich.print(token)
+        api.bootstrap_token()
     except InteractaLoginError as e:
         rich.print(f"[bold red]Autenticazione fallita![/bold red] --> [red]{e}[/red]")
         typer.Exit(code=1)
-    rich.print("[green]ogin effettuato con successo![/green]")
+    rich.print("[green]Login effettuato con successo![/green]")
     rich.print("[cyan]Elenco dei post:[/cyan]")
     rich.print(api.table_list_posts(posts=api.get_list_community_posts()))
 
 
 @app.command()
-def login(service_account_file: str = "", user: str = "", base_url: str = ""):
+def login(
+    service_account_file: str = typer.Option(
+        "", help="Path del file json per autenticazione con Service Account."
+    ),
+    user: str = typer.Option("", help=help_text_user),
+    base_url: str = typer.Option("", help=help_text_base_url),
+):
     """
-    Effettua il login .
+    Effettua il login nell'ambiente di produzione.
 
-    If --formal is used, say hi very formally.
+    Se viene passato l'argomento service_account_file il login viene tentato con le credenziali del
+    service account ignorando l'autenticazione username/password.
+
+    Specifica la URL di base dell'ambiente di produzione.
     """
     method_prepare_type = None
     auth_type = ""
@@ -93,15 +117,21 @@ def login(service_account_file: str = "", user: str = "", base_url: str = ""):
 
 @app.command()
 def logout():
+    """Effettua il logout dall'ambiente di produzione."""
     utils.clean_session_access_token()
     rich.print("[green]Logout effettuato con successo![/green]")
 
 
 @app.command()
 def list_posts(
-    community: int = 1,
-    base_url: str = "",
+    community: int = typer.Argument(1, help="Id della community"),
+    base_url: str = typer.Option("", help=help_text_base_url),
 ):
+    """
+    Mostra la lista dei post presenti in una community.
+
+    Specifica la URL di base dell'ambiente di produzione.
+    """
     base_url = base_url if base_url else os.getenv("INTERACTA_BASEURL", "")
     if not base_url:
         base_url = Prompt.ask("Interacta url")
