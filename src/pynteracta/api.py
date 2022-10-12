@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
@@ -10,7 +11,12 @@ import requests
 
 from . import urls
 from .exceptions import InteractaError, InteractaLoginError, InteractaResponseError
-from .utils import PLAYGROUND_SETTINGS, format_response_error, mock_validate_kid
+from .utils import (
+    PLAYGROUND_SETTINGS,
+    format_response_error,
+    mock_validate_kid,
+    parse_service_account_file,
+)
 
 logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid
@@ -72,7 +78,9 @@ class InteractaAPI:
 
     @service_auth_jti.setter
     def service_auth_jti(self, value):
-        self._service_auth_jti = value if value else os.getenv("INTERACTA_SERVICE_AUTH_JTI", None)
+        self._service_auth_jti = (
+            value if value else os.getenv("INTERACTA_SERVICE_AUTH_JTI", str(uuid.uuid4()))
+        )
 
     @property
     def service_auth_iss(self):
@@ -174,6 +182,13 @@ class InteractaAPI:
             raise e
         data = json.dumps({"jwtAssertion": token})
         return login_url, data
+
+    def prepare_service_login_from_file(self, file_path: str) -> tuple:
+        try:
+            data = parse_service_account_file(file_path)
+        except InteractaError as e:
+            raise e
+        return self.prepare_service_login(**data)
 
     def login(self, url, data):
         try:
