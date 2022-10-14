@@ -11,10 +11,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 keywords = ["api",]
+license = "LICENSE"
 packages = [{ include = "pynteracta", from = "src" },]
 
 [tool.poetry.scripts]
-pynteracta = "pynteracta.__main__:app"
+pynteracta = "pynteracta.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.9"
