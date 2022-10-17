@@ -2,16 +2,16 @@
 name = "pynteracta"
 version = "0.1.3"
 description = "A wrapper for Interacta API"
+license = "BSD-3-Clause"
 authors = ["Simone Dalla <simodalla@gmail.com>"]
 readme = "README.md"
+homepage = "https://github.com/simodalla/pynteracta"
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-keywords = ["api",]
-license = "LICENSE"
 packages = [{ include = "pynteracta", from = "src" },]
 
 [tool.poetry.scripts]
@@ -35,6 +35,8 @@ black = "^22.10.0"
 pylint = "^2.15.4"
 pre-commit = "^2.20.0"
 bumpver = "^2022.1118"
+bandit = "^1.7.4"
+safety = "^2.3.1"
 
 
 [tool.poetry.group.pytest.dependencies]
