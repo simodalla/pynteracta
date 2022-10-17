@@ -38,7 +38,7 @@ PLAYGROUND_SETTINGS = {
     },
 }
 
-SESSION_ACCESS_TOKEN_FILENAME = ".pyintercata"
+SESSION_ACCESSTK_CACHE_FILENAME = ".pyintercata"
 
 
 def mock_validate_kid(self, kid) -> None:
@@ -48,7 +48,7 @@ def mock_validate_kid(self, kid) -> None:
 
 def set_session_access_token(access_token: str):
     try:
-        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
         sak_file.write_text(access_token)
     except Exception:
         return False
@@ -57,7 +57,7 @@ def set_session_access_token(access_token: str):
 
 def get_session_access_token():
     try:
-        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
         token = sak_file.read_text()
     except Exception:
         return None
@@ -66,7 +66,7 @@ def get_session_access_token():
 
 def clean_session_access_token():
     try:
-        sak_file = Path.home() / SESSION_ACCESS_TOKEN_FILENAME
+        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
         sak_file.unlink()
     except Exception:
         return False
