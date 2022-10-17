@@ -37,6 +37,7 @@ pre-commit = "^2.20.0"
 bumpver = "^2022.1118"
 bandit = "^1.7.4"
 safety = "^2.3.1"
+pytest-cov = "^4.0.0"
 
 
 [tool.poetry.group.pytest.dependencies]
@@ -95,6 +96,7 @@ exclude = '''
     | build
     | dist
     | migrations
+    | demo
     | \.sh
   )
 )
