@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import os
 import time
+import uuid
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -22,7 +23,10 @@ class TestInteractaAPI:
 
         assert api.base_url is None
         assert api.service_auth_key == b""
-        assert api.service_auth_jti is None
+        try:
+            uuid.UUID(str(api.service_auth_jti))
+        except ValueError:
+            pytest.fail(f"api.service_auth_jti '{api.service_auth_jti}' is not a valid uuid")
         assert api.service_auth_iss is None
         assert api.service_auth_kid == 0
         assert api.service_auth_alg == "RS512"
