@@ -36,7 +36,7 @@ def playground():
         typer.Exit(code=1)
     rich.print("[green]Login effettuato con successo![/green]")
     rich.print("[cyan]Elenco dei post:[/cyan]")
-    rich.print(api.table_list_posts(posts=api.get_list_community_posts()))
+    rich.print(api.table_list_posts(posts=api.get_posts()))
 
 
 @app.command()
@@ -116,4 +116,4 @@ def list_posts(
     if not api.access_token:
         rich.print("[bold red]Sembra ci sia un problema. Effettua il login![/bold red]")
         typer.Exit(code=1)
-    rich.print(api.table_list_posts(api.get_list_community_posts(community_id=community)))
+    rich.print(api.table_list_posts(api.get_posts(community_id=community)))

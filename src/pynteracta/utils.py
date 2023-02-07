@@ -1,3 +1,4 @@
+import functools
 import json
 from pathlib import Path
 
@@ -86,8 +87,8 @@ def parse_service_account_file(file_path: str) -> dict:
             json_data = json.load(f)
             check_service_account_json_data(data=json_data)
             data = {
-                "service_auth_key": json_data["private_key"],
-                "service_auth_iss": json_data["client_id"],
+                "service_auth_key": str(json_data["private_key"]),
+                "service_auth_iss": str(json_data["client_id"]),
                 "service_auth_kid": int(json_data["private_key_id"]),
             }
     except Exception as e:
@@ -108,3 +109,32 @@ def check_service_account_json_data(data: dict):
             "Il service account non risulta valido. Non sono valorizzati tutti parametri necessari."
         )
     return True
+
+
+def to_camel(string: str) -> str:
+    words = string.split("_")
+    if len(words) == 1:
+        return string
+    return f"{words[0]}{''.join(word.capitalize() for ix, word in enumerate(words[0:]) if ix > 0)}"
+
+
+def interactapi(func=None, *, response_model=None):
+    if func is None:
+        return functools.partial(interactapi, response_model=response_model)
+
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if "headers" not in kwargs:
+            kwargs["headers"] = self.authorized_header
+        else:
+            kwargs["headers"].update(self.authorized_header)
+        if "data" in kwargs:
+            kwargs["data"] = kwargs["data"] if not kwargs["data"] else kwargs["data"].json()
+        response = func(self, *args, **kwargs)
+        if not response_model:
+            return response
+        result = response_model.parse_obj(response.json())
+        result._response = response
+        return result
+
+    return wrapper

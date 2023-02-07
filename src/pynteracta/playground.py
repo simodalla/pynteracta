@@ -25,7 +25,7 @@ class PlaygroundApi(InteractaAPI):
         return token
 
     def list_posts(self):
-        response = self.get_list_community_posts(PLAYGROUND_SETTINGS["community"]["id"])
+        response = self.get_posts(PLAYGROUND_SETTINGS["community"]["id"])
         if response.status_code != 200:
             pass
         result = response.json()
