@@ -16,7 +16,7 @@ colorama==0.4.5
     # via typer
 commonmark==0.9.1
     # via rich
-cryptography==38.0.1
+cryptography==39.0.1
     # via pyjwt
 idna==3.4
     # via requests
@@ -25,15 +25,15 @@ pycparser==2.21
 pygments==2.13.0
     # via rich
 pyjwt[crypto]==2.5.0
-    # via -r requirements/base.in
+    # via -r base.in
 requests==2.28.1
-    # via -r requirements/base.in
+    # via -r base.in
 rich==12.6.0
     # via typer
 shellingham==1.5.0
     # via typer
 typer[all]==0.6.1
-    # via -r requirements/base.in
+    # via -r base.in
 types-cryptography==3.3.23
     # via pyjwt
 urllib3==1.26.12
