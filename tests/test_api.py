@@ -38,7 +38,8 @@ class TestInteractaAPI:
         api = InteractaAPI()
 
         assert (
-            api.base_url == f'{environment_params["INTERACTA_BASEURL"]}{intercta_urls.PORTAL_PATH}'
+            api.base_url
+            == f'{environment_params["INTERACTA_BASEURL"]}{intercta_urls.API_ENDPOINT_PATH}'
         )
         assert api.service_auth_key == environment_params["INTERACTA_SERVICE_AUTH_KEY"].encode()
         assert api.service_auth_jti == environment_params["INTERACTA_SERVICE_AUTH_JTI"]
@@ -50,11 +51,11 @@ class TestInteractaAPI:
 
         mocker.patch.dict(os.environ, {"INTERACTA_BASEURL": url}, clear=True)
         api = InteractaAPI()
-        assert api.base_url == f"https://example.org{intercta_urls.PORTAL_PATH}"
+        assert api.base_url == f"https://example.org{intercta_urls.API_ENDPOINT_PATH}"
 
         mocker.patch.dict(os.environ, {}, clear=True)
         api = InteractaAPI(base_url=url)
-        assert api.base_url == f"https://example.org{intercta_urls.PORTAL_PATH}"
+        assert api.base_url == f"https://example.org{intercta_urls.API_ENDPOINT_PATH}"
 
     @pytest.mark.parametrize(
         "env,expected",
@@ -79,7 +80,9 @@ class TestInteractaAPI:
         login_url, data = api.prepare_credentials_login(username=username, password=pwd)
         data = json.loads(data)
 
-        assert login_url == f"{url}{intercta_urls.PORTAL_PATH}{intercta_urls.LOGIN_CREDENTIAL}"
+        assert (
+            login_url == f"{url}{intercta_urls.API_ENDPOINT_PATH}{intercta_urls.LOGIN_CREDENTIAL}"
+        )
         assert data["username"] == username
         assert data["password"] == pwd
 
@@ -98,7 +101,7 @@ class TestInteractaAPI:
 
         assert login_url == (
             f"{environment_params['INTERACTA_BASEURL']}"
-            f"{intercta_urls.PORTAL_PATH}{intercta_urls.LOGIN_SERVICE}"
+            f"{intercta_urls.API_ENDPOINT_PATH}{intercta_urls.LOGIN_SERVICE}"
         )
         assert "jwtAssertion" in data
         assert data["jwtAssertion"] == token

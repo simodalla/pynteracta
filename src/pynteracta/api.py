@@ -16,14 +16,13 @@ from .schemas.models import (
     GroupMembersOut,
     GroupsOut,
     HashtagsOut,
+    PostDefinitionOut,
     PostDetailOut,
     PostIn,
     PostsOut,
     UsersOut,
 )
 from .schemas.requests import BodyPost
-
-# from .schemas.responses import ResponsePost, ResponsePosts, ResponseUsers
 from .utils import (
     PLAYGROUND_SETTINGS,
     format_response_error,
@@ -61,7 +60,8 @@ class Api:
     def call_api(
         self, method: str, path: str, query_url: str = None, headers={}, data: dict | str = None
     ):
-        url = f"{self.base_url}/external/v2{path}"
+        # url = f"{self.base_url}/external/v2{path}"
+        url = f"{self.base_url}{path}"
         request_method = getattr(requests, method)
         response = request_method(url, headers=headers, data=data)
         if response.status_code != 200:
@@ -89,7 +89,6 @@ class InteractaAPI(Api):
         self.service_auth_kid = service_auth_kid
         self.service_auth_alg = service_auth_alg
         self.service_auth_token_expiration = service_auth_token_expiration
-        # self.access_token = None
         self._log_calls = log_calls
         self._log_call_responses = log_call_responses
         self._call_stack = OrderedDict()
@@ -104,8 +103,8 @@ class InteractaAPI(Api):
         if url:
             if url.endswith("/"):
                 url = url.rstrip("/")
-            if not url.endswith(urls.PORTAL_PATH):
-                url = f"{url}{urls.PORTAL_PATH}"
+            if not url.endswith(urls.API_ENDPOINT_PATH):
+                url = f"{url}{urls.API_ENDPOINT_PATH}"
         self._base_url = url
 
     # SERVICE AUTH PAYLOAD PROPS
@@ -175,9 +174,9 @@ class InteractaAPI(Api):
     def prepare_credentials_login(self, username: str = "", password: str = ""):
         username = username if username else os.getenv("INTERACTA_USERNAME", "")
         password = password if password else os.getenv("INTERACTA_PASSWORD", "")
-        login_url = f"{self.base_url}{urls.LOGIN_CREDENTIAL}"
+        login_path = urls.LOGIN_CREDENTIAL
         data = json.dumps({"username": username, "password": password})
-        return login_url, data
+        return login_path, data
 
     def prepare_service_login(
         self,
@@ -195,7 +194,7 @@ class InteractaAPI(Api):
         if service_auth_kid:
             self.service_auth_kid = service_auth_kid
 
-        login_url = f"{self.base_url}{urls.LOGIN_SERVICE}"
+        login_path = urls.LOGIN_SERVICE
         now = datetime.now()
         current_timestamp = time.mktime(now.timetuple())
         expiration_timestamp = time.mktime(
@@ -219,7 +218,7 @@ class InteractaAPI(Api):
         except Exception as e:
             raise e
         data = json.dumps({"jwtAssertion": token})
-        return login_url, data
+        return login_path, data
 
     def prepare_service_login_from_file(self, file_path: str) -> tuple:
         try:
@@ -228,17 +227,26 @@ class InteractaAPI(Api):
             raise e
         return self.prepare_service_login(**data)
 
-    def login(self, url, data):
+    def login(self, path, data):
         try:
-            response = self.call_request(
+            response = self.call_api(
                 "post",
-                url,
+                path=path,
                 headers={
                     "accept": "application/json",
                     "content-type": "application/json",
                 },
                 data=data,
             )
+            # response = self.call_request(
+            #     "post",
+            #     url,
+            #     headers={
+            #         "accept": "application/json",
+            #         "content-type": "application/json",
+            #     },
+            #     data=data,
+            # )
         except InteractaResponseError as e:
             raise InteractaLoginError(str(e))
         result = response.json()
@@ -247,20 +255,16 @@ class InteractaAPI(Api):
         self.access_token = result["accessToken"]
         return self.access_token
 
-    def call_request(self, method: str, url: str, **kwargs):
-        if method not in ["get", "post"]:
-            return False
-        request_method = getattr(requests, method)
-        # print("______________________________________-")
-        # print(url, kwargs)
-        # print("______________________________________-")
-
-        response = request_method(url, **kwargs)
-        if self._log_calls:
-            self._record_log_call(url, kwargs, response)
-        if response.status_code != 200:
-            raise InteractaResponseError(format_response_error(response))
-        return response
+    # def call_request(self, method: str, url: str, **kwargs):
+    #     if method not in ["get", "post"]:
+    #         return False
+    #     request_method = getattr(requests, method)
+    #     response = request_method(url, **kwargs)
+    #     if self._log_calls:
+    #         self._record_log_call(url, kwargs, response)
+    #     if response.status_code != 200:
+    #         raise InteractaResponseError(format_response_error(response))
+    #     return response
 
     @interactapi(schema_out=PostsOut)
     def post_list(
@@ -304,10 +308,10 @@ class InteractaAPI(Api):
         path = f"/admin/data/communities/{community_id}/hashtags"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi
+    @interactapi(schema_out=PostDefinitionOut)
     def community_post_definition_detail(
         self, community_id: str | int, query_url=None, headers: dict = {}
-    ):
+    ) -> PostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 

@@ -146,9 +146,61 @@ class DriveAttachment(InteractaModel):
 class Hashtag(InteractaModel):
     id: int
     name: str | None = None
-    community_id: int
+    community_id: int | None = None
     external_id: str | None = None
     deleted: bool | None = None
+
+
+class EnumValue(InteractaModel):
+    id: int
+    label: str | None = None
+    external_id: str | None = None
+    parent_ids: list[int] | None = None
+    deleted: bool | None = None
+
+
+class FieldDefinition(InteractaModel):
+    id: int
+    name: str | None = None
+    label: str | None = None
+    description: str | None = None
+    type: int | None = None
+    parent_id: int | None = None
+    required: bool | None = None
+    readonly: bool | None = None
+    searchable: bool | None = None
+    sortable: bool | None = None
+    visible_in_preview: bool | None = None
+    visible_in_detail: bool | None = None
+    visible_in_create: bool | None = None
+    visible_in_edit: bool | None = None
+    external_id: str | None = None
+    enum_values: list[EnumValue] | None = None
+    metadata: dict | None = None
+    validations: list[dict] | None = None
+
+
+class PostDefinition(InteractaModel):
+    community_id: int
+    workflow_definition: dict | None = None  # creare model
+    title_enabled: int | None = None
+    description_enabled: int | None = None
+    watchers_enabled: int | None = None
+    watchers_visible_in_preview: bool | None = None
+    manual_author_enabled: bool | None = None
+    hash_tag_enabled: bool | None = None
+    attachment_enabled: bool | None = None
+    like_enabled: bool | None = None
+    offline_Enabled: bool | None = None
+    custom_fields_enabled: bool | None = None
+    attachment_max_size: int | None = None
+    field_definitions: list[FieldDefinition] | None = None
+    hashtags: list[Hashtag] | None = None
+    default_post_visibility: int | None = None
+    post_views: list[dict] | None = None  # creare model
+    community_relations: list[dict] | None = None  # creare model
+    inverse_community_relations: list[dict] | None = None  # creare model
+    acknowledge_task_enabled: bool | None = None
 
 
 # Out Models
@@ -190,6 +242,10 @@ class GroupMembersOut(ItemsOut):
 
 class HashtagsOut(ItemsOut):
     items: list[Hashtag] | None = []
+
+
+class PostDefinitionOut(SchemaOut, PostDefinition):
+    pass
 
 
 # In Models
