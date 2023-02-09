@@ -118,9 +118,9 @@ def to_camel(string: str) -> str:
     return f"{words[0]}{''.join(word.capitalize() for ix, word in enumerate(words[0:]) if ix > 0)}"
 
 
-def interactapi(func=None, *, response_model=None):
+def interactapi(func=None, *, schema_out=None):
     if func is None:
-        return functools.partial(interactapi, response_model=response_model)
+        return functools.partial(interactapi, schema_out=schema_out)
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -128,12 +128,10 @@ def interactapi(func=None, *, response_model=None):
             kwargs["headers"] = self.authorized_header
         else:
             kwargs["headers"].update(self.authorized_header)
-        if "data" in kwargs:
-            kwargs["data"] = kwargs["data"] if not kwargs["data"] else kwargs["data"].json()
         response = func(self, *args, **kwargs)
-        if not response_model:
+        if not schema_out:
             return response
-        result = response_model.parse_obj(response.json())
+        result = schema_out.parse_obj(response.json())
         result._response = response
         return result
 

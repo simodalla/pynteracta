@@ -12,8 +12,16 @@ from requests import Response
 
 from . import urls
 from .exceptions import InteractaError, InteractaLoginError, InteractaResponseError
-from .schemas.models import PostDetailOut, PostIn, PostsOut, UsersOut
-from .schemas.requests import BodyPost, BodyUser
+from .schemas.models import (
+    GroupMembersOut,
+    GroupsOut,
+    HashtagsOut,
+    PostDetailOut,
+    PostIn,
+    PostsOut,
+    UsersOut,
+)
+from .schemas.requests import BodyPost
 
 # from .schemas.responses import ResponsePost, ResponsePosts, ResponseUsers
 from .utils import (
@@ -32,21 +40,30 @@ class Api:
     def __init__(self):
         self.access_token = None
 
-    def call_post(self, path: str, headers: dict = None, data=None):
-        return self.call_api("post", path=path, headers=headers, data=data)
+    def call_post(
+        self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
+    ):
+        if data:
+            data = data.json()
+        else:
+            data = json.dumps({})
 
-    def call_get(self, path: str, headers: dict = None, data=None):
-        return self.call_api("get", path=path, headers=headers, data=data)
+        return self.call_api("post", path=path, query_url=query_url, headers=headers, data=data)
 
-    def call_put(self, path: str, headers: dict = None, data=None):
-        return self.call_api("put", path=path, headers=headers, data=data)
+    def call_get(self, path: str, query_url: str = None, headers: dict = None):
+        return self.call_api("get", path=path, query_url=query_url, headers=headers)
 
-    def call_api(self, method: str, path: str, headers={}, data={}):
+    def call_put(
+        self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
+    ):
+        return self.call_api("put", path=path, query_url=query_url, headers=headers, data=data)
+
+    def call_api(
+        self, method: str, path: str, query_url: str = None, headers={}, data: dict | str = None
+    ):
         url = f"{self.base_url}/external/v2{path}"
         request_method = getattr(requests, method)
         response = request_method(url, headers=headers, data=data)
-        # if self._log_calls:
-        #     self._record_log_call(url, kwargs, response)
         if response.status_code != 200:
             raise InteractaResponseError(format_response_error(response))
         return response
@@ -192,8 +209,6 @@ class InteractaAPI(Api):
             "exp": expiration_timestamp,
         }
         headers = {"kid": self.service_auth_kid, "typ": None}
-        # print("**** 2")
-        # print(payload, headers)
         try:
             token = jwt.encode(
                 payload,
@@ -204,8 +219,6 @@ class InteractaAPI(Api):
         except Exception as e:
             raise e
         data = json.dumps({"jwtAssertion": token})
-        # print("**** 3")
-        # print(data)
         return login_url, data
 
     def prepare_service_login_from_file(self, file_path: str) -> tuple:
@@ -238,6 +251,10 @@ class InteractaAPI(Api):
         if method not in ["get", "post"]:
             return False
         request_method = getattr(requests, method)
+        # print("______________________________________-")
+        # print(url, kwargs)
+        # print("______________________________________-")
+
         response = request_method(url, **kwargs)
         if self._log_calls:
             self._record_log_call(url, kwargs, response)
@@ -245,28 +262,54 @@ class InteractaAPI(Api):
             raise InteractaResponseError(format_response_error(response))
         return response
 
-    @interactapi(response_model=PostsOut)
-    def post_list(self, community_id, query_url=None, headers: dict = {}, data: BodyPost = None):
+    @interactapi(schema_out=PostsOut)
+    def post_list(
+        self, community_id: str | int, query_url=None, headers: dict = {}, data: BodyPost = None
+    ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi(response_model=PostDetailOut)
-    def post_detail(self, post_id, query_url=None, headers: dict = {}, data: dict = None):
+    @interactapi(schema_out=PostDetailOut)
+    def post_detail(
+        self, post_id: str | int, query_url=None, headers: dict = {}
+    ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
-        return self.call_get(path=path, headers=headers, data=data)
+        return self.call_get(path=path, query_url=query_url, headers=headers)
 
-    @interactapi(response_model=UsersOut)
-    def list_users(
-        self, query_url=None, headers: dict = {}, data: BodyUser = None
+    @interactapi(schema_out=UsersOut)
+    def user_list(
+        self, query_url=None, headers: dict = {}, data: dict = None
     ) -> UsersOut | Response:
         path = "/admin/data/users"
-        return self.call_post(path=path, headers=headers, data=data)
-        # url = f"{self.base_url}/external/v2/admin/data/users"
-        # headers = self.authorized_header
-        # data = data if not data else data.json()
-        # response = self.call_request("post", url, headers=headers, data=data)
-        # result = ResponseUsers.parse_obj(response.json())
-        # return result
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    @interactapi(schema_out=GroupMembersOut)
+    def group_member_list(
+        self, group_id: str | int, query_url=None, headers: dict = {}, data: dict = {}
+    ) -> GroupMembersOut | Response:
+        path = f"/admin/data/groups/{group_id}/members"
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    @interactapi(schema_out=GroupsOut)
+    def group_list(
+        self, query_url=None, headers: dict = {}, data: dict = {}
+    ) -> GroupsOut | Response:
+        path = "/admin/data/groups"
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    @interactapi(schema_out=HashtagsOut)
+    def hashtag_list(
+        self, community_id: str | int, query_url=None, headers: dict = {}, data: dict = {}
+    ) -> GroupsOut | Response:
+        path = f"/admin/data/communities/{community_id}/hashtags"
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    @interactapi
+    def community_post_definition_detail(
+        self, community_id: str | int, query_url=None, headers: dict = {}
+    ):
+        path = f"/communication/settings/communities/{community_id}/post-definition"
+        return self.call_get(path=path, query_url=query_url, headers=headers)
 
     def create_post(self, community_id, payload: PostIn) -> Response:
         url = f"{self.base_url}/external/v2/communication/posts/manage/create-post/{community_id}"
@@ -275,45 +318,6 @@ class InteractaAPI(Api):
         data = payload.json()
         response = self.call_request("post", url, headers=headers, data=data)
         return response.json()
-
-    def get_group_members(self, group_id, data={}):
-        url = f"{self.base_url}/external/v2/admin/data/groups/{group_id}/members"
-        headers = self.authorized_header
-        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
-        return response
-
-    def get_groups(self, data={}):
-        url = f"{self.base_url}/external/v2/admin/data/groups"
-        headers = self.authorized_header
-        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
-        return response
-
-    def get_users(self, data={}):
-        url = f"{self.base_url}/external/v2/admin/data/users"
-        headers = self.authorized_header
-        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
-        return response
-
-    def get_hastags(self, community_id, data={}):
-        url = f"{self.base_url}/external/v2/admin/data/communities/{community_id}/hashtags"
-        headers = self.authorized_header
-        response = self.call_request("post", url, headers=headers, data=json.dumps(data))
-        return response
-
-    def get_community_post_definition(self, community_id, data={}):
-        url = (
-            f"{self.base_url}/external/v2/communication/settings/"
-            f"communities/{community_id}/post-definition"
-        )
-        headers = self.authorized_header
-        try:
-            response = self.call_request("get", url, headers=headers, data=data)
-        except InteractaError as e:
-            raise e
-        return response.json()
-        # result = ResponsePosts.parse_obj(response.json())
-        # result = response.json()
-        # return result
 
 
 class PlaygroundApi(InteractaAPI):

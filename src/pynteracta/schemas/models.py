@@ -39,13 +39,24 @@ class Timezone(InteractaModel):
     description: str | None
 
 
+class Group(InteractaModel):
+    id: int
+    name: str = ""
+    email: str | None
+    visible: bool | None
+    deleted: bool | None
+    external_id: str | None
+    occ_token: int | None
+    members_count: int | None
+
+
 class User(InteractaModel):
     id: int
     first_name: str = ""
     last_name: str = ""
-    contact_rmail: str | None
-    google_acountId: str | None
-    microsoft_accountId: str | None
+    contact_email: str | None
+    google_account_id: str | None
+    microsoft_account_id: str | None
     service_account: bool | None
     system_account: bool | None
     activeDWD: bool | None
@@ -58,35 +69,35 @@ class User(InteractaModel):
 
 
 class UserProfile(User):
-    highResAccountPhotoUrl: str | None
-    accountPhotoUrl: str | None
-    customPhotoUrl: str | None
-    googlePhotoUrl: str | None
-    microsoftPhotoUrl: str | None
-    privateEmail: str | None
-    privateEmailVerified: bool | None
+    high_res_account_photo_url: str | None
+    account_photo_url: str | None
+    custom_photo_url: str | None
+    google_photo_url: str | None
+    microsoft_photo_url: str | None
+    private_email: str | None
+    private_email_verified: bool | None
     phone: str | None
-    internalPhone: str | None
-    mobilePhone: str | None
+    internal_phone: str | None
+    mobile_phone: str | None
     place: str | None
     biography: str | None
-    businessUnit: BusinessUnit | None
+    business_unit: BusinessUnit | None
     area: Area | None
     role: str | None
     manager: User | None
     employees: list[User] | None
     language: Language | None
     timezone: Timezone | None
-    emailNotificationsEnabled: bool | None
-    occToken: int | None
-    canManageProfilePhoto: bool | None
-    editProfile: bool | None
+    email_notifications_enabled: bool | None
+    occ_token: int | None
+    can_manage_profile_photo: bool | None
+    edit_profile: bool | None
 
 
 class UserFull(User):
-    loginProviders: list[str] | None
-    lastAccessTimestamp: datetime | None
-    userProfileInfo: UserProfile | None
+    login_providers: list[str] | None
+    last_access_timestamp: datetime | None
+    user_profile_info: UserProfile | None
 
 
 class Post(InteractaModel):
@@ -124,12 +135,20 @@ class Post(InteractaModel):
     cover_image: dict | None = None
 
 
-class DriveAttachment(BaseModel):
-    driveId: str = ""
-    mimeType: str | None = None
+class DriveAttachment(InteractaModel):
+    drive_id: str = ""
+    mime_type: str | None = None
     size: int | None = None
-    webViewLink: str | None = None
-    webContentLink: str | None = None
+    web_view_link: str | None = None
+    web_content_link: str | None = None
+
+
+class Hashtag(InteractaModel):
+    id: int
+    name: str | None = None
+    community_id: int
+    external_id: str | None = None
+    deleted: bool | None = None
 
 
 # Out Models
@@ -159,6 +178,18 @@ class PostDetailOut(SchemaOut, Post):
 
 class UsersOut(ItemsOut):
     items: list[UserFull] | None
+
+
+class GroupsOut(ItemsOut):
+    items: list[Group] | None = []
+
+
+class GroupMembersOut(ItemsOut):
+    items: list[User] | None = []
+
+
+class HashtagsOut(ItemsOut):
+    items: list[Hashtag] | None = []
 
 
 # In Models
