@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import jwt
 import requests
+from pydantic import BaseModel
 from requests import Response
 
 from . import urls
@@ -43,7 +44,10 @@ class Api:
         self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
     ):
         if data:
-            data = data.json()
+            if isinstance(data, BaseModel):
+                data = data.json()
+            else:
+                data = json.dumps(data)
         else:
             data = json.dumps({})
 
@@ -60,9 +64,13 @@ class Api:
     def call_api(
         self, method: str, path: str, query_url: str = None, headers={}, data: dict | str = None
     ):
-        # url = f"{self.base_url}/external/v2{path}"
         url = f"{self.base_url}{path}"
         request_method = getattr(requests, method)
+        # print("------------------------------")
+        # print(f"url --> {url}")
+        # print(f"headaers --> {headers}")
+        # print(f"data --> {data}")
+        # print("------------------------------")
         response = request_method(url, headers=headers, data=data)
         if response.status_code != 200:
             raise InteractaResponseError(format_response_error(response))
@@ -161,15 +169,26 @@ class InteractaAPI(Api):
             "content-type": "application/json",
         }
 
-    def _record_log_call(self, url: str, kwargs: dict = {}, response=None):
-        log_data = {
-            "url": url,
-            "kwargs": kwargs,
-            "status_code": response.status_code,
-        }
-        if self._log_call_responses:
-            log_data["content"] = response.content
-        self._call_stack[len(self._call_stack) + 1] = log_data
+    # def _record_log_call(self, url: str, kwargs: dict = {}, response=None):
+    #     log_data = {
+    #         "url": url,
+    #         "kwargs": kwargs,
+    #         "status_code": response.status_code,
+    #     }
+    #     if self._log_call_responses:
+    #         log_data["content"] = response.content
+    #     self._call_stack[len(self._call_stack) + 1] = log_data
+
+    # def call_request(self, method: str, url: str, **kwargs):
+    #     if method not in ["get", "post"]:
+    #         return False
+    #     request_method = getattr(requests, method)
+    #     response = request_method(url, **kwargs)
+    #     if self._log_calls:
+    #         self._record_log_call(url, kwargs, response)
+    #     if response.status_code != 200:
+    #         raise InteractaResponseError(format_response_error(response))
+    #     return response
 
     def prepare_credentials_login(self, username: str = "", password: str = ""):
         username = username if username else os.getenv("INTERACTA_USERNAME", "")
@@ -238,15 +257,6 @@ class InteractaAPI(Api):
                 },
                 data=data,
             )
-            # response = self.call_request(
-            #     "post",
-            #     url,
-            #     headers={
-            #         "accept": "application/json",
-            #         "content-type": "application/json",
-            #     },
-            #     data=data,
-            # )
         except InteractaResponseError as e:
             raise InteractaLoginError(str(e))
         result = response.json()
@@ -254,17 +264,6 @@ class InteractaAPI(Api):
             raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
         self.access_token = result["accessToken"]
         return self.access_token
-
-    # def call_request(self, method: str, url: str, **kwargs):
-    #     if method not in ["get", "post"]:
-    #         return False
-    #     request_method = getattr(requests, method)
-    #     response = request_method(url, **kwargs)
-    #     if self._log_calls:
-    #         self._record_log_call(url, kwargs, response)
-    #     if response.status_code != 200:
-    #         raise InteractaResponseError(format_response_error(response))
-    #     return response
 
     @interactapi(schema_out=PostsOut)
     def post_list(
@@ -315,13 +314,13 @@ class InteractaAPI(Api):
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
-    def create_post(self, community_id, payload: PostIn) -> Response:
-        url = f"{self.base_url}/external/v2/communication/posts/manage/create-post/{community_id}"
-        headers = self.authorized_header
-        response = requests.get(url, headers=headers)
-        data = payload.json()
-        response = self.call_request("post", url, headers=headers, data=data)
-        return response.json()
+    @interactapi
+    def create_post(
+        self, community_id, query_url=None, headers: dict = {}, data: PostIn = None
+    ) -> Response:
+        path = f"/communication/posts/manage/create-post/{community_id}"
+        # data = data.json()
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
 
 class PlaygroundApi(InteractaAPI):
