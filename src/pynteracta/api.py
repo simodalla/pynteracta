@@ -12,11 +12,19 @@ from pydantic import BaseModel
 from requests import Response
 
 from . import urls
-from .exceptions import InteractaError, InteractaLoginError, InteractaResponseError
+from .exceptions import (
+    InteractaError,
+    InteractaLoginError,
+    InteractaResponseError,
+    MultipleObjectsReturned,
+    PostDoesNotFound,
+)
 from .schemas.models import (
     GroupMembersOut,
     GroupsOut,
     HashtagsOut,
+    Post,
+    PostCreatedOut,
     PostDefinitionOut,
     PostDetailOut,
     PostIn,
@@ -279,6 +287,36 @@ class InteractaAPI(Api):
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
+    @interactapi(schema_out=PostCreatedOut)
+    def create_post(
+        self, community_id, query_url=None, headers: dict = {}, data: PostIn = None
+    ) -> PostCreatedOut | Response:
+        path = f"/communication/posts/manage/create-post/{community_id}"
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    def get_post_by_title(self, community_id: int, title: str) -> Post | None:
+        search = BodyPost(title=title)
+        result = self.post_list(community_id, data=search)
+        posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
+        if len(posts) == 0:
+            # raise PostDoesNotFound(f"{title} non found in interacta", result._response)
+            raise PostDoesNotFound(f"{title} non found in interacta")
+        elif len(posts) > 1:
+            # raise MultipleObjectsReturned(f"{title} non found in interacta", result._response)
+            raise MultipleObjectsReturned(f"{title} non found in interacta")
+        return posts[0]
+
+    def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
+        search = BodyPost(title=title)
+        result = self.post_list(community_id, data=search)
+        if result.count() == 1 and result.items[0].title.strip().lower() == title.lower():
+            return result.items[0]
+        if result.count() > 1:
+            for item in result.items:
+                if item.title.strip().lower() == title.lower():
+                    return item
+        raise PostDoesNotFound(f"{title} non found in interacta", result._response)
+
     @interactapi(schema_out=UsersOut)
     def user_list(
         self, query_url=None, headers: dict = {}, data: dict = None
@@ -313,14 +351,6 @@ class InteractaAPI(Api):
     ) -> PostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
-
-    @interactapi
-    def create_post(
-        self, community_id, query_url=None, headers: dict = {}, data: PostIn = None
-    ) -> Response:
-        path = f"/communication/posts/manage/create-post/{community_id}"
-        # data = data.json()
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
 
 class PlaygroundApi(InteractaAPI):

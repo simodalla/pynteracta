@@ -11,6 +11,11 @@ class InteractaModel(BaseModel):
         alias_generator = to_camel
 
 
+class Link(BaseModel):
+    label: str = ""
+    url: str = ""
+
+
 class SchemaOut(InteractaModel):
     _response: Any = PrivateAttr(None)
 
@@ -101,8 +106,8 @@ class UserFull(User):
 
 
 class Post(InteractaModel):
-    id: int
-    community_id: int
+    id: int = 0
+    community_id: int = 0
     custom_id: str | None = None
     title: str = ""
     description_plain_text: str | None = None
@@ -180,7 +185,7 @@ class FieldDefinition(InteractaModel):
     validations: list[dict] | None = None
 
 
-class PostDefinition(InteractaModel):
+class CommunityDefinition(InteractaModel):
     community_id: int
     workflow_definition: dict | None = None  # creare model
     title_enabled: int | None = None
@@ -203,20 +208,7 @@ class PostDefinition(InteractaModel):
     acknowledge_task_enabled: bool | None = None
 
 
-# Out Models
-
-
-class ItemsOut(SchemaOut):
-    items: list | None = []
-    next_page_token: str | None = None
-    total_items_count: int | None = None
-
-
-class PostsOut(ItemsOut):
-    items: list[Post] | None = []
-
-
-class PostDetailOut(SchemaOut, Post):
+class PostDetail(Post):
     current_workflow_state: Any | None = None
     current_workflow_screen_data: Any | None = None
     mentions: Any | None = None
@@ -226,6 +218,33 @@ class PostDetailOut(SchemaOut, Post):
     watcher_groups: list[dict] | None = None  # <-- creare model
     hashtags: list[dict] | None = None  # <-- creare model
     attachments_count: int | None = None
+
+
+# Out Models
+
+
+class ItemsOut(SchemaOut):
+    items: list | None = []
+    next_page_token: str | None = None
+    total_items_count: int | None = None
+
+    def count(self):
+        if not self.items:
+            return 0
+        return len(self.items)
+
+    def has_items(self):
+        if self.count():
+            return True
+        return False
+
+
+class PostsOut(ItemsOut):
+    items: list[Post] | None = []
+
+
+class PostDetailOut(SchemaOut, PostDetail):
+    pass
 
 
 class UsersOut(ItemsOut):
@@ -244,8 +263,14 @@ class HashtagsOut(ItemsOut):
     items: list[Hashtag] | None = []
 
 
-class PostDefinitionOut(SchemaOut, PostDefinition):
+class PostDefinitionOut(SchemaOut, CommunityDefinition):
     pass
+
+
+class PostCreatedOut(SchemaOut):
+    post_id: int
+    next_occ_token: int | None = None
+    post_data: PostDetail | None = None
 
 
 # In Models

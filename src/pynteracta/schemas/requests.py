@@ -5,10 +5,13 @@ class Body(BaseModel):
     pageToken: str | None = None
     pageSize: int | None = None
     calculateTotalItemsCount: bool | None = True
+
+
+class BodyOrdering(Body):
     orderDesc: bool | None = None
 
 
-class BodyPost(Body):
+class BodyPost(BodyOrdering):
     title: str | None = None
     description: str | None = None
     createdByUserId: int | None = None
@@ -42,7 +45,7 @@ class BodyPost(Body):
     pinnedFirst: bool | None = None
 
 
-class BodyUser(Body):
+class BodyUser(BodyOrdering):
     fullTextFilter: str | None
     firstNamePrefixFullTextFilter: str | None
     lastNamePrefixFullTextFilter: str | None
