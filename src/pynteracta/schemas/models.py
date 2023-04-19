@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import datetime as type_datetime
 
 from pydantic import BaseModel, PrivateAttr
 from pydantic.typing import Any
@@ -11,13 +12,13 @@ class InteractaModel(BaseModel):
         alias_generator = to_camel
 
 
+class SchemaOut(InteractaModel):
+    _response: Any = PrivateAttr(None)
+
+
 class Link(BaseModel):
     label: str = ""
     url: str = ""
-
-
-class SchemaOut(InteractaModel):
-    _response: Any = PrivateAttr(None)
 
 
 class BusinessUnit(InteractaModel):
@@ -44,7 +45,14 @@ class Timezone(InteractaModel):
     description: str | None
 
 
+class ZonedDatetime(InteractaModel):
+    zoned_datetime: datetime | None = None
+    local_datetime: datetime | None = None
+    timezone: str | None = None
+
+
 class Group(InteractaModel):
+    # GroupDTO
     id: int
     name: str = ""
     email: str | None
@@ -56,6 +64,7 @@ class Group(InteractaModel):
 
 
 class User(InteractaModel):
+    # UserDTO
     id: int
     first_name: str = ""
     last_name: str = ""
@@ -185,8 +194,17 @@ class FieldDefinition(InteractaModel):
     validations: list[dict] | None = None
 
 
-class CommunityDefinition(InteractaModel):
+class PostDefinition(InteractaModel):
+    # GetPostDefinitionResponseDTO
+    acknowledge_task_enabled: bool | None = None
+    attachment_enabled: bool | None = None
+    attachment_max_size: int | None = None
     community_id: int
+    community_relations: list[dict] | None = None  # creare model
+    custom_fields_enabled: bool | None = None
+    default_post_visibility: int | None = None
+    description_enabled: int | None = None
+    field_definitions: list[FieldDefinition] | None = None
     workflow_definition: dict | None = None  # creare model
     title_enabled: int | None = None
     description_enabled: int | None = None
@@ -197,19 +215,38 @@ class CommunityDefinition(InteractaModel):
     attachment_enabled: bool | None = None
     like_enabled: bool | None = None
     offline_Enabled: bool | None = None
-    custom_fields_enabled: bool | None = None
-    attachment_max_size: int | None = None
-    field_definitions: list[FieldDefinition] | None = None
     hashtags: list[Hashtag] | None = None
     default_post_visibility: int | None = None
     post_views: list[dict] | None = None  # creare model
-    community_relations: list[dict] | None = None  # creare model
     inverse_community_relations: list[dict] | None = None  # creare model
-    acknowledge_task_enabled: bool | None = None
+
+    def get_field_by_id(self, field_id: int) -> FieldDefinition | None:
+        for field in self.field_definitions:
+            # breakpoint()
+            if field_id == field.id:
+                return field
+        return None
+
+    def get_enum_id(self, field_id: int, label: str) -> int | None:
+        field = self.get_field_by_id(field_id=field_id)
+        if not field:
+            return None
+        for option in field.enum_values:
+            if label == option.label:
+                return option.id
+        return None
+
+
+class WorkflowState(InteractaModel):
+    #  PostWorkflowDefinitionStateDTO
+    id: int
+    init_state: bool | None = None
+    name: str = ""
+    metadata: dict = {}
 
 
 class PostDetail(Post):
-    current_workflow_state: Any | None = None
+    current_workflow_state: WorkflowState | None = None
     current_workflow_screen_data: Any | None = None
     mentions: Any | None = None
     comment_mentions: Any | None = None
@@ -218,6 +255,25 @@ class PostDetail(Post):
     watcher_groups: list[dict] | None = None  # <-- creare model
     hashtags: list[dict] | None = None  # <-- creare model
     attachments_count: int | None = None
+
+
+class PostEditableContentData(InteractaModel):
+    title: str = ""
+    description: str | None = ""
+    description_delta: str | None = None
+    visibility: int | None = None
+    custom_data: dict | None = None
+    current_workflow_screen_data: dict | None = None
+    attachments: list[dict] | None = None
+    mentions: list[User] | None = None
+    watchers: list[User] | None = None
+    watchers_users: list[User] | None = None
+    watchers_groups: list[Group] | None = None
+    hashtags: list[Hashtag] | None = None
+    draft: bool | None = None
+    draft_data: dict | None = None
+    scheduled_publication: dict | None = None
+    scheduled_publication_result: int | None = None
 
 
 # Out Models
@@ -263,7 +319,7 @@ class HashtagsOut(ItemsOut):
     items: list[Hashtag] | None = []
 
 
-class PostDefinitionOut(SchemaOut, CommunityDefinition):
+class PostDefinitionOut(SchemaOut, PostDefinition):
     pass
 
 
@@ -273,17 +329,40 @@ class PostCreatedOut(SchemaOut):
     post_data: PostDetail | None = None
 
 
+class GetCustomPostForEditResponse(SchemaOut):
+    # GetCustomPostForEditResponseDTO
+    content_data: PostEditableContentData | None = None
+    occ_token: int
+    community_id: int
+    custom_id: str | None = None
+    current_workflow_state: WorkflowState | None = None
+    creator_user: User | None = None
+    creation_timestamp: datetime | None = None
+    last_modify_user: User | None = None
+    last_modify_timestamp: datetime | None = None
+    last_operation_timestamp: datetime | None = None
+
+
 # In Models
 
 
 class AttachmentIn(BaseModel):
+    # EditCustomPostRequestDTO
+    # InputPostAttachmentDTO
     type: int | None = None
-    attachmentId: int | None = None
+    attachment_id: int | None = None
     name: str | None = None
-    contentRef: str | None = None
-    referencedAttachmentId: int | None = None
-    hashtagIds: list[int] | None = None
+    content_ref: str | None = None  # Il riferimento sul cloudStorage dell'allegato.
+    referenced_attachment_id: int | None = None  # Identificativo dell'allegato di riferimento
+    hashtag_ids: list[int] | None = None
     drive: DriveAttachment | None = None
+
+
+class ZonedDatetimeIn(InteractaModel):
+    # ZonedDatetimeInputDTO
+    datetime: type_datetime = None
+    # datetime: datetime | None = None
+    timezone: str | None = None
 
 
 class PostIn(BaseModel):
@@ -301,3 +380,44 @@ class PostIn(BaseModel):
     # draft: bool | None = None
     # # scheduledPublication --> {"datetime": "string", "timezone": "string"
     # scheduledPublication: dict | None = None
+
+
+# class PostEditableContentData(InteractaModel):
+#     title: str = ""
+#     description: str | None = ""
+#     description_delta: str | None = None
+#     visibility: int | None = None
+#     custom_data: dict | None = None
+#     current_workflow_screen_data: dict | None = None
+#     attachments: list[dict] | None = None
+#     mentions: list[User] | None = None
+#     watchers: list[User] | None = None
+#     watchers_users: list[User] | None = None
+#     watchers_groups: list[Group] | None = None
+#     hashtags: list[Hashtag] | None = None
+#     draft: bool | None = None
+#     draft_data: dict | None = None
+#     scheduled_publication: dict | None = None
+#     scheduled_publication_result: int | None = None
+
+
+class EditCustomPostIn(InteractaModel):
+    # EditCustomPostRequestDTO
+    title: str
+    description: str | None  # Descrizione del post
+    description_format: int = (
+        1  # Formato della descrizione del post, facoltativo (1=delta, 2=markdown, default: 1)
+    )
+    custom_data: dict | None = {}  # Dati custom del post
+    # Formato dei campi custom di tipo 11-delta, facoltativo (1=delta, 2=plain text, default: 1)
+    delta_area_format: int = 1
+    add_attachments: list[AttachmentIn] = []
+    update_attachments: list[AttachmentIn] = []
+    remove_attachment_ids: list[int] = []
+    add_watcher_user_ids: list[int] = []
+    remove_watcher_user_ids: list[int] = []
+    visibility: int | None
+    # Identificativo dello stato iniziale del workflow, se la community lo permette
+    workflow_init_state_id: int | None = None
+    draft: bool = False  # Creazione in stato bozza/pubblicato
+    scheduledPublication: ZonedDatetimeIn | None = None

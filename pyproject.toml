@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pynteracta"
-version = "0.1.5"
+version = "0.1.6"
 description = "A wrapper for Interacta API"
 license = "BSD-3-Clause"
 authors = ["Simone Dalla <simodalla@gmail.com>"]

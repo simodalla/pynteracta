@@ -20,6 +20,8 @@ from .exceptions import (
     PostDoesNotFound,
 )
 from .schemas.models import (
+    EditCustomPostIn,
+    GetCustomPostForEditResponse,
     GroupMembersOut,
     GroupsOut,
     HashtagsOut,
@@ -47,6 +49,7 @@ jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
 class Api:
     def __init__(self):
         self.access_token = None
+        self._log_calls = False
 
     def call_post(
         self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
@@ -74,14 +77,12 @@ class Api:
     ):
         url = f"{self.base_url}{path}"
         request_method = getattr(requests, method)
-        # print("------------------------------")
-        # print(f"url --> {url}")
-        # print(f"headaers --> {headers}")
-        # print(f"data --> {data}")
-        # print("------------------------------")
+        if self._log_calls:
+            log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
+            logger.info(log_msg)
         response = request_method(url, headers=headers, data=data)
         if response.status_code != 200:
-            raise InteractaResponseError(format_response_error(response))
+            raise InteractaResponseError(format_response_error(response), response=response)
         return response
 
 
@@ -187,17 +188,6 @@ class InteractaAPI(Api):
     #         log_data["content"] = response.content
     #     self._call_stack[len(self._call_stack) + 1] = log_data
 
-    # def call_request(self, method: str, url: str, **kwargs):
-    #     if method not in ["get", "post"]:
-    #         return False
-    #     request_method = getattr(requests, method)
-    #     response = request_method(url, **kwargs)
-    #     if self._log_calls:
-    #         self._record_log_call(url, kwargs, response)
-    #     if response.status_code != 200:
-    #         raise InteractaResponseError(format_response_error(response))
-    #     return response
-
     def prepare_credentials_login(self, username: str = "", password: str = ""):
         username = username if username else os.getenv("INTERACTA_USERNAME", "")
         password = password if password else os.getenv("INTERACTA_PASSWORD", "")
@@ -285,7 +275,10 @@ class InteractaAPI(Api):
         self, post_id: str | int, query_url=None, headers: dict = {}
     ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
-        return self.call_get(path=path, query_url=query_url, headers=headers)
+        try:
+            return self.call_get(path=path, query_url=query_url, headers=headers)
+        except InteractaResponseError as e:
+            raise PostDoesNotFound(f"Post with id '{post_id}' non found in interacta: {e}")
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
@@ -294,28 +287,43 @@ class InteractaAPI(Api):
         path = f"/communication/posts/manage/create-post/{community_id}"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
+    @interactapi(schema_out=GetCustomPostForEditResponse)
+    def post_data_for_edit(
+        self, post_id, query_url=None, headers: dict = {}
+    ) -> GetCustomPostForEditResponse | Response:
+        path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
+        return self.call_get(path=path, query_url=query_url, headers=headers)
+
+    @interactapi()
+    def edit_post(
+        self, post_id, occ_token, query_url=None, headers: dict = {}, data: EditCustomPostIn = None
+    ) -> Response:
+        path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
+        return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
+
     def get_post_by_title(self, community_id: int, title: str) -> Post | None:
         search = BodyPost(title=title)
         result = self.post_list(community_id, data=search)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
-            # raise PostDoesNotFound(f"{title} non found in interacta", result._response)
-            raise PostDoesNotFound(f"{title} non found in interacta")
+            raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
         elif len(posts) > 1:
-            # raise MultipleObjectsReturned(f"{title} non found in interacta", result._response)
-            raise MultipleObjectsReturned(f"{title} non found in interacta")
+            raise MultipleObjectsReturned(
+                f"Multiple post with '{title}' in title founded in interacta"
+            )
         return posts[0]
 
     def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
         search = BodyPost(title=title)
         result = self.post_list(community_id, data=search)
-        if result.count() == 1 and result.items[0].title.strip().lower() == title.lower():
-            return result.items[0]
-        if result.count() > 1:
-            for item in result.items:
-                if item.title.strip().lower() == title.lower():
-                    return item
-        raise PostDoesNotFound(f"{title} non found in interacta", result._response)
+        posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
+        if len(posts) == 0:
+            raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
+        elif len(posts) > 1:
+            raise MultipleObjectsReturned(
+                f"Multiple post with title '{title}' founded in interacta"
+            )
+        return posts[0]
 
     @interactapi(schema_out=UsersOut)
     def user_list(
@@ -350,6 +358,12 @@ class InteractaAPI(Api):
         self, community_id: str | int, query_url=None, headers: dict = {}
     ) -> PostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
+        return self.call_get(path=path, query_url=query_url, headers=headers)
+
+    def catalog_for_edit_detail(
+        self, catalog_id: str | int, query_url=None, headers: dict = {}
+    ) -> PostDefinitionOut | Response:
+        path = f"/admin/manage/catalogs/{catalog_id}/edit"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
 
