@@ -127,7 +127,7 @@ class TestInteractaAPI:
 
         with pytest.raises(InteractaLoginError) as excinfo:
             api = InteractaAPI(base_url=url)
-            api.login(url=url, data={})
+            api.login(url=url, payload={})
 
         assert f"url: {url}" in str(excinfo.value)
 
@@ -139,7 +139,7 @@ class TestInteractaAPI:
         mocked_responses.post(url, status=200, json=fake_json)
         with pytest.raises(InteractaLoginError) as excinfo:
             api = InteractaAPI(base_url=url)
-            api.login(url=url, data={})
+            api.login(url=url, payload={})
 
         assert f"url: {url}" in str(excinfo.value)
         assert "No accessToken" in str(excinfo.value)
