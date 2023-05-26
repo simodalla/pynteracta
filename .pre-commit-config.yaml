@@ -2,7 +2,7 @@ exclude: "docs|node_modules|migrations|.git|.tox"
 default_stages: [commit]
 fail_fast: true
 default_language_version:
-  python: python3.10
+  python: python3.11
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -17,14 +17,14 @@ repos:
     rev: v3.0.0
     hooks:
       - id: pyupgrade
-        args: [--py310-plus]
+        args: [--py311-plus]
 
   - repo: https://github.com/psf/black
     rev: 22.8.0
     hooks:
       - id: black
 
-  - repo: https://gitlab.com/pycqa/flake8
+  - repo: https://github.com/pycqa/flake8
     rev: 5.0.4
     hooks:
       - id: flake8
