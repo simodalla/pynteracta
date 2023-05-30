@@ -1,5 +1,6 @@
 from datetime import datetime
 from datetime import datetime as type_datetime
+from enum import IntEnum
 
 from pydantic import BaseModel, PrivateAttr
 from pydantic.typing import Any
@@ -173,12 +174,30 @@ class EnumValue(InteractaModel):
     deleted: bool | None = None
 
 
+class FieldTypeEnum(IntEnum):
+    INT = 1
+    BIGINT = 2
+    DECIMAL = 3
+    DATE = 4
+    DATETIME = 5
+    STRING = 6
+    ENUM = 7
+    ENUM_LIST = 8
+    TEXT_AREA = 9
+    FLAG = 10
+    DELTA_AREA = 11
+    FEEDBACK = 12
+    HIERARCHICAL_ENUM = 13
+    LINK = 14
+    GENERIC_ENTITY_LIST = 15
+
+
 class FieldDefinition(InteractaModel):
     id: int
     name: str | None = None
     label: str | None = None
     description: str | None = None
-    type: int | None = None
+    type: FieldTypeEnum | None = None
     parent_id: int | None = None
     required: bool | None = None
     readonly: bool | None = None
@@ -195,7 +214,6 @@ class FieldDefinition(InteractaModel):
 
 
 class PostDefinition(InteractaModel):
-    # GetPostDefinitionResponseDTO
     acknowledge_task_enabled: bool | None = None
     attachment_enabled: bool | None = None
     attachment_max_size: int | None = None
@@ -222,7 +240,6 @@ class PostDefinition(InteractaModel):
 
     def get_field_by_id(self, field_id: int) -> FieldDefinition | None:
         for field in self.field_definitions:
-            # breakpoint()
             if field_id == field.id:
                 return field
         return None
@@ -235,6 +252,9 @@ class PostDefinition(InteractaModel):
             if label == option.label:
                 return option.id
         return None
+
+    def get_fields_id(self):
+        return [field.id for field in self.field_definitions]
 
 
 class WorkflowState(InteractaModel):
@@ -274,6 +294,24 @@ class PostEditableContentData(InteractaModel):
     draft_data: dict | None = None
     scheduled_publication: dict | None = None
     scheduled_publication_result: int | None = None
+
+
+class Community(InteractaModel):
+    # -- GetCommunityDetailsResponseDTO
+    draft: bool | None = None  # Se true community non ancora pubblicata.
+    admin_capabilities: dict | None = None
+    operational_capabilities: dict | None = None
+    # Link temporaneo download immagine di copertina della community.
+    cover_image_temporary_content_view_link: str | None = None
+    name: str | None = None  # Nome della community.
+    workspace_id: int | None = None  # Id workspace di appartenenza.
+    color_code: str | None = None  # Colore community.
+    etag: int | None = None  # ETag
+    members_count: int | None = None  # Numero membri community.
+    creation_timestamp: int | None = None  # Istante creazione
+    creator_user: User | None = None
+    id: int | None = None  # Identificativo univoco della community.
+    description: str | None = None  # Descrizione della community.
 
 
 # Out Models
@@ -319,10 +357,6 @@ class HashtagsOut(ItemsOut):
     items: list[Hashtag] | None = []
 
 
-class PostDefinitionOut(SchemaOut, PostDefinition):
-    pass
-
-
 class PostCreatedOut(SchemaOut):
     post_id: int
     next_occ_token: int | None = None
@@ -330,7 +364,7 @@ class PostCreatedOut(SchemaOut):
 
 
 class GetCustomPostForEditResponse(SchemaOut):
-    # GetCustomPostForEditResponseDTO
+    # -- GetCustomPostForEditResponseDTO
     content_data: PostEditableContentData | None = None
     occ_token: int
     community_id: int
@@ -341,6 +375,15 @@ class GetCustomPostForEditResponse(SchemaOut):
     last_modify_user: User | None = None
     last_modify_timestamp: datetime | None = None
     last_operation_timestamp: datetime | None = None
+
+
+class GetPostDefinitionResponse(SchemaOut, PostDefinition):
+    # -- GetPostDefinitionResponseDTO
+    pass
+
+
+class GetCommunityDetailsResponse(SchemaOut):
+    community: Community | None = None
 
 
 # In Models

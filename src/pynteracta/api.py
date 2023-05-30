@@ -21,13 +21,14 @@ from .exceptions import (
 )
 from .schemas.models import (
     EditCustomPostIn,
+    GetCommunityDetailsResponse,
     GetCustomPostForEditResponse,
+    GetPostDefinitionResponse,
     GroupMembersOut,
     GroupsOut,
     HashtagsOut,
     Post,
     PostCreatedOut,
-    PostDefinitionOut,
     PostDetailOut,
     PostIn,
     PostsOut,
@@ -353,18 +354,25 @@ class InteractaAPI(Api):
         path = f"/admin/data/communities/{community_id}/hashtags"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi(schema_out=PostDefinitionOut)
+    @interactapi(schema_out=GetPostDefinitionResponse)
     def community_post_definition_detail(
         self, community_id: str | int, query_url=None, headers: dict = {}
-    ) -> PostDefinitionOut | Response:
+    ) -> GetPostDefinitionResponse | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
-    def catalog_for_edit_detail(
-        self, catalog_id: str | int, query_url=None, headers: dict = {}
-    ) -> PostDefinitionOut | Response:
-        path = f"/admin/manage/catalogs/{catalog_id}/edit"
+    @interactapi(schema_out=GetCommunityDetailsResponse)
+    def community_detail(
+        self, community_id: str | int, query_url=None, headers: dict = {}
+    ) -> GetCommunityDetailsResponse | Response:
+        path = f"/communication/settings/communities/{community_id}/details"
         return self.call_get(path=path, query_url=query_url, headers=headers)
+
+    # def catalog_for_edit_detail(
+    #     self, catalog_id: str | int, query_url=None, headers: dict = {}
+    # ) -> PostDefinitionOut | Response:
+    #     path = f"/admin/manage/catalogs/{catalog_id}/edit"
+    #     return self.call_get(path=path, query_url=query_url, headers=headers)
 
 
 class PlaygroundApi(InteractaAPI):

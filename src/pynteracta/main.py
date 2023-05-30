@@ -117,3 +117,6 @@ def list_posts(
         rich.print("[bold red]Sembra ci sia un problema. Effettua il login![/bold red]")
         typer.Exit(code=1)
     rich.print(api.table_list_posts(api.get_posts(community_id=community)))
+
+
+# @app
