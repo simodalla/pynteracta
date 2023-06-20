@@ -20,6 +20,7 @@ from .exceptions import (
     PostDoesNotFound,
 )
 from .schemas.models import (
+    CreateCustomPostIn,
     EditCustomPostIn,
     GetCommunityDetailsResponse,
     GetCustomPostForEditResponse,
@@ -31,7 +32,6 @@ from .schemas.models import (
     Post,
     PostCreatedOut,
     PostDetailOut,
-    PostIn,
     PostsOut,
     UsersOut,
 )
@@ -291,7 +291,7 @@ class InteractaAPI(Api):
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
-        self, community_id, query_url=None, headers: dict = {}, data: PostIn = None
+        self, community_id, query_url=None, headers: dict = {}, data: CreateCustomPostIn = None
     ) -> PostCreatedOut | Response:
         path = f"/communication/posts/manage/create-post/{community_id}"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)

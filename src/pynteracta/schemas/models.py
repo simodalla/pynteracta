@@ -153,6 +153,12 @@ class Hashtag(InteractaModel):
     deleted: bool | None = None
 
 
+class ZonedDatetimeIn(InteractaModel):
+    # ZonedDatetimeInputDTO
+    datetime: type_datetime = None
+    timezone: str | None = None
+
+
 class PostAttachmentData(InteractaModel):
     # PostAttachmentDataDTO ##OK##
     id: int
@@ -176,7 +182,16 @@ class PostAttachmentData(InteractaModel):
     drive: dict | None = None
 
 
+class PostWorkflowDefinitionState(InteractaModel):
+    #  PostWorkflowDefinitionStateDTO
+    id: int
+    init_state: bool | None = None
+    name: str = ""
+    metadata: dict = {}
+
+
 class Post(InteractaModel):
+    # ROOT
     id: int = 0
     community_id: int = 0
     custom_id: str | None = None
@@ -213,7 +228,37 @@ class BaseListPostsElement(Post):
     watchers_count: int | None = None
     viewed_by_me: bool | None = None
     capabilities: dict | None = None
-    cover_image: dict | None = None
+    cover_image: dict | None = None  # PostCoverImageDTO
+
+
+class PostDetail(Post):
+    # PostDetailDTO
+    current_workflow_state: PostWorkflowDefinitionState | None = None
+    current_workflow_screen_data: dict | None = None
+    attachments: dict | None = None  # PostAttachmentDataDTO
+    mentions: list[User] | None = None
+    watchers: list[User] | None = None
+    watcher_users: list[User] | None = None
+    watcher_groups: list[Group] | None = None
+    hashtags: list[Hashtag] | None = None  # HashtagDTO
+    cover_image: dict | None = None  # PostCoverImageDTO
+    draft: bool = False  # Creazione in stato bozza/pubblicato
+    draft_data: dict | None = None  # DraftPostDataDTO
+    scheduled_publication: ZonedDatetimeIn | None = None
+    # Info stato del post programmato [1=SUCCESS, 2=FAILED]
+    scheduled_publication_result: int | None = None
+
+
+class PostDetailOut(SchemaOut, Post):
+    # GetPostDetailResponseDTO
+    current_workflow_state: PostWorkflowDefinitionState | None = None
+    current_workflow_screen_data: dict | None = None
+    mentions: list[User] | None = None
+    comment_mentions: UsersOut | None = None
+    watchers: list[User] | None = None
+    watcher_users: list[User] | None = None
+    watcher_groups: list[Group] | None = None
+    hashtags: list[Hashtag] | None = None
 
 
 class DriveAttachment(InteractaModel):
@@ -324,26 +369,6 @@ class PostDefinition(InteractaModel):
         return [int(field.id) for field in self.field_definitions]
 
 
-class PostWorkflowDefinitionState(InteractaModel):
-    #  PostWorkflowDefinitionStateDTO
-    id: int
-    init_state: bool | None = None
-    name: str = ""
-    metadata: dict = {}
-
-
-class PostDetailOut(SchemaOut, Post):
-    # GetPostDetailResponseDTO
-    current_workflow_state: PostWorkflowDefinitionState | None = None
-    current_workflow_screen_data: dict | None = None
-    mentions: list[User] | None = None
-    comment_mentions: UsersOut | None = None
-    watchers: list[User] | None = None
-    watcher_users: list[User] | None = None
-    watcher_groups: list[Group] | None = None
-    hashtags: list[Hashtag] | None = None
-
-
 class PostEditableContentData(InteractaModel):
     title: str = ""
     description: str | None = ""
@@ -397,7 +422,7 @@ class AcknowledgeTaskFilter(InteractaModel):
     assigned_to_me: bool | None = None
 
 
-# Out Models
+# Out Models #######################################################################################
 
 
 class PostsOut(PagedItemsOut):
@@ -418,9 +443,10 @@ class HashtagsOut(PagedItemsOut):
 
 
 class PostCreatedOut(SchemaOut):
+    # CreatePostResponseDTO
     post_id: int
     next_occ_token: int | None = None
-    post_data: PostDetailOut | None = None
+    post_data: PostDetail | None = None
 
 
 class GetCustomPostForEditResponse(SchemaOut):
@@ -461,28 +487,38 @@ class AttachmentIn(BaseModel):
     drive: DriveAttachmentData | None = None
 
 
-class ZonedDatetimeIn(InteractaModel):
-    # ZonedDatetimeInputDTO
-    datetime: type_datetime = None
-    # datetime: datetime | None = None
-    timezone: str | None = None
-
-
-class PostIn(BaseModel):
+class CustomPostIn(InteractaModel):
+    # ROOT
     title: str
-    description: str | None
-    descriptionFormat: bool | None
-    customData: dict | None
-    deltaAreaFormat: bool | None
-    attachments: list[AttachmentIn] | None
-    watcherUserIds: list[int] | None
-    workflowInitStateId: int | None
+    description: str | None  # Descrizione del post
+    description_format: int = (
+        1  # Formato della descrizione del post, facoltativo (1=delta, 2=markdown, default: 1)
+    )
+    custom_data: dict | None = {}  # Dati custom del post
+    # Formato dei campi custom di tipo 11-delta, facoltativo (1=delta, 2=plain text, default: 1)
+    delta_area_format: int = 1
     visibility: int | None
+    # Identificativo dello stato iniziale del workflow, se la community lo permette
+    workflow_init_state_id: int | None = None
+    draft: bool = False  # Creazione in stato bozza/pubblicato
+    scheduled_publication: ZonedDatetimeIn | None = None
+
+
+class CreateCustomPostIn(CustomPostIn):
+    # CreateCustomPostRequest
+    attachments: list[AttachmentIn] | None
+    watcher_user_ids: list[int] | None
     announcement: bool | None
-    # clientUid: str | None = ""
-    # draft: bool | None = None
-    # # scheduledPublication --> {"datetime": "string", "timezone": "string"
-    # scheduledPublication: dict | None = None
+    client_uid: str | None = None
+
+
+class EditCustomPostIn(CustomPostIn):
+    # EditCustomPostRequestDTO
+    add_attachments: list[AttachmentIn] = []
+    update_attachments: list[AttachmentIn] = []
+    remove_attachment_ids: list[int] = []
+    add_watcher_user_ids: list[int] = []
+    remove_watcher_user_ids: list[int] = []
 
 
 # class PostEditableContentData(InteractaModel):
@@ -502,25 +538,3 @@ class PostIn(BaseModel):
 #     draft_data: dict | None = None
 #     scheduled_publication: dict | None = None
 #     scheduled_publication_result: int | None = None
-
-
-class EditCustomPostIn(InteractaModel):
-    # EditCustomPostRequestDTO
-    title: str
-    description: str | None  # Descrizione del post
-    description_format: int = (
-        1  # Formato della descrizione del post, facoltativo (1=delta, 2=markdown, default: 1)
-    )
-    custom_data: dict | None = {}  # Dati custom del post
-    # Formato dei campi custom di tipo 11-delta, facoltativo (1=delta, 2=plain text, default: 1)
-    delta_area_format: int = 1
-    add_attachments: list[AttachmentIn] = []
-    update_attachments: list[AttachmentIn] = []
-    remove_attachment_ids: list[int] = []
-    add_watcher_user_ids: list[int] = []
-    remove_watcher_user_ids: list[int] = []
-    visibility: int | None
-    # Identificativo dello stato iniziale del workflow, se la community lo permette
-    workflow_init_state_id: int | None = None
-    draft: bool = False  # Creazione in stato bozza/pubblicato
-    scheduledPublication: ZonedDatetimeIn | None = None

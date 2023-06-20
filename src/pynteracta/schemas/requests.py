@@ -1,5 +1,3 @@
-from pydantic import BaseModel
-
 from .models import AcknowledgeTaskFilter, CustomFieldFilter, InteractaModel
 
 
@@ -11,13 +9,6 @@ class InteractaRequestIn(InteractaModel):
 
     class Config:
         validate_assignment = True
-
-
-class Body(BaseModel):
-    pageToken: str | None = None
-    pageSize: int | None = None
-    # Ordinamento decrescente(true)/crescente(false). Default: 'true'
-    calculateTotalItemsCount: bool | None = True
 
 
 class ListCommunityPostsRequestIn(InteractaRequestIn):
@@ -86,12 +77,6 @@ class ListCommunityPostsRequestIn(InteractaRequestIn):
     draft: bool | None = None
     # Ordinamento sui post pinnati. Default: 'true'
     pinned_first: bool | None = None
-
-
-# class ListCommunityPostsRequestIn(InteractaRequestIn):
-#     pageToken: str | None = None
-#     pageSize: int | None = None
-#     calculateTotalItemsCount: bool | None = True
 
 
 # class BodyUser(RequestOrdering):
