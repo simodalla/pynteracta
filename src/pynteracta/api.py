@@ -27,6 +27,7 @@ from .schemas.models import (
     GroupMembersOut,
     GroupsOut,
     HashtagsOut,
+    InteractaModel,
     Post,
     PostCreatedOut,
     PostDetailOut,
@@ -34,7 +35,7 @@ from .schemas.models import (
     PostsOut,
     UsersOut,
 )
-from .schemas.requests import BodyPost
+from .schemas.requests import ListCommunityPostsRequestIn
 from .utils import (
     PLAYGROUND_SETTINGS,
     format_response_error,
@@ -57,7 +58,10 @@ class Api:
     ):
         if data:
             if isinstance(data, BaseModel):
-                data = data.json()
+                if isinstance(data, InteractaModel):
+                    data = data.json(by_alias=True)
+                else:
+                    data = data.json()
             else:
                 data = json.dumps(data)
         else:
@@ -266,7 +270,11 @@ class InteractaAPI(Api):
 
     @interactapi(schema_out=PostsOut)
     def post_list(
-        self, community_id: str | int, query_url=None, headers: dict = {}, data: BodyPost = None
+        self,
+        community_id: str | int,
+        query_url=None,
+        headers: dict = {},
+        data: ListCommunityPostsRequestIn = None,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
@@ -303,7 +311,7 @@ class InteractaAPI(Api):
         return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
 
     def get_post_by_title(self, community_id: int, title: str) -> Post | None:
-        search = BodyPost(title=title)
+        search = ListCommunityPostsRequestIn(title=title)
         result = self.post_list(community_id, data=search)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
@@ -315,7 +323,7 @@ class InteractaAPI(Api):
         return posts[0]
 
     def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
-        search = BodyPost(title=title)
+        search = ListCommunityPostsRequestIn(title=title)
         result = self.post_list(community_id, data=search)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
         if len(posts) == 0:

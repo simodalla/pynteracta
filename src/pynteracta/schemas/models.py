@@ -17,6 +17,22 @@ class SchemaOut(InteractaModel):
     _response: Any = PrivateAttr(None)
 
 
+class PagedItemsOut(SchemaOut):
+    items: list | None = []
+    next_page_token: str | None = None
+    total_items_count: int | None = None
+
+    def count(self):
+        if not self.items:
+            return 0
+        return len(self.items)
+
+    def has_items(self):
+        if self.count():
+            return True
+        return False
+
+
 class Link(BaseModel):
     label: str = ""
     url: str = ""
@@ -53,7 +69,7 @@ class ZonedDatetime(InteractaModel):
 
 
 class Group(InteractaModel):
-    # GroupDTO
+    # GroupDTO ##OK##
     id: int
     name: str = ""
     email: str | None
@@ -65,7 +81,7 @@ class Group(InteractaModel):
 
 
 class User(InteractaModel):
-    # UserDTO
+    # UserDTO ##OK##
     id: int
     first_name: str = ""
     last_name: str = ""
@@ -81,6 +97,11 @@ class User(InteractaModel):
     external_id: str | None
     private_profile: bool | None
     licences: dict | None
+
+
+class UsersOut(PagedItemsOut):
+    # ListUsersResponseDTO ##OK##
+    items: list[User] | None
 
 
 class UserProfile(User):
@@ -115,6 +136,46 @@ class UserFull(User):
     user_profile_info: UserProfile | None
 
 
+class DriveAttachmentData(InteractaModel):
+    # DriveAttachmentDataDTO
+    drive_id: str = ""
+    mime_type: str | None = None
+    size: int | None = None
+    web_view_link: str | None = None
+    web_content_link: str | None = None
+
+
+class Hashtag(InteractaModel):
+    # HashtagDTO ##OK##
+    id: int
+    name: str | None = None
+    external_id: str | None = None
+    deleted: bool | None = None
+
+
+class PostAttachmentData(InteractaModel):
+    # PostAttachmentDataDTO ##OK##
+    id: int
+    temporary_content_view_link: str | None = None
+    temporary_content_download_link: str | None = None
+    temporary_content_preview_image_link: str | None
+    temporary_content_preview_image_animated_link: str | None = None
+    temporary_content_preview_image_hi_res_link: str | None = None
+    temporary_content_preview_image_hi_des_animated_link: str | None = None
+    version_number: int | None = None
+    type: int | None = None
+    content_ref: str | None = None
+    content_mime_type: str | None = None
+    etag: str | None = None
+    md5_hash: str | None = None
+    size: int | None = None
+    creator_user: User | None = None
+    creation_timestamp: int | None = None
+    hashtags: list[Hashtag] = []
+    reference: bool = False
+    drive: dict | None = None
+
+
 class Post(InteractaModel):
     id: int = 0
     community_id: int = 0
@@ -124,28 +185,33 @@ class Post(InteractaModel):
     description_delta: str | None = None
     visibility: int | None = None
     announcement: bool | None = None
-    workflow_state_description: str | None = None
-    workflow_state_color: str | None = None
     custom_data: Any | None = None
     creator_user: User | None = None
     creation_timestamp: datetime | None = None
     last_modify_user: User | None = None
     last_modify_timestamp: datetime | None = None
     last_operation_timestamp: datetime | None = None
-    main_attachment: dict | None = None
-    watchers_count: int | None = None
+    main_attachment: PostAttachmentData | None = None
+    attachments_count: int | None = None
     image_attachments_count: int | None = None
     video_attachments_count: int | None = None
     comments_count: int | None = None
-    tasks_count: int | None = None
-    total_standard_tasks_count: int | None = None
     views_count: int | None = None
     viewed_by_users_count: int | None = None
     show_like_section: bool | None = None
     likes_count: int | None = None
-    viewed_by_me: bool | None = None
     liked_by_me: bool | None = None
+    tasks_count: int | None = None
     followed_by_me: bool | None = None
+    total_standard_tasks_count: int | None = None
+
+
+class BaseListPostsElement(Post):
+    # BaseListPostsElementDTO
+    workflow_state_description: str | None = None
+    workflow_state_color: str | None = None
+    watchers_count: int | None = None
+    viewed_by_me: bool | None = None
     capabilities: dict | None = None
     cover_image: dict | None = None
 
@@ -253,11 +319,12 @@ class PostDefinition(InteractaModel):
                 return option.id
         return None
 
-    def get_fields_id(self):
-        return [field.id for field in self.field_definitions]
+    @property
+    def custom_fields_ids(self) -> list[int]:
+        return [int(field.id) for field in self.field_definitions]
 
 
-class WorkflowState(InteractaModel):
+class PostWorkflowDefinitionState(InteractaModel):
     #  PostWorkflowDefinitionStateDTO
     id: int
     init_state: bool | None = None
@@ -265,16 +332,16 @@ class WorkflowState(InteractaModel):
     metadata: dict = {}
 
 
-class PostDetail(Post):
-    current_workflow_state: WorkflowState | None = None
-    current_workflow_screen_data: Any | None = None
-    mentions: Any | None = None
-    comment_mentions: Any | None = None
+class PostDetailOut(SchemaOut, Post):
+    # GetPostDetailResponseDTO
+    current_workflow_state: PostWorkflowDefinitionState | None = None
+    current_workflow_screen_data: dict | None = None
+    mentions: list[User] | None = None
+    comment_mentions: UsersOut | None = None
     watchers: list[User] | None = None
     watcher_users: list[User] | None = None
-    watcher_groups: list[dict] | None = None  # <-- creare model
-    hashtags: list[dict] | None = None  # <-- creare model
-    attachments_count: int | None = None
+    watcher_groups: list[Group] | None = None
+    hashtags: list[Hashtag] | None = None
 
 
 class PostEditableContentData(InteractaModel):
@@ -314,53 +381,46 @@ class Community(InteractaModel):
     description: str | None = None  # Descrizione della community.
 
 
+class CustomFieldFilter(InteractaModel):
+    # CustomFieldFilterDTO
+    # Identificativo univoco del campo del post.
+    column_id: int | None = None
+    # ipo di ricerca [1=EQUAL, 2=INTERVAL, 3=LIKE, 4=IN, 5=CONTAINS, 6=IS_NULL_OR_IN, 7=IS_EMPTY].
+    type_id: int | None = None
+    # Parametri del filtro, ove necessari.
+    parameters: list[dict] = None
+
+
+class AcknowledgeTaskFilter(InteractaModel):
+    # AcknowledgeTaskFilterDTO
+    confirmed: bool | None = None
+    assigned_to_me: bool | None = None
+
+
 # Out Models
 
 
-class ItemsOut(SchemaOut):
-    items: list | None = []
-    next_page_token: str | None = None
-    total_items_count: int | None = None
-
-    def count(self):
-        if not self.items:
-            return 0
-        return len(self.items)
-
-    def has_items(self):
-        if self.count():
-            return True
-        return False
+class PostsOut(PagedItemsOut):
+    # PagedListPostsResponseDTO
+    items: list[BaseListPostsElement] | None = []
 
 
-class PostsOut(ItemsOut):
-    items: list[Post] | None = []
-
-
-class PostDetailOut(SchemaOut, PostDetail):
-    pass
-
-
-class UsersOut(ItemsOut):
-    items: list[UserFull] | None
-
-
-class GroupsOut(ItemsOut):
+class GroupsOut(PagedItemsOut):
     items: list[Group] | None = []
 
 
-class GroupMembersOut(ItemsOut):
+class GroupMembersOut(PagedItemsOut):
     items: list[User] | None = []
 
 
-class HashtagsOut(ItemsOut):
+class HashtagsOut(PagedItemsOut):
     items: list[Hashtag] | None = []
 
 
 class PostCreatedOut(SchemaOut):
     post_id: int
     next_occ_token: int | None = None
-    post_data: PostDetail | None = None
+    post_data: PostDetailOut | None = None
 
 
 class GetCustomPostForEditResponse(SchemaOut):
@@ -369,7 +429,7 @@ class GetCustomPostForEditResponse(SchemaOut):
     occ_token: int
     community_id: int
     custom_id: str | None = None
-    current_workflow_state: WorkflowState | None = None
+    current_workflow_state: PostWorkflowDefinitionState | None = None
     creator_user: User | None = None
     creation_timestamp: datetime | None = None
     last_modify_user: User | None = None
@@ -398,7 +458,7 @@ class AttachmentIn(BaseModel):
     content_ref: str | None = None  # Il riferimento sul cloudStorage dell'allegato.
     referenced_attachment_id: int | None = None  # Identificativo dell'allegato di riferimento
     hashtag_ids: list[int] | None = None
-    drive: DriveAttachment | None = None
+    drive: DriveAttachmentData | None = None
 
 
 class ZonedDatetimeIn(InteractaModel):
