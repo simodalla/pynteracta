@@ -29,13 +29,13 @@ from .schemas.models import (
     GroupsOut,
     HashtagsOut,
     InteractaModel,
+    ListSystemUsersOut,
     Post,
     PostCreatedOut,
     PostDetailOut,
     PostsOut,
-    UsersOut,
 )
-from .schemas.requests import ListCommunityPostsRequestIn
+from .schemas.requests import ListCommunityPostsRequestIn, ListSystemUsersRequestIn
 from .utils import (
     PLAYGROUND_SETTINGS,
     format_response_error,
@@ -334,10 +334,10 @@ class InteractaAPI(Api):
             )
         return posts[0]
 
-    @interactapi(schema_out=UsersOut)
+    @interactapi(schema_out=ListSystemUsersOut)
     def user_list(
-        self, query_url=None, headers: dict = {}, data: dict = None
-    ) -> UsersOut | Response:
+        self, query_url=None, headers: dict = {}, data: ListSystemUsersRequestIn = None
+    ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 

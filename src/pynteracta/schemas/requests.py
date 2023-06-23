@@ -79,15 +79,30 @@ class ListCommunityPostsRequestIn(InteractaRequestIn):
     pinned_first: bool | None = None
 
 
-# class BodyUser(RequestOrdering):
-#     fullTextFilter: str | None
-#     firstNamePrefixFullTextFilter: str | None
-#     lastNamePrefixFullTextFilter: str | None
-#     emailPrefixFullTextFilter: str | None
-#     externalAuthServiceEmailFullTextFilter: str | None
-#     statusFilter: list[int] | None
-#     workspaceIds: list[int] | None
-#     businessUnitIds: list[int] | None
-#     areaIds: list[int] | None
-#     place: str | None
-#     orderTypeId: str | None
+class ListSystemUsersRequestIn(InteractaRequestIn):
+    # ListSystemUsersRequestDTO
+    # Filtro fulltext su nome cognome e email
+    full_text_filter: str | None
+    # Filtro sul nome dell'utente
+    first_name_prefix_full_text_filter: str | None
+    # Filtro sul cognome dell'utente
+    last_name_prefix_full_text_filter: str | None
+    # Filtro sull'email dell'utente
+    email_prefix_full_text_filter: str | None
+    # Filtro sull'email di autenticazione con servizi esterni
+    external_auth_service_email_full_text_filter: str | None
+    # Filtro sullo stato dell'utente
+    status_filter: list[int] | None
+    # Filtro sui workspace
+    workspace_ids: list[int] | None
+    # Filtro per businessUnits
+    business_unit_ids: list[int] | None
+    # Filtro per area
+    area_ids: list[int] | None
+    # Filtro full-text per luogo
+    place: str | None
+    # Id campo di ordinamento
+    order_type_id: str | None
+
+
+# class ListSystemUsersRequestDTO(InteractaRequestIn):

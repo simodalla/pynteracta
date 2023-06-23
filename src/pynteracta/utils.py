@@ -136,3 +136,7 @@ def interactapi(func=None, *, schema_out=None):
         return result
 
     return wrapper
+
+
+# def get_post_url(url: HttpUrl, ticket_id: int) -> str:
+#     return f"{url}/{ticket_id}/change/"

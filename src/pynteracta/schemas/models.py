@@ -12,6 +12,9 @@ class InteractaModel(BaseModel):
     class Config:
         alias_generator = to_camel
 
+    def get_absolute_url(self, base_url: str | None = None) -> str:
+        raise NotImplementedError
+
 
 class SchemaOut(InteractaModel):
     _response: Any = PrivateAttr(None)
@@ -38,28 +41,32 @@ class Link(BaseModel):
     url: str = ""
 
 
-class BusinessUnit(InteractaModel):
+class UserInfoBusinessUnit(InteractaModel):
+    # UserInfoBusinessUnitDTO
     id: int
-    name: str
+    name: str | None = None
     external_id: str | None = None
 
 
-class Area(InteractaModel):
+class UserInfoArea(InteractaModel):
+    # UserInfoAreaDTO
     id: int
-    name: str
+    name: str | None = None
     external_id: str | None
 
 
 class Language(InteractaModel):
-    code: str | None
-    description: str | None
+    # LanguageDTO
+    code: str | None = None
+    description: str | None = None
 
 
 class Timezone(InteractaModel):
-    id: int | None
-    code: str | None
-    zone_id: str | None
-    description: str | None
+    # TimezoneDTO
+    id: int
+    code: str | None = None
+    zone_id: str | None = None
+    description: str | None = None
 
 
 class ZonedDatetime(InteractaModel):
@@ -80,33 +87,31 @@ class Group(InteractaModel):
     members_count: int | None
 
 
-class User(InteractaModel):
-    # UserDTO ##OK##
+class UserBase(InteractaModel):
     id: int
     first_name: str = ""
     last_name: str = ""
+    account_photo_url: str | None
     contact_email: str | None
+
+
+class User(UserBase):
+    # UserDTO ##OK##
     google_account_id: str | None
     microsoft_account_id: str | None
     service_account: bool | None
     system_account: bool | None
-    activeDWD: bool | None
-    account_photo_url: str | None
+    active_dwd: bool | None
     deleted: bool | None
     blocked: bool | None
     external_id: str | None
     private_profile: bool | None
-    licences: dict | None
+    licences: dict | None  # LicenseDTO
 
 
-class UsersOut(PagedItemsOut):
-    # ListUsersResponseDTO ##OK##
-    items: list[User] | None
-
-
-class UserProfile(User):
+class UserProfileInfo(UserBase):
+    # UserProfileInfoDTO
     high_res_account_photo_url: str | None
-    account_photo_url: str | None
     custom_photo_url: str | None
     google_photo_url: str | None
     microsoft_photo_url: str | None
@@ -117,23 +122,43 @@ class UserProfile(User):
     mobile_phone: str | None
     place: str | None
     biography: str | None
-    business_unit: BusinessUnit | None
-    area: Area | None
+    business_unit: UserInfoBusinessUnit | None
+    area: UserInfoArea | None
     role: str | None
     manager: User | None
     employees: list[User] | None
     language: Language | None
     timezone: Timezone | None
     email_notifications_enabled: bool | None
+    deleted: bool | None
+    blocked: bool | None
     occ_token: int | None
     can_manage_profile_photo: bool | None
     edit_profile: bool | None
+    private_profile: bool | None
+
+
+class ListSystemUsersElement(User):
+    # ListSystemUsersElementDTO
+    login_providers: list[str] | None = None  # [ CUSTOM, GOOGLE, MICROSOFT ]
+    last_access_timestamp: datetime | None = None
+    user_profile_info: UserProfileInfo | None = None  # UserProfileInfoDTO
+
+
+class UsersOut(PagedItemsOut):
+    # ListUsersResponseDTO ##OK##
+    items: list[User] | None
+
+
+class ListSystemUsersOut(PagedItemsOut):
+    # ListSystemUsersResponseDTO
+    items: list[ListSystemUsersElement] | None
 
 
 class UserFull(User):
     login_providers: list[str] | None
     last_access_timestamp: datetime | None
-    user_profile_info: UserProfile | None
+    user_profile_info: UserProfileInfo | None
 
 
 class DriveAttachmentData(InteractaModel):
@@ -219,6 +244,12 @@ class Post(InteractaModel):
     tasks_count: int | None = None
     followed_by_me: bool | None = None
     total_standard_tasks_count: int | None = None
+
+    def get_absolute_url(self, base_url: str | None = None):
+        url = f"/post/{self.id}/"
+        if base_url:
+            url = f"{base_url}{url}"
+        return url
 
 
 class BaseListPostsElement(Post):
