@@ -2,38 +2,10 @@ from datetime import datetime
 from datetime import datetime as type_datetime
 from enum import IntEnum
 
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel
 from pydantic.typing import Any
 
-from ..utils import to_camel
-
-
-class InteractaModel(BaseModel):
-    class Config:
-        alias_generator = to_camel
-
-    def get_absolute_url(self, base_url: str | None = None) -> str:
-        raise NotImplementedError
-
-
-class SchemaOut(InteractaModel):
-    _response: Any = PrivateAttr(None)
-
-
-class PagedItemsOut(SchemaOut):
-    items: list | None = []
-    next_page_token: str | None = None
-    total_items_count: int | None = None
-
-    def count(self):
-        if not self.items:
-            return 0
-        return len(self.items)
-
-    def has_items(self):
-        if self.count():
-            return True
-        return False
+from .core import InteractaModel, SchemaOut
 
 
 class Link(BaseModel):
@@ -85,6 +57,11 @@ class Group(InteractaModel):
     external_id: str | None
     occ_token: int | None
     members_count: int | None
+
+
+class ListSystemGroupsElement(Group):
+    # ListSystemGroupsElementDTO
+    pass
 
 
 class UserBase(InteractaModel):
@@ -143,16 +120,6 @@ class ListSystemUsersElement(User):
     login_providers: list[str] | None = None  # [ CUSTOM, GOOGLE, MICROSOFT ]
     last_access_timestamp: datetime | None = None
     user_profile_info: UserProfileInfo | None = None  # UserProfileInfoDTO
-
-
-class UsersOut(PagedItemsOut):
-    # ListUsersResponseDTO ##OK##
-    items: list[User] | None
-
-
-class ListSystemUsersOut(PagedItemsOut):
-    # ListSystemUsersResponseDTO
-    items: list[ListSystemUsersElement] | None
 
 
 class UserFull(User):
@@ -278,18 +245,6 @@ class PostDetail(Post):
     scheduled_publication: ZonedDatetimeIn | None = None
     # Info stato del post programmato [1=SUCCESS, 2=FAILED]
     scheduled_publication_result: int | None = None
-
-
-class PostDetailOut(SchemaOut, Post):
-    # GetPostDetailResponseDTO
-    current_workflow_state: PostWorkflowDefinitionState | None = None
-    current_workflow_screen_data: dict | None = None
-    mentions: list[User] | None = None
-    comment_mentions: UsersOut | None = None
-    watchers: list[User] | None = None
-    watcher_users: list[User] | None = None
-    watcher_groups: list[Group] | None = None
-    hashtags: list[Hashtag] | None = None
 
 
 class DriveAttachment(InteractaModel):
@@ -456,30 +411,6 @@ class AcknowledgeTaskFilter(InteractaModel):
 # Out Models #######################################################################################
 
 
-class PostsOut(PagedItemsOut):
-    # PagedListPostsResponseDTO
-    items: list[BaseListPostsElement] | None = []
-
-
-class GroupsOut(PagedItemsOut):
-    items: list[Group] | None = []
-
-
-class GroupMembersOut(PagedItemsOut):
-    items: list[User] | None = []
-
-
-class HashtagsOut(PagedItemsOut):
-    items: list[Hashtag] | None = []
-
-
-class PostCreatedOut(SchemaOut):
-    # CreatePostResponseDTO
-    post_id: int
-    next_occ_token: int | None = None
-    post_data: PostDetail | None = None
-
-
 class GetCustomPostForEditResponse(SchemaOut):
     # -- GetCustomPostForEditResponseDTO
     content_data: PostEditableContentData | None = None
@@ -492,11 +423,6 @@ class GetCustomPostForEditResponse(SchemaOut):
     last_modify_user: User | None = None
     last_modify_timestamp: datetime | None = None
     last_operation_timestamp: datetime | None = None
-
-
-class GetPostDefinitionResponse(SchemaOut, PostDefinition):
-    # -- GetPostDefinitionResponseDTO
-    pass
 
 
 class GetCommunityDetailsResponse(SchemaOut):

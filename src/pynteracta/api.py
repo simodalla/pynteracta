@@ -19,23 +19,30 @@ from .exceptions import (
     MultipleObjectsReturned,
     PostDoesNotFound,
 )
-from .schemas.models import (
+from .schemas.models import (  # ListSystemGroupsOut,
     CreateCustomPostIn,
     EditCustomPostIn,
     GetCommunityDetailsResponse,
     GetCustomPostForEditResponse,
-    GetPostDefinitionResponse,
-    GroupMembersOut,
-    GroupsOut,
-    HashtagsOut,
     InteractaModel,
-    ListSystemUsersOut,
     Post,
+)
+from .schemas.requests import (
+    ListCommunityPostsIn,
+    ListGroupMembersIn,
+    ListSystemGroupsIn,
+    ListSystemUsersIn,
+)
+from .schemas.responses import (
+    GetPostDefinitionOut,
+    HashtagsOut,
+    ListGroupMembersOut,
+    ListSystemGroupsOut,
+    ListSystemUsersOut,
     PostCreatedOut,
     PostDetailOut,
     PostsOut,
 )
-from .schemas.requests import ListCommunityPostsRequestIn, ListSystemUsersRequestIn
 from .utils import (
     PLAYGROUND_SETTINGS,
     format_response_error,
@@ -274,7 +281,7 @@ class InteractaAPI(Api):
         community_id: str | int,
         query_url=None,
         headers: dict = {},
-        data: ListCommunityPostsRequestIn = None,
+        data: ListCommunityPostsIn = None,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
@@ -311,7 +318,7 @@ class InteractaAPI(Api):
         return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
 
     def get_post_by_title(self, community_id: int, title: str) -> Post | None:
-        search = ListCommunityPostsRequestIn(title=title)
+        search = ListCommunityPostsIn(title=title)
         result = self.post_list(community_id, data=search)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
@@ -323,7 +330,7 @@ class InteractaAPI(Api):
         return posts[0]
 
     def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
-        search = ListCommunityPostsRequestIn(title=title)
+        search = ListCommunityPostsIn(title=title)
         result = self.post_list(community_id, data=search)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
         if len(posts) == 0:
@@ -336,36 +343,40 @@ class InteractaAPI(Api):
 
     @interactapi(schema_out=ListSystemUsersOut)
     def user_list(
-        self, query_url=None, headers: dict = {}, data: ListSystemUsersRequestIn = None
+        self, query_url=None, headers: dict = {}, data: ListSystemUsersIn | None = None
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi(schema_out=GroupMembersOut)
-    def group_member_list(
-        self, group_id: str | int, query_url=None, headers: dict = {}, data: dict = {}
-    ) -> GroupMembersOut | Response:
-        path = f"/admin/data/groups/{group_id}/members"
+    @interactapi(schema_out=ListSystemGroupsOut)
+    def group_list(
+        self, query_url=None, headers: dict = {}, data: ListSystemGroupsIn | None = None
+    ) -> ListSystemGroupsOut | Response:
+        path = "/admin/data/groups"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi(schema_out=GroupsOut)
-    def group_list(
-        self, query_url=None, headers: dict = {}, data: dict = {}
-    ) -> GroupsOut | Response:
-        path = "/admin/data/groups"
+    @interactapi(schema_out=ListGroupMembersOut)
+    def group_member_list(
+        self,
+        group_id: str | int,
+        query_url=None,
+        headers: dict = {},
+        data: ListGroupMembersIn | None = None,
+    ) -> ListGroupMembersOut | Response:
+        path = f"/admin/data/groups/{group_id}/members"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=HashtagsOut)
     def hashtag_list(
         self, community_id: str | int, query_url=None, headers: dict = {}, data: dict = {}
-    ) -> GroupsOut | Response:
+    ) -> ListSystemGroupsOut | Response:
         path = f"/admin/data/communities/{community_id}/hashtags"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
-    @interactapi(schema_out=GetPostDefinitionResponse)
+    @interactapi(schema_out=GetPostDefinitionOut)
     def community_post_definition_detail(
         self, community_id: str | int, query_url=None, headers: dict = {}
-    ) -> GetPostDefinitionResponse | Response:
+    ) -> GetPostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 

@@ -1,7 +1,7 @@
 from .models import AcknowledgeTaskFilter, CustomFieldFilter, InteractaModel
 
 
-class InteractaRequestIn(InteractaModel):
+class InteractaIn(InteractaModel):
     page_token: str | None = None
     page_size: int | None = None
     calculate_total_items_count: bool | None = True
@@ -11,7 +11,7 @@ class InteractaRequestIn(InteractaModel):
         validate_assignment = True
 
 
-class ListCommunityPostsRequestIn(InteractaRequestIn):
+class ListCommunityPostsIn(InteractaIn):
     # ListCommunityPostsRequestDTO
     # Filtro sul titolo
     title: str | None = None
@@ -79,30 +79,46 @@ class ListCommunityPostsRequestIn(InteractaRequestIn):
     pinned_first: bool | None = None
 
 
-class ListSystemUsersRequestIn(InteractaRequestIn):
+class ListSystemUsersIn(InteractaIn):
     # ListSystemUsersRequestDTO
     # Filtro fulltext su nome cognome e email
-    full_text_filter: str | None
+    full_text_filter: str | None = None
     # Filtro sul nome dell'utente
-    first_name_prefix_full_text_filter: str | None
+    first_name_prefix_full_text_filter: str | None = None
     # Filtro sul cognome dell'utente
-    last_name_prefix_full_text_filter: str | None
+    last_name_prefix_full_text_filter: str | None = None
     # Filtro sull'email dell'utente
-    email_prefix_full_text_filter: str | None
+    email_prefix_full_text_filter: str | None = None
     # Filtro sull'email di autenticazione con servizi esterni
-    external_auth_service_email_full_text_filter: str | None
+    external_auth_service_email_full_text_filter: str | None = None
     # Filtro sullo stato dell'utente
-    status_filter: list[int] | None
+    status_filter: list[int] | None = None
     # Filtro sui workspace
-    workspace_ids: list[int] | None
+    workspace_ids: list[int] | None = None
     # Filtro per businessUnits
-    business_unit_ids: list[int] | None
+    business_unit_ids: list[int] | None = None
     # Filtro per area
-    area_ids: list[int] | None
+    area_ids: list[int] | None = None
     # Filtro full-text per luogo
-    place: str | None
+    place: str | None = None
     # Id campo di ordinamento
-    order_type_id: str | None
+    order_type_id: str | None = None
 
 
-# class ListSystemUsersRequestDTO(InteractaRequestIn):
+class ListSystemGroupsIn(InteractaIn):
+    # ListSystemGroupsRequestDTO
+    # Filtro fulltext su nome e email
+    full_text_filter: str | None = None
+    # Filtro sullo stato dell'utente
+    status_filter: list[int] | None = None  # 0 == solo gruppi non eliminati
+    # Filtro sui workspace
+    workspace_ids: list[int] | None = None
+    # Filtro per escludere i gruppi che contengono l'utente
+    exclude_group_by_member_user_id: int | None = None
+    # Id campo di ordinamento
+    order_type_id: str | None = None
+
+
+class ListGroupMembersIn(InteractaIn):
+    # ListGroupMembersRequestDTO
+    pass
