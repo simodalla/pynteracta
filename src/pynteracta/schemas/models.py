@@ -2,10 +2,10 @@ from datetime import datetime
 from datetime import datetime as type_datetime
 from enum import IntEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from pydantic.typing import Any
 
-from .core import InteractaModel, SchemaOut
+from .core import InteractaModel, InteractaOut
 
 
 class Link(BaseModel):
@@ -25,6 +25,60 @@ class UserInfoArea(InteractaModel):
     id: int
     name: str | None = None
     external_id: str | None
+
+
+class UserInfo(InteractaModel):
+    # UserInfoDTO
+    area: UserInfoArea | None = None
+    business_unit: UserInfoBusinessUnit | None = None
+    private_email: EmailStr | None
+    private_email_verified: bool | None = None
+    private_email_verification_required: bool | None = None
+
+
+class GoogleUserCredentialsConfiguration(InteractaModel):
+    # GoogleUserCredentialsConfigurationDTO
+    # Email autenticazione tramite servizi esterno Google
+    google_account_id: str | None = None
+    enabled: bool | None = None
+    profile_photo_url: str | None = None
+
+
+class MicrosoftUserCredentialsConfiguration(InteractaModel):
+    # MicrosoftUserCredentialsConfigurationDTO
+    # Email autenticazione tramite servizi esterno Microsoft
+    microsoft_account_id: str | None = None
+    enabled: bool | None = None
+    profile_photo_url: str | None = None
+
+
+class CustomUserCredentialsConfiguration(InteractaModel):
+    # CustomUserCredentialsConfigurationDTO
+    username: str | None = None
+    can_user_manage_custom_credentials: bool | None = None
+    active: bool | None = None
+    profile_photo_url: str | None = None
+    profile_photo: dict | None = None
+    can_manage_profile_photo: bool | None = None
+
+
+class UserCredentialsConfiguration(InteractaModel):
+    # UserCredentialsConfigurationDTO
+    google: GoogleUserCredentialsConfiguration | None = None
+    microsoft: MicrosoftUserCredentialsConfiguration | None = None
+    custom: CustomUserCredentialsConfiguration | None = None
+
+
+class ResetUserCustomCredentialsCommand(InteractaModel):
+    # ResetUserCustomCredentialsCommandDTO
+    # Genera una password.
+    generate_password: bool | None = None
+    # Password da impostare. Campo da impostare nel caso in cui 'generatePassword' = false.
+    password: list[str]
+    # Indica se le credenziali devono essere cambiate al prossimo login.
+    force_credentials_expiration: bool | None = None
+    # Indica se è stata spedita un'email di notifica.
+    email_notify_recipients: list[str]
 
 
 class Language(InteractaModel):
@@ -69,7 +123,7 @@ class UserBase(InteractaModel):
     first_name: str = ""
     last_name: str = ""
     account_photo_url: str | None
-    contact_email: str | None
+    contact_email: EmailStr | None
 
 
 class User(UserBase):
@@ -92,7 +146,7 @@ class UserProfileInfo(UserBase):
     custom_photo_url: str | None
     google_photo_url: str | None
     microsoft_photo_url: str | None
-    private_email: str | None
+    private_email: EmailStr | None
     private_email_verified: bool | None
     phone: str | None
     internal_phone: str | None
@@ -408,10 +462,17 @@ class AcknowledgeTaskFilter(InteractaModel):
     assigned_to_me: bool | None = None
 
 
+class AdminUserPreferences(InteractaModel):
+    # AdminUserPreferencesDTO
+    default_language_id: str | None = None
+    default_timezone_id: int | None = None
+    email_notifications_enabled: bool = True
+
+
 # Out Models #######################################################################################
 
 
-class GetCustomPostForEditResponse(SchemaOut):
+class GetCustomPostForEditResponse(InteractaOut):
     # -- GetCustomPostForEditResponseDTO
     content_data: PostEditableContentData | None = None
     occ_token: int
@@ -425,7 +486,7 @@ class GetCustomPostForEditResponse(SchemaOut):
     last_operation_timestamp: datetime | None = None
 
 
-class GetCommunityDetailsResponse(SchemaOut):
+class GetCommunityDetailsResponse(InteractaOut):
     community: Community | None = None
 
 

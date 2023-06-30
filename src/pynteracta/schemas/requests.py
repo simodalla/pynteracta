@@ -1,14 +1,14 @@
-from .models import AcknowledgeTaskFilter, CustomFieldFilter, InteractaModel
+from pydantic import EmailStr
 
-
-class InteractaIn(InteractaModel):
-    page_token: str | None = None
-    page_size: int | None = None
-    calculate_total_items_count: bool | None = True
-    order_desc: bool | None = None
-
-    class Config:
-        validate_assignment = True
+from .core import InteractaIn, InteractaModel
+from .models import (
+    AcknowledgeTaskFilter,
+    AdminUserPreferences,
+    CustomFieldFilter,
+    ResetUserCustomCredentialsCommand,
+    UserCredentialsConfiguration,
+    UserInfo,
+)
 
 
 class ListCommunityPostsIn(InteractaIn):
@@ -122,3 +122,29 @@ class ListSystemGroupsIn(InteractaIn):
 class ListGroupMembersIn(InteractaIn):
     # ListGroupMembersRequestDTO
     pass
+
+
+class UserSettingsIn(InteractaModel):
+    # UserSettingsRequestDTO
+    # Sezione Persone abilitata/disabilitata
+    people_section_enabled: bool = True
+    # Utente visibile nella sezione persone
+    visible_in_people_section: bool = True
+    # Visualizzazione profilo in versione ridotta/estesa
+    reduced_profile: bool = False
+    # Possibilità di visualizzare o meno il profilo di utenti terzi
+    view_user_profiles: bool = True
+
+
+class CreateUserIn(InteractaModel):
+    # CreateUserRequestDTO
+    firstname: str = ""
+    lastname: str = ""
+    contact_email: EmailStr | None = None
+    private_email: EmailStr | None = None
+    external_id: str | None = None
+    user_preferences: AdminUserPreferences | None = None
+    user_info: UserInfo | None = None
+    user_settings: UserSettingsIn | None = None
+    user_credentials_configuration: UserCredentialsConfiguration | None = None
+    reset_user_custom_credentials_command: ResetUserCustomCredentialsCommand | None = None

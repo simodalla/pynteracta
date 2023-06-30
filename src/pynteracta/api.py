@@ -17,6 +17,7 @@ from .exceptions import (
     InteractaLoginError,
     InteractaResponseError,
     MultipleObjectsReturned,
+    ObjectDoesNotFound,
     PostDoesNotFound,
 )
 from .schemas.models import (  # ListSystemGroupsOut,
@@ -28,12 +29,14 @@ from .schemas.models import (  # ListSystemGroupsOut,
     Post,
 )
 from .schemas.requests import (
+    CreateUserIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
     ListSystemGroupsIn,
     ListSystemUsersIn,
 )
 from .schemas.responses import (
+    CreateUserOut,
     GetPostDefinitionOut,
     HashtagsOut,
     ListGroupMembersOut,
@@ -317,35 +320,18 @@ class InteractaAPI(Api):
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
         return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
 
-    def get_post_by_title(self, community_id: int, title: str) -> Post | None:
-        search = ListCommunityPostsIn(title=title)
-        result = self.post_list(community_id, data=search)
-        posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
-        if len(posts) == 0:
-            raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
-        elif len(posts) > 1:
-            raise MultipleObjectsReturned(
-                f"Multiple post with '{title}' in title founded in interacta"
-            )
-        return posts[0]
-
-    def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
-        search = ListCommunityPostsIn(title=title)
-        result = self.post_list(community_id, data=search)
-        posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
-        if len(posts) == 0:
-            raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
-        elif len(posts) > 1:
-            raise MultipleObjectsReturned(
-                f"Multiple post with title '{title}' founded in interacta"
-            )
-        return posts[0]
-
     @interactapi(schema_out=ListSystemUsersOut)
     def user_list(
         self, query_url=None, headers: dict = {}, data: ListSystemUsersIn | None = None
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
+        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+
+    @interactapi(schema_out=CreateUserOut)
+    def create_user(
+        self, query_url=None, headers: dict = {}, data: CreateUserIn = None
+    ) -> CreateUserOut | Response:
+        path = "/admin/manage/users"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemGroupsOut)
@@ -386,6 +372,50 @@ class InteractaAPI(Api):
     ) -> GetCommunityDetailsResponse | Response:
         path = f"/communication/settings/communities/{community_id}/details"
         return self.call_get(path=path, query_url=query_url, headers=headers)
+
+    def get_post_by_title(self, community_id: int, title: str) -> Post | None:
+        search = ListCommunityPostsIn(title=title)
+        result = self.post_list(community_id, data=search)
+        posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
+        if len(posts) == 0:
+            raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
+        elif len(posts) > 1:
+            raise MultipleObjectsReturned(
+                f"Multiple post with '{title}' in title founded in interacta"
+            )
+        return posts[0]
+
+    def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
+        search = ListCommunityPostsIn(title=title)
+        result = self.post_list(community_id, data=search)
+        posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
+        if len(posts) == 0:
+            raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
+        elif len(posts) > 1:
+            raise MultipleObjectsReturned(
+                f"Multiple post with title '{title}' founded in interacta"
+            )
+        return posts[0]
+
+    def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Post | None:
+        if not filter:
+            filter = ListSystemGroupsIn()
+            filter.page_size = 100
+            filter.calculate_total_items_count = True
+            filter.full_text_filter = name
+            filter.status_filter = [0]
+        else:
+            filter.full_text_filter = name
+        result = self.group_list(data=filter)
+        groups = [group for group in result.items if group.name == name]
+
+        if len(groups) == 0:
+            raise ObjectDoesNotFound(f"Group with name '{name}' non found in interacta")
+        elif len(groups) > 1:
+            raise MultipleObjectsReturned(
+                f"Multiple groups with name '{name}' founded in interacta"
+            )
+        return groups[0]
 
     # def catalog_for_edit_detail(
     #     self, catalog_id: str | int, query_url=None, headers: dict = {}

@@ -12,11 +12,11 @@ class InteractaModel(BaseModel):
         raise NotImplementedError
 
 
-class SchemaOut(InteractaModel):
+class InteractaOut(InteractaModel):
     _response: Any = PrivateAttr(None)
 
 
-class PagedItemsOut(SchemaOut):
+class PagedItemsOut(InteractaOut):
     items: list | None = []
     next_page_token: str | None = None
     total_items_count: int | None = None
@@ -30,3 +30,13 @@ class PagedItemsOut(SchemaOut):
         if self.count():
             return True
         return False
+
+
+class InteractaIn(InteractaModel):
+    page_token: str | None = None
+    page_size: int | None = None
+    calculate_total_items_count: bool | None = True
+    order_desc: bool | None = None
+
+    class Config:
+        validate_assignment = True
