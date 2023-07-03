@@ -376,16 +376,13 @@ class PostDefinition(InteractaModel):
     field_definitions: list[FieldDefinition] | None = None
     workflow_definition: dict | None = None  # creare model
     title_enabled: int | None = None
-    description_enabled: int | None = None
     watchers_enabled: int | None = None
     watchers_visible_in_preview: bool | None = None
     manual_author_enabled: bool | None = None
     hash_tag_enabled: bool | None = None
-    attachment_enabled: bool | None = None
     like_enabled: bool | None = None
     offline_Enabled: bool | None = None
     hashtags: list[Hashtag] | None = None
-    default_post_visibility: int | None = None
     post_views: list[dict] | None = None  # creare model
     inverse_community_relations: list[dict] | None = None  # creare model
 
@@ -537,22 +534,3 @@ class EditCustomPostIn(CustomPostIn):
     remove_attachment_ids: list[int] = []
     add_watcher_user_ids: list[int] = []
     remove_watcher_user_ids: list[int] = []
-
-
-# class PostEditableContentData(InteractaModel):
-#     title: str = ""
-#     description: str | None = ""
-#     description_delta: str | None = None
-#     visibility: int | None = None
-#     custom_data: dict | None = None
-#     current_workflow_screen_data: dict | None = None
-#     attachments: list[dict] | None = None
-#     mentions: list[User] | None = None
-#     watchers: list[User] | None = None
-#     watchers_users: list[User] | None = None
-#     watchers_groups: list[Group] | None = None
-#     hashtags: list[Hashtag] | None = None
-#     draft: bool | None = None
-#     draft_data: dict | None = None
-#     scheduled_publication: dict | None = None
-#     scheduled_publication_result: int | None = None
