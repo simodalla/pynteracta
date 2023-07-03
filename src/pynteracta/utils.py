@@ -92,7 +92,7 @@ def parse_service_account_file(file_path: str) -> dict:
                 "service_auth_kid": int(json_data["private_key_id"]),
             }
     except Exception as e:
-        raise InteractaError(str(e))
+        raise InteractaError(str(e)) from e
     return data
 
 
@@ -131,12 +131,8 @@ def interactapi(func=None, *, schema_out=None):
         response = func(self, *args, **kwargs)
         if not schema_out:
             return response
-        result = schema_out.parse_obj(response.json())
+        result = schema_out.model_validate(response.json())
         result._response = response
         return result
 
     return wrapper
-
-
-# def get_post_url(url: HttpUrl, ticket_id: int) -> str:
-#     return f"{url}/{ticket_id}/change/"

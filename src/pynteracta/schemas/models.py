@@ -1,9 +1,9 @@
 from datetime import datetime
 from datetime import datetime as type_datetime
 from enum import IntEnum
+from typing import Any
 
 from pydantic import BaseModel, EmailStr
-from pydantic.typing import Any
 
 from .core import InteractaModel, InteractaOut
 
@@ -122,51 +122,51 @@ class UserBase(InteractaModel):
     id: int
     first_name: str = ""
     last_name: str = ""
-    account_photo_url: str | None
-    contact_email: EmailStr | None
+    account_photo_url: str | None = None
+    contact_email: EmailStr | None = None
 
 
 class User(UserBase):
     # UserDTO ##OK##
-    google_account_id: str | None
-    microsoft_account_id: str | None
-    service_account: bool | None
-    system_account: bool | None
-    active_dwd: bool | None
-    deleted: bool | None
-    blocked: bool | None
-    external_id: str | None
-    private_profile: bool | None
-    licences: dict | None  # LicenseDTO
+    google_account_id: str | None = None
+    microsoft_account_id: str | None = None
+    service_account: bool | None = None
+    system_account: bool | None = None
+    active_dwd: bool | None = None
+    deleted: bool | None = None
+    blocked: bool | None = None
+    external_id: str | None = None
+    private_profile: bool | None = None
+    licences: dict | None = None  # LicenseDTO
 
 
 class UserProfileInfo(UserBase):
     # UserProfileInfoDTO
-    high_res_account_photo_url: str | None
-    custom_photo_url: str | None
-    google_photo_url: str | None
-    microsoft_photo_url: str | None
-    private_email: EmailStr | None
-    private_email_verified: bool | None
-    phone: str | None
-    internal_phone: str | None
-    mobile_phone: str | None
-    place: str | None
-    biography: str | None
-    business_unit: UserInfoBusinessUnit | None
-    area: UserInfoArea | None
-    role: str | None
-    manager: User | None
-    employees: list[User] | None
-    language: Language | None
-    timezone: Timezone | None
-    email_notifications_enabled: bool | None
-    deleted: bool | None
-    blocked: bool | None
-    occ_token: int | None
-    can_manage_profile_photo: bool | None
-    edit_profile: bool | None
-    private_profile: bool | None
+    high_res_account_photo_url: str | None = None
+    custom_photo_url: str | None = None
+    google_photo_url: str | None = None
+    microsoft_photo_url: str | None = None
+    private_email: EmailStr | None = None
+    private_email_verified: bool | None = None
+    phone: str | None = None
+    internal_phone: str | None = None
+    mobile_phone: str | None = None
+    place: str | None = None
+    biography: str | None = None
+    business_unit: UserInfoBusinessUnit | None = None
+    area: UserInfoArea | None = None
+    role: str | None = None
+    manager: User | None = None
+    employees: list[User] | None = None
+    language: Language | None = None
+    timezone: Timezone | None = None
+    email_notifications_enabled: bool | None = None
+    deleted: bool | None = None
+    blocked: bool | None = None
+    occ_token: int | None = None
+    can_manage_profile_photo: bool | None = None
+    edit_profile: bool | None = None
+    private_profile: bool | None = None
 
 
 class ListSystemUsersElement(User):
@@ -233,7 +233,7 @@ class PostWorkflowDefinitionState(InteractaModel):
     id: int
     init_state: bool | None = None
     name: str = ""
-    metadata: dict = {}
+    metadata: dict = None
 
 
 class Post(InteractaModel):
@@ -505,14 +505,14 @@ class AttachmentIn(BaseModel):
 class CustomPostIn(InteractaModel):
     # ROOT
     title: str
-    description: str | None  # Descrizione del post
+    description: str | None = None  # Descrizione del post
     description_format: int = (
         1  # Formato della descrizione del post, facoltativo (1=delta, 2=markdown, default: 1)
     )
-    custom_data: dict | None = {}  # Dati custom del post
+    custom_data: dict | None = None  # Dati custom del post
     # Formato dei campi custom di tipo 11-delta, facoltativo (1=delta, 2=plain text, default: 1)
     delta_area_format: int = 1
-    visibility: int | None
+    visibility: int | None = None
     # Identificativo dello stato iniziale del workflow, se la community lo permette
     workflow_init_state_id: int | None = None
     draft: bool = False  # Creazione in stato bozza/pubblicato
@@ -521,9 +521,9 @@ class CustomPostIn(InteractaModel):
 
 class CreateCustomPostIn(CustomPostIn):
     # CreateCustomPostRequest
-    attachments: list[AttachmentIn] | None
-    watcher_user_ids: list[int] | None
-    announcement: bool | None
+    attachments: list[AttachmentIn] | None = None
+    watcher_user_ids: list[int] | None = None
+    announcement: bool | None = None
     client_uid: str | None = None
 
 

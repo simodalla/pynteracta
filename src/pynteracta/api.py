@@ -69,9 +69,9 @@ class Api:
         if data:
             if isinstance(data, BaseModel):
                 if isinstance(data, InteractaModel):
-                    data = data.json(by_alias=True)
+                    data = data.model_dump_json(by_alias=True)
                 else:
-                    data = data.json()
+                    data = data.model_dump_json()
             else:
                 data = json.dumps(data)
         else:
@@ -88,7 +88,12 @@ class Api:
         return self.call_api("put", path=path, query_url=query_url, headers=headers, data=data)
 
     def call_api(
-        self, method: str, path: str, query_url: str = None, headers={}, data: dict | str = None
+        self,
+        method: str,
+        path: str,
+        query_url: str | None = None,
+        headers: dict | None = None,
+        data: dict | str | None = None,
     ):
         url = f"{self.base_url}{path}"
         request_method = getattr(requests, method)
@@ -193,16 +198,6 @@ class InteractaAPI(Api):
             "content-type": "application/json",
         }
 
-    # def _record_log_call(self, url: str, kwargs: dict = {}, response=None):
-    #     log_data = {
-    #         "url": url,
-    #         "kwargs": kwargs,
-    #         "status_code": response.status_code,
-    #     }
-    #     if self._log_call_responses:
-    #         log_data["content"] = response.content
-    #     self._call_stack[len(self._call_stack) + 1] = log_data
-
     def prepare_credentials_login(self, username: str = "", password: str = ""):
         username = username if username else os.getenv("INTERACTA_USERNAME", "")
         password = password if password else os.getenv("INTERACTA_PASSWORD", "")
@@ -271,7 +266,7 @@ class InteractaAPI(Api):
                 data=data,
             )
         except InteractaResponseError as e:
-            raise InteractaLoginError(str(e))
+            raise InteractaLoginError(str(e)) from e
         result = response.json()
         if "accessToken" not in result:
             raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
@@ -282,8 +277,8 @@ class InteractaAPI(Api):
     def post_list(
         self,
         community_id: str | int,
-        query_url=None,
-        headers: dict = {},
+        query_url: str = None,
+        headers: dict = None,
         data: ListCommunityPostsIn = None,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
@@ -291,52 +286,57 @@ class InteractaAPI(Api):
 
     @interactapi(schema_out=PostDetailOut)
     def post_detail(
-        self, post_id: str | int, query_url=None, headers: dict = {}
+        self, post_id: str | int, query_url: str = None, headers: dict = None
     ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
         try:
             return self.call_get(path=path, query_url=query_url, headers=headers)
         except InteractaResponseError as e:
-            raise PostDoesNotFound(f"Post with id '{post_id}' non found in interacta: {e}")
+            raise PostDoesNotFound(f"Post with id '{post_id}' non found in interacta: {e}") from e
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
-        self, community_id, query_url=None, headers: dict = {}, data: CreateCustomPostIn = None
+        self, community_id, query_url=None, headers: dict = None, data: CreateCustomPostIn = None
     ) -> PostCreatedOut | Response:
         path = f"/communication/posts/manage/create-post/{community_id}"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=GetCustomPostForEditResponse)
     def post_data_for_edit(
-        self, post_id, query_url=None, headers: dict = {}
+        self, post_id, query_url=None, headers: dict = None
     ) -> GetCustomPostForEditResponse | Response:
         path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
     @interactapi()
     def edit_post(
-        self, post_id, occ_token, query_url=None, headers: dict = {}, data: EditCustomPostIn = None
+        self,
+        post_id,
+        occ_token,
+        query_url=None,
+        headers: dict = None,
+        data: EditCustomPostIn = None,
     ) -> Response:
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
         return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemUsersOut)
     def user_list(
-        self, query_url=None, headers: dict = {}, data: ListSystemUsersIn | None = None
+        self, query_url=None, headers: dict = None, data: ListSystemUsersIn | None = None
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=CreateUserOut)
     def create_user(
-        self, query_url=None, headers: dict = {}, data: CreateUserIn = None
+        self, query_url=None, headers: dict = None, data: CreateUserIn = None
     ) -> CreateUserOut | Response:
         path = "/admin/manage/users"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemGroupsOut)
     def group_list(
-        self, query_url=None, headers: dict = {}, data: ListSystemGroupsIn | None = None
+        self, query_url=None, headers: dict = None, data: ListSystemGroupsIn | None = None
     ) -> ListSystemGroupsOut | Response:
         path = "/admin/data/groups"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
@@ -346,7 +346,7 @@ class InteractaAPI(Api):
         self,
         group_id: str | int,
         query_url=None,
-        headers: dict = {},
+        headers: dict = None,
         data: ListGroupMembersIn | None = None,
     ) -> ListGroupMembersOut | Response:
         path = f"/admin/data/groups/{group_id}/members"
@@ -354,21 +354,21 @@ class InteractaAPI(Api):
 
     @interactapi(schema_out=HashtagsOut)
     def hashtag_list(
-        self, community_id: str | int, query_url=None, headers: dict = {}, data: dict = {}
+        self, community_id: str | int, query_url=None, headers: dict = None, data: dict = None
     ) -> ListSystemGroupsOut | Response:
         path = f"/admin/data/communities/{community_id}/hashtags"
         return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
 
     @interactapi(schema_out=GetPostDefinitionOut)
     def community_post_definition_detail(
-        self, community_id: str | int, query_url=None, headers: dict = {}
+        self, community_id: str | int, query_url=None, headers: dict = None
     ) -> GetPostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, query_url=query_url, headers=headers)
 
     @interactapi(schema_out=GetCommunityDetailsResponse)
     def community_detail(
-        self, community_id: str | int, query_url=None, headers: dict = {}
+        self, community_id: str | int, query_url=None, headers: dict = None
     ) -> GetCommunityDetailsResponse | Response:
         path = f"/communication/settings/communities/{community_id}/details"
         return self.call_get(path=path, query_url=query_url, headers=headers)
@@ -416,12 +416,6 @@ class InteractaAPI(Api):
                 f"Multiple groups with name '{name}' founded in interacta"
             )
         return groups[0]
-
-    # def catalog_for_edit_detail(
-    #     self, catalog_id: str | int, query_url=None, headers: dict = {}
-    # ) -> PostDefinitionOut | Response:
-    #     path = f"/admin/manage/catalogs/{catalog_id}/edit"
-    #     return self.call_get(path=path, query_url=query_url, headers=headers)
 
 
 class PlaygroundApi(InteractaAPI):
