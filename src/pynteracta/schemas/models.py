@@ -287,7 +287,7 @@ class PostDetail(Post):
     # PostDetailDTO
     current_workflow_state: PostWorkflowDefinitionState | None = None
     current_workflow_screen_data: dict | None = None
-    attachments: dict | None = None  # PostAttachmentDataDTO
+    attachments: list[dict] | None = None  # PostAttachmentDataDTO
     mentions: list[User] | None = None
     watchers: list[User] | None = None
     watcher_users: list[User] | None = None
