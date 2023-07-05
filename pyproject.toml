@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pynteracta"
-version = "0.1.6"
+version = "0.2.0"
 description = "A wrapper for Interacta API"
 license = "BSD-3-Clause"
 authors = ["Simone Dalla <simodalla@gmail.com>"]
@@ -56,7 +56,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.bumpver]
-current_version = "0.1.6"
+current_version = "0.2.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "bump version {old_version} -> {new_version}"
 commit          = true
