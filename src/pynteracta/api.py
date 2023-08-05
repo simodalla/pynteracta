@@ -25,6 +25,7 @@ from .schemas.models import (  # ListSystemGroupsOut,
     EditCustomPostIn,
     GetCommunityDetailsResponse,
     GetCustomPostForEditResponse,
+    Group,
     InteractaModel,
     Post,
 )
@@ -41,6 +42,7 @@ from .schemas.responses import (
     HashtagsOut,
     ListGroupMembersOut,
     ListSystemGroupsOut,
+    ListSystemUsersElement,
     ListSystemUsersOut,
     PostCreatedOut,
     PostDetailOut,
@@ -397,7 +399,7 @@ class InteractaAPI(Api):
             )
         return posts[0]
 
-    def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Post | None:
+    def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Group | None:
         if not filter:
             filter = ListSystemGroupsIn()
             filter.page_size = 100
@@ -416,6 +418,31 @@ class InteractaAPI(Api):
                 f"Multiple groups with name '{name}' founded in interacta"
             )
         return groups[0]
+
+    def get_user(
+        self,
+        email: str | None,
+        external_auth_service: bool = False,
+        body: ListSystemUsersIn | None = None,
+    ) -> ListSystemUsersElement:
+        if not body:
+            body = ListSystemUsersIn()
+            body.page_size = 100
+            body.calculate_total_items_count = True
+        if external_auth_service:
+            body.external_auth_service_email_full_text_filter = email
+        else:
+            body.email_prefix_full_text_filter = email
+
+        result = self.user_list(data=body)
+
+        if len(result.items) == 0:
+            raise ObjectDoesNotFound(f"User with email '{email}' non found in interacta")
+        elif len(result.items) > 1:
+            raise MultipleObjectsReturned(
+                f"Multiple users with email '{email}' founded in interacta"
+            )
+        return result.items[0]
 
 
 class PlaygroundApi(InteractaAPI):

@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel
 
 
@@ -18,8 +20,20 @@ class CommunitySettings(BaseModel):
         return list(self.custom_fields.values())
 
 
+class InteractaLoginProvider(StrEnum):
+    GOOGLE = "google"
+    MICROSOFT = "microsoft"
+
+
+class InteractaUsersSettings(BaseModel):
+    check_by_email: bool = True
+    check_by_external_auth_service: bool = False
+    external_login_providers: InteractaLoginProvider | None = None
+
+
 class InteractaSettings(BaseModel):
     base_url: str | None = None
     service_file_path: str | None = None
     log_api_calls: bool = False
     operators_group_id: int | None = None
+    users: InteractaUsersSettings | None = None
