@@ -279,7 +279,7 @@ class InteractaApi(Api):
         return self.access_token
 
     @interactapi(schema_out=PostsOut)
-    def post_list(
+    def list_posts(
         self,
         community_id: str | int,
         params: dict = None,
@@ -290,14 +290,14 @@ class InteractaApi(Api):
         return self.call_post(path=path, params=params, headers=headers, data=data)
 
     @interactapi(schema_out=PostDetailOut)
-    def post_detail(
+    def get_post_detail(
         self, post_id: str | int, parms: dict = None, headers: dict = None
     ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
         try:
             return self.call_get(path=path, params=parms, headers=headers)
         except InteractaResponseError as e:
-            raise PostDoesNotFound(f"Post with id '{post_id}' non found in interacta: {e}") from e
+            raise PostDoesNotFound(f"Post with id '{post_id}' non found: {e}") from e
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
@@ -307,7 +307,7 @@ class InteractaApi(Api):
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=GetCustomPostForEditResponse)
-    def post_data_for_edit(
+    def get_post_data_for_edit(
         self, post_id, headers: dict = None
     ) -> GetCustomPostForEditResponse | Response:
         path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
@@ -325,7 +325,7 @@ class InteractaApi(Api):
         return self.call_put(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemUsersOut)
-    def user_list(
+    def list_users(
         self, headers: dict = None, data: ListSystemUsersIn | None = None
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
@@ -339,14 +339,14 @@ class InteractaApi(Api):
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemGroupsOut)
-    def group_list(
+    def list_groups(
         self, headers: dict = None, data: ListSystemGroupsIn | None = None
     ) -> ListSystemGroupsOut | Response:
         path = "/admin/data/groups"
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListGroupMembersOut)
-    def group_member_list(
+    def list_group_members(
         self,
         group_id: str | int,
         headers: dict = None,
@@ -356,21 +356,21 @@ class InteractaApi(Api):
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=HashtagsOut)
-    def hashtag_list(
+    def list_hashtags(
         self, community_id: str | int, headers: dict = None, data: dict = None
     ) -> ListSystemGroupsOut | Response:
         path = f"/admin/data/communities/{community_id}/hashtags"
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=GetPostDefinitionOut)
-    def community_post_definition_detail(
+    def get_post_definition_detail(
         self, community_id: str | int, headers: dict = None
     ) -> GetPostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, headers=headers)
 
     @interactapi(schema_out=GetCommunityDetailsResponse)
-    def community_detail(
+    def get_community_detail(
         self, community_id: str | int, headers: dict = None
     ) -> GetCommunityDetailsResponse | Response:
         path = f"/communication/settings/communities/{community_id}/details"
@@ -379,7 +379,7 @@ class InteractaApi(Api):
     ### worflow operations
 
     @interactapi(schema_out=GetPostWorkflowScreenDataForEditResponse)
-    def post_workflow_screen_data_for_edit(
+    def get_post_workflow_screen_data_for_edit(
         self, post_id: int, workflow_operation_id: int | None = None, headers: dict = None
     ) -> GetPostWorkflowScreenDataForEditResponse | Response:
         path = f"/communication/posts/manage/post-workflow-screen-data-for-edit/{post_id}"
@@ -404,9 +404,9 @@ class InteractaApi(Api):
 
     ### end worflow operations
 
-    def get_post_by_title(self, community_id: int, title: str) -> Post | None:
+    def get_post_by_title(self, community_id: int, title: str) -> Post:
         search = ListCommunityPostsIn(title=title)
-        result = self.post_list(community_id, data=search)
+        result = self.list_posts(community_id, data=search)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
@@ -418,7 +418,7 @@ class InteractaApi(Api):
 
     def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
         search = ListCommunityPostsIn(title=title)
-        result = self.post_list(community_id, data=search)
+        result = self.list_posts(community_id, data=search)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
@@ -437,7 +437,7 @@ class InteractaApi(Api):
             filter.status_filter = [0]
         else:
             filter.full_text_filter = name
-        result = self.group_list(data=filter)
+        result = self.list_groups(data=filter)
         groups = [group for group in result.items if group.name == name]
 
         if len(groups) == 0:
@@ -463,7 +463,7 @@ class InteractaApi(Api):
         else:
             body.email_prefix_full_text_filter = email
 
-        result = self.user_list(data=body)
+        result = self.list_users(data=body)
 
         if len(result.items) == 0:
             raise ObjectDoesNotFound(f"User with email '{email}' non found in interacta")
