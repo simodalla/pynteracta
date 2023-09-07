@@ -18,7 +18,7 @@ More information is available at:
 Version:
 --------
 
-- pynteracta v0.2.0
+- pynteracta v0.2.1
 """
 
 from .main import app
