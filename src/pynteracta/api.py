@@ -111,7 +111,7 @@ class Api:
         return response
 
 
-class InteractaAPI(Api):
+class InteractaApi(Api):
     def __init__(
         self,
         base_url: str | None = None,
@@ -473,8 +473,12 @@ class InteractaAPI(Api):
             )
         return result.items[0]
 
+    @classmethod
+    def swap_type_model(cls, post: Post, PostModel: BaseModel):
+        return PostModel.model_validate(post.model_dump(by_alias=True))
 
-class PlaygroundApi(InteractaAPI):
+
+class PlaygroundApi(InteractaApi):
     def __init__(
         self,
         log_calls: bool = False,

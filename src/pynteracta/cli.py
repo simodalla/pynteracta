@@ -1,6 +1,6 @@
 from rich.table import Table
 
-from pynteracta.api import InteractaAPI, PlaygroundApi
+from pynteracta.api import InteractaApi, PlaygroundApi
 
 
 class CliRichMixin:
@@ -15,5 +15,5 @@ class CliPlaygroundApi(CliRichMixin, PlaygroundApi):
     pass
 
 
-class CliInteractaApi(CliRichMixin, InteractaAPI):
+class CliInteractaApi(CliRichMixin, InteractaApi):
     pass

@@ -9,17 +9,17 @@ import pytest
 import time_machine
 
 from pynteracta import urls as intercta_urls
-from pynteracta.api import InteractaAPI
+from pynteracta.api import InteractaApi
 from pynteracta.exceptions import InteractaLoginError
 
 rome_tz = ZoneInfo("Europe/Rome")
 
 
-class TestInteractaAPI:
+class TestInteractaApi:
     def test_init_without_params_no_envs(self, mocker):
         mocker.patch.dict(os.environ, {}, clear=True)
 
-        api = InteractaAPI()
+        api = InteractaApi()
 
         assert api.base_url is None
         assert api.service_auth_key == b""
@@ -35,7 +35,7 @@ class TestInteractaAPI:
     def test_init_without_params_with_env(self, mocker, environment_params):
         mocker.patch.dict(os.environ, environment_params)
 
-        api = InteractaAPI()
+        api = InteractaApi()
 
         assert (
             api.base_url
@@ -50,11 +50,11 @@ class TestInteractaAPI:
         url = "https://example.org/"
 
         mocker.patch.dict(os.environ, {"INTERACTA_BASEURL": url}, clear=True)
-        api = InteractaAPI()
+        api = InteractaApi()
         assert api.base_url == f"https://example.org{intercta_urls.API_ENDPOINT_PATH}"
 
         mocker.patch.dict(os.environ, {}, clear=True)
-        api = InteractaAPI(base_url=url)
+        api = InteractaApi(base_url=url)
         assert api.base_url == f"https://example.org{intercta_urls.API_ENDPOINT_PATH}"
 
     @pytest.mark.parametrize(
@@ -67,7 +67,7 @@ class TestInteractaAPI:
     )
     def test_service_auth_kid_setter(self, mocker, env, expected):
         mocker.patch.dict(os.environ, env, clear=True)
-        api = InteractaAPI()
+        api = InteractaApi()
         assert api.service_auth_kid == expected
 
     def test_prepare_credentials_login(self):
@@ -75,7 +75,7 @@ class TestInteractaAPI:
         username = "user1"
         pwd = "test1234"
 
-        api = InteractaAPI(base_url=url)
+        api = InteractaApi(base_url=url)
 
         login_url, data = api.prepare_credentials_login(username=username, password=pwd)
         data = json.loads(data)
@@ -94,7 +94,7 @@ class TestInteractaAPI:
         mocker.patch.dict(os.environ, environment_params)
         mock_jwt = mocker.patch("jwt.encode", return_value=token)
 
-        api = InteractaAPI(service_auth_token_expiration=auth_token_expiration)
+        api = InteractaApi(service_auth_token_expiration=auth_token_expiration)
 
         login_url, data = api.prepare_service_login()
         data = json.loads(data)
@@ -126,7 +126,7 @@ class TestInteractaAPI:
         mocked_responses.post(url, status=404)
 
         with pytest.raises(InteractaLoginError) as excinfo:
-            api = InteractaAPI(base_url=url)
+            api = InteractaApi(base_url=url)
             api.login(url=url, data={})
 
         assert f"url: {url}" in str(excinfo.value)
@@ -138,7 +138,7 @@ class TestInteractaAPI:
         fake_json = {"wrong_key": 123}
         mocked_responses.post(url, status=200, json=fake_json)
         with pytest.raises(InteractaLoginError) as excinfo:
-            api = InteractaAPI(base_url=url)
+            api = InteractaApi(base_url=url)
             api.login(url=url, data={})
 
         assert f"url: {url}" in str(excinfo.value)

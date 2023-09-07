@@ -1,10 +1,10 @@
 from rich.table import Table
 
-from .api import InteractaAPI
+from .api import InteractaApi
 from .utils import PLAYGROUND_SETTINGS
 
 
-class PlaygroundApi(InteractaAPI):
+class PlaygroundApi(InteractaApi):
     def __init__(
         self,
         log_calls: bool = False,
