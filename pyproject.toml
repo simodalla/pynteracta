@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-packages = [{ include = "pynteracta", from = "src" },]
+packages = [{ include = "pynteracta", from = "src" }]
 
 [tool.poetry.scripts]
 pynteracta = "pynteracta.main:app"
@@ -21,8 +21,8 @@ pynteracta = "pynteracta.main:app"
 python = "^3.11"
 requests = "^2.28.1"
 typer = "^0.9.0"
-pydantic = {extras = ["email"], version = "^2.0"}
-pyjwt = {extras = ["crypto"], version = "^2.6.0"}
+pydantic = { extras = ["email"], version = "^2.0" }
+pyjwt = { extras = ["crypto"], version = "^2.6.0" }
 pydantic-settings = "^2.0.0"
 pydantic-settings-toml = "^0.2.0"
 
@@ -59,25 +59,31 @@ build-backend = "poetry.core.masonry.api"
 [tool.bumpver]
 current_version = "0.2.0"
 version_pattern = "MAJOR.MINOR.PATCH"
-commit_message  = "bump version {old_version} -> {new_version}"
-commit          = true
-tag             = true
-push            = false
+commit_message = "bump version v{old_version} -> v{new_version}"
+tag_message = "v{new_version}"
+tag_scope = "default"
+commit = true
+tag = true
+push = false
 
-    [tool.bumpver.file_patterns]
-    "pyproject.toml" = [
-        'current_version = "{version}"',
-        'version = "{version}"',
-    ]
-    "src/pynteracta/__init__.py" = ["{version}"]
-    "src/pynteracta/__main__.py" = ["- pynteracta v{version}"]
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
+"src/pynteracta/__init__.py" = ["{version}"]
+"src/pynteracta/__main__.py" = ["- pynteracta v{version}"]
 
 [tool.isort]
 profile = "black"
 default_section = "THIRDPARTY"
 known_first_party = ["pynteracta"]
 known_django = "django"
-sections = ["FUTURE","STDLIB","THIRDPARTY", "DJANGO", "FIRSTPARTY","LOCALFOLDER"]
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "DJANGO",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
+]
 skip_glob = ["**/migrations/*.py"]
 
 
@@ -109,9 +115,41 @@ exclude = '''
 [tool.ruff]
 # Docs: https://beta.ruff.rs/docs/
 # Rules: https://beta.ruff.rs/docs/rules/
-select = ["B", "C4", "EXE", "F", "E", "ISC", "ICN", "INP", "PIE", "SIM", "W", "T20", "UP", "T10", "G", "C90", "ERA"]
+select = [
+    "B",
+    "C4",
+    "EXE",
+    "F",
+    "E",
+    "ISC",
+    "ICN",
+    "INP",
+    "PIE",
+    "SIM",
+    "W",
+    "T20",
+    "UP",
+    "T10",
+    "G",
+    "C90",
+    "ERA",
+]
 ignore = ["B008", "SIM102"]
-fixable = ["F", "E", "B", "C4", "EXE", "ISC", "ICN", "INP", "PIE", "SIM", "W", "T20", "UP"]
+fixable = [
+    "F",
+    "E",
+    "B",
+    "C4",
+    "EXE",
+    "ISC",
+    "ICN",
+    "INP",
+    "PIE",
+    "SIM",
+    "W",
+    "T20",
+    "UP",
+]
 unfixable = ["ERA", "F401"]
 # Exclude a variety of commonly ignored directories.
 exclude = [
