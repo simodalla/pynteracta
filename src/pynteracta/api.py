@@ -20,17 +20,19 @@ from .exceptions import (
     ObjectDoesNotFound,
     PostDoesNotFound,
 )
-from .schemas.models import (  # ListSystemGroupsOut,
+from .schemas.models import (
     CreateCustomPostIn,
     EditCustomPostIn,
     GetCommunityDetailsResponse,
     GetCustomPostForEditResponse,
+    GetPostWorkflowScreenDataForEditResponse,
     Group,
     InteractaModel,
     Post,
 )
 from .schemas.requests import (
     CreateUserIn,
+    ExecutePostWorkflowOperationIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
     ListSystemGroupsIn,
@@ -38,6 +40,7 @@ from .schemas.requests import (
 )
 from .schemas.responses import (
     CreateUserOut,
+    ExecutePostWorkflowOperationResponse,
     GetPostDefinitionOut,
     HashtagsOut,
     ListGroupMembersOut,
@@ -66,7 +69,7 @@ class Api:
         self._log_calls = False
 
     def call_post(
-        self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
+        self, path: str, params: dict = None, headers: dict = None, data: dict | str = None
     ):
         if data:
             if isinstance(data, BaseModel):
@@ -79,21 +82,21 @@ class Api:
         else:
             data = json.dumps({})
 
-        return self.call_api("post", path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_api("post", path=path, params=params, headers=headers, data=data)
 
-    def call_get(self, path: str, query_url: str = None, headers: dict = None):
-        return self.call_api("get", path=path, query_url=query_url, headers=headers)
+    def call_get(self, path: str, params: str = None, headers: dict = None):
+        return self.call_api("get", path=path, params=params, headers=headers)
 
     def call_put(
-        self, path: str, query_url: str = None, headers: dict = None, data: dict | str = None
+        self, path: str, params: str = None, headers: dict = None, data: dict | str = None
     ):
-        return self.call_api("put", path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_api("put", path=path, params=params, headers=headers, data=data)
 
     def call_api(
         self,
         method: str,
         path: str,
-        query_url: str | None = None,
+        params: dict | None = None,
         headers: dict | None = None,
         data: dict | str | None = None,
     ):
@@ -102,7 +105,7 @@ class Api:
         if self._log_calls:
             log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
             logger.info(log_msg)
-        response = request_method(url, headers=headers, data=data)
+        response = request_method(url, headers=headers, data=data, params=params)
         if response.status_code != 200:
             raise InteractaResponseError(format_response_error(response), response=response)
         return response
@@ -279,101 +282,127 @@ class InteractaAPI(Api):
     def post_list(
         self,
         community_id: str | int,
-        query_url: str = None,
+        params: dict = None,
         headers: dict = None,
         data: ListCommunityPostsIn = None,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, params=params, headers=headers, data=data)
 
     @interactapi(schema_out=PostDetailOut)
     def post_detail(
-        self, post_id: str | int, query_url: str = None, headers: dict = None
+        self, post_id: str | int, parms: dict = None, headers: dict = None
     ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
         try:
-            return self.call_get(path=path, query_url=query_url, headers=headers)
+            return self.call_get(path=path, params=parms, headers=headers)
         except InteractaResponseError as e:
             raise PostDoesNotFound(f"Post with id '{post_id}' non found in interacta: {e}") from e
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
-        self, community_id, query_url=None, headers: dict = None, data: CreateCustomPostIn = None
+        self, community_id, headers: dict = None, data: CreateCustomPostIn = None
     ) -> PostCreatedOut | Response:
         path = f"/communication/posts/manage/create-post/{community_id}"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=GetCustomPostForEditResponse)
     def post_data_for_edit(
-        self, post_id, query_url=None, headers: dict = None
+        self, post_id, headers: dict = None
     ) -> GetCustomPostForEditResponse | Response:
         path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
-        return self.call_get(path=path, query_url=query_url, headers=headers)
+        return self.call_get(path=path, headers=headers)
 
     @interactapi()
     def edit_post(
         self,
         post_id,
         occ_token,
-        query_url=None,
         headers: dict = None,
         data: EditCustomPostIn = None,
     ) -> Response:
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
-        return self.call_put(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_put(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemUsersOut)
     def user_list(
-        self, query_url=None, headers: dict = None, data: ListSystemUsersIn | None = None
+        self, headers: dict = None, data: ListSystemUsersIn | None = None
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=CreateUserOut)
     def create_user(
-        self, query_url=None, headers: dict = None, data: CreateUserIn = None
+        self, headers: dict = None, data: CreateUserIn = None
     ) -> CreateUserOut | Response:
         path = "/admin/manage/users"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemGroupsOut)
     def group_list(
-        self, query_url=None, headers: dict = None, data: ListSystemGroupsIn | None = None
+        self, headers: dict = None, data: ListSystemGroupsIn | None = None
     ) -> ListSystemGroupsOut | Response:
         path = "/admin/data/groups"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListGroupMembersOut)
     def group_member_list(
         self,
         group_id: str | int,
-        query_url=None,
         headers: dict = None,
         data: ListGroupMembersIn | None = None,
     ) -> ListGroupMembersOut | Response:
         path = f"/admin/data/groups/{group_id}/members"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=HashtagsOut)
     def hashtag_list(
-        self, community_id: str | int, query_url=None, headers: dict = None, data: dict = None
+        self, community_id: str | int, headers: dict = None, data: dict = None
     ) -> ListSystemGroupsOut | Response:
         path = f"/admin/data/communities/{community_id}/hashtags"
-        return self.call_post(path=path, query_url=query_url, headers=headers, data=data)
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=GetPostDefinitionOut)
     def community_post_definition_detail(
-        self, community_id: str | int, query_url=None, headers: dict = None
+        self, community_id: str | int, headers: dict = None
     ) -> GetPostDefinitionOut | Response:
         path = f"/communication/settings/communities/{community_id}/post-definition"
-        return self.call_get(path=path, query_url=query_url, headers=headers)
+        return self.call_get(path=path, headers=headers)
 
     @interactapi(schema_out=GetCommunityDetailsResponse)
     def community_detail(
-        self, community_id: str | int, query_url=None, headers: dict = None
+        self, community_id: str | int, headers: dict = None
     ) -> GetCommunityDetailsResponse | Response:
         path = f"/communication/settings/communities/{community_id}/details"
-        return self.call_get(path=path, query_url=query_url, headers=headers)
+        return self.call_get(path=path, headers=headers)
+
+    ### worflow operations
+
+    @interactapi(schema_out=GetPostWorkflowScreenDataForEditResponse)
+    def post_workflow_screen_data_for_edit(
+        self, post_id: int, workflow_operation_id: int | None = None, headers: dict = None
+    ) -> GetPostWorkflowScreenDataForEditResponse | Response:
+        path = f"/communication/posts/manage/post-workflow-screen-data-for-edit/{post_id}"
+        params = (
+            {"workflowOperationId": str(workflow_operation_id)} if workflow_operation_id else None
+        )
+        return self.call_get(path=path, params=params, headers=headers)
+
+    @interactapi(schema_out=ExecutePostWorkflowOperationResponse)
+    def execute_post_workflow_operation(
+        self,
+        post_id: int,
+        workflow_operation_id: int,
+        headers: dict | None = None,
+        data: ExecutePostWorkflowOperationIn | None = None,
+    ):
+        path = (
+            "/communication/posts/manage/execute-post-workflow-operation/"
+            f"{post_id}/{workflow_operation_id}"
+        )
+        return self.call_post(path=path, headers=headers, data=data)
+
+    ### end worflow operations
 
     def get_post_by_title(self, community_id: int, title: str) -> Post | None:
         search = ListCommunityPostsIn(title=title)

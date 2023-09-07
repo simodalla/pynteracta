@@ -11,6 +11,7 @@ from .models import (
     PostDefinition,
     PostDetail,
     PostWorkflowDefinitionState,
+    PostWorkflowDefinitionTransition,
     User,
 )
 
@@ -85,3 +86,13 @@ class CreateUserOut(InteractaOut):
     sent_email_notify: bool | None = None
     # Token per il controllo della conconcorrenza
     next_occ_token: int | None = None
+
+
+class ExecutePostWorkflowOperationResponse(InteractaOut):
+    # ExecutePostWorkflowOperationResponseDTO
+    new_current_state: PostWorkflowDefinitionState | None = None
+    new_screen_data: dict | None = None
+    new_current_workflow_permitted_operations: list[PostWorkflowDefinitionTransition] | None = None
+    new_can_edit_workflow_screen_data: bool | None = None
+    new_last_modify_timestamp: int | None = None
+    post_data_has_changed: bool | None = None

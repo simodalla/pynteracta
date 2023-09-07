@@ -36,6 +36,6 @@ class InteractaIn(InteractaModel):
     model_config = ConfigDict(validate_assignment=True)
 
     page_token: str | None = None
-    page_size: int | None = None
+    page_size: int = 15
     calculate_total_items_count: bool | None = True
     order_desc: bool | None = None

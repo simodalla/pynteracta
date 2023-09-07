@@ -1,11 +1,12 @@
 from datetime import datetime
 from datetime import datetime as type_datetime
-from enum import IntEnum
 from typing import Any
 
 from pydantic import BaseModel, EmailStr
 
+from ..exceptions import ObjectDoesNotFound
 from .core import InteractaModel, InteractaOut
+from .enums import FieldFilterTypeEnum, FieldTypeEnum
 
 
 class Link(BaseModel):
@@ -233,7 +234,9 @@ class PostWorkflowDefinitionState(InteractaModel):
     id: int
     init_state: bool | None = None
     name: str = ""
-    metadata: dict = None
+    metadata: dict | None = None
+    terminal: bool | None = None
+    deleted: bool | None = None
 
 
 class Post(InteractaModel):
@@ -325,43 +328,87 @@ class EnumValue(InteractaModel):
     deleted: bool | None = None
 
 
-class FieldTypeEnum(IntEnum):
-    INT = 1
-    BIGINT = 2
-    DECIMAL = 3
-    DATE = 4
-    DATETIME = 5
-    STRING = 6
-    ENUM = 7
-    ENUM_LIST = 8
-    TEXT_AREA = 9
-    FLAG = 10
-    DELTA_AREA = 11
-    FEEDBACK = 12
-    HIERARCHICAL_ENUM = 13
-    LINK = 14
-    GENERIC_ENTITY_LIST = 15
-
-
-class FieldDefinition(InteractaModel):
+class FieldBase(InteractaModel):
     id: int
     name: str | None = None
     label: str | None = None
-    description: str | None = None
     type: FieldTypeEnum | None = None
-    parent_id: int | None = None
     required: bool | None = None
-    readonly: bool | None = None
     searchable: bool | None = None
     sortable: bool | None = None
+    enum_values: list[EnumValue] | None = None
+    metadata: dict | None = None
+
+
+class FieldDefinition(FieldBase):
+    description: str | None = None
+    parent_id: int | None = None
+    readonly: bool | None = None
     visible_in_preview: bool | None = None
     visible_in_detail: bool | None = None
     visible_in_create: bool | None = None
     visible_in_edit: bool | None = None
     external_id: str | None = None
-    enum_values: list[EnumValue] | None = None
-    metadata: dict | None = None
     validations: list[dict] | None = None
+
+
+class PostWorkflowDefinitionScreenFieldAssociation(FieldBase):
+    # PostWorkflowDefinitionScreenFieldAssociation
+    pass
+
+
+class WorkflowDefinitionScreen(InteractaModel):
+    # WorkflowDefinitionScreenDTO
+    id: int
+    name: str = ""
+    message: str | None = None
+    field_metadatas: list[PostWorkflowDefinitionScreenFieldAssociation] | None = None
+
+
+class PostWorkflowDefinitionState(InteractaModel):
+    # PostWorkflowDefinitionStateDTO
+    id: int
+    init_state: bool | None = None
+    name: str | None = None
+    metadata: dict | None = None
+    terminal: bool | None = None
+    deleted: bool | None = None
+
+
+class PostWorkflowDefinitionTransition(InteractaModel):
+    # PostWorkflowDefinitionTransitionDTO
+    id: int
+    from_state: PostWorkflowDefinitionState | None = None
+    to_state: PostWorkflowDefinitionState | None = None
+    name: str | None = None
+    metadata: dict | None = None
+    screen: WorkflowDefinitionScreen | None = None
+
+
+class PostWorkflowDefinition(InteractaModel):
+    # PostWorkflowDefinitionDTO
+    id: int
+    title: str | None = None
+    states: list[PostWorkflowDefinitionState] | None = None
+    transitions: list[PostWorkflowDefinitionTransition] | None = None
+    screen_field_metadatas: list[PostWorkflowDefinitionState] | None = None
+    empty: bool | None = None
+
+    def get_state(self, name: str) -> PostWorkflowDefinitionState:
+        for state in self.states:
+            if state.name.lower() == name.lower():
+                return state
+        raise ObjectDoesNotFound(f"State '{name}' not found")
+
+    def get_transition(
+        self, from_state_id: int, to_state_id: int
+    ) -> PostWorkflowDefinitionTransition:
+        for transition in self.transitions:
+            if from_state_id == transition.from_state.id and to_state_id == transition.to_state.id:
+                return transition
+        raise ObjectDoesNotFound(
+            f"Transition from state {from_state_id} to state {to_state_id} not found"
+        )
 
 
 class PostDefinition(InteractaModel):
@@ -374,7 +421,7 @@ class PostDefinition(InteractaModel):
     default_post_visibility: int | None = None
     description_enabled: int | None = None
     field_definitions: list[FieldDefinition] | None = None
-    workflow_definition: dict | None = None  # creare model
+    workflow_definition: PostWorkflowDefinition | None = None  # creare model
     title_enabled: int | None = None
     watchers_enabled: int | None = None
     watchers_visible_in_preview: bool | None = None
@@ -390,7 +437,7 @@ class PostDefinition(InteractaModel):
         for field in self.field_definitions:
             if field_id == field.id:
                 return field
-        return None
+        raise ObjectDoesNotFound(f"Field with id '{field}' not found in field_definitions")
 
     def get_enum_id(self, field_id: int, label: str) -> int | None:
         field = self.get_field_by_id(field_id=field_id)
@@ -448,9 +495,9 @@ class CustomFieldFilter(InteractaModel):
     # Identificativo univoco del campo del post.
     column_id: int | None = None
     # ipo di ricerca [1=EQUAL, 2=INTERVAL, 3=LIKE, 4=IN, 5=CONTAINS, 6=IS_NULL_OR_IN, 7=IS_EMPTY].
-    type_id: int | None = None
+    type_id: FieldFilterTypeEnum | None = None
     # Parametri del filtro, ove necessari.
-    parameters: list[dict] = None
+    parameters: list[Any] = None
 
 
 class AcknowledgeTaskFilter(InteractaModel):
@@ -485,6 +532,16 @@ class GetCustomPostForEditResponse(InteractaOut):
 
 class GetCommunityDetailsResponse(InteractaOut):
     community: Community | None = None
+
+
+class GetPostWorkflowScreenDataForEditResponse(InteractaOut):
+    # GetPostWorkflowScreenDataForEditResponseDTO
+    screen_data: dict | None = None
+    screen_occ_token: int | None = (
+        None  # Token per il controllo delle modifiche concorrenti sugli screen.
+    )
+    screen: WorkflowDefinitionScreen | None = None
+    current_workflow_state: PostWorkflowDefinitionState | None = None
 
 
 # In Models

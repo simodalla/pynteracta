@@ -1,4 +1,4 @@
-from pydantic import EmailStr
+from pydantic import ConfigDict, EmailStr
 
 from .core import InteractaIn, InteractaModel
 from .models import (
@@ -148,3 +148,12 @@ class CreateUserIn(InteractaModel):
     user_settings: UserSettingsIn | None = None
     user_credentials_configuration: UserCredentialsConfiguration | None = None
     reset_user_custom_credentials_command: ResetUserCustomCredentialsCommand | None = None
+
+
+class ExecutePostWorkflowOperationIn(InteractaModel):
+    model_config = ConfigDict(validate_assignment=True)
+
+    # ExecutePostWorkflowOperationRequestDTO
+    screen_data: dict = {}
+    delta_area_format: int = 1
+    screen_occ_token: int
