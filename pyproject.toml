@@ -135,21 +135,7 @@ select = [
     "ERA",
 ]
 ignore = ["B008", "SIM102"]
-fixable = [
-    "F",
-    "E",
-    "B",
-    "C4",
-    "EXE",
-    "ISC",
-    "ICN",
-    "INP",
-    "PIE",
-    "SIM",
-    "W",
-    "T20",
-    "UP",
-]
+fixable = ["ALL"]
 unfixable = ["ERA", "F401"]
 # Exclude a variety of commonly ignored directories.
 exclude = [

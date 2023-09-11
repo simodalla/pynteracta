@@ -4,9 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, EmailStr
 
+from ..enums import FieldFilterTypeEnum, FieldTypeEnum
 from ..exceptions import ObjectDoesNotFound
 from .core import InteractaModel, InteractaOut
-from .enums import FieldFilterTypeEnum, FieldTypeEnum
 
 
 class Link(BaseModel):

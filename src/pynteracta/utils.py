@@ -98,7 +98,7 @@ def parse_service_account_file(file_path: str) -> dict:
 
 def check_service_account_json_data(data: dict):
     required_keys = ["private_key_id", "private_key", "client_id"]
-    not_keys = [key for key in required_keys if key not in data.keys()]
+    not_keys = [key for key in required_keys if key not in data]
     if not_keys:
         raise InteractaError(
             "Il service account non risulta valido. Non sono presenti tutti parametri necessari."

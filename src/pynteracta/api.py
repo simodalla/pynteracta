@@ -7,6 +7,7 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 
 import jwt
+import pytest
 import requests
 from pydantic import BaseModel
 from requests import Response
@@ -21,6 +22,7 @@ from .exceptions import (
     PostDoesNotFound,
 )
 from .schemas.models import (
+    BaseListPostsElement,
     CreateCustomPostIn,
     EditCustomPostIn,
     GetCommunityDetailsResponse,
@@ -428,6 +430,28 @@ class InteractaApi(Api):
             )
         return posts[0]
 
+    def list_all_posts(
+        self,
+        community_id: str | int,
+        params: dict = None,
+        headers: dict = None,
+        body: ListCommunityPostsIn = None,
+    ) -> list[BaseListPostsElement]:
+        all_posts = []
+        page_token = None
+        body = body if body else ListCommunityPostsIn()
+        while True:
+            body.page_token = page_token
+            posts = self.list_posts(
+                community_id=community_id,
+                data=body,
+            )
+            all_posts += posts.items
+            if not posts.next_page_token:
+                break
+            page_token = posts.next_page_token
+        return all_posts
+
     def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Group | None:
         if not filter:
             filter = ListSystemGroupsIn()
@@ -500,3 +524,8 @@ class PlaygroundApi(InteractaApi):
 
     def get_posts(self):
         return super().get_posts(community_id=PLAYGROUND_SETTINGS["community"]["id"])
+
+
+@pytest.fixture
+def test_fake():
+    pass
