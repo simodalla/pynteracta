@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 import time_machine
-
 from pynteracta import urls as intercta_urls
 from pynteracta.api import InteractaApi
 from pynteracta.exceptions import InteractaLoginError
@@ -34,20 +33,6 @@ class TestInteractaApi:
         assert api.service_auth_kid == 0
         assert api.service_auth_alg == "RS512"
         assert api.service_auth_token_expiration == 9
-
-    def test_init_without_params_with_env(self, mocker, environment_params):
-        mocker.patch.dict(os.environ, environment_params)
-
-        api = InteractaApi()
-
-        assert (
-            api.base_url
-            == f'{environment_params["INTERACTA_BASEURL"]}{intercta_urls.API_ENDPOINT_PATH}'
-        )
-        assert api.service_auth_key == environment_params["INTERACTA_SERVICE_AUTH_KEY"].encode()
-        assert api.service_auth_jti == environment_params["INTERACTA_SERVICE_AUTH_JTI"]
-        assert api.service_auth_iss == environment_params["INTERACTA_SERVICE_AUTH_ISS"]
-        assert api.service_auth_kid == int(environment_params["INTERACTA_SERVICE_AUTH_KID"])
 
     def test_base_url_setter_(self, mocker):
         url = "https://example.org/"

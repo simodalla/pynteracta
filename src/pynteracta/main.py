@@ -1,13 +1,22 @@
-import os
+from pathlib import Path
 
 import rich
 import typer
-from rich.prompt import Prompt
+from devtools import debug
+from rich.table import Table
 
-from pynteracta import cli, utils
+from pynteracta import cli
 from pynteracta.exceptions import InteractaLoginError
+from pynteracta.settings import AppSettings
 
 app = typer.Typer(help="")
+state = {"env_file": ""}
+
+
+@app.callback()
+def main(env_file: Path = typer.Option("env.toml", "--env", "-e")):  # noqa: B008
+    state["env_file"] = env_file
+
 
 help_text_base_url = (
     "URL di base ambiente di produzione. Se non valorizzato viene impostato dalla variabile "
@@ -40,83 +49,76 @@ def playground():
 
 
 @app.command()
-def login(
-    service_account_file: str = typer.Option(
-        "", help="Path del file json per autenticazione con Service Account."
-    ),
-    user: str = typer.Option("", help=help_text_user),
-    base_url: str = typer.Option("", help=help_text_base_url),
-):
-    """
-    Effettua il login nell'ambiente di produzione.
-
-    Se viene passato l'argomento service_account_file il login viene tentato con le credenziali del
-    service account ignorando l'autenticazione username/password.
-
-    Specifica la URL di base dell'ambiente di produzione.
-    """
-    method_prepare_type = None
-    auth_type = ""
-    params = {}
-    user = user if user else os.getenv("INTERACTA_USERNAME", "")
-
-    if service_account_file:
-        method_prepare_type = "prepare_service_login_from_file"
-        auth_type = "service account"
-        params = {"file_path": service_account_file}
-    else:
-        method_prepare_type = "prepare_credentials_login"
-        auth_type = "username/password"
-        user = user if user else os.getenv("INTERACTA_USERNAME", "")
-        password = os.getenv("INTERACTA_PASSWORD", "")
-        if not user:
-            user = Prompt.ask("Username")
-        if not password:
-            password = Prompt.ask("Password", password=True)
-        params = {"username": user, "password": password}
-    base_url = base_url if base_url else os.getenv("INTERACTA_BASEURL", "")
-    if not base_url:
-        base_url = Prompt.ask("Interacta url")
-
-    rich.print(f"[cyan]Connessione all'instanza Interacta {base_url} con '{auth_type}' ...[cyan]")
-    api = cli.CliInteractaApi(base_url=base_url)
-    try:
-        method = getattr(api, method_prepare_type)
-        url, data = method(**params)
-        access_token = api.login(url, data)
-        utils.set_session_access_token(access_token)
-    except InteractaLoginError as e:
-        rich.print(f"[bold red]Autenticazione fallita![/bold red] --> [red]{e}[/red]")
-        typer.Exit(code=1)
-    rich.print("[green]Login effettuato con successo![/green]")
-
-
-@app.command()
-def logout():
-    """Effettua il logout dall'ambiente di produzione."""
-    utils.clean_session_access_token()
-    rich.print("[green]Logout effettuato con successo![/green]")
-
-
-@app.command()
 def list_posts(
     community: int = typer.Argument(1, help="Id della community"),
-    base_url: str = typer.Option("", help=help_text_base_url),
 ):
     """
     Mostra la lista dei post presenti in una community.
-
-    Specifica la URL di base dell'ambiente di produzione.
     """
-    base_url = base_url if base_url else os.getenv("INTERACTA_BASEURL", "")
-    if not base_url:
-        base_url = Prompt.ask("Interacta url")
-    api = cli.CliInteractaApi(base_url=base_url)
-    api.access_token = utils.get_session_access_token()
-    if not api.access_token:
-        rich.print("[bold red]Sembra ci sia un problema. Effettua il login![/bold red]")
-        typer.Exit(code=1)
-    rich.print(api.table_list_posts(api.get_posts(community_id=community)))
+    settings = AppSettings(_env_file=state["env_file"])
+    api = cli.CliInteractaApi(settings=settings.interacta)
+    url, payload = api.prepare_service_login()
+    api.login(url, payload)
+    posts = api.list_posts(community_id=community).items
+    rich.print(api.table_list_posts(posts=posts))
 
 
-# @app
+@app.command()
+def get_community_definition(
+    community_id: int = typer.Option(0, "--id", "-i"),
+    community_name: str = typer.Option("", "--name", "-n"),
+    fields_definition: bool = typer.Option(False, "--fields", "-fd"),
+    output_table: bool = typer.Option(False, "--table", "-t"),
+):
+    if not community_id and not community_name:
+        rich.print(
+            "[bold red]Errore: inserisci almeno uno tra i due argomenti 'community_id' e"
+            " 'community_name' [/bold red]"
+        )
+        raise typer.Exit(code=1)
+
+    settings = AppSettings(_env_file=state["env_file"])
+    api = cli.CliInteractaApi(settings=settings.interacta)
+    url, payload = api.prepare_service_login()
+    api.login(url, payload)
+
+    if not community_id and community_name:
+        if community_name not in settings.interacta.model_dump():
+            rich.print(
+                f"[bold red]Errore: non è presente alcuna configurazione per la community"
+                f" '{community_name}'[/bold red]"
+            )
+            raise typer.Exit(code=1)
+        community_id = settings.interacta.model_dump()[community_name]["community_id"]
+
+    community = api.get_community_detail(community_id=community_id)
+    community_name = community.community.name
+    community_title = f"Community --> [cyan]{community_name}[/cyan]"
+    post_definition = api.get_post_definition_detail(community_id=community_id)
+
+    if fields_definition:
+        if output_table:
+            table = Table(
+                "Id", "Label", "Type", "Enum Values", title=community_title, show_lines=True
+            )
+            for field in post_definition.field_definitions:
+                table.add_row(
+                    str(field.id),
+                    field.label,
+                    field.type.name,
+                    ",".join([str((d.id, d.label)) for d in field.enum_values]),
+                )
+            rich.print(table)
+        else:
+            rich.print(f"{community_title}\n")
+            for field in post_definition.field_definitions:
+                rich.print(field)
+        raise typer.Exit()
+
+    rich.print_json(post_definition.model_dump_json())
+
+
+@app.command()
+def echo_settings():
+    settings = AppSettings(_env_file=state["env_file"])
+    debug(settings.model_dump(exclude={"interacta": {"service_account": {"private_key"}}}))

@@ -360,7 +360,7 @@ class PostWorkflowDefinitionScreenFieldAssociation(FieldBase):
 class WorkflowDefinitionScreen(InteractaModel):
     # WorkflowDefinitionScreenDTO
     id: int
-    name: str = ""
+    name: str | None = None
     message: str | None = None
     field_metadatas: list[PostWorkflowDefinitionScreenFieldAssociation] | None = None
 

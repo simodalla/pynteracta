@@ -1,7 +1,5 @@
 import json
 
-from devtools import debug
-
 from pynteracta.models import ServiceAccountModel
 
 
@@ -39,6 +37,6 @@ def test_service_account_jwt_token_headers():
         service_account = ServiceAccountModel(**json.load(f))
 
     jwt_token_headers = service_account.jwt_token_headers
-    debug(jwt_token_headers)
+
     assert jwt_token_headers["kid"] == 1
     assert jwt_token_headers["typ"] is None
