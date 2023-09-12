@@ -114,7 +114,7 @@ class Api:
 class InteractaApi(Api):
     def __init__(
         self,
-        settings: InteractaSettings = None,
+        settings: InteractaSettings,
         log_calls: bool = False,
         log_call_responses: bool = False,
     ) -> None:
@@ -138,18 +138,18 @@ class InteractaApi(Api):
         return login_path, data
 
     def prepare_service_login(self):
-        if not self.settings.service_account:
+        if not self.settings.auth_service_account:
             raise InteractaError("Problemi con service account")
 
         login_path = urls.LOGIN_SERVICE
-        payload = self.settings.service_account.jwt_token_payload
-        headers = self.settings.service_account.jwt_token_headers
+        payload = self.settings.auth_service_account.jwt_token_payload
+        headers = self.settings.auth_service_account.jwt_token_headers
 
         try:
             token = jwt.encode(
                 payload,
-                self.settings.service_account.private_key,
-                algorithm=self.settings.service_account.algorithm,
+                self.settings.auth_service_account.private_key,
+                algorithm=self.settings.auth_service_account.algorithm,
                 headers=headers,
             )
         except Exception as e:
@@ -157,7 +157,35 @@ class InteractaApi(Api):
         data = json.dumps({"jwtAssertion": token})
         return login_path, data
 
-    def login(self, path, data):
+    def login(self):
+        try:
+            path, data = (
+                self.prepare_service_login()
+                if self.settings.auth_service_account
+                else self.prepare_credentials_login()
+            )
+        except Exception as e:
+            raise InteractaError(f"Error on prepare login: {e}") from e
+
+        try:
+            response = self.call_api(
+                "post",
+                path=path,
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                },
+                data=data,
+            )
+        except InteractaResponseError as e:
+            raise InteractaLoginError(str(e)) from e
+        result = response.json()
+        if "accessToken" not in result:
+            raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
+        self.access_token = result["accessToken"]
+        return self.access_token
+
+    def login_pre(self, path, data):
         try:
             response = self.call_api(
                 "post",

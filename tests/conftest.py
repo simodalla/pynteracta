@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import responses
 
@@ -24,3 +26,8 @@ def mocked_responses():
 @pytest.fixture
 def settings():
     return InteractaSettings(base_url="https://interacta.com")
+
+
+@pytest.fixture
+def service_account_path():
+    return Path("./tests/fake_service_account.json")

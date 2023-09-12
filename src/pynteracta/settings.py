@@ -3,7 +3,14 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, HttpUrl, computed_field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    HttpUrl,
+    SecretStr,
+    computed_field,
+)
 from pydantic_settings_toml import TomlSettings
 
 from pynteracta.models import ServiceAccountModel
@@ -40,14 +47,22 @@ class ApiSettings(BaseModel):
     base_url: HttpUrl
     api_version: str = "v2"
     api_endpoint_path: str = "portal/api/external/"
-    service_file_path: Path | None = None
-    service_account: ServiceAccountModel | None = None
+    auth_service_file_path: Path | None = None
+    auth_service_account: ServiceAccountModel | None = None
+    auth_username: EmailStr | None = None
+    auth_password: SecretStr | None = None
 
     def model_post_init(self, __context: Any) -> None:
-        if self.service_file_path:
-            with open(self.service_file_path) as f:
-                data = json.load(f)
-                self.service_account = ServiceAccountModel(**data)
+        if self.auth_service_file_path:
+            try:
+                with open(self.auth_service_file_path) as f:
+                    data = json.load(f)
+                    self.auth_service_account = ServiceAccountModel(**data)
+                return
+            except Exception as exc:
+                raise ValueError(f"Wrong service account settings: {exc}") from exc
+        if not self.auth_username or not self.auth_password:
+            raise ValueError("No authentication settings is set")
 
     @computed_field
     @cached_property

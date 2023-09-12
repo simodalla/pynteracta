@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 import time_machine
+
 from pynteracta import urls as intercta_urls
 from pynteracta.api import InteractaApi
 from pynteracta.exceptions import InteractaLoginError
@@ -115,7 +116,7 @@ class TestInteractaApi:
 
         with pytest.raises(InteractaLoginError) as excinfo:
             api = InteractaApi(base_url=url)
-            api.login(url=url, data={})
+            api.login()
 
         assert f"url: {url}" in str(excinfo.value)
 
@@ -127,7 +128,7 @@ class TestInteractaApi:
         mocked_responses.post(url, status=200, json=fake_json)
         with pytest.raises(InteractaLoginError) as excinfo:
             api = InteractaApi(base_url=url)
-            api.login(url=url, data={})
+            api.login()
 
         assert f"url: {url}" in str(excinfo.value)
         assert "No accessToken" in str(excinfo.value)

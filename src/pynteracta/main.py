@@ -6,7 +6,7 @@ from devtools import debug
 from rich.table import Table
 
 from pynteracta import cli
-from pynteracta.exceptions import InteractaLoginError
+from pynteracta.exceptions import InteractaError
 from pynteracta.settings import AppSettings
 
 app = typer.Typer(help="")
@@ -39,8 +39,8 @@ def playground():
     rich.print("[cyan]Connessione all'ambiente Playground di Interacta...[cyan]")
     api = cli.CliPlaygroundApi()
     try:
-        api.bootstrap_token()
-    except InteractaLoginError as e:
+        api.login()
+    except InteractaError as e:
         rich.print(f"[bold red]Autenticazione fallita![/bold red] --> [red]{e}[/red]")
         typer.Exit(code=1)
     rich.print("[green]Login effettuato con successo![/green]")
@@ -57,8 +57,8 @@ def list_posts(
     """
     settings = AppSettings(_env_file=state["env_file"])
     api = cli.CliInteractaApi(settings=settings.interacta)
-    url, payload = api.prepare_service_login()
-    api.login(url, payload)
+    api.login()
+
     posts = api.list_posts(community_id=community).items
     rich.print(api.table_list_posts(posts=posts))
 
@@ -79,8 +79,7 @@ def get_community_definition(
 
     settings = AppSettings(_env_file=state["env_file"])
     api = cli.CliInteractaApi(settings=settings.interacta)
-    url, payload = api.prepare_service_login()
-    api.login(url, payload)
+    api.login()
 
     if not community_id and community_name:
         if community_name not in settings.interacta.model_dump():

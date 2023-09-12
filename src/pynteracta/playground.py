@@ -16,14 +16,6 @@ class PlaygroundApi(InteractaApi):
             log_call_responses=log_call_responses,
         )
 
-    def bootstrap_token(self):
-        url, data = self.prepare_credentials_login(
-            username=PLAYGROUND_SETTINGS["username"],
-            password=PLAYGROUND_SETTINGS["password"],
-        )
-        token = self.login(url, data)
-        return token
-
     def list_posts(self):
         response = self.get_posts(PLAYGROUND_SETTINGS["community"]["id"])
         if response.status_code != 200:

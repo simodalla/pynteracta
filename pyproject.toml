@@ -7,15 +7,15 @@ authors = ["Simone Dalla <simodalla@gmail.com>"]
 readme = "README.md"
 homepage = "https://github.com/simodalla/pynteracta"
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: License :: OSI Approved :: BSD License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: License :: OSI Approved :: BSD License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
 ]
 packages = [{ include = "pynteracta", from = "src" }]
 
 [tool.poetry.scripts]
-pynteracta = "pynteracta.main:app"
+pynta = "pynteracta.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -72,20 +72,20 @@ push = false
 "src/pynteracta/__init__.py" = ["{version}"]
 "src/pynteracta/__main__.py" = ["- pynteracta v{version}"]
 
-[tool.isort]
-profile = "black"
-default_section = "THIRDPARTY"
-known_first_party = ["pynteracta"]
-known_django = "django"
-sections = [
-    "FUTURE",
-    "STDLIB",
-    "THIRDPARTY",
-    "DJANGO",
-    "FIRSTPARTY",
-    "LOCALFOLDER",
-]
-skip_glob = ["**/migrations/*.py"]
+# [tool.isort]
+# profile = "black"
+# default_section = "THIRDPARTY"
+# known_first_party = ["pynteracta"]
+# known_django = "django"
+# sections = [
+#     "FUTURE",
+#     "STDLIB",
+#     "THIRDPARTY",
+#     "DJANGO",
+#     "FIRSTPARTY",
+#     "LOCALFOLDER",
+# ]
+# skip_glob = ["**/migrations/*.py"]
 
 [tool.black]
 line-length = 100
@@ -116,43 +116,44 @@ exclude = '''
 # Docs: https://beta.ruff.rs/docs/
 # Rules: https://beta.ruff.rs/docs/rules/
 select = [
-    "B",
-    "C4",
-    "EXE",
-    "F",
-    "E",
-    "ISC",
-    "ICN",
-    "INP",
-    "PIE",
-    "SIM",
-    "W",
-    "T20",
-    "UP",
-    "T10",
-    "G",
-    "C90",
-    "ERA",
+  "B",
+  "C4",
+  "EXE",
+  "F",
+  "E",
+  "ISC",
+  "ICN",
+  "INP",
+  "PIE",
+  "SIM",
+  "W",
+  "T20",
+  "UP",
+  "T10",
+  "G",
+  "C90",
+  "ERA",
 ]
 ignore = ["G004"] #["B008", "SIM102"]
 fixable = ["ALL"]
 unfixable = ["G004", "ERA001", "F401"]
 
 exclude = [
-    ".git",
-    ".mypy_cache",
-    ".pre-commit-cache",
-    ".ruff_cache",
-    ".tox",
-    ".venv",
-    "venv",
-    "docs",
-    "__pycache",
-    "**/migrations/*",
+  ".git",
+  ".mypy_cache",
+  ".pre-commit-cache",
+  ".ruff_cache",
+  ".tox",
+  ".venv",
+  "venv",
+  "docs",
+  "__pycache",
+  "**/migrations/*",
 ]
 line-length = 100
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py311"
+src = ["src", "test"]
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.

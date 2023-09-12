@@ -17,6 +17,5 @@ def settings(app_settings: AppSettings) -> InteractaSettings:
 @pytest.fixture(scope="session")
 def logged_api(settings: InteractaSettings) -> InteractaApi:
     api = InteractaApi(settings=settings)
-    url, payload = api.prepare_service_login()
-    api.login(url, payload)
+    api.login()
     return api
