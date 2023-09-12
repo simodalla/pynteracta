@@ -1,10 +1,7 @@
 import json
 import logging
 import os
-import time
-import uuid
 from collections import OrderedDict
-from datetime import datetime, timedelta
 
 import jwt
 import pytest
@@ -53,12 +50,12 @@ from .schemas.responses import (
     PostDetailOut,
     PostsOut,
 )
+from .settings import ApiSettings, InteractaSettings
 from .utils import (
     PLAYGROUND_SETTINGS,
     format_response_error,
     interactapi,
     mock_validate_kid,
-    parse_service_account_file,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,9 +63,10 @@ jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
 
 
 class Api:
-    def __init__(self):
+    def __init__(self, settings: ApiSettings):
         self.access_token = None
         self._log_calls = False
+        self.settings = settings
 
     def call_post(
         self, path: str, params: dict = None, headers: dict = None, data: dict | str = None
@@ -102,7 +100,7 @@ class Api:
         headers: dict | None = None,
         data: dict | str | None = None,
     ):
-        url = f"{self.base_url}{path}"
+        url = f"{self.settings.api_url}{path}"
         request_method = getattr(requests, method)
         if self._log_calls:
             log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
@@ -116,87 +114,14 @@ class Api:
 class InteractaApi(Api):
     def __init__(
         self,
-        base_url: str | None = None,
-        service_auth_key: str | bytes | None = None,
-        service_auth_jti: str | None = None,
-        service_auth_iss: str | None = None,
-        service_auth_kid: int = 0,
-        service_auth_alg: str = "RS512",
-        service_auth_token_expiration: int = 9,
+        settings: InteractaSettings = None,
         log_calls: bool = False,
         log_call_responses: bool = False,
     ) -> None:
-        self.base_url = base_url
-        self.service_auth_key = service_auth_key
-        self.service_auth_jti = service_auth_jti
-        self.service_auth_iss = service_auth_iss
-        self.service_auth_kid = service_auth_kid
-        self.service_auth_alg = service_auth_alg
-        self.service_auth_token_expiration = service_auth_token_expiration
+        self.settings = settings
         self._log_calls = log_calls
         self._log_call_responses = log_call_responses
         self._call_stack = OrderedDict()
-
-    @property
-    def base_url(self) -> str:
-        return self._base_url
-
-    @base_url.setter
-    def base_url(self, value: str) -> None:
-        url = value if value else os.getenv("INTERACTA_BASEURL", "")
-        if url:
-            if url.endswith("/"):
-                url = url.rstrip("/")
-            if not url.endswith(urls.API_ENDPOINT_PATH):
-                url = f"{url}{urls.API_ENDPOINT_PATH}"
-        self._base_url = url
-
-    # SERVICE AUTH PAYLOAD PROPS
-    @property
-    def service_auth_key(self) -> str:
-        return self._service_auth_key
-
-    @service_auth_key.setter
-    def service_auth_key(self, value: bytes) -> None:
-        self._service_auth_key = (
-            value if value else os.getenv("INTERACTA_SERVICE_AUTH_KEY", "").encode()
-        )
-
-    @property
-    def service_auth_jti(self):
-        return self._service_auth_jti
-
-    @service_auth_jti.setter
-    def service_auth_jti(self, value):
-        self._service_auth_jti = (
-            value if value else os.getenv("INTERACTA_SERVICE_AUTH_JTI", str(uuid.uuid4()))
-        )
-
-    @property
-    def service_auth_iss(self):
-        return self._service_auth_iss
-
-    @service_auth_iss.setter
-    def service_auth_iss(self, value):
-        self._service_auth_iss = value if value else os.getenv("INTERACTA_SERVICE_AUTH_ISS", None)
-
-    # END SERVICE AUTH PAYLOAD PROPS
-
-    # SERVICE AUTH HEADERS PROPS
-    @property
-    def service_auth_kid(self):
-        return self._service_auth_kid
-
-    @service_auth_kid.setter
-    def service_auth_kid(self, value):
-        self._service_auth_kid = value
-        if not self._service_auth_kid:
-            try:
-                self._service_auth_kid = int(os.getenv("INTERACTA_SERVICE_AUTH_KID", 0))
-            except ValueError:
-                self._service_auth_kid = 0
-
-    # END SERVICE AUTH HEADERS PROPS
 
     @property
     def authorized_header(self):
@@ -212,54 +137,25 @@ class InteractaApi(Api):
         data = json.dumps({"username": username, "password": password})
         return login_path, data
 
-    def prepare_service_login(
-        self,
-        service_auth_key: str | None = None,
-        service_auth_jti: str | None = None,
-        service_auth_iss: str | None = None,
-        service_auth_kid: int = 0,
-    ):
-        if service_auth_key:
-            self.service_auth_key = service_auth_key
-        if service_auth_jti:
-            self.service_auth_jti = service_auth_jti
-        if service_auth_iss:
-            self.service_auth_iss = service_auth_iss
-        if service_auth_kid:
-            self.service_auth_kid = service_auth_kid
+    def prepare_service_login(self):
+        if not self.settings.service_account:
+            raise InteractaError("Problemi con service account")
 
         login_path = urls.LOGIN_SERVICE
-        now = datetime.now()
-        current_timestamp = time.mktime(now.timetuple())
-        expiration_timestamp = time.mktime(
-            (now + timedelta(seconds=60 * self.service_auth_token_expiration)).timetuple()
-        )
-        payload = {
-            "jti": self.service_auth_jti,
-            "aud": "injenia/portal-authenticator",
-            "iss": self.service_auth_iss,
-            "iat": current_timestamp,
-            "exp": expiration_timestamp,
-        }
-        headers = {"kid": self.service_auth_kid, "typ": None}
+        payload = self.settings.service_account.jwt_token_payload
+        headers = self.settings.service_account.jwt_token_headers
+
         try:
             token = jwt.encode(
                 payload,
-                self.service_auth_key,
-                algorithm=self.service_auth_alg,
+                self.settings.service_account.private_key,
+                algorithm=self.settings.service_account.algorithm,
                 headers=headers,
             )
         except Exception as e:
             raise e
         data = json.dumps({"jwtAssertion": token})
         return login_path, data
-
-    def prepare_service_login_from_file(self, file_path: str) -> tuple:
-        try:
-            data = parse_service_account_file(file_path)
-        except InteractaError as e:
-            raise e
-        return self.prepare_service_login(**data)
 
     def login(self, path, data):
         try:

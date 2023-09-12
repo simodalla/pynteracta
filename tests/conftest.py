@@ -1,6 +1,8 @@
 import pytest
 import responses
 
+from pynteracta.settings import InteractaSettings
+
 
 @pytest.fixture()
 def environment_params():
@@ -17,3 +19,8 @@ def environment_params():
 def mocked_responses():
     with responses.RequestsMock() as rsps:
         yield rsps
+
+
+@pytest.fixture
+def settings():
+    return InteractaSettings(base_url="https://interacta.com")

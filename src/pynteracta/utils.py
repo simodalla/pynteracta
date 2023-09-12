@@ -1,11 +1,8 @@
 import functools
-import json
 from pathlib import Path
 
 from jwt.exceptions import InvalidTokenError
 from requests.models import Response
-
-from .exceptions import InteractaError
 
 # ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion # noqa: E501
 SERVICE_AUTH_HEADERS = {
@@ -79,36 +76,6 @@ def format_response_error(response: Response) -> str:
         f"url: {response.url} - response {response.status_code}"
         f" headers: {response.headers} content: {response.text}"
     )
-
-
-def parse_service_account_file(file_path: str) -> dict:
-    try:
-        with open(file_path) as f:
-            json_data = json.load(f)
-            check_service_account_json_data(data=json_data)
-            data = {
-                "service_auth_key": str(json_data["private_key"]),
-                "service_auth_iss": str(json_data["client_id"]),
-                "service_auth_kid": int(json_data["private_key_id"]),
-            }
-    except Exception as e:
-        raise InteractaError(str(e)) from e
-    return data
-
-
-def check_service_account_json_data(data: dict):
-    required_keys = ["private_key_id", "private_key", "client_id"]
-    not_keys = [key for key in required_keys if key not in data]
-    if not_keys:
-        raise InteractaError(
-            "Il service account non risulta valido. Non sono presenti tutti parametri necessari."
-        )
-    not_values = [key for key in required_keys if not data[key]]
-    if not_values:
-        raise InteractaError(
-            "Il service account non risulta valido. Non sono valorizzati tutti parametri necessari."
-        )
-    return True
 
 
 def to_camel(string: str) -> str:

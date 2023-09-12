@@ -48,6 +48,7 @@ pytest-mock = "^3.10.0"
 time-machine = "^2.9.0"
 responses = "^0.23.3"
 faker = "^19.2.0"
+devtools = "^0.12.2"
 
 
 [tool.poetry.group.pytest.dependencies]
@@ -85,7 +86,6 @@ sections = [
     "LOCALFOLDER",
 ]
 skip_glob = ["**/migrations/*.py"]
-
 
 [tool.black]
 line-length = 100
@@ -134,10 +134,10 @@ select = [
     "C90",
     "ERA",
 ]
-ignore = ["B008", "SIM102"]
+ignore = ["G004"] #["B008", "SIM102"]
 fixable = ["ALL"]
-unfixable = ["ERA", "F401"]
-# Exclude a variety of commonly ignored directories.
+unfixable = ["G004", "ERA001", "F401"]
+
 exclude = [
     ".git",
     ".mypy_cache",
@@ -150,13 +150,9 @@ exclude = [
     "__pycache",
     "**/migrations/*",
 ]
-# Same as Black.
 line-length = 100
-# Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-# Assume Python 3.11.
 target-version = "py311"
-# src = ["src"]
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.

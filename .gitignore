@@ -348,3 +348,6 @@ data*.json
 staticstorage
 query_lastlogin.txt
 demo/*
+
+*.json
+!tests/fake_service_account.json

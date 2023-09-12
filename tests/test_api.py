@@ -16,6 +16,9 @@ rome_tz = ZoneInfo("Europe/Rome")
 
 
 class TestInteractaApi:
+    def test_settings_base_url(self):
+        pass
+
     def test_init_without_params_no_envs(self, mocker):
         mocker.patch.dict(os.environ, {}, clear=True)
 
