@@ -270,7 +270,7 @@ class Post(InteractaModel):
     total_standard_tasks_count: int | None = None
 
     def get_absolute_url(self, base_url: str | None = None):
-        url = f"/post/{self.id}/"
+        url = f"post/{self.id}"
         if base_url:
             url = f"{base_url}{url}"
         return url

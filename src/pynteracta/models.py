@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, SecretStr, field_serializer
 
 
 class JwtTokenPayload(BaseModel):
@@ -21,7 +21,7 @@ class JwtTokenHeaders(BaseModel):
 class ServiceAccountModel(BaseModel):
     type: str = "service_account"
     private_key_id: int = Field(serialization_alias="kid")
-    private_key: str
+    private_key: SecretStr
     client_id: int = Field(serialization_alias="iss")
     aud: str = "injenia/portal-authenticator"
     algorithm: str = Field("RS512", serialization_alias="alg")

@@ -1,5 +1,4 @@
 import functools
-from pathlib import Path
 
 from jwt.exceptions import InvalidTokenError
 from requests.models import Response
@@ -28,47 +27,17 @@ SERVICE_AUTH_PAYLOAD = {
 
 PLAYGROUND_SETTINGS = {
     "base_url": "https://prod.development.lab.interacta.space",
-    "username": "interacta-test-api@interacta-prod",
-    "password": "MyInteractaPl@yground!",
-    "community": {
-        "nome": "Interacta Playground",
-        "id": 1142,
+    "auth_username": "interacta-test-api@interacta-prod",
+    "auth_password": "MyInteractaPl@yground!",
+    "playground_community": {
+        "community_id": 1142,
     },
 }
-
-SESSION_ACCESSTK_CACHE_FILENAME = ".pyintercata"
 
 
 def mock_validate_kid(self, kid) -> None:
     if not isinstance(kid, str) and not isinstance(kid, int):
         raise InvalidTokenError("Key ID header parameter must be a string or an int")
-
-
-def set_session_access_token(access_token: str):
-    try:
-        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
-        sak_file.write_text(access_token)
-    except Exception:
-        return False
-    return True
-
-
-def get_session_access_token():
-    try:
-        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
-        token = sak_file.read_text()
-    except Exception:
-        return None
-    return token
-
-
-def clean_session_access_token():
-    try:
-        sak_file = Path.home() / SESSION_ACCESSTK_CACHE_FILENAME
-        sak_file.unlink()
-    except Exception:
-        return False
-    return True
 
 
 def format_response_error(response: Response) -> str:

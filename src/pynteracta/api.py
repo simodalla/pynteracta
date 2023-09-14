@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from collections import OrderedDict
 
 import jwt
@@ -130,11 +129,14 @@ class InteractaApi(Api):
             "content-type": "application/json",
         }
 
-    def prepare_credentials_login(self, username: str = "", password: str = ""):
-        username = username if username else os.getenv("INTERACTA_USERNAME", "")
-        password = password if password else os.getenv("INTERACTA_PASSWORD", "")
+    def prepare_credentials_login(self):
         login_path = urls.LOGIN_CREDENTIAL
-        data = json.dumps({"username": username, "password": password})
+        data = json.dumps(
+            {
+                "username": self.settings.auth_username,
+                "password": self.settings.auth_password.get_secret_value(),
+            }
+        )
         return login_path, data
 
     def prepare_service_login(self):
@@ -148,7 +150,7 @@ class InteractaApi(Api):
         try:
             token = jwt.encode(
                 payload,
-                self.settings.auth_service_account.private_key,
+                self.settings.auth_service_account.private_key.get_secret_value(),
                 algorithm=self.settings.auth_service_account.algorithm,
                 headers=headers,
             )

@@ -3,19 +3,12 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    EmailStr,
-    HttpUrl,
-    SecretStr,
-    computed_field,
-)
-from pydantic_settings_toml import TomlSettings
-
-from pynteracta.models import ServiceAccountModel
+from pydantic import BaseModel, ConfigDict, HttpUrl, SecretStr, computed_field
+from pydantic_settings_toml import TomlSettings, TomlSettingsError
 
 from .enums import InteractaLoginProvider
+from .exceptions import InteractaError
+from .models import ServiceAccountModel
 
 
 class CommunitySettings(BaseModel):
@@ -47,9 +40,10 @@ class ApiSettings(BaseModel):
     base_url: HttpUrl
     api_version: str = "v2"
     api_endpoint_path: str = "portal/api/external/"
+    portal_path: str = "portal/"
     auth_service_file_path: Path | None = None
     auth_service_account: ServiceAccountModel | None = None
-    auth_username: EmailStr | None = None
+    auth_username: str | None = None
     auth_password: SecretStr | None = None
 
     def model_post_init(self, __context: Any) -> None:
@@ -67,7 +61,13 @@ class ApiSettings(BaseModel):
     @computed_field
     @cached_property
     def api_url(self) -> HttpUrl:
-        url = f"{self.base_url}{self.api_endpoint_path}{self.api_version}"
+        url = HttpUrl(f"{self.base_url}{self.api_endpoint_path}{self.api_version}")
+        return url
+
+    @computed_field
+    @cached_property
+    def portal_url(self) -> HttpUrl:
+        url = HttpUrl(f"{self.base_url}{self.portal_path}")
         return url
 
 
@@ -79,3 +79,10 @@ class InteractaSettings(ApiSettings):
 
 class AppSettings(TomlSettings):
     interacta: InteractaSettings | None = None
+
+
+def init_app_settings(env_file: Path | None = None) -> AppSettings:
+    try:
+        return AppSettings(_env_file=env_file)
+    except TomlSettingsError as tse:
+        raise InteractaError(tse) from tse

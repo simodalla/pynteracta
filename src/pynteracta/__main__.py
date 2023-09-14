@@ -21,7 +21,7 @@ Version:
 - pynteracta v0.3.1
 """
 
-from .main import app
+from .cli.commands import app
 
 if __name__ == "__main__":
     app()

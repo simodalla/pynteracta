@@ -15,7 +15,7 @@ classifiers = [
 packages = [{ include = "pynteracta", from = "src" }]
 
 [tool.poetry.scripts]
-pynta = "pynteracta.main:app"
+pynta = "pynteracta.cli.commands:app"
 
 [tool.poetry.dependencies]
 python = "^3.11"
