@@ -7,7 +7,13 @@ from pynteracta.schemas.models import (
     GoogleUserCredentialsConfiguration,
     UserCredentialsConfiguration,
 )
-from pynteracta.schemas.requests import CreateUserIn, ListSystemUsersIn, UserInfoIn, UserSettingsIn
+from pynteracta.schemas.requests import (
+    CreateUserIn,
+    EditUserIn,
+    ListSystemUsersIn,
+    UserInfoIn,
+    UserSettingsIn,
+)
 
 
 def test_list_users(logged_api: InteractaApi) -> None:
@@ -80,7 +86,26 @@ def test_user_lifecycle(logged_api: InteractaApi) -> None:
 
 
 def test_call_spot(logged_api: InteractaApi) -> None:
+    fake = Faker("it-IT")
     user_id = 4759
     prepare_edit_result = logged_api.get_user_data_for_edit(user_id=user_id)
     assert isinstance(prepare_edit_result, responses.GetUserForEditOut)
     debug(prepare_edit_result)
+    new_private_email = fake.email()
+    new_mobile_phone = fake.phone_number()
+    assert new_mobile_phone != prepare_edit_result.user_info.mobile_phone
+    assert new_private_email != prepare_edit_result.private_email
+    prepare_edit_result.private_email = new_private_email
+    prepare_edit_result.user_info.mobile_phone = new_mobile_phone
+
+    data = EditUserIn(**prepare_edit_result.model_dump(by_alias=True))
+    debug(data)
+
+    edit_result = logged_api.edit_user(user_id=user_id, data=data)
+    assert isinstance(edit_result, responses.EditUserOut)
+
+    edited_result = logged_api.get_user_data_for_edit(user_id=user_id)
+    assert edited_result.private_email == new_private_email
+    assert edited_result.user_info.mobile_phone == new_mobile_phone
+
+    debug(edit_result)

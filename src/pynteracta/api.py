@@ -29,6 +29,7 @@ from .schemas.models import (
 )
 from .schemas.requests import (
     CreateUserIn,
+    EditUserIn,
     ExecutePostWorkflowOperationIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
@@ -61,6 +62,19 @@ logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
 
 
+def prepare_data(data=None):
+    if not data:
+        return data  # data = json.dumps({})
+    if isinstance(data, BaseModel):
+        if isinstance(data, InteractaModel):
+            data = data.model_dump_json(by_alias=True)
+        else:
+            data = data.model_dump_json()
+    else:
+        data = json.dumps(data)
+    return data
+
+
 class Api:
     def __init__(self, settings: ApiSettings):
         self.access_token = None
@@ -70,18 +84,9 @@ class Api:
     def call_post(
         self, path: str, params: dict = None, headers: dict = None, data: dict | str = None
     ):
-        if data:
-            if isinstance(data, BaseModel):
-                if isinstance(data, InteractaModel):
-                    data = data.model_dump_json(by_alias=True)
-                else:
-                    data = data.model_dump_json()
-            else:
-                data = json.dumps(data)
-        else:
-            data = json.dumps({})
-
-        return self.call_api("post", path=path, params=params, headers=headers, data=data)
+        return self.call_api(
+            "post", path=path, params=params, headers=headers, data=prepare_data(data)
+        )
 
     def call_get(self, path: str, params: str = None, headers: dict = None):
         return self.call_api("get", path=path, params=params, headers=headers)
@@ -89,7 +94,9 @@ class Api:
     def call_put(
         self, path: str, params: str = None, headers: dict = None, data: dict | str = None
     ):
-        return self.call_api("put", path=path, params=params, headers=headers, data=data)
+        return self.call_api(
+            "put", path=path, params=params, headers=headers, data=prepare_data(data)
+        )
 
     def call_delete(self, path: str, headers: dict = None, **kwargs):
         return self.call_api("delete", path=path, headers=headers, **kwargs)
@@ -245,7 +252,9 @@ class InteractaApi(Api):
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=CreateUserOut)
-    def create_user(self, data: CreateUserIn, headers: dict = None) -> CreateUserOut | Response:
+    def create_user(
+        self, headers: dict = None, data: CreateUserIn | None = None
+    ) -> CreateUserOut | Response:
         path = "/admin/manage/users"
         return self.call_post(path=path, headers=headers, data=data)
 
@@ -256,9 +265,9 @@ class InteractaApi(Api):
 
     @interactapi(schema_out=EditUserOut)
     def edit_user(
-        self, user_id, data: CreateUserIn, headers: dict = None
+        self, user_id, headers: dict = None, data: EditUserIn | None = None
     ) -> EditUserOut | Response:
-        path = f"/admin/manage/users/{user_id}/edit"
+        path = f"/admin/manage/users/{user_id}"
         return self.call_put(path=path, headers=headers, data=data)
 
     @interactapi()
