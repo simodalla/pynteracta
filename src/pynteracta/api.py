@@ -3,7 +3,6 @@ import logging
 from collections import OrderedDict
 
 import jwt
-import pytest
 import requests
 from pydantic import BaseModel
 from requests import Response
@@ -38,8 +37,10 @@ from .schemas.requests import (
 )
 from .schemas.responses import (
     CreateUserOut,
+    EditUserOut,
     ExecutePostWorkflowOperationResponse,
     GetPostDefinitionOut,
+    GetUserForEditOut,
     HashtagsOut,
     ListGroupMembersOut,
     ListSystemGroupsOut,
@@ -51,7 +52,6 @@ from .schemas.responses import (
 )
 from .settings import ApiSettings, InteractaSettings
 from .utils import (
-    PLAYGROUND_SETTINGS,
     format_response_error,
     interactapi,
     mock_validate_kid,
@@ -91,6 +91,9 @@ class Api:
     ):
         return self.call_api("put", path=path, params=params, headers=headers, data=data)
 
+    def call_delete(self, path: str, headers: dict = None, **kwargs):
+        return self.call_api("delete", path=path, headers=headers, **kwargs)
+
     def call_api(
         self,
         method: str,
@@ -98,13 +101,14 @@ class Api:
         params: dict | None = None,
         headers: dict | None = None,
         data: dict | str | None = None,
+        **kwargs,
     ):
         url = f"{self.settings.api_url}{path}"
         request_method = getattr(requests, method)
         if self._log_calls:
             log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
             logger.info(log_msg)
-        response = request_method(url, headers=headers, data=data, params=params)
+        response = request_method(url, headers=headers, data=data, params=params, **kwargs)
         if response.status_code != 200:
             raise InteractaResponseError(format_response_error(response), response=response)
         return response
@@ -187,25 +191,6 @@ class InteractaApi(Api):
         self.access_token = result["accessToken"]
         return self.access_token
 
-    def login_pre(self, path, data):
-        try:
-            response = self.call_api(
-                "post",
-                path=path,
-                headers={
-                    "accept": "application/json",
-                    "content-type": "application/json",
-                },
-                data=data,
-            )
-        except InteractaResponseError as e:
-            raise InteractaLoginError(str(e)) from e
-        result = response.json()
-        if "accessToken" not in result:
-            raise InteractaLoginError(f"{format_response_error(response)} - No accessToken")
-        self.access_token = result["accessToken"]
-        return self.access_token
-
     @interactapi(schema_out=PostsOut)
     def list_posts(
         self,
@@ -260,11 +245,26 @@ class InteractaApi(Api):
         return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=CreateUserOut)
-    def create_user(
-        self, headers: dict = None, data: CreateUserIn = None
-    ) -> CreateUserOut | Response:
+    def create_user(self, data: CreateUserIn, headers: dict = None) -> CreateUserOut | Response:
         path = "/admin/manage/users"
         return self.call_post(path=path, headers=headers, data=data)
+
+    @interactapi(schema_out=GetUserForEditOut)
+    def get_user_data_for_edit(self, user_id, headers: dict = None) -> GetUserForEditOut | Response:
+        path = f"/admin/manage/users/{user_id}/edit"
+        return self.call_get(path=path, headers=headers)
+
+    @interactapi(schema_out=EditUserOut)
+    def edit_user(
+        self, user_id, data: CreateUserIn, headers: dict = None
+    ) -> EditUserOut | Response:
+        path = f"/admin/manage/users/{user_id}/edit"
+        return self.call_put(path=path, headers=headers, data=data)
+
+    @interactapi()
+    def delete_user(self, user_id: int, headers: dict = None) -> Response:
+        path = f"/admin/manage/users/{user_id}"
+        return self.call_delete(path=path, headers=headers)
 
     @interactapi(schema_out=ListSystemGroupsOut)
     def list_groups(
@@ -426,32 +426,3 @@ class InteractaApi(Api):
     @classmethod
     def swap_type_model(cls, post: Post, PostModel: BaseModel):
         return PostModel.model_validate(post.model_dump(by_alias=True))
-
-
-class PlaygroundApi(InteractaApi):
-    def __init__(
-        self,
-        log_calls: bool = False,
-        log_call_responses: bool = False,
-    ):
-        super().__init__(
-            base_url=PLAYGROUND_SETTINGS["base_url"],
-            log_calls=log_calls,
-            log_call_responses=log_call_responses,
-        )
-
-    def bootstrap_token(self):
-        url, data = self.prepare_credentials_login(
-            username=PLAYGROUND_SETTINGS["username"],
-            password=PLAYGROUND_SETTINGS["password"],
-        )
-        token = self.login(url, data)
-        return token
-
-    def get_posts(self):
-        return super().get_posts(community_id=PLAYGROUND_SETTINGS["community"]["id"])
-
-
-@pytest.fixture
-def test_fake():
-    pass

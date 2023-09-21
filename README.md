@@ -1,5 +1,5 @@
-PYnteracta, utility e wrapper per api di Interacta
----------------------------------------------------
+PYNTeractA, client ed utility per api rest di Interacta
+-------------------------------------------------------
 
 Utility e libreria wrapper open-source in linguaggio Python per l'interfacciamento con le api rest
 di [Interacta](https://catalogocloud.agid.gov.it/service/1892).

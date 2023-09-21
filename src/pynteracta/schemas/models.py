@@ -10,31 +10,15 @@ from .core import InteractaModel, InteractaOut
 
 
 class Link(BaseModel):
-    label: str = ""
-    url: str = ""
+    label: str | None = None
+    url: str | None = None
 
 
-class UserInfoBusinessUnit(InteractaModel):
-    # UserInfoBusinessUnitDTO
-    id: int
-    name: str | None = None
-    external_id: str | None = None
-
-
-class UserInfoArea(InteractaModel):
-    # UserInfoAreaDTO
-    id: int
-    name: str | None = None
-    external_id: str | None
-
-
-class UserInfo(InteractaModel):
-    # UserInfoDTO
-    area: UserInfoArea | None = None
-    business_unit: UserInfoBusinessUnit | None = None
-    private_email: EmailStr | None
-    private_email_verified: bool | None = None
-    private_email_verification_required: bool | None = None
+class AdminUserPreferences(InteractaModel):
+    # AdminUserPreferencesDTO
+    default_language_id: str | None = None
+    default_timezone_id: int | None = None
+    email_notifications_enabled: bool = True
 
 
 class GoogleUserCredentialsConfiguration(InteractaModel):
@@ -141,6 +125,22 @@ class User(UserBase):
     licences: dict | None = None  # LicenseDTO
 
 
+class UserInfoBase(InteractaModel):
+    id: int
+    name: str | None = None
+    external_id: str | None = None
+
+
+class UserInfoBusinessUnit(UserInfoBase):
+    # UserInfoBusinessUnitDTO
+    pass
+
+
+class UserInfoArea(UserInfoBase):
+    # UserInfoAreaDTO
+    pass
+
+
 class UserProfileInfo(UserBase):
     # UserProfileInfoDTO
     high_res_account_photo_url: str | None = None
@@ -168,6 +168,28 @@ class UserProfileInfo(UserBase):
     can_manage_profile_photo: bool | None = None
     edit_profile: bool | None = None
     private_profile: bool | None = None
+
+
+class DONTUSEUserInfo(InteractaModel):
+    # UserInfoDTO
+    area: UserInfoArea | None = None
+    business_unit: UserInfoBusinessUnit | None = None
+    private_email: EmailStr | None = None
+    private_email_verified: bool | None = None
+    private_email_verification_required: bool | None = None
+
+
+class UserInfo(InteractaModel):
+    # UserInfoDTO
+    area: UserInfoArea | None = None
+    biography: str | None = None
+    business_unit: UserInfoBusinessUnit | None = None
+    internal_phone: str | None = None
+    manager: User | None = None
+    mobile_phone: str | None = None
+    phone: str | None = None
+    place: str | None = None
+    role: str | None = None
 
 
 class ListSystemUsersElement(User):
@@ -504,13 +526,6 @@ class AcknowledgeTaskFilter(InteractaModel):
     # AcknowledgeTaskFilterDTO
     confirmed: bool | None = None
     assigned_to_me: bool | None = None
-
-
-class AdminUserPreferences(InteractaModel):
-    # AdminUserPreferencesDTO
-    default_language_id: str | None = None
-    default_timezone_id: int | None = None
-    email_notifications_enabled: bool = True
 
 
 # Out Models #######################################################################################

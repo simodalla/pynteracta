@@ -13,7 +13,9 @@ from .models import (
     PostWorkflowDefinitionState,
     PostWorkflowDefinitionTransition,
     User,
+    UserInfo,
 )
+from .requests import UserEditBase, UserSettingsIn
 
 
 class ListSystemGroupsOut(PagedItemsOut):
@@ -69,6 +71,16 @@ class GetPostDefinitionOut(InteractaOut, PostDefinition):
     pass
 
 
+class ExecutePostWorkflowOperationResponse(InteractaOut):
+    # ExecutePostWorkflowOperationResponseDTO
+    new_current_state: PostWorkflowDefinitionState | None = None
+    new_screen_data: dict | None = None
+    new_current_workflow_permitted_operations: list[PostWorkflowDefinitionTransition] | None = None
+    new_can_edit_workflow_screen_data: bool | None = None
+    new_last_modify_timestamp: int | None = None
+    post_data_has_changed: bool | None = None
+
+
 class CreateUserOut(InteractaOut):
     # CreateUserResponseDTO
     # ID dell'utente creato.
@@ -88,11 +100,21 @@ class CreateUserOut(InteractaOut):
     next_occ_token: int | None = None
 
 
-class ExecutePostWorkflowOperationResponse(InteractaOut):
-    # ExecutePostWorkflowOperationResponseDTO
-    new_current_state: PostWorkflowDefinitionState | None = None
-    new_screen_data: dict | None = None
-    new_current_workflow_permitted_operations: list[PostWorkflowDefinitionTransition] | None = None
-    new_can_edit_workflow_screen_data: bool | None = None
-    new_last_modify_timestamp: int | None = None
-    post_data_has_changed: bool | None = None
+class UserSettingsOut(UserSettingsIn):
+    # UserSettingsResponseDTO
+    edit_private_email_enabled: bool | None = None
+
+
+class GetUserForEditOut(InteractaOut, UserEditBase):
+    # GetUserForEditResponseDTO
+    private_email_verified: bool | None = None
+    occ_token: int | None = None
+    blocked: bool | None = None
+    user_settings: UserSettingsOut | None = None
+    user_info: UserInfo | None = None
+
+
+class EditUserOut(InteractaOut):
+    # EditUserResponseDTO
+    account_photo_url: str | None = None
+    next_occ_token: int | None = None

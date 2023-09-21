@@ -91,7 +91,7 @@ class ListSystemUsersIn(InteractaIn):
     email_prefix_full_text_filter: str | None = None
     # Filtro sull'email di autenticazione con servizi esterni
     external_auth_service_email_full_text_filter: str | None = None
-    # Filtro sullo stato dell'utente
+    # Filtro sullo stato dell'utente, 0 = solo utenti attivi
     status_filter: list[int] | None = None
     # Filtro sui workspace
     workspace_ids: list[int] | None = None
@@ -136,18 +136,40 @@ class UserSettingsIn(InteractaModel):
     view_user_profiles: bool = True
 
 
-class CreateUserIn(InteractaModel):
-    # CreateUserRequestDTO
+class DataUserInfoIn(InteractaModel):
+    id: int
+
+
+class UserInfoIn(UserInfo):
+    business_unit: DataUserInfoIn | None = None
+    area: DataUserInfoIn | None = None
+    manager: DataUserInfoIn | None = None
+
+
+class UserEditBase(InteractaModel):
     firstname: str = ""
     lastname: str = ""
     contact_email: EmailStr | None = None
     private_email: EmailStr | None = None
     external_id: str | None = None
     user_preferences: AdminUserPreferences | None = None
-    user_info: UserInfo | None = None
+    user_info: UserInfoIn | None = None
     user_settings: UserSettingsIn | None = None
+
+
+class UserIn(UserEditBase):
+    pass
+
+
+class CreateUserIn(UserIn):
+    # CreateUserRequestDTO
     user_credentials_configuration: UserCredentialsConfiguration | None = None
     reset_user_custom_credentials_command: ResetUserCustomCredentialsCommand | None = None
+
+
+class EditUserIn(UserIn):
+    # EditUserRequestDTO
+    occ_token: int | None = None
 
 
 class ExecutePostWorkflowOperationIn(InteractaModel):

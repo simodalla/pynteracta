@@ -6,7 +6,7 @@ from ..utils import to_camel
 
 
 class InteractaModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel)
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     def get_absolute_url(self, base_url: str | None = None) -> str:
         raise NotImplementedError
