@@ -64,7 +64,7 @@ jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
 
 def prepare_data(data=None):
     if not data:
-        return data  # data = json.dumps({})
+        return json.dumps({})
     if isinstance(data, BaseModel):
         if isinstance(data, InteractaModel):
             data = data.model_dump_json(by_alias=True)
@@ -370,16 +370,16 @@ class InteractaApi(Api):
         community_id: str | int,
         params: dict = None,
         headers: dict = None,
-        body: ListCommunityPostsIn = None,
+        data: ListCommunityPostsIn = None,
     ) -> list[BaseListPostsElement]:
         all_posts = []
         page_token = None
-        body = body if body else ListCommunityPostsIn()
+        data = data if data else ListCommunityPostsIn()
         while True:
-            body.page_token = page_token
+            data.page_token = page_token
             posts = self.list_posts(
                 community_id=community_id,
-                data=body,
+                data=data,
             )
             all_posts += posts.items
             if not posts.next_page_token:
@@ -409,26 +409,23 @@ class InteractaApi(Api):
 
     def get_user(
         self,
-        email: str | None,
-        external_auth_service: bool = False,
-        body: ListSystemUsersIn | None = None,
+        email_external_auth_service: str | None = None,
+        data: ListSystemUsersIn | None = None,
     ) -> ListSystemUsersElement:
-        if not body:
-            body = ListSystemUsersIn()
-            body.page_size = 100
-            body.calculate_total_items_count = True
-        if external_auth_service:
-            body.external_auth_service_email_full_text_filter = email
-        else:
-            body.email_prefix_full_text_filter = email
+        if not data:
+            data = ListSystemUsersIn()
+            data.calculate_total_items_count = True
+        if email_external_auth_service:
+            data.external_auth_service_email_full_text_filter = email_external_auth_service
 
-        result = self.list_users(data=body)
+        result = self.list_users(data=data)
 
+        json_data = data.model_dump_json(exclude_unset=True, exclude=["page_size"])
         if len(result.items) == 0:
-            raise ObjectDoesNotFound(f"User with email '{email}' non found in interacta")
+            raise ObjectDoesNotFound(f"User with data '{json_data}' non found in interacta")
         elif len(result.items) > 1:
             raise MultipleObjectsReturned(
-                f"Multiple users with email '{email}' founded in interacta"
+                f"Multiple users with data '{json_data}' founded in interacta"
             )
         return result.items[0]
 

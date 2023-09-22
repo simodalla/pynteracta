@@ -1,17 +1,49 @@
 import pytest
+from faker import Faker
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from pynteracta.api import InteractaApi
 from pynteracta.settings import AppSettings, InteractaSettings
 
 
-@pytest.fixture(scope="session")
-def app_settings() -> AppSettings:
-    return AppSettings(_env_file=".envs/integrations/.pyinteracta.toml")
+class UserData(BaseModel):
+    id: int | None = None
+    email: EmailStr | None = None
+
+
+class SentinelData(BaseModel):
+    domain: str | None = None
+    user: UserData | None = None
+    area_id: int | None = None
+    manager_id: int | None = None
+    business_unit_id: int | None = None
+
+
+class IntegrationTestData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    faker_locale: str = "it-IT"
+    prefix_admin_object: str = "zzz-pynta-"
+    sentinel: SentinelData | None = None
+
+
+class IntegrationsAppSettings(AppSettings):
+    integrations: IntegrationTestData | None = None
 
 
 @pytest.fixture(scope="session")
-def settings(app_settings: AppSettings) -> InteractaSettings:
-    return app_settings.interacta
+def integration_app_settings() -> IntegrationsAppSettings:
+    return IntegrationsAppSettings(_env_file=".envs/integrations/.pyinteracta.toml")
+
+
+@pytest.fixture(scope="session")
+def settings(integration_app_settings: IntegrationsAppSettings) -> InteractaSettings:
+    return integration_app_settings.interacta
+
+
+@pytest.fixture(scope="session")
+def integrations_data(integration_app_settings: IntegrationsAppSettings) -> IntegrationTestData:
+    return integration_app_settings.integrations
 
 
 @pytest.fixture(scope="session")
@@ -19,3 +51,8 @@ def logged_api(settings: InteractaSettings) -> InteractaApi:
     api = InteractaApi(settings=settings)
     api.login()
     return api
+
+
+@pytest.fixture
+def faker(integrations_data: IntegrationTestData) -> Faker:
+    return Faker(integrations_data.faker_locale)

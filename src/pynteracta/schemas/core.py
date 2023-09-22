@@ -1,12 +1,15 @@
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-
-from ..utils import to_camel
+from pydantic.alias_generators import to_camel
 
 
 class InteractaModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        validate_assignment=True,
+    )
 
     def get_absolute_url(self, base_url: str | None = None) -> str:
         raise NotImplementedError
@@ -33,8 +36,6 @@ class PagedItemsOut(InteractaOut):
 
 
 class InteractaIn(InteractaModel):
-    model_config = ConfigDict(validate_assignment=True)
-
     page_token: str | None = None
     page_size: int = 15
     calculate_total_items_count: bool | None = True

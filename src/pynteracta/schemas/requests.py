@@ -101,6 +101,8 @@ class ListSystemUsersIn(InteractaIn):
     area_ids: list[int] | None = None
     # Filtro full-text per luogo
     place: str | None = None
+    # Filtro per tipologia login
+    login_provider_filter: list[str] | None = None
     # Id campo di ordinamento
     order_type_id: str | None = None
 

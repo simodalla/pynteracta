@@ -38,7 +38,7 @@ pynta = "pynteracta.cli.commands:app"
 python = ">=3.9"
 requests = "^2.28.1"
 typer = "^0.9.0"
-pydantic = {extras = ["email"], version = "^2.3.0"}
+pydantic = { extras = ["email"], version = "^2.3.0" }
 pyjwt = { extras = ["crypto"], version = "^2.6.0" }
 pydantic-settings = "^2.0.0"
 pydantic-settings-toml = "^0.2.0"
@@ -88,6 +88,27 @@ push = false
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 "src/pynteracta/__init__.py" = ["{version}"]
 "src/pynteracta/__main__.py" = ["- pynteracta v{version}"]
+
+
+[tool.pytest.ini_options]
+addopts = "-p no:warnings --pdbcls=IPython.core.debugger:Pdb -p no:randomly -m 'not integration and not life and not temp'"
+pythonpath = "./src"
+testpaths = "tests"
+norecursedirs = [
+  ".*",
+  "templates",
+  "compose",
+  "docs",
+  "htmlcov",
+  "staticstorage",
+  "locale",
+]
+markers = [
+  "integration: marks tests as slow (deselect with '-m \"not integration\"')",
+  "lifecycle: marks tests as slow (deselect with '-m \"not lifecycle\"')",
+  "temp: marks tests as slow (deselect with '-m \"not temp\"')",
+  # "serial",
+]
 
 # [tool.isort]
 # profile = "black"
