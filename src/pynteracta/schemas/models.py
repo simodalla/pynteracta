@@ -86,16 +86,19 @@ class ZonedDatetime(InteractaModel):
     timezone: str | None = None
 
 
-class Group(InteractaModel):
+class GroupBase(InteractaModel):
+    name: str | None = None
+    email: str | None = None
+    visible: bool | None = None
+    external_id: str | None = None
+
+
+class Group(GroupBase):
     # GroupDTO ##OK##
     id: int
-    name: str = ""
-    email: str | None
-    visible: bool | None
-    deleted: bool | None
-    external_id: str | None
-    occ_token: int | None
-    members_count: int | None
+    deleted: bool | None = None
+    occ_token: int | None = None
+    members_count: int | None = None
 
 
 class ListSystemGroupsElement(Group):
@@ -214,12 +217,20 @@ class DriveAttachmentData(InteractaModel):
     web_content_link: str | None = None
 
 
-class Hashtag(InteractaModel):
-    # HashtagDTO ##OK##
+class TagBase(InteractaModel):
     id: int
     name: str | None = None
-    external_id: str | None = None
     deleted: bool | None = None
+
+
+class Hashtag(TagBase):
+    # HashtagDTO ##OK##
+    external_id: str | None = None
+
+
+class Tag(TagBase):
+    # TagDTO
+    visible: str | None = None
 
 
 class ZonedDatetimeIn(InteractaModel):

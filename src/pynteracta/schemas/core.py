@@ -35,6 +35,10 @@ class PagedItemsOut(InteractaOut):
         return False
 
 
+class ItemCreatedEditedOut(InteractaOut):
+    next_occ_token: int | None = None
+
+
 class InteractaIn(InteractaModel):
     page_token: str | None = None
     page_size: int = 15

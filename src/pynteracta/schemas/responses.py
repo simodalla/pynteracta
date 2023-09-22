@@ -1,6 +1,6 @@
 from pydantic import HttpUrl
 
-from .core import InteractaOut, PagedItemsOut
+from .core import InteractaOut, ItemCreatedEditedOut, PagedItemsOut
 from .models import (
     BaseListPostsElement,
     Group,
@@ -12,6 +12,7 @@ from .models import (
     PostDetail,
     PostWorkflowDefinitionState,
     PostWorkflowDefinitionTransition,
+    Tag,
     User,
     UserInfo,
 )
@@ -114,7 +115,23 @@ class GetUserForEditOut(InteractaOut, UserEditBase):
     user_info: UserInfo | None = None
 
 
-class EditUserOut(InteractaOut):
+class EditUserOut(ItemCreatedEditedOut):
     # EditUserResponseDTO
     account_photo_url: str | None = None
-    next_occ_token: int | None = None
+
+
+class CreateGroupOut(Group, ItemCreatedEditedOut):
+    # CreateGroupResponseDTO
+    tags: list[dict] | None = None
+    group_id: int | None = None
+
+
+class EditGroupOut(ItemCreatedEditedOut):
+    # EditGroupResponseDTO
+    pass
+
+
+class GetGroupForEditOut(InteractaOut, Group):
+    # GetGroupForEditResponseDTO
+    members: list[User] | None = None
+    tags: list[Tag] | None = None

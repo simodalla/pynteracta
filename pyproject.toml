@@ -91,7 +91,8 @@ push = false
 
 
 [tool.pytest.ini_options]
-addopts = "-p no:warnings --pdbcls=IPython.core.debugger:Pdb -p no:randomly -m 'not integration and not life and not temp'"
+addopts = "-p no:warnings --pdbcls=IPython.core.debugger:Pdb -p no:randomly"
+#  -m 'not integration and not lifecycle and not temp'
 pythonpath = "./src"
 testpaths = "tests"
 norecursedirs = [
@@ -174,7 +175,7 @@ select = [
 ]
 ignore = ["G004"] #["B008", "SIM102"]
 fixable = ["ALL"]
-unfixable = ["G004", "ERA001", "F401"]
+unfixable = ["G004", "ERA001"]
 
 exclude = [
   ".git",

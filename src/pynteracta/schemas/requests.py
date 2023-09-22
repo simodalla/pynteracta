@@ -5,6 +5,7 @@ from .models import (
     AcknowledgeTaskFilter,
     AdminUserPreferences,
     CustomFieldFilter,
+    GroupBase,
     ResetUserCustomCredentialsCommand,
     UserCredentialsConfiguration,
     UserInfo,
@@ -79,6 +80,21 @@ class ListCommunityPostsIn(InteractaIn):
     pinned_first: bool | None = None
 
 
+### Workflow
+
+
+class ExecutePostWorkflowOperationIn(InteractaModel):
+    model_config = ConfigDict(validate_assignment=True)
+
+    # ExecutePostWorkflowOperationRequestDTO
+    screen_data: dict = {}
+    delta_area_format: int = 1
+    screen_occ_token: int
+
+
+### Utenti
+
+
 class ListSystemUsersIn(InteractaIn):
     # ListSystemUsersRequestDTO
     # Filtro fulltext su nome cognome e email
@@ -105,25 +121,6 @@ class ListSystemUsersIn(InteractaIn):
     login_provider_filter: list[str] | None = None
     # Id campo di ordinamento
     order_type_id: str | None = None
-
-
-class ListSystemGroupsIn(InteractaIn):
-    # ListSystemGroupsRequestDTO
-    # Filtro fulltext su nome e email
-    full_text_filter: str | None = None
-    # Filtro sullo stato dell'utente
-    status_filter: list[int] | None = None  # 0 == solo gruppi non eliminati
-    # Filtro sui workspace
-    workspace_ids: list[int] | None = None
-    # Filtro per escludere i gruppi che contengono l'utente
-    exclude_group_by_member_user_id: int | None = None
-    # Id campo di ordinamento
-    order_type_id: str | None = None
-
-
-class ListGroupMembersIn(InteractaIn):
-    # ListGroupMembersRequestDTO
-    pass
 
 
 class UserSettingsIn(InteractaModel):
@@ -174,10 +171,46 @@ class EditUserIn(UserIn):
     occ_token: int | None = None
 
 
-class ExecutePostWorkflowOperationIn(InteractaModel):
-    model_config = ConfigDict(validate_assignment=True)
+### Gruppi
 
-    # ExecutePostWorkflowOperationRequestDTO
-    screen_data: dict = {}
-    delta_area_format: int = 1
-    screen_occ_token: int
+
+class ListSystemGroupsIn(InteractaIn):
+    # ListSystemGroupsRequestDTO
+    # Filtro fulltext su nome e email
+    full_text_filter: str | None = None
+    # Filtro sullo stato dell'utente
+    status_filter: list[int] | None = None  # 0 == solo gruppi non eliminati
+    # Filtro sui workspace
+    workspace_ids: list[int] | None = None
+    # Filtro per escludere i gruppi che contengono l'utente
+    exclude_group_by_member_user_id: int | None = None
+    # Id campo di ordinamento
+    order_type_id: str | None = None
+
+
+class ListGroupMembersIn(InteractaIn):
+    # ListGroupMembersRequestDTO
+    pass
+
+
+class CreateGroupIn(GroupBase):
+    # CreateGroupRequestDTO
+    member_ids: list[int] | None = None
+
+
+class EditGroupIn(CreateGroupIn):
+    # EditGroupRequestDTO
+    occ_token: int | None = None
+
+
+class EditGroupMember(InteractaModel):
+    # creato da rreverse engineering, non supportato da api a settembre 2023
+    id: int | None = None
+    occ_token: int | None = None
+    add_user_ids: list[int] | None = None
+    delete_user_ids: list[int] | None = None
+
+
+class EditGroupMembersIn(InteractaModel):
+    # creato da rreverse engineering, non supportato da api a settembre 2023
+    group_members: list[EditGroupMember] | None = None

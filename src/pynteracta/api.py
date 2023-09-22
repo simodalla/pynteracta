@@ -28,7 +28,9 @@ from .schemas.models import (
     Post,
 )
 from .schemas.requests import (
+    CreateGroupIn,
     CreateUserIn,
+    EditGroupIn,
     EditUserIn,
     ExecutePostWorkflowOperationIn,
     ListCommunityPostsIn,
@@ -37,9 +39,12 @@ from .schemas.requests import (
     ListSystemUsersIn,
 )
 from .schemas.responses import (
+    CreateGroupOut,
     CreateUserOut,
+    EditGroupOut,
     EditUserOut,
     ExecutePostWorkflowOperationResponse,
+    GetGroupForEditOut,
     GetPostDefinitionOut,
     GetUserForEditOut,
     HashtagsOut,
@@ -282,6 +287,13 @@ class InteractaApi(Api):
         path = "/admin/data/groups"
         return self.call_post(path=path, headers=headers, data=data)
 
+    @interactapi(schema_out=CreateGroupOut)
+    def create_group(
+        self, headers: dict = None, data: CreateGroupIn | None = None
+    ) -> CreateGroupOut | Response:
+        path = "/admin/manage/groups"
+        return self.call_post(path=path, headers=headers, data=data)
+
     @interactapi(schema_out=ListGroupMembersOut)
     def list_group_members(
         self,
@@ -291,6 +303,23 @@ class InteractaApi(Api):
     ) -> ListGroupMembersOut | Response:
         path = f"/admin/data/groups/{group_id}/members"
         return self.call_post(path=path, headers=headers, data=data)
+
+    @interactapi(schema_out=GetGroupForEditOut)
+    def get_group_data_for_edit(
+        self, group_id, headers: dict = None
+    ) -> GetGroupForEditOut | Response:
+        path = f"/admin/manage/groups/{group_id}/edit"
+        return self.call_get(path=path, headers=headers)
+
+    @interactapi(schema_out=EditGroupOut)
+    def edit_group(
+        self,
+        group_id: str | int,
+        headers: dict = None,
+        data: EditGroupIn | None = None,
+    ) -> EditGroupOut | Response:
+        path = f"/admin/manage/groups/{group_id}"
+        return self.call_put(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=HashtagsOut)
     def list_hashtags(

@@ -17,6 +17,7 @@ class SentinelData(BaseModel):
     area_id: int | None = None
     manager_id: int | None = None
     business_unit_id: int | None = None
+    filter_group_name: str = "demo"
 
 
 class IntegrationTestData(BaseModel):
