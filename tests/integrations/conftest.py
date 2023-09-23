@@ -11,7 +11,21 @@ class UserData(BaseModel):
     email: EmailStr | None = None
 
 
+class GroupsData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: int | None = None
+    filter_user_members: str | None = None
+
+
+class GroupLifecycleData(BaseModel):
+    create_filter_user_members: str | None = None
+    edit_filter_user_members: str | None = None
+
+
 class SentinelData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     domain: str | None = None
     user: UserData | None = None
     area_id: int | None = None
@@ -26,6 +40,7 @@ class IntegrationTestData(BaseModel):
     faker_locale: str = "it-IT"
     prefix_admin_object: str = "zzz-pynta-"
     sentinel: SentinelData | None = None
+    group_lifecycle: GroupLifecycleData | None = None
 
 
 class IntegrationsAppSettings(AppSettings):

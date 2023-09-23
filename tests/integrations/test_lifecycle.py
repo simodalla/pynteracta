@@ -13,6 +13,7 @@ from pynteracta.schemas.models import (
 from pynteracta.schemas.requests import (
     CreateGroupIn,
     CreateUserIn,
+    EditGroupIn,
     EditUserIn,
     ListSystemUsersIn,
     UserInfoIn,
@@ -100,23 +101,56 @@ def test_user_lifecycle(
 def test_group_lifecycle(
     logged_api: InteractaApi, integrations_data: IntegrationTestData, faker: Faker
 ) -> None:
-    page_size = 5
-    data = ListSystemUsersIn(
-        full_text_filter=integrations_data.prefix_admin_object, page_size=page_size
+    page_size = 2
+    users_to_create = logged_api.list_users(
+        data=ListSystemUsersIn(
+            full_text_filter=integrations_data.group_lifecycle.create_filter_user_members,
+            page_size=page_size,
+            status_filter=[0],
+        )
     )
-    results_users = logged_api.list_users(data=data)
-    [user.id for user in results_users.items]
-
+    if len(users_to_create.items) < 2:
+        pytest.fail(
+            f"Sembra che non siano presenti almeno 2 utenti (creazione) che fanno match con il"
+            f" filtro full text '{integrations_data.sentinel.groups.filter_user_members}'"
+        )
+    member_ids = [user.id for user in users_to_create.items]
     group_name = f"{integrations_data.prefix_admin_object}{faker.uuid4()}"
     debug(group_name)
 
-    data = CreateGroupIn(
+    # creazione gruppo
+    creating_data = CreateGroupIn(
         name=group_name,
         email=faker.company_email(),
         visible=False,
         external_id=str(faker.pyint()),
-        member_ids=[4739, 3678],
+        member_ids=member_ids,
     )
-    debug(data)
-    created_results = logged_api.create_group(data=data)
-    debug(created_results)
+    created = logged_api.create_group(data=creating_data)
+
+    # preparazione modifiche gruppo
+    users_to_edit = logged_api.list_users(
+        data=ListSystemUsersIn(
+            full_text_filter=integrations_data.group_lifecycle.edit_filter_user_members,
+            page_size=page_size,
+            status_filter=[0],
+        )
+    )
+    if len(users_to_edit.items) < 2:
+        pytest.fail(
+            f"Sembra che non siano presenti almeno 2 utenti (modifica) che fanno match con il"
+            f" filtro full text '{integrations_data.sentinel.groups.filter_user_members}'"
+        )
+    member_ids += [user.id for user in users_to_edit.items]
+    prepare_editing = logged_api.get_group_data_for_edit(group_id=created.id)
+
+    # modifica gruppo
+    edit_data = EditGroupIn(
+        member_ids=member_ids,
+        **prepare_editing.model_dump(by_alias=True, exclude=["members", "tags"]),
+    )
+    logged_api.edit_group(group_id=created.id, data=edit_data)
+
+    # cancellazione gruppo
+    deleted_result = logged_api.delete_group(group_id=created.id)
+    assert deleted_result.status_code == 200

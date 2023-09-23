@@ -321,6 +321,11 @@ class InteractaApi(Api):
         path = f"/admin/manage/groups/{group_id}"
         return self.call_put(path=path, headers=headers, data=data)
 
+    @interactapi()
+    def delete_group(self, group_id: int, headers: dict = None) -> Response:
+        path = f"/admin/manage/groups/{group_id}"
+        return self.call_delete(path=path, headers=headers)
+
     @interactapi(schema_out=HashtagsOut)
     def list_hashtags(
         self, community_id: str | int, headers: dict = None, data: dict = None
