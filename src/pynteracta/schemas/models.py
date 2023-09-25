@@ -108,8 +108,8 @@ class ListSystemGroupsElement(Group):
 
 class UserBase(InteractaModel):
     id: int
-    first_name: str = ""
-    last_name: str = ""
+    first_name: str | None = None
+    last_name: str | None = None
     account_photo_url: str | None = None
     contact_email: EmailStr | None = None
 

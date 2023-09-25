@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from requests import Response
 
 from . import urls
+from .core import format_response_error, interactapi, mock_validate_kid
 from .exceptions import (
     InteractaError,
     InteractaLoginError,
@@ -57,11 +58,6 @@ from .schemas.responses import (
     PostsOut,
 )
 from .settings import ApiSettings, InteractaSettings
-from .utils import (
-    format_response_error,
-    interactapi,
-    mock_validate_kid,
-)
 
 logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
