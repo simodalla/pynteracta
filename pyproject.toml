@@ -47,12 +47,11 @@ pydantic-settings-toml = "^0.2.0"
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.9"
 pytest = "^7.1"
-pip-tools = "^6.9.0"
 flake8 = "^6.0.0"
 flake8-isort = "^6.0.0"
 coverage = "^7.0.0"
 black = "^23.0"
-pylint = "^2.15.4"
+pylint = "^3.0.1"
 pre-commit = "^3.0"
 bumpver = "^2023.1124"
 bandit = "^1.7.4"
@@ -67,8 +66,6 @@ responses = "^0.23.3"
 faker = "^19.2.0"
 devtools = "^0.12.2"
 
-
-[tool.poetry.group.pytest.dependencies]
 
 [build-system]
 requires = ["poetry-core"]
@@ -105,9 +102,9 @@ norecursedirs = [
   "locale",
 ]
 markers = [
-  "integration: marks tests as slow (deselect with '-m \"not integration\"')",
-  "lifecycle: marks tests as slow (deselect with '-m \"not lifecycle\"')",
-  "temp: marks tests as slow (deselect with '-m \"not temp\"')",
+  "integration: marks tests as integration (deselect with '-m \"not integration\"')",
+  "lifecycle: marks tests as lifecycle (deselect with '-m \"not lifecycle\"')",
+  "temp: marks tests as temp (deselect with '-m \"not temp\"')",
   # "serial",
 ]
 
