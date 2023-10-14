@@ -343,6 +343,11 @@ class InteractaApi(Api):
         path = f"/communication/settings/communities/{community_id}/details"
         return self.call_get(path=path, headers=headers)
 
+    @interactapi()
+    def list_business_units(self, headers: dict = None) -> Response:
+        path = "/admin/data/business-units"
+        return self.call_get(path=path, headers=headers)
+
     ### worflow operations
 
     @interactapi(schema_out=GetPostWorkflowScreenDataForEditResponse)

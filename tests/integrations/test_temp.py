@@ -62,3 +62,7 @@ def test_modify_group_members(
 
     edit_results = logged_api.edit_group(group_id=group.id, data=data)
     debug(edit_results)
+
+
+def test_list_business_unit(logged_api: InteractaApi):
+    debug(logged_api.list_business_units())

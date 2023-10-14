@@ -1,9 +1,9 @@
-"""Pynteracta
+"""PYNTeractA
 
 Usage:
 ------
 
-    $ pynteracta
+    $ pynta
 
 Contact:
 --------
