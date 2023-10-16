@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, HttpUrl, SecretStr, computed_field
 from pydantic_settings_toml import TomlSettings, TomlSettingsError
 
-from .enums import InteractaLoginProviderEnum
+from .enums import LoginProviderEnum
 from .exceptions import InteractaError
 from .models import ServiceAccountModel
 
@@ -31,7 +31,7 @@ class CommunitySettings(BaseModel):
 class InteractaUsersSettings(BaseModel):
     check_by_email: bool = True
     check_by_external_auth_service: bool = False
-    external_login_providers: InteractaLoginProviderEnum | None = None
+    external_login_providers: LoginProviderEnum | None = None
 
 
 class ApiSettings(BaseModel):

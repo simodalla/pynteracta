@@ -6,21 +6,13 @@ from devtools import debug
 from rich.table import Table
 
 from ..api import InteractaApi
-from ..exceptions import InteractaError
-from ..settings import AppSettings, init_app_settings
-from .utils import table_list_posts
+from .users import app as users_app
+from .utils import cli_init_setting, table_list_posts
 
 app = typer.Typer(help="")
+app.add_typer(users_app, name="users")
 
 state = {"env_file": None}
-
-
-def cli_init_setting(env_file: Path | None = None) -> AppSettings:
-    try:
-        return init_app_settings(env_file=env_file)
-    except InteractaError as ie:
-        rich.print(f"[bold red]{ie}[/bold red]")
-        raise typer.Exit(code=10) from ie
 
 
 @app.callback()

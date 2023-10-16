@@ -29,7 +29,7 @@ class FieldFilterTypeEnum(IntEnum):
     IS_EMPTY = 7
 
 
-class InteractaLoginProviderEnum(StrEnum):
+class LoginProviderEnum(StrEnum):
     GOOGLE = "google"
     MICROSOFT = "microsoft"
     CUSTOM = "custom"

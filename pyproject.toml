@@ -172,7 +172,8 @@ select = [
 ]
 ignore = ["G004"] #["B008", "SIM102"]
 fixable = ["ALL"]
-unfixable = ["G004", "ERA001"]
+# unfixable = ["G004", "ERA001"]
+unfixable = ["G004", "ERA001", "ERA001", "F401", "F841"]
 
 exclude = [
   ".git",

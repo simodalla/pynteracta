@@ -422,6 +422,21 @@ class InteractaApi(Api):
             page_token = posts.next_page_token
         return all_posts
 
+    def all_users(self, data: ListSystemUsersIn | None = None) -> list[ListSystemUsersElement]:
+        all_items = []
+        page_token = None
+        counter = 1
+        data = data if data else ListSystemUsersIn(page_size=100)
+        while True:
+            data.page_token = page_token
+            list_results = self.list_users(data=data)
+            all_items += list_results.items
+            if not list_results.next_page_token:
+                break
+            page_token = list_results.next_page_token
+            counter += 1
+        return all_items
+
     def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Group | None:
         if not filter:
             filter = ListSystemGroupsIn()
