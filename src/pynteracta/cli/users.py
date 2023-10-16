@@ -34,23 +34,34 @@ def set_env_file(
 
 @app.command("list")
 def list_users(  # noqa: C901
-    not_active: bool = typer.Option(False, "--not-active", "-na"),
+    show_not_active: bool = typer.Option(False, help="Mostra anche gli utenti non attivi"),
     login_provider: list[LoginProviderEnum] = typer.Option(  # noqa: B008
-        [], "--login-provider", "-lp"
+        [], "--login-provider", "-lp", help="Filtra gli utenti con i login provider selezionati"
     ),
-    no_login_provider: bool = typer.Option(False, "--no-login-provider", "-nlp"),
-    user_filter: str = typer.Option(None, "--user-filter", "-uf"),
-    divergent_contact_email: bool = typer.Option(False),
+    show_no_login_provider: bool = typer.Option(
+        False, help="Mostra solo gli utenti senza alcun login provider"
+    ),
+    user_filter: str = typer.Option(
+        "",
+        "--user-filter",
+        "-uf",
+        help="Filtra gli utenti con una ricerca fulltext su nome cognome e email",
+    ),
+    divergent_contact_email: bool = typer.Option(
+        False,
+        help="Mostra solo gli utenti che hanno email di contatto diverse da quelle"
+        " del login provider",
+    ),
     output_format: OutputFormat = typer.Option(  # noqa: B008
-        OutputFormat.TABLE, "--out-format", "-of"
+        OutputFormat.TABLE, "--out-format", "-of", help="Tipo di formato dell'output"
     ),
 ):
     filter_data = ListSystemUsersIn()
-    if not not_active:
+    if not show_not_active:
         filter_data.status_filter = [0]
     if login_provider:
         filter_data.login_provider_filter = list(login_provider)
-    if no_login_provider:
+    if show_no_login_provider:
         filter_data.login_provider_filter = []
     if user_filter:
         filter_data.full_text_filter = user_filter
@@ -63,7 +74,7 @@ def list_users(  # noqa: C901
 
     users_stats = UsersStats.create_by_user_list(users=users)
 
-    if no_login_provider:
+    if show_no_login_provider:
         users = users_stats.no_provider.values() if users_stats.no_provider else []
 
     if not users:
