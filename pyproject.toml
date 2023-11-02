@@ -88,8 +88,7 @@ push = false
 
 
 [tool.pytest.ini_options]
-addopts = "-p no:warnings --pdbcls=IPython.core.debugger:Pdb -p no:randomly"
-#  -m 'not integration and not lifecycle and not temp'
+addopts = "-p no:warnings --pdbcls=IPython.core.debugger:Pdb -p no:randomly -m 'not integration and not lifecycle and not temp'"
 pythonpath = "./src"
 testpaths = "tests"
 norecursedirs = [
