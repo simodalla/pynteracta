@@ -1,10 +1,21 @@
 import pytest
+from devtools import debug  # noqa
 from faker import Faker
 
 from pynteracta import exceptions
 from pynteracta.api import InteractaApi
 from pynteracta.schemas import responses
-from pynteracta.schemas.requests import ListSystemGroupsIn, ListSystemUsersIn
+from pynteracta.schemas.models import (
+    GoogleUserCredentialsConfiguration,
+    UserCredentialsConfiguration,
+)
+from pynteracta.schemas.requests import (
+    CreateUserIn,
+    ListSystemGroupsIn,
+    ListSystemUsersIn,
+    UserInfoIn,
+    UserSettingsIn,
+)
 
 from .conftest import IntegrationTestData
 
@@ -87,3 +98,42 @@ def test_list_groups_filter_name(
             f"Sembra che non siano presenti almeno 2 gruppi che fanno match con il filtro full"
             f" text '{filter_group_name}'"
         )
+
+
+@pytest.mark.lifecycle
+def test_user_con_accentate(
+    logged_api: InteractaApi, integrations_data: IntegrationTestData, faker: Faker
+) -> None:
+    fake_id = faker.uuid4()
+    username = f"{integrations_data.prefix_admin_object}{fake_id}"
+    email = f"{username}@{integrations_data.sentinel.domain}"
+    google_credential = GoogleUserCredentialsConfiguration(google_account_id=email, enabled=True)
+    user_credential_conf = UserCredentialsConfiguration(google=google_credential)
+    user_info = UserInfoIn(
+        area={"id": integrations_data.sentinel.area_id},
+        business_unit={"id": integrations_data.sentinel.business_unit_id},
+        internal_phone=faker.phone_number(),
+        manager={"id": integrations_data.sentinel.manager_id},
+        mobile_phone=faker.phone_number(),
+        phone=faker.phone_number(),
+        place=faker.address(),
+        role=faker.job(),
+    )
+    debug(email)
+    create_data = CreateUserIn(
+        firstname="provà",
+        lastname="provà",
+        user_credentials_configuration=user_credential_conf,
+        contact_email=email,
+        private_email=faker.email(),
+        user_info=user_info,
+        user_settings=UserSettingsIn(
+            people_section_enabled=False,
+            visible_in_people_section=False,
+            reduced_profile=True,
+            view_user_profiles=False,
+        ),
+    )
+    debug(create_data)
+    created_result = logged_api.create_user(data=create_data)
+    assert isinstance(created_result, responses.CreateUserOut)

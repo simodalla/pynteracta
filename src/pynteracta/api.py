@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import jwt
 import requests
+from devtools import debug
 from pydantic import BaseModel
 from requests import Response
 
@@ -116,6 +117,10 @@ class Api:
         if self._log_calls:
             log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
             logger.info(log_msg)
+        headers.update(
+            {"accept-language": "it,en-US;q=0.9,en;q=0.8", "Interacta-Preferred-Language": "it"}
+        )
+        debug(headers)
         response = request_method(url, headers=headers, data=data, params=params, **kwargs)
         if response.status_code != 200:
             raise InteractaResponseError(format_response_error(response), response=response)
@@ -138,7 +143,7 @@ class InteractaApi(Api):
     def authorized_header(self):
         return {
             "authorization": f"Bearer {self.access_token}",
-            "content-type": "application/json",
+            "content-type": "application/json",  # charset=UTF-8",
         }
 
     def prepare_credentials_login(self):
