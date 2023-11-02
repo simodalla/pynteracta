@@ -138,7 +138,7 @@ class InteractaApi(Api):
     def authorized_header(self):
         return {
             "authorization": f"Bearer {self.access_token}",
-            "content-type": "application/json",
+            "content-type": "application/json",  # charset=UTF-8",
         }
 
     def prepare_credentials_login(self):
