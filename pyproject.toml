@@ -108,20 +108,6 @@ markers = [
   # "serial",
 ]
 
-# [tool.isort]
-# profile = "black"
-# default_section = "THIRDPARTY"
-# known_first_party = ["pynteracta"]
-# known_django = "django"
-# sections = [
-#     "FUTURE",
-#     "STDLIB",
-#     "THIRDPARTY",
-#     "DJANGO",
-#     "FIRSTPARTY",
-#     "LOCALFOLDER",
-# ]
-# skip_glob = ["**/migrations/*.py"]
 
 [tool.black]
 line-length = 100
@@ -173,7 +159,7 @@ select = [
 ignore = ["G004"] #["B008", "SIM102"]
 fixable = ["ALL"]
 # unfixable = ["G004", "ERA001"]
-unfixable = ["G004", "ERA001", "ERA001", "F401", "F841"]
+unfixable = ["G004", "ERA001",  "F841"]
 
 exclude = [
   ".git",
@@ -189,7 +175,7 @@ exclude = [
 ]
 line-length = 100
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-target-version = "py311"
+target-version = "py312"
 src = ["src", "test"]
 
 [tool.ruff.mccabe]

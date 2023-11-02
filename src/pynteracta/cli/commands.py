@@ -4,6 +4,7 @@ import rich
 import typer
 from devtools import debug
 from rich.table import Table
+from rich.text import Text
 
 from ..api import InteractaApi
 from .users import app as users_app
@@ -25,10 +26,11 @@ def set_env_file(
 
 
 @app.command()
-def get_community_definition(
+def get_community_definition(  # noqa: C901
     community_id: int = typer.Option(0, "--id", "-i"),
     community_name: str = typer.Option("", "--name", "-n"),
     fields_definition: bool = typer.Option(False, "--fields", "-fd"),
+    workflow_definition: bool = typer.Option(False, "--workflow", "-wf"),
     output_table: bool = typer.Option(False, "--table", "-t"),
 ):
     """
@@ -77,6 +79,65 @@ def get_community_definition(
             rich.print(f"{community_title}\n")
             for field in post_definition.field_definitions:
                 rich.print(field)
+        raise typer.Exit()
+
+    if workflow_definition:
+        if output_table:
+            state_table = Table(
+                "Id",
+                "Nome",
+                "Iniziale",
+                "Finale",
+                "Metadati",
+                title=f"Stati di {community_title}",
+                show_lines=True,
+            )
+            for state_data in post_definition.workflow_definition.states:
+                if state_data.deleted:
+                    continue
+
+                state_color = (
+                    state_data.metadata["style_color"]
+                    if "style_color" in state_data.metadata
+                    else ""
+                )
+                state_table.add_row(
+                    str(state_data.id),
+                    Text(state_data.name, style=f"bold {state_color}"),
+                    str(state_data.init_state),
+                    str(state_data.terminal),
+                    str(state_data.metadata),
+                )
+            rich.print(state_table)
+            transitions_table = Table(
+                "Id",
+                "Nome",
+                "Trasizione",
+                "Screen",
+                title=f"Transizine di {community_title}",
+                show_lines=True,
+            )
+            for transition in post_definition.workflow_definition.transitions:
+                state_from_color = (
+                    transition.from_state.metadata["style_color"]
+                    if "style_color" in transition.from_state.metadata
+                    else ""
+                )
+                state_to_color = (
+                    transition.to_state.metadata["style_color"]
+                    if "style_color" in transition.to_state.metadata
+                    else ""
+                )
+                transition_txt = Text(transition.from_state.name, style=f"bold {state_from_color}")
+                transition_txt.append(" --> ", style=f"bold {state_to_color}")
+                transition_txt.append(transition.to_state.name, style=f"bold {state_to_color}")
+
+                transitions_table.add_row(
+                    str(transition.id), transition.name, transition_txt, str(transition.screen)
+                )
+            rich.print(transitions_table)
+        else:
+            rich.print_json(post_definition.workflow_definition.model_dump_json())
         raise typer.Exit()
 
     rich.print_json(post_definition.model_dump_json())
