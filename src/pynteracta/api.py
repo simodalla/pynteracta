@@ -73,7 +73,7 @@ def prepare_data(data=None):
             data = data.model_dump_json()
     else:
         data = json.dumps(data)
-    return data
+    return data.encode("utf-8")
 
 
 class Api:
