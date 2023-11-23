@@ -34,6 +34,7 @@ from .schemas.requests import (
     EditGroupIn,
     EditUserIn,
     ExecutePostWorkflowOperationIn,
+    GetPostDefinitionCatalogsIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
     ListSystemGroupsIn,
@@ -46,10 +47,12 @@ from .schemas.responses import (
     EditUserOut,
     ExecutePostWorkflowOperationResponse,
     GetGroupForEditOut,
+    GetPostDefinitionCatalogsOut,
     GetPostDefinitionOut,
     GetUserForEditOut,
     HashtagsOut,
     ListGroupMembersOut,
+    ListPostDefinitionCatalogEntriesOut,
     ListSystemGroupsOut,
     ListSystemUsersElement,
     ListSystemUsersOut,
@@ -348,6 +351,25 @@ class InteractaApi(Api):
         path = "/admin/data/business-units"
         return self.call_get(path=path, headers=headers)
 
+    @interactapi(schema_out=GetPostDefinitionCatalogsOut)
+    def list_catalogs(
+        self,
+        catalog_ids: set[int],
+        load_entries: bool = False,
+        headers: dict = None,
+    ) -> GetPostDefinitionCatalogsOut | Response:
+        path = "/communication/settings/post-definition/catalogs"
+        params = {"loadEntries": load_entries}
+        data = GetPostDefinitionCatalogsIn(catalog_ids=list(catalog_ids))
+        return self.call_post(path=path, headers=headers, data=data, params=params)
+
+    @interactapi(schema_out=ListPostDefinitionCatalogEntriesOut)
+    def list_catalog_entries(
+        self, catalog_id: int | str, headers: dict = None, data: dict = None
+    ) -> ListPostDefinitionCatalogEntriesOut | Response:
+        path = f"/communication/settings/post-definition/catalogs/{catalog_id}/entries"
+        return self.call_post(path=path, headers=headers, data=data)
+
     ### worflow operations
 
     @interactapi(schema_out=GetPostWorkflowScreenDataForEditResponse)
@@ -403,8 +425,6 @@ class InteractaApi(Api):
     def list_all_posts(
         self,
         community_id: str | int,
-        params: dict = None,
-        headers: dict = None,
         data: ListCommunityPostsIn = None,
     ) -> list[BaseListPostsElement]:
         all_posts = []
@@ -470,7 +490,7 @@ class InteractaApi(Api):
 
         result = self.list_users(data=data)
 
-        json_data = data.model_dump_json(exclude_unset=True, exclude=["page_size"])
+        json_data = data.model_dump_json(exclude_unset=True, exclude={"page_size"})
         if len(result.items) == 0:
             raise ObjectDoesNotFound(f"User with data '{json_data}' non found in interacta")
         elif len(result.items) > 1:

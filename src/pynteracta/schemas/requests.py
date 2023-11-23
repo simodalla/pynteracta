@@ -214,3 +214,8 @@ class EditGroupMember(InteractaModel):
 class EditGroupMembersIn(InteractaModel):
     # creato da rreverse engineering, non supportato da api a settembre 2023
     group_members: list[EditGroupMember] | None = None
+
+
+class GetPostDefinitionCatalogsIn(InteractaModel):
+    # GetPostDefinitionCatalogsRequest
+    catalog_ids: list[int] = []

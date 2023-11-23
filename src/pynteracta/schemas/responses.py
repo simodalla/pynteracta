@@ -3,6 +3,8 @@ from pydantic import HttpUrl
 from .core import InteractaOut, ItemCreatedEditedOut, PagedItemsOut
 from .models import (
     BaseListPostsElement,
+    Catalog,
+    CatalogEntry,
     Group,
     Hashtag,
     ListSystemGroupsElement,
@@ -37,6 +39,11 @@ class ListUsersOut(PagedItemsOut):
 class ListGroupMembersOut(PagedItemsOut):
     # ListGroupMembersResponseDTO
     items: list[User] | None = []
+
+
+class ListPostDefinitionCatalogEntriesOut(PagedItemsOut):
+    # ListPostDefinitionCatalogEntriesResponseDTO
+    items: list[CatalogEntry] | None = []
 
 
 class PostDetailOut(InteractaOut, Post):
@@ -135,3 +142,8 @@ class GetGroupForEditOut(InteractaOut, Group):
     # GetGroupForEditResponseDTO
     members: list[User] | None = None
     tags: list[Tag] | None = None
+
+
+class GetPostDefinitionCatalogsOut(InteractaOut):
+    # GetPostDefinitionCatalogsResponseDTO
+    catalogs: list[Catalog] | None = None

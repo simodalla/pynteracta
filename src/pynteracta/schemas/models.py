@@ -2,7 +2,7 @@ from datetime import datetime
 from datetime import datetime as type_datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from ..enums import FieldFilterTypeEnum, FieldTypeEnum
 from ..exceptions import ObjectDoesNotFound
@@ -361,6 +361,15 @@ class EnumValue(InteractaModel):
     deleted: bool | None = None
 
 
+class FieldMetadata(InteractaModel):
+    model_config = ConfigDict(extra="allow")
+
+    catalog_id: int | None = None
+    hierarchical: bool | None = None
+    generic_entity_list_config_id: str | None = None
+    community_id: int | None = None
+
+
 class FieldBase(InteractaModel):
     id: int
     name: str | None = None
@@ -370,7 +379,11 @@ class FieldBase(InteractaModel):
     searchable: bool | None = None
     sortable: bool | None = None
     enum_values: list[EnumValue] | None = None
-    metadata: dict | None = None
+    metadata: FieldMetadata | None = None
+
+    @property
+    def catalog_id(self):
+        return self.metadata.catalog_id
 
 
 class FieldDefinition(FieldBase):
@@ -485,6 +498,10 @@ class PostDefinition(InteractaModel):
     def custom_fields_ids(self) -> list[int]:
         return [int(field.id) for field in self.field_definitions]
 
+    @property
+    def catalog_ids(self) -> list[int]:
+        return [field.catalog_id for field in self.field_definitions if field.catalog_id]
+
 
 class PostEditableContentData(InteractaModel):
     title: str = ""
@@ -530,13 +547,32 @@ class CustomFieldFilter(InteractaModel):
     # ipo di ricerca [1=EQUAL, 2=INTERVAL, 3=LIKE, 4=IN, 5=CONTAINS, 6=IS_NULL_OR_IN, 7=IS_EMPTY].
     type_id: FieldFilterTypeEnum | None = None
     # Parametri del filtro, ove necessari.
-    parameters: list[Any] = None
+    parameters: list[Any] | None = None
 
 
 class AcknowledgeTaskFilter(InteractaModel):
     # AcknowledgeTaskFilterDTO
     confirmed: bool | None = None
     assigned_to_me: bool | None = None
+
+
+class CatalogEntry(InteractaModel):
+    # CatalogEntryDTO
+    id: int
+    catalog_id: int
+    label: str | None = None
+    external_id: str | None = None
+    parent_ids: list[int] | None = None
+    deleted: bool = False
+
+
+class Catalog(InteractaModel):
+    # CatalogDTO
+    id: int
+    name: str
+    etag: int | None = None
+    paged: bool = False
+    entries: list[CatalogEntry] | None = None
 
 
 # Out Models #######################################################################################

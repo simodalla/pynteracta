@@ -34,6 +34,19 @@ class SentinelData(BaseModel):
     filter_group_name: str = "demo"
 
 
+class CatalogData(BaseModel):
+    id: int | None = None
+    labels: list[str] | None = None
+    name: str | None = None
+    community_id: int | None = None
+
+
+class CatalogsData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    catalog: CatalogData | None = None
+
+
 class IntegrationTestData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -41,6 +54,7 @@ class IntegrationTestData(BaseModel):
     prefix_admin_object: str = "zzz-pynta-"
     sentinel: SentinelData | None = None
     group_lifecycle: GroupLifecycleData | None = None
+    catalogs: CatalogsData | None = None
 
 
 class IntegrationsAppSettings(AppSettings):
