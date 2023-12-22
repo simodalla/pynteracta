@@ -421,6 +421,22 @@ class PostWorkflowDefinitionState(InteractaModel):
     deleted: bool | None = None
 
 
+class PostWorkflowDefinitionScreenField(InteractaModel):
+    # PostWorkflowDefinitionScreenFieldDTO
+    id: int
+    label: str | None = None
+    type: FieldTypeEnum | None = None
+    parent_id: int | None = None
+    readonly: bool | None = None
+    searchable: bool | None = None
+    sortable: bool | None = None
+    visible_in_create: bool | None = None
+    visible_in_edit: bool | None = None
+    external_id: str | None = None
+    enum_values: list[EnumValue] | None = None
+    metadata: FieldMetadata | None = None
+
+
 class PostWorkflowDefinitionTransition(InteractaModel):
     # PostWorkflowDefinitionTransitionDTO
     id: int
@@ -437,14 +453,14 @@ class PostWorkflowDefinition(InteractaModel):
     title: str | None = None
     states: list[PostWorkflowDefinitionState] | None = None
     transitions: list[PostWorkflowDefinitionTransition] | None = None
-    screen_field_metadatas: list[PostWorkflowDefinitionState] | None = None
+    screen_field_metadatas: list[PostWorkflowDefinitionScreenField] | None = None
     empty: bool | None = None
 
     def get_state(self, name: str) -> PostWorkflowDefinitionState:
         for state in self.states:
             if state.name.lower() == name.lower():
                 return state
-        raise ObjectDoesNotFound(f"State '{name}' not found")
+        raise ObjectDoesNotFound(f"State {name} not found")
 
     def get_transition(
         self, from_state_id: int, to_state_id: int
@@ -455,6 +471,12 @@ class PostWorkflowDefinition(InteractaModel):
         raise ObjectDoesNotFound(
             f"Transition from state {from_state_id} to state {to_state_id} not found"
         )
+
+    def get_screen_field(self, label: str) -> PostWorkflowDefinitionScreenField:
+        for screen_field in self.screen_field_metadatas:
+            if screen_field.label.lower() == label.lower():
+                return screen_field
+        raise ObjectDoesNotFound(f"Screen field metadata {label} not found")
 
 
 class PostDefinition(InteractaModel):

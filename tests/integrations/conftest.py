@@ -47,6 +47,12 @@ class CatalogsData(BaseModel):
     catalog: CatalogData | None = None
 
 
+class CommunityPostDefinitionData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    community_id: int | None = None
+
+
 class IntegrationTestData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -55,6 +61,7 @@ class IntegrationTestData(BaseModel):
     sentinel: SentinelData | None = None
     group_lifecycle: GroupLifecycleData | None = None
     catalogs: CatalogsData | None = None
+    community_post_definition: CommunityPostDefinitionData | None = None
 
 
 class IntegrationsAppSettings(AppSettings):

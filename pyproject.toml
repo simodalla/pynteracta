@@ -61,8 +61,8 @@ pytest-xdist = "^3.2.0"
 pytest-sugar = "^0.9.6"
 pytest-mock = "^3.10.0"
 time-machine = "^2.9.0"
-responses = "^0.23.3"
-faker = "^19.2.0"
+responses = "^0.24.1"
+faker = "^21.0.0"
 devtools = "^0.12.2"
 
 
