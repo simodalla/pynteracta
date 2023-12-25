@@ -219,3 +219,19 @@ class EditGroupMembersIn(InteractaModel):
 class GetPostDefinitionCatalogsIn(InteractaModel):
     # GetPostDefinitionCatalogsRequest
     catalog_ids: list[int] = []
+
+
+class InputPostCommentAttachmentIn(InteractaModel):
+    # InputPostCommentAttachmentDTO
+    attachment_id: int | None = None
+    name: str | None = None
+    content_ref: str | None = None
+
+
+class CreatePostCommentRequestIn(InteractaModel):
+    # CreatePostCommentRequestDTO
+    comment: str | None = None
+    comment_format: int = 1  # Formato del commento, facoltativo (1=delta, 2=plainText, default: 1)
+    client_uid: str | None = None
+    attachments: InputPostCommentAttachmentIn | None = None
+    parent_comment_id: int | None = None

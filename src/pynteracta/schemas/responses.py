@@ -10,6 +10,7 @@ from .models import (
     ListSystemGroupsElement,
     ListSystemUsersElement,
     Post,
+    PostComment,
     PostDefinition,
     PostDetail,
     PostWorkflowDefinitionState,
@@ -147,3 +148,13 @@ class GetGroupForEditOut(InteractaOut, Group):
 class GetPostDefinitionCatalogsOut(InteractaOut):
     # GetPostDefinitionCatalogsResponseDTO
     catalogs: list[Catalog] | None = None
+
+
+class DeletePostResponseOut(InteractaOut):
+    # DeletePostResponseDTO
+    post_id: int
+
+
+class CreatePostCommentResponseOut(InteractaOut):
+    # CreatePostCommentResponseDTO
+    comment: PostComment

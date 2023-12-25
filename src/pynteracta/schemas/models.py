@@ -597,6 +597,41 @@ class Catalog(InteractaModel):
     entries: list[CatalogEntry] | None = None
 
 
+class PostCommentAttachment(InteractaModel):
+    # PostCommentAttachmentDTO
+    id: int
+    temporary_content_view_link: str | None = None
+    temporary_content_download_link: str | None = None
+    temporary_content_preview_image_link: str | None = None
+    temporary_content_preview_image_animated_link: str | None = None
+    temporary_content_preview_image_hi_res_link: str | None = None
+    temporary_content_preview_image_hi_res_animated_link: str | None = None
+    name: str | None = None
+    content_ref: str | None = None
+    content_mime_type: str | None = None
+    etag: str | None = None
+    md5_hash: str | None = None
+    size: int | None = None
+    creator_user: User | None = None
+    creation_timestamp: datetime | None = None
+
+
+class PostComment(InteractaModel):
+    # PostCommentDTO
+    id: int
+    comment_delta: str | None = None
+    comment_plain_text: str | None = None
+    creator_user: User | None = None
+    creation_timestamp: datetime | None = None
+    mentions: list[User] | None = None
+    attachments: PostCommentAttachment | None = None  # PostCommentAttachmentDTO
+    deleted: bool | None | None
+    parent_comment: int | None = None
+    likes_count: int | None = None
+    liked_by_me: bool | None | None
+    show_like_section: bool | None | None
+
+
 # Out Models #######################################################################################
 
 

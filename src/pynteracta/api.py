@@ -30,6 +30,7 @@ from .schemas.models import (
 )
 from .schemas.requests import (
     CreateGroupIn,
+    CreatePostCommentRequestIn,
     CreateUserIn,
     EditGroupIn,
     EditUserIn,
@@ -42,7 +43,9 @@ from .schemas.requests import (
 )
 from .schemas.responses import (
     CreateGroupOut,
+    CreatePostCommentResponseOut,
     CreateUserOut,
+    DeletePostResponseOut,
     EditGroupOut,
     EditUserOut,
     ExecutePostWorkflowOperationResponse,
@@ -247,6 +250,21 @@ class InteractaApi(Api):
     ) -> Response:
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
         return self.call_put(path=path, headers=headers, data=data)
+
+    @interactapi(schema_out=DeletePostResponseOut)
+    def delete_post(self, post_id: int | str, headers: dict | None = None) -> DeletePostResponseOut:
+        path = f"/communication/posts/manage/edit-post/{post_id}"
+        return self.call_delete(path=path, headers=headers)
+
+    @interactapi(schema_out=CreatePostCommentResponseOut)
+    def create_comment_post(
+        self,
+        post_id: int | str,
+        headers: dict = None,
+        data: CreatePostCommentRequestIn | None = None,
+    ) -> CreatePostCommentResponseOut | Response:
+        path = f"/communication/posts/manage/create-comment/{post_id}"
+        return self.call_post(path=path, headers=headers, data=data)
 
     @interactapi(schema_out=ListSystemUsersOut)
     def list_users(
