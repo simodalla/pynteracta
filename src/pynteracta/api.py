@@ -253,7 +253,7 @@ class InteractaApi(Api):
 
     @interactapi(schema_out=DeletePostResponseOut)
     def delete_post(self, post_id: int | str, headers: dict | None = None) -> DeletePostResponseOut:
-        path = f"/communication/posts/manage/edit-post/{post_id}"
+        path = f"/communication/posts/manage/delete-post/{post_id}"
         return self.call_delete(path=path, headers=headers)
 
     @interactapi(schema_out=CreatePostCommentResponseOut)
