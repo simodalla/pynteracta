@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import HttpUrl
 
 from .core import InteractaOut, ItemCreatedEditedOut, PagedItemsOut
@@ -5,6 +7,7 @@ from .models import (
     BaseListPostsElement,
     Catalog,
     CatalogEntry,
+    Community,
     Group,
     Hashtag,
     ListSystemGroupsElement,
@@ -13,13 +16,33 @@ from .models import (
     PostComment,
     PostDefinition,
     PostDetail,
+    PostEditableContentData,
     PostWorkflowDefinitionState,
     PostWorkflowDefinitionTransition,
     Tag,
     User,
     UserInfo,
+    WorkflowDefinitionScreen,
 )
 from .requests import UserEditBase, UserSettingsIn
+
+
+class GetCommunityDetailsOut(InteractaOut):
+    community: Community | None = None
+
+
+class GetCustomPostForEditOut(InteractaOut):
+    # -- GetCustomPostForEditResponseDTO
+    content_data: PostEditableContentData | None = None
+    occ_token: int
+    community_id: int
+    custom_id: str | None = None
+    current_workflow_state: PostWorkflowDefinitionState | None = None
+    creator_user: User | None = None
+    creation_timestamp: datetime | None = None
+    last_modify_user: User | None = None
+    last_modify_timestamp: datetime | None = None
+    last_operation_timestamp: datetime | None = None
 
 
 class ListSystemGroupsOut(PagedItemsOut):
@@ -80,14 +103,30 @@ class GetPostDefinitionOut(InteractaOut, PostDefinition):
     pass
 
 
-class ExecutePostWorkflowOperationResponse(InteractaOut):
-    # ExecutePostWorkflowOperationResponseDTO
-    new_current_state: PostWorkflowDefinitionState | None = None
+class GetPostWorkflowScreenDataForEditOut(InteractaOut):
+    # GetPostWorkflowScreenDataForEditResponseDTO
+    screen_data: dict | None = None
+    screen_occ_token: int | None = None
+    screen: WorkflowDefinitionScreen | None = None
+    current_workflow_state: PostWorkflowDefinitionState | None = None
+
+
+class EditPostWorkflowOut(InteractaOut):
     new_screen_data: dict | None = None
-    new_current_workflow_permitted_operations: list[PostWorkflowDefinitionTransition] | None = None
-    new_can_edit_workflow_screen_data: bool | None = None
     new_last_modify_timestamp: int | None = None
     post_data_has_changed: bool | None = None
+
+
+class ExecutePostWorkflowOperationOut(EditPostWorkflowOut):
+    # ExecutePostWorkflowOperationResponseDTO
+    new_current_state: PostWorkflowDefinitionState | None = None
+    new_current_workflow_permitted_operations: list[PostWorkflowDefinitionTransition] | None = None
+    new_can_edit_workflow_screen_data: bool | None = None
+
+
+class EditPostWorkflowScreenDataOut(EditPostWorkflowOut):
+    # EditPostWorkflowScreenDataResponseDTO
+    next_screen_occ_token: int | None = None
 
 
 class CreateUserOut(InteractaOut):
@@ -150,11 +189,11 @@ class GetPostDefinitionCatalogsOut(InteractaOut):
     catalogs: list[Catalog] | None = None
 
 
-class DeletePostResponseOut(InteractaOut):
+class DeletePostOut(InteractaOut):
     # DeletePostResponseDTO
     post_id: int
 
 
-class CreatePostCommentResponseOut(InteractaOut):
+class CreatePostCommentOut(InteractaOut):
     # CreatePostCommentResponseDTO
     comment: PostComment

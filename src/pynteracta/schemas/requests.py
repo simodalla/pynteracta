@@ -83,12 +83,16 @@ class ListCommunityPostsIn(InteractaIn):
 ### Workflow
 
 
-class ExecutePostWorkflowOperationIn(InteractaModel):
+class EditPostWorkflowScreenDataIn(InteractaModel):
+    # EditPostWorkflowScreenDataRequestDTO
     model_config = ConfigDict(validate_assignment=True)
 
-    # ExecutePostWorkflowOperationRequestDTO
     screen_data: dict = {}
     delta_area_format: int = 1
+
+
+class ExecutePostWorkflowOperationIn(EditPostWorkflowScreenDataIn):
+    # ExecutePostWorkflowOperationRequestDTO
     screen_occ_token: int
 
 
@@ -216,9 +220,15 @@ class EditGroupMembersIn(InteractaModel):
     group_members: list[EditGroupMember] | None = None
 
 
+### Catalogs
+
+
 class GetPostDefinitionCatalogsIn(InteractaModel):
     # GetPostDefinitionCatalogsRequest
     catalog_ids: list[int] = []
+
+
+### Comments
 
 
 class InputPostCommentAttachmentIn(InteractaModel):

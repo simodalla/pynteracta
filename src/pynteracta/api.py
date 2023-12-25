@@ -21,9 +21,7 @@ from .schemas.models import (
     BaseListPostsElement,
     CreateCustomPostIn,
     EditCustomPostIn,
-    GetCommunityDetailsResponse,
-    GetCustomPostForEditResponse,
-    GetPostWorkflowScreenDataForEditResponse,
+    GetCustomPostForEditOut,
     Group,
     InteractaModel,
     Post,
@@ -33,6 +31,7 @@ from .schemas.requests import (
     CreatePostCommentRequestIn,
     CreateUserIn,
     EditGroupIn,
+    EditPostWorkflowScreenDataIn,
     EditUserIn,
     ExecutePostWorkflowOperationIn,
     GetPostDefinitionCatalogsIn,
@@ -43,15 +42,18 @@ from .schemas.requests import (
 )
 from .schemas.responses import (
     CreateGroupOut,
-    CreatePostCommentResponseOut,
+    CreatePostCommentOut,
     CreateUserOut,
-    DeletePostResponseOut,
+    DeletePostOut,
     EditGroupOut,
+    EditPostWorkflowScreenDataOut,
     EditUserOut,
-    ExecutePostWorkflowOperationResponse,
+    ExecutePostWorkflowOperationOut,
+    GetCommunityDetailsOut,
     GetGroupForEditOut,
     GetPostDefinitionCatalogsOut,
     GetPostDefinitionOut,
+    GetPostWorkflowScreenDataForEditOut,
     GetUserForEditOut,
     HashtagsOut,
     ListGroupMembersOut,
@@ -233,10 +235,10 @@ class InteractaApi(Api):
         path = f"/communication/posts/manage/create-post/{community_id}"
         return self.call_post(path=path, headers=headers, data=data)
 
-    @interactapi(schema_out=GetCustomPostForEditResponse)
+    @interactapi(schema_out=GetCustomPostForEditOut)
     def get_post_data_for_edit(
         self, post_id, headers: dict = None
-    ) -> GetCustomPostForEditResponse | Response:
+    ) -> GetCustomPostForEditOut | Response:
         path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
         return self.call_get(path=path, headers=headers)
 
@@ -251,18 +253,18 @@ class InteractaApi(Api):
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
         return self.call_put(path=path, headers=headers, data=data)
 
-    @interactapi(schema_out=DeletePostResponseOut)
-    def delete_post(self, post_id: int | str, headers: dict | None = None) -> DeletePostResponseOut:
+    @interactapi(schema_out=DeletePostOut)
+    def delete_post(self, post_id: int | str, headers: dict | None = None) -> DeletePostOut:
         path = f"/communication/posts/manage/delete-post/{post_id}"
         return self.call_delete(path=path, headers=headers)
 
-    @interactapi(schema_out=CreatePostCommentResponseOut)
+    @interactapi(schema_out=CreatePostCommentOut)
     def create_comment_post(
         self,
         post_id: int | str,
         headers: dict = None,
         data: CreatePostCommentRequestIn | None = None,
-    ) -> CreatePostCommentResponseOut | Response:
+    ) -> CreatePostCommentOut | Response:
         path = f"/communication/posts/manage/create-comment/{post_id}"
         return self.call_post(path=path, headers=headers, data=data)
 
@@ -357,10 +359,10 @@ class InteractaApi(Api):
         path = f"/communication/settings/communities/{community_id}/post-definition"
         return self.call_get(path=path, headers=headers)
 
-    @interactapi(schema_out=GetCommunityDetailsResponse)
+    @interactapi(schema_out=GetCommunityDetailsOut)
     def get_community_detail(
         self, community_id: str | int, headers: dict = None
-    ) -> GetCommunityDetailsResponse | Response:
+    ) -> GetCommunityDetailsOut | Response:
         path = f"/communication/settings/communities/{community_id}/details"
         return self.call_get(path=path, headers=headers)
 
@@ -390,29 +392,43 @@ class InteractaApi(Api):
 
     ### worflow operations
 
-    @interactapi(schema_out=GetPostWorkflowScreenDataForEditResponse)
+    @interactapi(schema_out=GetPostWorkflowScreenDataForEditOut)
     def get_post_workflow_screen_data_for_edit(
         self, post_id: int, workflow_operation_id: int | None = None, headers: dict = None
-    ) -> GetPostWorkflowScreenDataForEditResponse | Response:
+    ) -> GetPostWorkflowScreenDataForEditOut | Response:
         path = f"/communication/posts/manage/post-workflow-screen-data-for-edit/{post_id}"
         params = (
             {"workflowOperationId": str(workflow_operation_id)} if workflow_operation_id else None
         )
         return self.call_get(path=path, params=params, headers=headers)
 
-    @interactapi(schema_out=ExecutePostWorkflowOperationResponse)
+    @interactapi(schema_out=ExecutePostWorkflowOperationOut)
     def execute_post_workflow_operation(
         self,
         post_id: int,
         workflow_operation_id: int,
         headers: dict | None = None,
         data: ExecutePostWorkflowOperationIn | None = None,
-    ):
+    ) -> ExecutePostWorkflowOperationOut:
         path = (
             "/communication/posts/manage/execute-post-workflow-operation/"
             f"{post_id}/{workflow_operation_id}"
         )
         return self.call_post(path=path, headers=headers, data=data)
+
+    @interactapi(schema_out=EditPostWorkflowScreenDataOut)
+    def edit_post_workflow_screen_data(
+        self,
+        post_id: int,
+        screen_occ_token: int,
+        headers: dict | None = None,
+        data: EditPostWorkflowScreenDataIn | None = None,
+    ) -> EditPostWorkflowScreenDataOut:
+        path = (
+            "/communication/posts/manage/edit-post-workflow-screen-data/"
+            f"{post_id}/{screen_occ_token}"
+        )
+        return self.call_put(path=path, headers=headers, data=data)
 
     ### end worflow operations
 

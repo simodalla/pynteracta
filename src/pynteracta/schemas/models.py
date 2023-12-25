@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 from ..enums import FieldFilterTypeEnum, FieldTypeEnum
 from ..exceptions import ObjectDoesNotFound
-from .core import InteractaModel, InteractaOut
+from .core import InteractaModel
 
 
 class Link(BaseModel):
@@ -630,37 +630,6 @@ class PostComment(InteractaModel):
     likes_count: int | None = None
     liked_by_me: bool | None | None
     show_like_section: bool | None | None
-
-
-# Out Models #######################################################################################
-
-
-class GetCustomPostForEditResponse(InteractaOut):
-    # -- GetCustomPostForEditResponseDTO
-    content_data: PostEditableContentData | None = None
-    occ_token: int
-    community_id: int
-    custom_id: str | None = None
-    current_workflow_state: PostWorkflowDefinitionState | None = None
-    creator_user: User | None = None
-    creation_timestamp: datetime | None = None
-    last_modify_user: User | None = None
-    last_modify_timestamp: datetime | None = None
-    last_operation_timestamp: datetime | None = None
-
-
-class GetCommunityDetailsResponse(InteractaOut):
-    community: Community | None = None
-
-
-class GetPostWorkflowScreenDataForEditResponse(InteractaOut):
-    # GetPostWorkflowScreenDataForEditResponseDTO
-    screen_data: dict | None = None
-    screen_occ_token: int | None = (
-        None  # Token per il controllo delle modifiche concorrenti sugli screen.
-    )
-    screen: WorkflowDefinitionScreen | None = None
-    current_workflow_state: PostWorkflowDefinitionState | None = None
 
 
 # In Models
