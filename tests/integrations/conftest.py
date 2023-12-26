@@ -1,5 +1,6 @@
 import pytest
 from faker import Faker
+
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 from pynteracta.api import InteractaApi

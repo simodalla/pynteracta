@@ -134,32 +134,10 @@ exclude = '''
 '''
 
 [tool.ruff]
-# Docs: https://beta.ruff.rs/docs/
-# Rules: https://beta.ruff.rs/docs/rules/
-select = [
-  "B",
-  "C4",
-  "EXE",
-  "F",
-  "E",
-  "ISC",
-  "ICN",
-  "INP",
-  "PIE",
-  "SIM",
-  "W",
-  "T20",
-  "UP",
-  "T10",
-  "G",
-  "C90",
-  "ERA",
-]
+line-length = 100
+extend-select = ['Q', 'RUF100', 'C90', 'UP', 'I', 'T']
 ignore = ["G004"] #["B008", "SIM102"]
-fixable = ["ALL"]
-# unfixable = ["G004", "ERA001"]
-unfixable = ["G004", "ERA001",  "F841"]
-
+unfixable = ["G004"] # , "F401"]
 exclude = [
   ".git",
   ".mypy_cache",
@@ -172,11 +150,16 @@ exclude = [
   "__pycache",
   "**/migrations/*",
 ]
-line-length = 100
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py312"
-src = ["src", "test"]
+mccabe = { max-complexity = 14 }
 
-[tool.ruff.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
-max-complexity = 10
+[tool.ruff.lint.isort]
+known-first-party = ["pynteracta", "tests"]
+sections = { "pydantic" = ["pydantic", "pydantic_settings", "pydantic_settings_toml"] }
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "pydantic",
+  "first-party",
+  "local-folder"]

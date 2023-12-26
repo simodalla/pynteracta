@@ -233,7 +233,7 @@ class Tag(TagBase):
     visible: str | None = None
 
 
-class ZonedDatetimeIn(InteractaModel):
+class ZonedDatetimeInput(InteractaModel):
     # ZonedDatetimeInputDTO
     datetime: type_datetime = None
     timezone: str | None = None
@@ -332,7 +332,7 @@ class PostDetail(Post):
     cover_image: dict | None = None  # PostCoverImageDTO
     draft: bool = False  # Creazione in stato bozza/pubblicato
     draft_data: dict | None = None  # DraftPostDataDTO
-    scheduled_publication: ZonedDatetimeIn | None = None
+    scheduled_publication: ZonedDatetimeInput | None = None
     # Info stato del post programmato [1=SUCCESS, 2=FAILED]
     scheduled_publication_result: int | None = None
 
@@ -630,52 +630,3 @@ class PostComment(InteractaModel):
     likes_count: int | None = None
     liked_by_me: bool | None | None
     show_like_section: bool | None | None
-
-
-# In Models
-
-
-class AttachmentIn(BaseModel):
-    # EditCustomPostRequestDTO
-    # InputPostAttachmentDTO
-    type: int | None = None
-    attachment_id: int | None = None
-    name: str | None = None
-    content_ref: str | None = None  # Il riferimento sul cloudStorage dell'allegato.
-    referenced_attachment_id: int | None = None  # Identificativo dell'allegato di riferimento
-    hashtag_ids: list[int] | None = None
-    drive: DriveAttachmentData | None = None
-
-
-class CustomPostIn(InteractaModel):
-    # ROOT
-    title: str
-    description: str | None = None  # Descrizione del post
-    description_format: int = (
-        1  # Formato della descrizione del post, facoltativo (1=delta, 2=markdown, default: 1)
-    )
-    custom_data: dict | None = None  # Dati custom del post
-    # Formato dei campi custom di tipo 11-delta, facoltativo (1=delta, 2=plain text, default: 1)
-    delta_area_format: int = 1
-    visibility: int | None = None
-    # Identificativo dello stato iniziale del workflow, se la community lo permette
-    workflow_init_state_id: int | None = None
-    draft: bool = False  # Creazione in stato bozza/pubblicato
-    scheduled_publication: ZonedDatetimeIn | None = None
-
-
-class CreateCustomPostIn(CustomPostIn):
-    # CreateCustomPostRequest
-    attachments: list[AttachmentIn] | None = None
-    watcher_user_ids: list[int] | None = None
-    announcement: bool | None = None
-    client_uid: str | None = None
-
-
-class EditCustomPostIn(CustomPostIn):
-    # EditCustomPostRequestDTO
-    add_attachments: list[AttachmentIn] = []
-    update_attachments: list[AttachmentIn] = []
-    remove_attachment_ids: list[int] = []
-    add_watcher_user_ids: list[int] = []
-    remove_watcher_user_ids: list[int] = []

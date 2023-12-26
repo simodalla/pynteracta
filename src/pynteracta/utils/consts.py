@@ -1,4 +1,4 @@
-# ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion # noqa: E501
+# ref https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione#Costruzione-del-jwtAssertion
 SERVICE_AUTH_HEADERS = {
     # Sostituire con il valore "private_key_id" recuperato dal JSON delle credenziali
     # (Service Account). Attenzione che è un tipo JSON number, non una stringa.

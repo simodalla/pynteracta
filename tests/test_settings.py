@@ -1,4 +1,5 @@
 import pytest
+
 from pydantic import ValidationError
 
 from pynteracta.models import ServiceAccountModel

@@ -3,9 +3,10 @@ from pathlib import Path
 
 import rich
 import typer
-from pydantic import RootModel
 from rich.progress import Progress
 from rich.table import Table
+
+from pydantic import RootModel
 
 from ..enums import LoginProviderEnum
 from ..schemas.models import ListSystemUsersElement
@@ -25,7 +26,7 @@ class OutputFormat(StrEnum):
 
 @app.callback()
 def set_env_file(
-    env_file: Path = typer.Option(  # noqa: B008
+    env_file: Path = typer.Option(
         Path("~/.pynta.toml"), "--env", "-e", help="Environment file in formato toml"
     ),
 ):
@@ -33,9 +34,9 @@ def set_env_file(
 
 
 @app.command("list")
-def list_users(  # noqa: C901
+def list_users(
     show_not_active: bool = typer.Option(False, help="Mostra anche gli utenti non attivi"),
-    login_provider: list[LoginProviderEnum] = typer.Option(  # noqa: B008
+    login_provider: list[LoginProviderEnum] = typer.Option(
         [], "--login-provider", "-lp", help="Filtra gli utenti con i login provider selezionati"
     ),
     show_no_login_provider: bool = typer.Option(
@@ -52,7 +53,7 @@ def list_users(  # noqa: C901
         help="Mostra solo gli utenti che hanno email di contatto diverse da quelle"
         " del login provider",
     ),
-    output_format: OutputFormat = typer.Option(  # noqa: B008
+    output_format: OutputFormat = typer.Option(
         OutputFormat.TABLE, "--out-format", "-of", help="Tipo di formato dell'output"
     ),
 ):

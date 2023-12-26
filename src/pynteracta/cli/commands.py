@@ -18,7 +18,7 @@ state = {"env_file": None}
 
 @app.callback()
 def set_env_file(
-    env_file: Path = typer.Option(  # noqa: B008
+    env_file: Path = typer.Option(
         Path("~/.pynta.toml"), "--env", "-e", help="Environment file in formato toml"
     ),
 ):
@@ -26,7 +26,7 @@ def set_env_file(
 
 
 @app.command()
-def get_community_definition(  # noqa: C901
+def get_community_definition(
     community_id: int = typer.Option(0, "--id", "-i"),
     community_name: str = typer.Option("", "--name", "-n"),
     fields_definition: bool = typer.Option(False, "--fields", "-fd"),

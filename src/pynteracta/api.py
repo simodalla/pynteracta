@@ -4,8 +4,9 @@ from collections import OrderedDict
 
 import jwt
 import requests
-from pydantic import BaseModel
 from requests import Response
+
+from pydantic import BaseModel
 
 from . import urls
 from .core import format_response_error, interactapi, mock_validate_kid
@@ -19,16 +20,16 @@ from .exceptions import (
 )
 from .schemas.models import (
     BaseListPostsElement,
-    CreateCustomPostIn,
-    EditCustomPostIn,
     Group,
     InteractaModel,
     Post,
 )
 from .schemas.requests import (
+    CreateCustomPostIn,
     CreateGroupIn,
     CreatePostCommentRequestIn,
     CreateUserIn,
+    EditCustomPostIn,
     EditGroupIn,
     EditPostWorkflowScreenDataIn,
     EditUserIn,
@@ -432,7 +433,7 @@ class InteractaApi(Api):
 
     ### end worflow operations
 
-    def get_post_by_title(self, community_id: int, title: str) -> Post:
+    def get_post_by_title(self, community_id: int, title: str) -> BaseListPostsElement:
         search = ListCommunityPostsIn(title=title)
         result = self.list_posts(community_id, data=search)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
@@ -444,7 +445,7 @@ class InteractaApi(Api):
             )
         return posts[0]
 
-    def get_post_by_exact_title(self, community_id: int, title: str) -> Post | None:
+    def get_post_by_exact_title(self, community_id: int, title: str) -> BaseListPostsElement | None:
         search = ListCommunityPostsIn(title=title)
         result = self.list_posts(community_id, data=search)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
