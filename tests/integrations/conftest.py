@@ -54,6 +54,13 @@ class CommunityPostDefinitionData(BaseModel):
     community_id: int | None = None
 
 
+class CommentsData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    community_id: int | None = None
+    default_custom_data: dict | None = None
+
+
 class IntegrationTestData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -63,6 +70,7 @@ class IntegrationTestData(BaseModel):
     group_lifecycle: GroupLifecycleData | None = None
     catalogs: CatalogsData | None = None
     community_post_definition: CommunityPostDefinitionData | None = None
+    comments: CommentsData | None = None
 
 
 class IntegrationsAppSettings(AppSettings):

@@ -19,7 +19,7 @@ class InteractaOut(InteractaModel):
     _response: Any = PrivateAttr(None)
 
 
-class PagedItemsOut(InteractaOut):
+class PaginatedOut(InteractaOut):
     items: list | None = []
     next_page_token: str | None = None
     total_items_count: int | None = None
@@ -39,8 +39,11 @@ class ItemCreatedEditedOut(InteractaOut):
     next_occ_token: int | None = None
 
 
-class InteractaIn(InteractaModel):
+class PaginatedIn(InteractaModel):
     page_token: str | None = None
     page_size: int = 15
     calculate_total_items_count: bool | None = True
+
+
+class InteractaIn(PaginatedIn):
     order_desc: bool | None = None

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import HttpUrl
 
-from .core import InteractaOut, ItemCreatedEditedOut, PagedItemsOut
+from .core import InteractaOut, ItemCreatedEditedOut, PaginatedOut
 from .models import (
     BaseListPostsElement,
     Catalog,
@@ -45,27 +45,27 @@ class GetCustomPostForEditOut(InteractaOut):
     last_operation_timestamp: datetime | None = None
 
 
-class ListSystemGroupsOut(PagedItemsOut):
+class ListSystemGroupsOut(PaginatedOut):
     # ListSystemGroupsResponseDTO
     items: list[ListSystemGroupsElement] | None = []
 
 
-class ListSystemUsersOut(PagedItemsOut):
+class ListSystemUsersOut(PaginatedOut):
     # ListSystemUsersResponseDTO
     items: list[ListSystemUsersElement] | None
 
 
-class ListUsersOut(PagedItemsOut):
+class ListUsersOut(PaginatedOut):
     # ListUsersResponseDTO ##OK##
     items: list[User] | None
 
 
-class ListGroupMembersOut(PagedItemsOut):
+class ListGroupMembersOut(PaginatedOut):
     # ListGroupMembersResponseDTO
     items: list[User] | None = []
 
 
-class ListPostDefinitionCatalogEntriesOut(PagedItemsOut):
+class ListPostDefinitionCatalogEntriesOut(PaginatedOut):
     # ListPostDefinitionCatalogEntriesResponseDTO
     items: list[CatalogEntry] | None = []
 
@@ -82,12 +82,12 @@ class PostDetailOut(InteractaOut, Post):
     hashtags: list[Hashtag] | None = None
 
 
-class PostsOut(PagedItemsOut):
+class PostsOut(PaginatedOut):
     # PagedListPostsResponseDTO
     items: list[BaseListPostsElement] | None = []
 
 
-class HashtagsOut(PagedItemsOut):
+class HashtagsOut(PaginatedOut):
     items: list[Hashtag] | None = []
 
 
@@ -192,6 +192,11 @@ class GetPostDefinitionCatalogsOut(InteractaOut):
 class DeletePostOut(InteractaOut):
     # DeletePostResponseDTO
     post_id: int
+
+
+class ListPostCommentsOut(PaginatedOut):
+    # ListPostCommentsResponseDTO
+    items: list[PostComment] | None = []
 
 
 class CreatePostCommentOut(InteractaOut):

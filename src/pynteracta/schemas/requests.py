@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
 
-from .core import InteractaIn, InteractaModel
+from .core import InteractaIn, InteractaModel, PaginatedIn
 from .models import (
     AcknowledgeTaskFilter,
     AdminUserPreferences,
@@ -279,6 +279,11 @@ class GetPostDefinitionCatalogsIn(InteractaModel):
 ### Comments
 
 
+class ListPostCommentsIn(PaginatedIn):
+    # ListPostCommentsRequestDTO
+    pass
+
+
 class InputPostCommentAttachmentIn(InteractaModel):
     # InputPostCommentAttachmentDTO
     attachment_id: int | None = None
@@ -286,7 +291,7 @@ class InputPostCommentAttachmentIn(InteractaModel):
     content_ref: str | None = None
 
 
-class CreatePostCommentRequestIn(InteractaModel):
+class CreatePostCommentIn(InteractaModel):
     # CreatePostCommentRequestDTO
     comment: str | None = None
     comment_format: int = 1  # Formato del commento, facoltativo (1=delta, 2=plainText, default: 1)

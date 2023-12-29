@@ -27,7 +27,7 @@ from .schemas.models import (
 from .schemas.requests import (
     CreateCustomPostIn,
     CreateGroupIn,
-    CreatePostCommentRequestIn,
+    CreatePostCommentIn,
     CreateUserIn,
     EditCustomPostIn,
     EditGroupIn,
@@ -37,6 +37,7 @@ from .schemas.requests import (
     GetPostDefinitionCatalogsIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
+    ListPostCommentsIn,
     ListSystemGroupsIn,
     ListSystemUsersIn,
 )
@@ -58,6 +59,7 @@ from .schemas.responses import (
     GetUserForEditOut,
     HashtagsOut,
     ListGroupMembersOut,
+    ListPostCommentsOut,
     ListPostDefinitionCatalogEntriesOut,
     ListSystemGroupsOut,
     ListSystemUsersElement,
@@ -259,15 +261,34 @@ class InteractaApi(Api):
         path = f"/communication/posts/manage/delete-post/{post_id}"
         return self.call_delete(path=path, headers=headers)
 
+    # comments operations
+
+    @interactapi(schema_out=ListPostCommentsOut)
+    def list_comment_post(
+        self,
+        post_id: int | str,
+        headers: dict = None,
+        data: ListPostCommentsIn | None = None,
+    ) -> ListPostCommentsOut | Response:
+        path = f"/communication/posts/data/comments-list/{post_id}"
+        return self.call_post(path=path, headers=headers, data=data)
+
     @interactapi(schema_out=CreatePostCommentOut)
     def create_comment_post(
         self,
         post_id: int | str,
         headers: dict = None,
-        data: CreatePostCommentRequestIn | None = None,
+        data: CreatePostCommentIn | None = None,
     ) -> CreatePostCommentOut | Response:
         path = f"/communication/posts/manage/create-comment/{post_id}"
         return self.call_post(path=path, headers=headers, data=data)
+
+    @interactapi
+    def delete_comment_post(self, comment_id: int | str, headers: dict = None) -> Response:
+        path = f"/communication/posts/manage/delete-comment/{comment_id}"
+        return self.call_delete(path=path, headers=headers)
+
+    # end comments operations
 
     @interactapi(schema_out=ListSystemUsersOut)
     def list_users(

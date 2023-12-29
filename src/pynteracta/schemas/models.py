@@ -624,7 +624,7 @@ class PostComment(InteractaModel):
     creator_user: User | None = None
     creation_timestamp: datetime | None = None
     mentions: list[User] | None = None
-    attachments: PostCommentAttachment | None = None  # PostCommentAttachmentDTO
+    attachments: list[PostCommentAttachment] | None = None  # PostCommentAttachmentDTO
     deleted: bool | None | None
     parent_comment: int | None = None
     likes_count: int | None = None
