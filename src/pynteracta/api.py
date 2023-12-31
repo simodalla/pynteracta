@@ -1,15 +1,11 @@
 import json
 import logging
-from collections import OrderedDict
 
 import jwt
-import requests
 from requests import Response
 
-from pydantic import BaseModel
-
 from . import urls
-from .core import format_response_error, interactapi, mock_validate_kid
+from .core import Api, format_response_error, interactapi, mock_validate_kid
 from .exceptions import (
     InteractaError,
     InteractaLoginError,
@@ -21,8 +17,6 @@ from .exceptions import (
 from .schemas.models import (
     BaseListPostsElement,
     Group,
-    InteractaModel,
-    Post,
 )
 from .schemas.requests import (
     CreateCustomPostIn,
@@ -68,69 +62,10 @@ from .schemas.responses import (
     PostDetailOut,
     PostsOut,
 )
-from .settings import ApiSettings, InteractaSettings
+from .settings import InteractaSettings
 
 logger = logging.getLogger(__name__)
 jwt.api_jws.PyJWS._validate_kid = mock_validate_kid  # type: ignore
-
-
-def prepare_data(data=None):
-    if not data:
-        return json.dumps({})
-    if isinstance(data, BaseModel):
-        if isinstance(data, InteractaModel):
-            data = data.model_dump_json(by_alias=True)
-        else:
-            data = data.model_dump_json()
-    else:
-        data = json.dumps(data)
-    return data.encode("utf-8")
-
-
-class Api:
-    def __init__(self, settings: ApiSettings):
-        self.access_token = None
-        self._log_calls = False
-        self.settings = settings
-
-    def call_post(
-        self, path: str, params: dict = None, headers: dict = None, data: dict | str = None
-    ):
-        return self.call_api(
-            "post", path=path, params=params, headers=headers, data=prepare_data(data)
-        )
-
-    def call_get(self, path: str, params: str = None, headers: dict = None):
-        return self.call_api("get", path=path, params=params, headers=headers)
-
-    def call_put(
-        self, path: str, params: str = None, headers: dict = None, data: dict | str = None
-    ):
-        return self.call_api(
-            "put", path=path, params=params, headers=headers, data=prepare_data(data)
-        )
-
-    def call_delete(self, path: str, headers: dict = None, **kwargs):
-        return self.call_api("delete", path=path, headers=headers, **kwargs)
-
-    def call_api(
-        self,
-        method: str,
-        path: str,
-        params: dict | None = None,
-        headers: dict | None = None,
-        data: dict | str | None = None,
-        **kwargs,
-    ):
-        url = f"{self.settings.api_url}{path}"
-        request_method = getattr(requests, method)
-        if self._log_calls:
-            log_msg = f"API CALL: URL [{url}] HEADERS [{headers}] DATA [{data}]"
-            logger.info(log_msg)
-        response = request_method(url, headers=headers, data=data, params=params, **kwargs)
-        if response.status_code != 200:
-            raise InteractaResponseError(format_response_error(response), response=response)
-        return response
 
 
 class InteractaApi(Api):
@@ -143,7 +78,6 @@ class InteractaApi(Api):
         self.settings = settings
         self._log_calls = log_calls
         self._log_call_responses = log_call_responses
-        self._call_stack = OrderedDict()
 
     @property
     def authorized_header(self):
@@ -210,253 +144,241 @@ class InteractaApi(Api):
         self.access_token = result["accessToken"]
         return self.access_token
 
+    # post operations
+
     @interactapi(schema_out=PostsOut)
     def list_posts(
         self,
         community_id: str | int,
-        params: dict = None,
-        headers: dict = None,
-        data: ListCommunityPostsIn = None,
+        params: dict = {},
+        data: ListCommunityPostsIn | None = None,
+        **kwargs,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
-        return self.call_post(path=path, params=params, headers=headers, data=data)
+        return self.call_post(path=path, params=params, data=data, **kwargs)
 
     @interactapi(schema_out=PostDetailOut)
     def get_post_detail(
-        self, post_id: str | int, parms: dict = None, headers: dict = None
+        self, post_id: str | int, parms: dict = {}, **kwargs
     ) -> PostDetailOut | Response:
         path = f"/communication/posts/data/post-detail-by-id/{post_id}"
         try:
-            return self.call_get(path=path, params=parms, headers=headers)
+            return self.call_get(path=path, params=parms, **kwargs)
         except InteractaResponseError as e:
             raise PostDoesNotFound(f"Post with id '{post_id}' non found: {e}") from e
 
     @interactapi(schema_out=PostCreatedOut)
     def create_post(
-        self, community_id, headers: dict = None, data: CreateCustomPostIn = None
+        self, community_id, data: CreateCustomPostIn, **kwargs
     ) -> PostCreatedOut | Response:
         path = f"/communication/posts/manage/create-post/{community_id}"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=GetCustomPostForEditOut)
-    def get_post_data_for_edit(
-        self, post_id, headers: dict = None
-    ) -> GetCustomPostForEditOut | Response:
+    def get_post_data_for_edit(self, post_id, **kwargs) -> GetCustomPostForEditOut | Response:
         path = f"/communication/posts/manage/post-data-for-edit/{post_id}"
-        return self.call_get(path=path, headers=headers)
+        return self.call_get(path=path, **kwargs)
 
     @interactapi()
-    def edit_post(
-        self,
-        post_id,
-        occ_token,
-        headers: dict = None,
-        data: EditCustomPostIn = None,
-    ) -> Response:
+    def edit_post(self, post_id, occ_token, data: EditCustomPostIn, **kwargs) -> Response:
         path = f"/communication/posts/manage/edit-post/{post_id}/{occ_token}"
-        return self.call_put(path=path, headers=headers, data=data)
+        return self.call_put(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=DeletePostOut)
-    def delete_post(self, post_id: int | str, headers: dict | None = None) -> DeletePostOut:
+    def delete_post(self, post_id: int | str, **kwargs) -> DeletePostOut:
         path = f"/communication/posts/manage/delete-post/{post_id}"
-        return self.call_delete(path=path, headers=headers)
+        return self.call_delete(path=path, **kwargs)
+
+    # end post operations
 
     # comments operations
 
     @interactapi(schema_out=ListPostCommentsOut)
     def list_comment_post(
-        self,
-        post_id: int | str,
-        headers: dict = None,
-        data: ListPostCommentsIn | None = None,
+        self, post_id: int | str, data: ListPostCommentsIn | None = None, **kwargs
     ) -> ListPostCommentsOut | Response:
         path = f"/communication/posts/data/comments-list/{post_id}"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=CreatePostCommentOut)
     def create_comment_post(
-        self,
-        post_id: int | str,
-        headers: dict = None,
-        data: CreatePostCommentIn | None = None,
+        self, post_id: int | str, data: CreatePostCommentIn, **kwargs
     ) -> CreatePostCommentOut | Response:
         path = f"/communication/posts/manage/create-comment/{post_id}"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi
-    def delete_comment_post(self, comment_id: int | str, headers: dict = None) -> Response:
+    def delete_comment_post(self, comment_id: int | str, **kwargs) -> Response:
         path = f"/communication/posts/manage/delete-comment/{comment_id}"
-        return self.call_delete(path=path, headers=headers)
+        return self.call_delete(path=path, **kwargs)
 
     # end comments operations
 
+    # user and groups operations
+
     @interactapi(schema_out=ListSystemUsersOut)
     def list_users(
-        self, headers: dict = None, data: ListSystemUsersIn | None = None
+        self, data: ListSystemUsersIn | None = None, **kwargs
     ) -> ListSystemUsersOut | Response:
         path = "/admin/data/users"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=CreateUserOut)
-    def create_user(
-        self, headers: dict = None, data: CreateUserIn | None = None
-    ) -> CreateUserOut | Response:
+    def create_user(self, data: CreateUserIn, **kwargs) -> CreateUserOut | Response:
         path = "/admin/manage/users"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=GetUserForEditOut)
-    def get_user_data_for_edit(self, user_id, headers: dict = None) -> GetUserForEditOut | Response:
+    def get_user_data_for_edit(self, user_id, **kwargs) -> GetUserForEditOut | Response:
         path = f"/admin/manage/users/{user_id}/edit"
-        return self.call_get(path=path, headers=headers)
+        return self.call_get(path=path, **kwargs)
 
     @interactapi(schema_out=EditUserOut)
-    def edit_user(
-        self, user_id, headers: dict = None, data: EditUserIn | None = None
-    ) -> EditUserOut | Response:
+    def edit_user(self, user_id, data: EditUserIn, **kwargs) -> EditUserOut | Response:
         path = f"/admin/manage/users/{user_id}"
-        return self.call_put(path=path, headers=headers, data=data)
+        return self.call_put(path=path, data=data, **kwargs)
 
     @interactapi()
-    def delete_user(self, user_id: int, headers: dict = None) -> Response:
+    def delete_user(self, user_id: int, **kwargs) -> Response:
         path = f"/admin/manage/users/{user_id}"
-        return self.call_delete(path=path, headers=headers)
-
-    @interactapi(schema_out=ListSystemGroupsOut)
-    def list_groups(
-        self, headers: dict = None, data: ListSystemGroupsIn | None = None
-    ) -> ListSystemGroupsOut | Response:
-        path = "/admin/data/groups"
-        return self.call_post(path=path, headers=headers, data=data)
-
-    @interactapi(schema_out=CreateGroupOut)
-    def create_group(
-        self, headers: dict = None, data: CreateGroupIn | None = None
-    ) -> CreateGroupOut | Response:
-        path = "/admin/manage/groups"
-        return self.call_post(path=path, headers=headers, data=data)
-
-    @interactapi(schema_out=ListGroupMembersOut)
-    def list_group_members(
-        self,
-        group_id: str | int,
-        headers: dict = None,
-        data: ListGroupMembersIn | None = None,
-    ) -> ListGroupMembersOut | Response:
-        path = f"/admin/data/groups/{group_id}/members"
-        return self.call_post(path=path, headers=headers, data=data)
-
-    @interactapi(schema_out=GetGroupForEditOut)
-    def get_group_data_for_edit(
-        self, group_id, headers: dict = None
-    ) -> GetGroupForEditOut | Response:
-        path = f"/admin/manage/groups/{group_id}/edit"
-        return self.call_get(path=path, headers=headers)
-
-    @interactapi(schema_out=EditGroupOut)
-    def edit_group(
-        self,
-        group_id: str | int,
-        headers: dict = None,
-        data: EditGroupIn | None = None,
-    ) -> EditGroupOut | Response:
-        path = f"/admin/manage/groups/{group_id}"
-        return self.call_put(path=path, headers=headers, data=data)
-
-    @interactapi()
-    def delete_group(self, group_id: int, headers: dict = None) -> Response:
-        path = f"/admin/manage/groups/{group_id}"
-        return self.call_delete(path=path, headers=headers)
-
-    @interactapi(schema_out=HashtagsOut)
-    def list_hashtags(
-        self, community_id: str | int, headers: dict = None, data: dict = None
-    ) -> ListSystemGroupsOut | Response:
-        path = f"/admin/data/communities/{community_id}/hashtags"
-        return self.call_post(path=path, headers=headers, data=data)
-
-    @interactapi(schema_out=GetPostDefinitionOut)
-    def get_post_definition_detail(
-        self, community_id: str | int, headers: dict = None
-    ) -> GetPostDefinitionOut | Response:
-        path = f"/communication/settings/communities/{community_id}/post-definition"
-        return self.call_get(path=path, headers=headers)
-
-    @interactapi(schema_out=GetCommunityDetailsOut)
-    def get_community_detail(
-        self, community_id: str | int, headers: dict = None
-    ) -> GetCommunityDetailsOut | Response:
-        path = f"/communication/settings/communities/{community_id}/details"
-        return self.call_get(path=path, headers=headers)
+        return self.call_delete(path=path, **kwargs)
 
     @interactapi()
     def list_business_units(self, headers: dict = None) -> Response:
         path = "/admin/data/business-units"
         return self.call_get(path=path, headers=headers)
 
+    @interactapi(schema_out=ListSystemGroupsOut)
+    def list_groups(
+        self, data: ListSystemGroupsIn | None = None, **kwargs
+    ) -> ListSystemGroupsOut | Response:
+        path = "/admin/data/groups"
+        return self.call_post(path=path, data=data, **kwargs)
+
+    @interactapi(schema_out=CreateGroupOut)
+    def create_group(self, data: CreateGroupIn, **kwargs) -> CreateGroupOut | Response:
+        path = "/admin/manage/groups"
+        return self.call_post(path=path, data=data, **kwargs)
+
+    @interactapi(schema_out=ListGroupMembersOut)
+    def list_group_members(
+        self, group_id: str | int, data: ListGroupMembersIn | None = None, **kwargs
+    ) -> ListGroupMembersOut | Response:
+        path = f"/admin/data/groups/{group_id}/members"
+        return self.call_post(path=path, data=data, **kwargs)
+
+    @interactapi(schema_out=GetGroupForEditOut)
+    def get_group_data_for_edit(self, group_id, **kwargs) -> GetGroupForEditOut | Response:
+        path = f"/admin/manage/groups/{group_id}/edit"
+        return self.call_get(path=path, **kwargs)
+
+    @interactapi(schema_out=EditGroupOut)
+    def edit_group(
+        self, group_id: str | int, data: EditGroupIn, **kwargs
+    ) -> EditGroupOut | Response:
+        path = f"/admin/manage/groups/{group_id}"
+        return self.call_put(path=path, data=data, **kwargs)
+
+    @interactapi()
+    def delete_group(self, group_id: int, **kwargs) -> Response:
+        path = f"/admin/manage/groups/{group_id}"
+        return self.call_delete(path=path, **kwargs)
+
+    # user and groups operations
+
+    # hashtags operations
+    @interactapi(schema_out=HashtagsOut)
+    def list_hashtags(
+        self, community_id: str | int, data: dict = {}, **kwargs
+    ) -> ListSystemGroupsOut | Response:
+        path = f"/admin/data/communities/{community_id}/hashtags"
+        return self.call_post(path=path, data=data, **kwargs)
+
+    # end hashtags operations
+
+    # community definition operations
+
+    @interactapi(schema_out=GetPostDefinitionOut)
+    def get_post_definition_detail(
+        self, community_id: str | int, **kwargs
+    ) -> GetPostDefinitionOut | Response:
+        path = f"/communication/settings/communities/{community_id}/post-definition"
+        return self.call_get(path=path, **kwargs)
+
+    @interactapi(schema_out=GetCommunityDetailsOut)
+    def get_community_detail(
+        self, community_id: str | int, **kwargs
+    ) -> GetCommunityDetailsOut | Response:
+        path = f"/communication/settings/communities/{community_id}/details"
+        return self.call_get(path=path, **kwargs)
+
+    # community definition operations
+
+    ### catalog operations
+
     @interactapi(schema_out=GetPostDefinitionCatalogsOut)
     def list_catalogs(
-        self,
-        catalog_ids: set[int],
-        load_entries: bool = False,
-        headers: dict = None,
+        self, catalog_ids: set[int], load_entries: bool = False, **kwargs
     ) -> GetPostDefinitionCatalogsOut | Response:
         path = "/communication/settings/post-definition/catalogs"
         params = {"loadEntries": load_entries}
         data = GetPostDefinitionCatalogsIn(catalog_ids=list(catalog_ids))
-        return self.call_post(path=path, headers=headers, data=data, params=params)
+        return self.call_post(path=path, data=data, params=params, **kwargs)
 
     @interactapi(schema_out=ListPostDefinitionCatalogEntriesOut)
     def list_catalog_entries(
-        self, catalog_id: int | str, headers: dict = None, data: dict = None
+        self, catalog_id: int | str, data: dict = None, **kwargs
     ) -> ListPostDefinitionCatalogEntriesOut | Response:
         path = f"/communication/settings/post-definition/catalogs/{catalog_id}/entries"
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
+
+    ### end catalog operations
 
     ### worflow operations
 
     @interactapi(schema_out=GetPostWorkflowScreenDataForEditOut)
     def get_post_workflow_screen_data_for_edit(
-        self, post_id: int, workflow_operation_id: int | None = None, headers: dict = None
+        self, post_id: int, workflow_operation_id: int | None = None, **kwargs
     ) -> GetPostWorkflowScreenDataForEditOut | Response:
         path = f"/communication/posts/manage/post-workflow-screen-data-for-edit/{post_id}"
         params = (
             {"workflowOperationId": str(workflow_operation_id)} if workflow_operation_id else None
         )
-        return self.call_get(path=path, params=params, headers=headers)
+        return self.call_get(path=path, params=params, **kwargs)
 
     @interactapi(schema_out=ExecutePostWorkflowOperationOut)
     def execute_post_workflow_operation(
         self,
         post_id: int,
         workflow_operation_id: int,
-        headers: dict | None = None,
-        data: ExecutePostWorkflowOperationIn | None = None,
+        data: ExecutePostWorkflowOperationIn,
+        **kwargs,
     ) -> ExecutePostWorkflowOperationOut:
         path = (
             "/communication/posts/manage/execute-post-workflow-operation/"
             f"{post_id}/{workflow_operation_id}"
         )
-        return self.call_post(path=path, headers=headers, data=data)
+        return self.call_post(path=path, data=data, **kwargs)
 
     @interactapi(schema_out=EditPostWorkflowScreenDataOut)
     def edit_post_workflow_screen_data(
         self,
         post_id: int,
         screen_occ_token: int,
-        headers: dict | None = None,
-        data: EditPostWorkflowScreenDataIn | None = None,
+        data: EditPostWorkflowScreenDataIn,
+        **kwargs,
     ) -> EditPostWorkflowScreenDataOut:
         path = (
             "/communication/posts/manage/edit-post-workflow-screen-data/"
             f"{post_id}/{screen_occ_token}"
         )
-        return self.call_put(path=path, headers=headers, data=data)
+        return self.call_put(path=path, data=data, **kwargs)
 
     ### end worflow operations
 
-    def get_post_by_title(self, community_id: int, title: str) -> BaseListPostsElement:
+    def get_post_by_title(self, community_id: int, title: str, **kwargs) -> BaseListPostsElement:
         search = ListCommunityPostsIn(title=title)
-        result = self.list_posts(community_id, data=search)
+        result = self.list_posts(community_id, data=search, **kwargs)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
@@ -466,9 +388,11 @@ class InteractaApi(Api):
             )
         return posts[0]
 
-    def get_post_by_exact_title(self, community_id: int, title: str) -> BaseListPostsElement | None:
+    def get_post_by_exact_title(
+        self, community_id: int, title: str, **kwargs
+    ) -> BaseListPostsElement | None:
         search = ListCommunityPostsIn(title=title)
-        result = self.list_posts(community_id, data=search)
+        result = self.list_posts(community_id, data=search, **kwargs)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
@@ -479,33 +403,30 @@ class InteractaApi(Api):
         return posts[0]
 
     def list_all_posts(
-        self,
-        community_id: str | int,
-        data: ListCommunityPostsIn = None,
+        self, community_id: str | int, data: ListCommunityPostsIn | None = None, **kwargs
     ) -> list[BaseListPostsElement]:
         all_posts = []
         page_token = None
         data = data if data else ListCommunityPostsIn()
         while True:
             data.page_token = page_token
-            posts = self.list_posts(
-                community_id=community_id,
-                data=data,
-            )
+            posts = self.list_posts(community_id=community_id, data=data, **kwargs)
             all_posts += posts.items
             if not posts.next_page_token:
                 break
             page_token = posts.next_page_token
         return all_posts
 
-    def all_users(self, data: ListSystemUsersIn | None = None) -> list[ListSystemUsersElement]:
+    def all_users(
+        self, data: ListSystemUsersIn | None = None, **kwargs
+    ) -> list[ListSystemUsersElement]:
         all_items = []
         page_token = None
         counter = 1
         data = data if data else ListSystemUsersIn(page_size=100)
         while True:
             data.page_token = page_token
-            list_results = self.list_users(data=data)
+            list_results = self.list_users(data=data, **kwargs)
             all_items += list_results.items
             if not list_results.next_page_token:
                 break
@@ -513,7 +434,7 @@ class InteractaApi(Api):
             counter += 1
         return all_items
 
-    def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Group | None:
+    def get_group(self, name: str | None, filter: ListSystemGroupsIn | None = None) -> Group:
         if not filter:
             filter = ListSystemGroupsIn()
             filter.page_size = 100
@@ -554,7 +475,3 @@ class InteractaApi(Api):
                 f"Multiple users with data '{json_data}' founded in interacta"
             )
         return result.items[0]
-
-    @classmethod
-    def swap_type_model(cls, post: Post, PostModel: BaseModel):
-        return PostModel.model_validate(post.model_dump(by_alias=True))

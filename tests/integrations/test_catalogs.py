@@ -1,11 +1,14 @@
-from devtools import debug  # noqa
+import pytest
 
 from pynteracta.api import InteractaApi
 from pynteracta.schemas.responses import (
     GetPostDefinitionCatalogsOut,
     ListPostDefinitionCatalogEntriesOut,
 )
+
 from .conftest import IntegrationTestData
+
+pytestmark = pytest.mark.integration
 
 
 def test_list_catalogs(logged_api: InteractaApi, integrations_data: IntegrationTestData):

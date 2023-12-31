@@ -1,15 +1,18 @@
-from devtools import debug  # noqa
-
-from pynteracta.api import InteractaApi
-from pynteracta.exceptions import InteractaResponseError
-from pynteracta.schemas.responses import (
-    ListPostCommentsOut,
-)
-from .conftest import IntegrationTestData
-from pynteracta.schemas.requests import CreateCustomPostIn, CreatePostCommentIn
 import json
 
 import pytest
+
+from pynteracta.api import InteractaApi
+from pynteracta.exceptions import InteractaResponseError
+from pynteracta.schemas.models import PostComment
+from pynteracta.schemas.requests import CreateCustomPostIn, CreatePostCommentIn
+from pynteracta.schemas.responses import (
+    ListPostCommentsOut,
+)
+
+from .conftest import IntegrationTestData
+
+pytestmark = pytest.mark.integration
 
 
 def test_list_comment_post(logged_api: InteractaApi, integrations_data: IntegrationTestData):
@@ -28,15 +31,18 @@ def test_list_comment_post(logged_api: InteractaApi, integrations_data: Integrat
     assert isinstance(list_comments, ListPostCommentsOut)
     assert len(list_comments.items) == 0
 
-    data = CreatePostCommentIn(comment=json.dumps([{"insert": "Commento di test"}]))
-    result_crate_comment = logged_api.create_comment_post(post_id=post_created.post_id, data=data)
+    text_comment = "Commento di test"
 
-    debug(result_crate_comment)
+    data = CreatePostCommentIn(comment=json.dumps([{"insert": text_comment}]))
+    result_create_comment = logged_api.create_comment_post(post_id=post_created.post_id, data=data)
+    assert text_comment == result_create_comment.comment.comment_plain_text
+    assert text_comment in result_create_comment.comment.comment_delta
 
     list_comments = logged_api.list_comment_post(post_id=post_created.post_id)
-    debug(list_comments)
     assert isinstance(list_comments, ListPostCommentsOut)
     assert len(list_comments.items) == 1
+    assert isinstance(list_comments.items[0], PostComment)
+    assert result_create_comment.comment.id == list_comments.items[0].id
 
     with pytest.raises(InteractaResponseError):
         logged_api.delete_comment_post(comment_id=list_comments.items[0].id)

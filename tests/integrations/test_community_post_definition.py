@@ -1,8 +1,11 @@
-from devtools import debug  # noqa
+import pytest
 
 from pynteracta.api import InteractaApi
-from .conftest import IntegrationTestData
 from pynteracta.schemas.models import PostWorkflowDefinitionScreenField
+
+from .conftest import IntegrationTestData
+
+pytestmark = pytest.mark.integration
 
 
 def test_screen_field_metadatas_of_postworkflowdefinition(
