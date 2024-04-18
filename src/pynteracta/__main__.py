@@ -18,7 +18,7 @@ More information is available at:
 Version:
 --------
 
-- pynteracta v0.4.20
+- pynteracta v0.4.21
 """
 
 from .cli.commands import app
