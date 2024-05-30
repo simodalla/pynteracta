@@ -315,7 +315,7 @@ class BaseListPostsElement(Post):
     workflow_state_color: str | None = None
     watchers_count: int | None = None
     viewed_by_me: bool | None = None
-    capabilities: dict | None = None
+    capabilities: dict | None = None  # GetPostCapabilitiesResponseDTO
     cover_image: dict | None = None  # PostCoverImageDTO
 
 

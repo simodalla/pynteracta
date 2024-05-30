@@ -29,6 +29,7 @@ from .schemas.requests import (
     EditUserIn,
     ExecutePostWorkflowOperationIn,
     GetPostDefinitionCatalogsIn,
+    ListCommunityPostsFilteredIn,
     ListCommunityPostsIn,
     ListGroupMembersIn,
     ListPostCommentsIn,
@@ -155,6 +156,17 @@ class InteractaApi(Api):
         **kwargs,
     ) -> PostsOut | Response:
         path = f"/communication/posts/data/community-list/{community_id}"
+        return self.call_post(path=path, params=params, data=data, **kwargs)
+
+    @interactapi(schema_out=PostsOut)
+    def list_posts_filtered(
+        self,
+        community_id: str | int,
+        params: dict = {},
+        data: ListCommunityPostsFilteredIn | None = None,
+        **kwargs,
+    ) -> PostsOut | Response:
+        path = f"/communication/posts/data/list/community/{community_id}"
         return self.call_post(path=path, params=params, data=data, **kwargs)
 
     @interactapi(schema_out=PostDetailOut)
