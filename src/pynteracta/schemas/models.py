@@ -385,6 +385,12 @@ class FieldBase(InteractaModel):
     def catalog_id(self):
         return self.metadata.catalog_id
 
+    def get_enum_id(self, label: str) -> int | None:
+        for option in self.enum_values:
+            if label == option.label:
+                return option.id
+        raise ValueError(f"No enum value with label {label}")
+
 
 class FieldDefinition(FieldBase):
     description: str | None = None
@@ -509,12 +515,13 @@ class PostDefinition(InteractaModel):
 
     def get_enum_id(self, field_id: int, label: str) -> int | None:
         field = self.get_field_by_id(field_id=field_id)
-        if not field:
-            return None
-        for option in field.enum_values:
-            if label == option.label:
-                return option.id
-        return None
+        return field.get_enum_id(label=label)
+
+    def get_field_by_label(self, field_label: str) -> FieldDefinition | None:
+        for field in self.field_definitions:
+            if field_label.lower() == field.label.lower():
+                return field
+        raise ObjectDoesNotFound(f"Field with id '{field}' not found in field_definitions")
 
     @property
     def custom_fields_ids(self) -> list[int]:
