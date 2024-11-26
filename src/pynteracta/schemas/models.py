@@ -354,6 +354,7 @@ class Hashtag(InteractaModel):
 
 
 class EnumValue(InteractaModel):
+    # PostFieldConfigEnumValueDTO
     id: int
     label: str | None = None
     external_id: str | None = None
@@ -368,6 +369,15 @@ class FieldMetadata(InteractaModel):
     hierarchical: bool | None = None
     generic_entity_list_config_id: str | None = None
     community_id: int | None = None
+
+
+class FieldValidation(InteractaModel):
+    # PostFieldValidationDTO
+    id: int
+    field_id: int | None = None
+    validation_type_id: int | None = None
+    parameter: str | None = None
+    order: int | None = None
 
 
 class FieldBase(InteractaModel):
@@ -393,6 +403,7 @@ class FieldBase(InteractaModel):
 
 
 class FieldDefinition(FieldBase):
+    # PostFieldDefinitionDTOPostFieldDefinitionDTO
     description: str | None = None
     parent_id: int | None = None
     readonly: bool | None = None
@@ -401,7 +412,7 @@ class FieldDefinition(FieldBase):
     visible_in_create: bool | None = None
     visible_in_edit: bool | None = None
     external_id: str | None = None
-    validations: list[dict] | None = None
+    validations: list[FieldValidation] | None = None
 
 
 class PostWorkflowDefinitionScreenFieldAssociation(FieldBase):
