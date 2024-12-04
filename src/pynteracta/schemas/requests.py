@@ -177,7 +177,7 @@ class CommunityPostFilters(InteractaModel):
     # Filtro per recuperare solo post pinnati
     only_pinned: bool | None = None
     # Filtro sull'ID del post (utile per visualizzare tutti gli attachments di un singolo post).
-    post_id_: int | None = None
+    post_id: int | None = None
     # Filtri sugli hashtag
     hashtag_ids: list[int] | None = None
     # Indica se i filtri sugli hashtag vanno combinati in AND o in OR (default = false)
