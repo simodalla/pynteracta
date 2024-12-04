@@ -19,6 +19,7 @@ from .schemas.models import (
     Group,
 )
 from .schemas.requests import (
+    CommunityPostFilters,
     CreateCustomPostIn,
     CreateGroupIn,
     CreatePostCommentIn,
@@ -389,8 +390,10 @@ class InteractaApi(Api):
     ### end worflow operations
 
     def get_post_by_title(self, community_id: int, title: str, **kwargs) -> BaseListPostsElement:
-        search = ListCommunityPostsIn(title=title)
-        result = self.list_posts(community_id, data=search, **kwargs)
+        search = ListCommunityPostsFilteredIn(
+            community_post_filters=CommunityPostFilters(title=title)
+        )
+        result = self.list_posts_filtered(community_id, data=search, **kwargs)
         posts = [post for post in result.items if title.lower() in post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with '{title}' in title non found in interacta")
@@ -403,8 +406,10 @@ class InteractaApi(Api):
     def get_post_by_exact_title(
         self, community_id: int, title: str, **kwargs
     ) -> BaseListPostsElement | None:
-        search = ListCommunityPostsIn(title=title)
-        result = self.list_posts(community_id, data=search, **kwargs)
+        search = ListCommunityPostsFilteredIn(
+            community_post_filters=CommunityPostFilters(title=title)
+        )
+        result = self.list_posts_filtered(community_id, data=search, **kwargs)
         posts = [post for post in result.items if title.lower() == post.title.strip().lower()]
         if len(posts) == 0:
             raise PostDoesNotFound(f"Post with title '{title}' non found in interacta")
