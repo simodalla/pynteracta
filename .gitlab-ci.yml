@@ -1,0 +1,26 @@
+# tags: [pynteracta-runner]   # TODO: set self-hosted runner tag (Q11)
+# image: ${CI_REGISTRY}/python:3.12-slim   # TODO: set registry image (Q11)
+
+stages: [lint, type]
+
+variables:
+  UV_CACHE_DIR: .uv-cache
+
+lint:
+  stage: lint
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID
+  script:
+    - pip install uv && uv sync --frozen
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+type-check:
+  stage: type
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID
+  script:
+    - uv sync --frozen
+    - uv run mypy src

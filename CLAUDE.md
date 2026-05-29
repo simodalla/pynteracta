@@ -1,4 +1,4 @@
-# Agent Guidelines for Python Code Quality
+<!-- # Agent Guidelines for Python Code Quality
 
 This document provides guidelines for maintaining high-quality Python code. These rules MUST be followed by all AI coding agents and contributors.
 
@@ -166,4 +166,4 @@ def calculate_total(items: list[dict], tax_rate: float = 0.0) -> float:
 
 ---
 
-**Remember:** Prioritize clarity and maintainability over cleverness.
+**Remember:** Prioritize clarity and maintainability over cleverness. -->
