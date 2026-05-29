@@ -42,6 +42,7 @@
 | Python | 3.12, 3.13 (test matrix) |
 | HTTP client | `httpx` (sync only in v0.1) |
 | Models | `pydantic` v2 |
+| Settings/config | `pydantic-settings` (layered precedence sources) |
 | CLI | `typer` |
 | CLI rendering | `rich` |
 | Logging | `structlog` |
@@ -54,7 +55,7 @@
 | Changelog | `git-cliff` |
 | Versioning/release | `python-semantic-release` |
 | Config dirs | `platformdirs` |
-| TOML | `tomllib` (stdlib) read; `tomli-w` write |
+| TOML | `tomllib` (stdlib) read; `tomlkit` write (round-trip TOML with comment/format preservation) |
 
 ---
 
@@ -74,12 +75,14 @@ pynteracta/
 ├── src/
 │   └── pynteracta/
 │       ├── __init__.py           # public re-exports + __version__
+│       ├── py.typed              # PEP 561 marker (ships typing info)
 │       ├── client.py             # InteractaClient façade
 │       ├── auth.py               # ServiceAccountCredentials, TokenManager, TokenCache
 │       ├── config.py             # Config, Profile, loader (defaults<file<env<flags)
 │       ├── exceptions.py         # error hierarchy
 │       ├── transport.py          # httpx wrapper, request/response logging, redaction
-│       ├── logging.py            # structlog setup, processors, redactor
+│       ├── hooks.py              # ClientHooks Protocol + RequestInfo/ResponseInfo dataclasses
+│       ├── logging.py            # named logger factory + setup_default_logging() (no global config on import)
 │       ├── pagination.py         # PageIterator helper
 │       ├── urls.py               # URL normalization + WebUrls helper
 │       ├── models/
@@ -127,6 +130,8 @@ pynteracta/
 - `client.py`: top-level `InteractaClient` façade aggregating `auth`, `users`, `posts`, `web_urls`.
 - `auth.py`: credentials parsing, JWT lifecycle, file cache (mode 0o600) or in-memory cache.
 - `transport.py`: `HttpTransport` wraps `httpx.Client`, injects `Authorization`, custom `User-Agent`, request/response hooks, error mapping.
+- `hooks.py`: framework-agnostic `RequestInfo`/`ResponseInfo` dataclasses and the public `ClientHooks` Protocol (see §12); deliberately free of `httpx` types.
+- `logging.py`: exposes the named logger factory (`structlog.get_logger("pynteracta")`) and the opt-in `setup_default_logging` helper; **never mutates global logging state on import** (does not call `structlog.configure()`).
 - `api/_base.py`: shared `ResourceClient` (URL build, body validation, error translation).
 - `models/generated/`: untouched output of `datamodel-code-generator`.
 - `models/facade/`: hand-written, narrower, ergonomic versions for the in-scope endpoints; expose only the fields we actually use in v0.1.
@@ -177,6 +182,8 @@ class Config(BaseModel):
 3. Config file profile (selected by `--profile`/`PYNTERACTA_PROFILE`/`current_profile`)
 4. Built-in defaults
 
+**Implementation.** Precedence is resolved with **`pydantic-settings`**, using a custom settings source per layer (CLI flags, env, file profile, defaults) ordered so that higher layers win. `config.py` wires the sources; no ad-hoc manual merging. **Decision:** `pydantic-settings` over a hand-rolled `ConfigResolver` — it is the modern default and keeps validation in one place.
+
 ### Environment variables
 | Var | Maps to |
 |---|---|
@@ -192,7 +199,7 @@ class Config(BaseModel):
 | `PYNTERACTA_CONFIG_FILE` | override config file path |
 
 ### CLI global flags (resolved before any command)
-`--profile`, `--base-url`, `--base-path`, `--api-version`, `--service-account-key`, `--output`, `--log-level`, `--config-file`.
+`--profile`, `--base-url`, `--base-path`, `--api-version`, `--service-account-key`, `--timeout` (→ `timeout_seconds`), `--output`, `--log-level`, `--config-file`.
 
 ### `pynteracta config` commands
 - `set <key> <value> [--profile NAME]`
@@ -201,6 +208,8 @@ class Config(BaseModel):
 - `use-profile <name>` (sets `current_profile`)
 - `add-profile <name> --base-url ...`
 - `remove-profile <name>`
+
+**TOML read vs write.** Reads use `tomllib` (stdlib) for fast parsing. Any command that rewrites `config.toml` (`set`, `use-profile`, `add-profile`, `remove-profile`) performs a **read-modify-write with `tomlkit`** so user comments, key ordering and formatting are preserved across edits.
 
 ---
 
@@ -261,6 +270,11 @@ Exposed as `client.web_urls`.
 - File created with mode `0o600`; directory `0o700`.
 - On startup, verify mode; if wider, refuse to read and warn.
 
+### Cross-platform behavior
+- **POSIX (Linux/macOS):** enforce `0o700` on the cache directory and `0o600` on the cache file. On read, if permissions are wider than `0o600`, refuse to read and raise a clear error.
+- **Windows:** best effort only. POSIX modes do not apply (`os.chmod(0o600)` is effectively a no-op), so the library emits a one-time warning (`pynteracta.token_cache.windows_permissions`) clarifying that protection relies on user-level NTFS ACLs. The library does **not** attempt to set Windows ACLs in v0.1 (out of scope; deferred — see **Q13**).
+- **Decision:** Windows users who require strong at-rest protection should prefer the in-memory cache (`token_cache = "memory"`).
+
 ### Security
 - Never log SA private key, raw assertion, or access token (see Redaction in §12).
 - Memory mode: token kept only inside the process.
@@ -294,6 +308,8 @@ class TokenManager:
 - Re-export only the **fields actually used** by v0.1 (narrower, better documented).
 - Use composition: `class Post(BaseModel): raw: generated.GetPostDetailResponseDTO`, with computed properties for ergonomics.
 - Forward-compatibility: unknown fields ignored (`model_config = ConfigDict(extra="ignore")`).
+
+> **Decision — `.raw` is part of the public contract.** Composition is intentional: the façade deliberately narrows the API surface to the fields v0.1 supports, and `.raw` (the underlying generated DTO) is the **documented escape hatch** for anything the façade does not yet expose. Users reaching for `.raw` is an expected, supported pattern, not a workaround.
 
 ### Regeneration workflow
 1. Bump pinned Swagger URL/snapshot in `scripts/generate_models.py`.
@@ -339,22 +355,36 @@ class AuthAPI(ResourceClient):
     def current_user_data(self) -> CurrentUserDataResponseDTO: ...
 
 class UsersAPI(ResourceClient):
-    def list(self, req: ListSystemUsersRequestDTO | None = None, *, page_token: str | None = None,
-             page_size: int | None = None, **filters) -> ListSystemUsersResponseDTO: ...
-    def iterate(self, req: ListSystemUsersRequestDTO | None = None, **filters) -> Iterator[SystemUser]: ...
+    # Explicit kwargs only; validated internally into the request DTO.
+    def list(self, *, page_token: str | None = None, page_size: int | None = None,
+             **filters) -> ListSystemUsersResponseDTO: ...
+    def iterate(self, *, page_size: int | None = None, **filters) -> Iterator[SystemUser]: ...
     def me(self) -> CurrentUserDataResponseDTO: ...                 # alias for AuthAPI.current_user_data
     def profile(self) -> UserProfileInfoDTO: ...
-    def get_for_edit(self, user_id: int) -> GetUserForEditResponseDTO: ...
+    def get_for_edit(self, user_id: int) -> GetUserForEditResponseDTO: ...  # docstring: requires admin permissions on the target user
+    # Escape hatch for callers holding a pre-built DTO:
+    def list_raw(self, req: ListSystemUsersRequestDTO) -> ListSystemUsersResponseDTO: ...
 
 class PostsAPI(ResourceClient):
     def get(self, post_id: int, *, load_main_attachment: bool = False,
             load_main_attachment_view_link: bool = False, ...) -> GetPostDetailResponseDTO: ...
-    def list_in_community(self, community_id: int, req: ListCommunityPostsFilteredRequestDTO | None = None, *,
-                          load_post_details: bool = True, **load_flags) -> PagedListPostsResponseDTO: ...
-    def iterate_in_community(self, community_id: int, ...) -> Iterator[Post]: ...
-    def comments(self, post_id: int, req: ListPostCommentsRequestDTO | None = None) -> ListPostCommentsResponseDTO: ...
-    def iterate_comments(self, post_id: int, ...) -> Iterator[PostComment]: ...
+    # Explicit kwargs only; validated internally into the request DTO.
+    def list_in_community(self, community_id: int, *, page_token: str | None = None,
+                          page_size: int | None = None, load_post_details: bool = True,
+                          **filters) -> PagedListPostsResponseDTO: ...
+    def iterate_in_community(self, community_id: int, *, page_size: int | None = None,
+                             **filters) -> Iterator[Post]: ...
+    def comments(self, post_id: int, *, page_token: str | None = None,
+                 page_size: int | None = None, **filters) -> ListPostCommentsResponseDTO: ...
+    def iterate_comments(self, post_id: int, *, page_size: int | None = None,
+                         **filters) -> Iterator[PostComment]: ...
+    # Escape hatches for callers holding a pre-built DTO:
+    def list_in_community_raw(self, community_id: int,
+                              req: ListCommunityPostsFilteredRequestDTO) -> PagedListPostsResponseDTO: ...
+    def comments_raw(self, post_id: int, req: ListPostCommentsRequestDTO) -> ListPostCommentsResponseDTO: ...
 ```
+
+> **Decision — one method, one shape.** The list/get/comments methods accept **explicit kwargs only**, which the client validates internally into the corresponding request DTO; no public `req:` parameter is exposed for in-scope endpoints (it created an ambiguous "both provided" case and duplicated the surface). Power users holding a pre-built DTO use the single thin escape hatch `*_raw(...)` on each resource client. `iterate*` methods accept the same kwargs as their `list`/`comments` counterparts.
 
 ### Façade
 ```python
@@ -388,7 +418,7 @@ client.web_urls.community(community_id=79)
 ### CLI
 A `--web-url` flag added to the read commands that surface a single resource:
 - `pynteracta posts get <id> --web-url` → output gains a `web_url` column/field.
-- `pynteracta users get <id> --web-url`
+- `pynteracta users get-for-edit <id> --web-url`
 - `pynteracta posts list` (per-row `web_url` when flag present).
 
 When `--output json|yaml`, the field is added as `web_url`. When `--output table`, an extra column is appended.
@@ -443,6 +473,10 @@ while resp.next_page_token:
 
 ### Iterator API
 ```python
+class PageLike(Protocol[T]):
+    items: list[T]
+    next_page_token: str | None
+
 class PageIterator(Generic[T]):
     def __init__(self, fetch_page: Callable[[str | None], PageLike[T]]): ...
     def __iter__(self) -> Iterator[T]: ...
@@ -459,6 +493,13 @@ Applies to: users list (3), posts list-in-community (7), post comments (8).
 ---
 
 ## 12. Observability / Logging
+
+### Library vs CLI logging
+As a library, `pynteracta` must not hijack a host application's logging configuration:
+- The library uses **named loggers** (`structlog.get_logger("pynteracta")` and submodule equivalents) and **never calls `structlog.configure()` at import time**.
+- An **opt-in helper** is provided — `pynteracta.logging.setup_default_logging(level="INFO", json=False, ...)`. Host applications may call it, but the library never invokes it implicitly.
+- The **CLI** (`pynteracta/cli/__init__.py`) is the top-level entry point and is free to call `setup_default_logging()` at startup.
+- **Decision:** processor/renderer wiring below is applied only inside `setup_default_logging()`, not at import.
 
 ### Setup
 - `structlog` configured with: `add_log_level`, `TimeStamper(fmt="iso", utc=True)`, `EventRenamer`, `JSONRenderer` (when not TTY) or `ConsoleRenderer` (when TTY).
@@ -479,13 +520,29 @@ Applies to: users list (3), posts list-in-community (7), post comments (8).
 - Body fields whose key matches `(?i)token|password|secret|privateKey` → `***REDACTED***`.
 
 ### Hooks
+The public hook Protocol is framework-agnostic and **does not leak `httpx` types**, so the transport backend stays an implementation detail (changing it is not a breaking change). The dataclasses live in `hooks.py` (see §3).
+
 ```python
+@dataclass(frozen=True)
+class RequestInfo:
+    method: str
+    url: str                     # already redacted of auth params
+    headers: Mapping[str, str]   # already redacted
+
+@dataclass(frozen=True)
+class ResponseInfo:
+    status_code: int
+    url: str
+    headers: Mapping[str, str]
+    elapsed_ms: float
+    request_id: str | None
+
 class ClientHooks(Protocol):
-    def on_request(self, req: httpx.Request) -> None: ...
-    def on_response(self, resp: httpx.Response) -> None: ...
+    def on_request(self, req: RequestInfo) -> None: ...
+    def on_response(self, resp: ResponseInfo) -> None: ...
     def on_error(self, exc: BaseException) -> None: ...
 ```
-Registered via `InteractaClient(hooks=...)`.
+The transport layer builds `RequestInfo`/`ResponseInfo` from the underlying `httpx` objects (applying redaction) **before** invoking hooks. Registered via `InteractaClient(hooks=...)`.
 
 ### User-Agent
 `pynteracta/<__version__> python/<python_version> httpx/<httpx_version>`.
@@ -497,7 +554,7 @@ Registered via `InteractaClient(hooks=...)`.
 ### Command tree
 ```
 pynteracta [--profile NAME] [--config-file PATH] [--base-url URL] [--base-path P]
-           [--api-version N] [--service-account-key PATH] [--output FMT]
+           [--api-version N] [--service-account-key PATH] [--timeout SECS] [--output FMT]
            [--log-level LEVEL] [--no-color] [--quiet]
 
   auth
@@ -514,8 +571,8 @@ pynteracta [--profile NAME] [--config-file PATH] [--base-url URL] [--base-path P
     remove-profile <name>
 
   users
-    list    [--full-text TEXT] [--page-size N] [--all] [--web-url]
-    get <user_id>                                    [--web-url]
+    list          [--full-text TEXT] [--page-size N] [--all] [--web-url]
+    get-for-edit <user_id>                           [--web-url]   # admin-only lookup
     me
     profile
 
@@ -525,6 +582,11 @@ pynteracta [--profile NAME] [--config-file PATH] [--base-url URL] [--base-path P
     list  --community <id>              [--full-text TEXT] [--page-size N] [--all] [--web-url]
     comments <post_id>                  [--page-size N] [--all]
 ```
+
+### `users me` vs `users profile`
+These call two different endpoints; the names are kept short, so the distinction is documented here (and repeated in the CLI help):
+- **`users me`** → `GET /core/auth/current-user-data` (`CurrentUserDataResponseDTO`). *Use this when* you want the identity/account record of the authenticated principal (who am I, account-level data).
+- **`users profile`** → `GET /core/user-profile/info` (`UserProfileInfoDTO`). *Use this when* you want the richer people-directory profile (profile fields shown in the People section).
 
 ### Output formats
 - `--output table|json|yaml` (default: `table`). Implemented in `cli/_common.py`.
@@ -597,9 +659,10 @@ tests/
 - Snapshots stored per output format.
 
 ### Coverage
-- Target: **≥ 88%** on `src/pynteracta/` excluding `models/generated/` and `cli/`.
-- CLI target: ≥ 70%.
-- Enforced in CI via `pytest --cov --cov-fail-under=85`.
+- **Aspirational target:** ≥ 90% on `src/pynteracta/`, excluding `models/generated/`.
+- **Hard CI gate:** ≥ 85% on `src/pynteracta/`, excluding `models/generated/` (single combined number).
+- **CLI-only** coverage is reported but **not gated** in v0.x.
+- Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]` with `omit = ["src/pynteracta/models/generated/*"]`, so the CI command stays simple (`pytest --cov --cov-fail-under=85`) and the `omit` is applied implicitly via config (see §16).
 
 ---
 
@@ -627,6 +690,18 @@ docs/
 - README: install, quickstart (library + CLI), trademark disclaimer (mandatory).
 - All public modules/functions/classes use **Google-style docstrings**.
 
+### Trademark disclaimer (verbatim)
+The README (and `docs/index.md`) must carry this exact text:
+
+> *"pynteracta is an unofficial third-party Python client for the Interacta™ platform by Dinova S.r.l. / Maggioli S.p.A. It is neither sponsored nor endorsed by the vendor."*
+
+### `CONTRIBUTING.md` (outline)
+The project is designed to grow toward full API coverage, so a contributor guide is shipped covering at least:
+- Dev environment setup (`uv sync`, `pre-commit install`).
+- Branch/commit conventions (Conventional Commits) and the PR checklist.
+- Running the test tiers (`unit`, `contract`, `integration`).
+- **"How to add a new endpoint" recipe:** regenerate models → write/extend the façade model → add the resource method (kwargs + `*_raw` escape hatch) → add unit + contract tests → expose in the CLI if applicable → update docs.
+
 ---
 
 ## 16. Quality and Tooling
@@ -634,7 +709,7 @@ docs/
 ### Pre-commit (`.pre-commit-config.yaml`)
 - `ruff` (check + format) — replaces black/isort/flake8.
 - `mypy --strict` (scoped to `src/`).
-- `commitizen` or `conventional-pre-commit` to enforce Conventional Commits.
+- `conventional-pre-commit` to enforce Conventional Commits (chosen over `commitizen` — lighter, single-purpose, integrates cleanly with pre-commit).
 - `check-toml`, `check-yaml`, `end-of-file-fixer`, `trailing-whitespace`.
 
 ### Ruff
@@ -647,6 +722,15 @@ docs/
 
 ### Conventional Commits
 - Types used by semantic-release: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`. `BREAKING CHANGE:` footer triggers major.
+
+### Coverage configuration
+- Lives in `pyproject.toml` under `[tool.coverage.run]`/`[tool.coverage.report]` with `omit = ["src/pynteracta/models/generated/*"]`. The hard gate is `fail_under = 85` (see §14); the CI command therefore stays a plain `pytest --cov --cov-fail-under=85`.
+
+### Typing distribution (PEP 561)
+- `py.typed` is shipped as package data so downstream type-checkers honor the annotations. `pyproject.toml`'s `[tool.setuptools.package-data]` (or the uv-build equivalent) must include `pynteracta/py.typed`.
+
+### License headers
+- All Python source files carry the SPDX header `# SPDX-License-Identifier: Apache-2.0` at the top.
 
 ---
 
@@ -706,6 +790,8 @@ build:
     expire_in: 1 year
 ```
 
+> **Note (matrix interpreters).** The `parallel: matrix: PY: ["3.12", "3.13"]` job requires both interpreters on the runner: the self-hosted GitLab runner image is expected to provide both Python 3.12 and 3.13; alternatively `uv python install ${PY}` is invoked before `uv sync`.
+
 No `publish` job in v0.x — wheels are downloaded from the pipeline artifacts.
 
 ---
@@ -764,12 +850,12 @@ No `publish` job in v0.x — wheels are downloaded from the pipeline artifacts.
 - **Depends on**: M4.
 
 ### M6 — CLI
-- **Deliverables**: `cli/*` with `auth`, `config`, `users`, `posts` groups; `--output` formats; `--web-url` flag; exit-code map.
+- **Deliverables**: `cli/*` with `auth`, `config`, `users`, `posts` groups; `--output` formats; `--web-url` flag; `--timeout` global flag; exit-code map. The admin-only user lookup is exposed as `users get-for-edit` (not `users get`); `users me` and `users profile` documented as distinct endpoints (see §13).
 - **Acceptance**: `typer` snapshot tests (syrupy) for each command in each output format; CLI integration smoke against mocked transport.
 - **Depends on**: M5.
 
 ### M7 — Test hardening + documentation + first release
-- **Deliverables**: coverage ≥ 88%, integration test suite documented (`.env.example`, secrets layout), MkDocs site, README with disclaimer, `git-cliff` first changelog, `v0.1.0` tag via semantic-release.
+- **Deliverables**: coverage meeting the §14 policy (hard gate ≥ 85% on `src/pynteracta/` excl. `models/generated/`; aspirational ≥ 90%), integration test suite documented (`.env.example`, secrets layout), MkDocs site, README with disclaimer, `git-cliff` first changelog, `v0.1.0` tag via semantic-release.
 - **Acceptance**: docs build green; semantic-release dry-run shows `v0.1.0`; CI artifact contains usable wheel.
 - **Depends on**: M6.
 
@@ -798,3 +884,4 @@ The following items could not be resolved from the Swagger snapshot available at
 - **Q10 — Pre-1.0 semver vs strict semver.** Confirm whether breaking changes during v0.x bump minor (lenient, as planned) or major (strict semver).
 - **Q11 — Self-hosted GitLab runner tags & registry image.** Placeholders left in `.gitlab-ci.yml`; the actual values must be filled by the platform owner.
 - **Q12 — Public tenant for contract test fixtures.** Whether the cert tenant (`cert.development.lab.interacta.space`) is the canonical source for the pinned Swagger snapshot, or whether production Swagger should be tracked separately.
+- **Q13 — Windows ACL hardening (deferred).** The token cache file relies on POSIX modes (`0o600`/`0o700`), which do not apply on Windows; v0.1 only emits a one-time warning and recommends the in-memory cache (see §6). Setting Windows NTFS ACLs is deferred to a later milestone if demand emerges.
