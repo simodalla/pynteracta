@@ -47,6 +47,30 @@
 - `PLR0913` (too many arguments) suppressed on `InteractaError.__init__` via inline `# noqa`; the 6-argument signature is intentional per §10.
 
 ### Follow-ups for later milestones
-- M2: wire `TokenManager` constructor to accept `transport: HttpTransport` when `transport.py` is implemented; create `hooks.py` alongside.
+- ~~M2: wire `TokenManager` constructor to accept `transport: HttpTransport` when `transport.py` is implemented; create `hooks.py` alongside.~~ Done in M2.
 - M4: implement `FileTokenCache` (0o600 enforcement, JSON serialization, cross-platform warning); implement `TokenManager.get_token()` / `_build_assertion()` / `_fetch_token()` once Q1-Q4 are resolved.
 - M6: expose `--token-cache` and `--token-cache-dir` CLI flags (mirror their env vars); wire CLI flag overrides into `resolve_profile(overrides=...)`.
+
+---
+
+## M2 — Transport + error mapping + structured logging — completed 2026-05-29
+
+### Done
+- `src/pynteracta/hooks.py` — `RequestInfo` and `ResponseInfo` frozen dataclasses; `@runtime_checkable ClientHooks` Protocol. Zero httpx types.
+- `src/pynteracta/transport.py` — `HttpTransport` wrapping `httpx.Client` (sync). Constructor: `base_url`, `token_provider`, `hooks`, `timeout`, `user_agent`, `auth_scheme`. `request()` method: builds headers (User-Agent, optional Authorization), logs `http.request`/`http.response`/`http.error`, calls hooks, maps every §10 error row, surfaces `request_id` from `X-Request-Id`. Context-manager support (`__enter__`/`__exit__`/`close()`).
+- `src/pynteracta/logging.py` — added `redact_string()`, `redact_headers()`, `redact_body()`, and `redaction_processor()` (structlog processor); wired into `setup_default_logging()`.
+- `src/pynteracta/auth.py` — restored `transport: HttpTransport` parameter on `TokenManager.__init__` (used via `TYPE_CHECKING` import to avoid runtime circular dependency).
+- `.pre-commit-config.yaml` — added `additional_dependencies` to the mirrors-mypy hook (`httpx`, `pydantic>=2`, `pydantic-settings`, `structlog`, `platformdirs`, `tomlkit`) so the isolated pre-commit environment can resolve all stubs.
+- `tests/unit/test_hooks.py` — Protocol satisfaction, frozen enforcement, no-httpx-type assertions.
+- `tests/unit/test_redaction.py` — `redact_string`, `redact_headers`, `redact_body` unit tests; parametrized over all sensitive key patterns.
+- `tests/unit/test_transport.py` — 30 tests covering: all §10 error-mapping rows (parametrized), 400 discrimination, network/timeout → TransportError, carried exception fields, User-Agent format, User-Agent override, raw vs `Bearer` auth schemes, no-token case, hooks callbacks (success/error/network), no-httpx-type leak check, Authorization redaction in RequestInfo, JWT redaction in structlog `capture_logs`, context manager.
+
+### Decisions made beyond the plan
+- **Q4 parameterized via `auth_scheme`.** `auth_scheme=None` (default) sends the raw token; `auth_scheme="Bearer"` sends `Bearer <token>`. Both modes are tested. The project-wide default will be set in M4 once Q4 is resolved.
+- **`_map_error` returns `InteractaError` rather than `NoReturn`.** Raising inside `request()` after the call keeps mypy's control-flow analysis clean and avoids the need for `cast`.
+- **`PermissionError` imported under alias `InteractaPermissionError`** inside `transport.py` to avoid shadowing the builtin `PermissionError` in that module's scope.
+- **`redaction_processor` uses `_ = logger; _ = method`** to silence mypy/ruff unused-variable warnings for the two parameters required by the structlog processor signature but not needed by this processor.
+
+### Follow-ups for later milestones
+- M4: implement `FileTokenCache` (0o600 enforcement, JSON serialization, cross-platform warning); implement `TokenManager.get_token()` / `_build_assertion()` / `_fetch_token()` once Q1-Q4 are resolved; set the project-wide default for `auth_scheme` once Q4 is answered.
+- M6: expose `--token-cache` and `--token-cache-dir` CLI flags; wire CLI flag overrides into `resolve_profile(overrides=...)`.

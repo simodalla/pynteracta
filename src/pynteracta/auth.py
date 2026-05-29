@@ -12,7 +12,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from pynteracta.transport import HttpTransport
 
 
 def _utcnow() -> datetime:
@@ -96,10 +99,12 @@ class TokenManager:
         self,
         key: ServiceAccountKey,
         cache: TokenCache,
+        transport: HttpTransport,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         self._key = key
         self._cache = cache
+        self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
         self._profile: str = key.client_id

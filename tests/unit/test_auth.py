@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,6 +13,7 @@ from pynteracta.auth import (
     TokenCache,
     TokenManager,
 )
+from pynteracta.transport import HttpTransport
 
 _EXPIRY_SHORT = 30
 _EXPIRY_LONG = 3600
@@ -80,35 +82,31 @@ class TestFileTokenCacheStub:
             fc.clear("dev")
 
 
-class TestTokenManager:
-    def _make(self) -> TokenManager:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
-        cache = MemoryTokenCache()
-        return TokenManager(key=key, cache=cache)
+def _make_token_manager(cache: MemoryTokenCache | None = None) -> TokenManager:
+    key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
+    transport = MagicMock(spec=HttpTransport)
+    return TokenManager(key=key, cache=cache or MemoryTokenCache(), transport=transport)
 
+
+class TestTokenManager:
     def test_get_token_raises_not_implemented(self) -> None:
-        tm = self._make()
+        tm = _make_token_manager()
         with pytest.raises(NotImplementedError):
             tm.get_token()
 
     def test_invalidate_clears_cache(self) -> None:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
         cache = MemoryTokenCache()
         cache.save("cid", _token())
-        tm = TokenManager(key=key, cache=cache)
+        tm = _make_token_manager(cache=cache)
         tm.invalidate()
         assert cache.load("cid") is None
 
     def test_needs_refresh_when_near_expiry(self) -> None:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
-        cache = MemoryTokenCache()
-        tm = TokenManager(key=key, cache=cache)
+        tm = _make_token_manager()
         near_expiry = _token(seconds_until_expiry=_EXPIRY_SHORT)
         assert tm._needs_refresh(near_expiry) is True
 
     def test_no_refresh_when_valid(self) -> None:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
-        cache = MemoryTokenCache()
-        tm = TokenManager(key=key, cache=cache)
+        tm = _make_token_manager()
         valid = _token(seconds_until_expiry=_EXPIRY_LONG)
         assert tm._needs_refresh(valid) is False
