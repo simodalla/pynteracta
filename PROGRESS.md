@@ -22,6 +22,31 @@
 - Pre-commit hook revisions pinned: `pre-commit-hooks` v5.0.0, `ruff-pre-commit` v0.8.6, `mirrors-mypy` v1.14.1, `conventional-pre-commit` v3.6.0.
 
 ### Follow-ups for later milestones
-- M1: add SPDX header `# SPDX-License-Identifier: Apache-2.0` to every new `.py` file.
+- ~~M1: add SPDX header `# SPDX-License-Identifier: Apache-2.0` to every new `.py` file.~~ Done in M1.
 - M2: create `hooks.py` together with `transport.py`.
 - M6: expose `--token-cache` and `--token-cache-dir` CLI flags (mirror their env vars).
+
+---
+
+## M1 — Configuration, URL building, Auth scaffolding — completed 2026-05-29
+
+### Done
+- `src/pynteracta/exceptions.py` — full error hierarchy (§10): `InteractaError`, `AuthenticationError`, `PermissionError`, `NotFoundError`, `ValidationError`, `CustomFieldValidationError`, `ConcurrencyError`, `ServerError`, `TransportError`. All carry `status_code`, `request_method`, `request_url`, `response_body`, `request_id`.
+- `src/pynteracta/urls.py` — `build_api_base()` with all four normalization rules from §5; `WebUrls` helper (`post`, `user`, `community`) with correct trailing-slash behavior.
+- `src/pynteracta/config.py` — `Profile` and `Config` pydantic models; `load_config()`; `resolve_profile()` implementing 3-level precedence (defaults < file < env), plus an `overrides` dict for CLI flags (M6). TOML reads use `tomllib` (stdlib). `PYNTERACTA_CONFIG_FILE` env var honored.
+- `src/pynteracta/logging.py` — `get_logger()` named-logger factory; `setup_default_logging()` opt-in helper (configures structlog with ISO timestamps, JSON or console renderer; never called at import time).
+- `src/pynteracta/auth.py` — `ServiceAccountKey` frozen dataclass; `CachedToken` dataclass; `TokenCache` Protocol (`@runtime_checkable`); `MemoryTokenCache` (fully functional); `FileTokenCache` stub (raises `NotImplementedError`; completed in M4); `TokenManager` skeleton with `invalidate()`, `_needs_refresh()`, and a 60-second skew constant (`get_token()` raises `NotImplementedError` until M4).
+- `tests/unit/test_urls.py`, `tests/unit/test_config.py`, `tests/unit/test_exceptions.py`, `tests/unit/test_auth.py` — 41 unit tests; all green.
+- Dev deps: added `pytest`, `pytest-cov`, `respx` to `[dependency-groups] dev`.
+- SPDX header applied to all new source and test files.
+
+### Decisions made beyond the plan
+- `PYNTERACTA_TIMEOUT` (not `PYNTERACTA_TIMEOUT_SECONDS`) maps to `Profile.timeout_seconds`: achieved by naming the `_EnvSettings` field `timeout` (so `env_prefix="PYNTERACTA_"` yields `PYNTERACTA_TIMEOUT`) and renaming it to `timeout_seconds` in `to_profile_overrides()`.
+- `TokenManager.__init__` omits the `transport: HttpTransport` parameter present in the plan's indicative interface; transport is an M2 concern and adding it now would require a forward reference. It will be added in M2 alongside `transport.py`.
+- `PermissionError` shadows the builtin as the plan specifies; `# noqa: A001` not needed (ruff's `A001` is not in the enabled rule set).
+- `PLR0913` (too many arguments) suppressed on `InteractaError.__init__` via inline `# noqa`; the 6-argument signature is intentional per §10.
+
+### Follow-ups for later milestones
+- M2: wire `TokenManager` constructor to accept `transport: HttpTransport` when `transport.py` is implemented; create `hooks.py` alongside.
+- M4: implement `FileTokenCache` (0o600 enforcement, JSON serialization, cross-platform warning); implement `TokenManager.get_token()` / `_build_assertion()` / `_fetch_token()` once Q1-Q4 are resolved.
+- M6: expose `--token-cache` and `--token-cache-dir` CLI flags (mirror their env vars); wire CLI flag overrides into `resolve_profile(overrides=...)`.

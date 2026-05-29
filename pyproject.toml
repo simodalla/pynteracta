@@ -39,6 +39,9 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "respx",
 ]
 
 [tool.hatch.version]
