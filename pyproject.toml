@@ -79,6 +79,7 @@ omit = ["src/pynteracta/models/generated/*"]
 fail_under = 85
 
 [tool.pytest.ini_options]
+pythonpath = ["tests/unit"]
 markers = [
     "contract: validates generated models against the pinned swagger snapshot",
     "integration: hits a real tenant read-only (opt-in)",

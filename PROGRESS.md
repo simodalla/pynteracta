@@ -158,3 +158,33 @@
 - M6: `auth login` / `auth logout` CLI commands; `--token-cache` flags.
 - Run the opt-in integration test against the cert tenant to confirm Q4 (`raw` vs `Bearer`) and assertion claim shape.
 - Q8: add `filelock` if multi-process cache contention appears in integration testing.
+
+---
+
+## M5 — Resource clients (auth, users, posts) + pagination + web URLs — completed 2026-05-29
+
+### Done
+
+- `src/pynteracta/api/_base.py` — `ResourceClient` base with `_get` / `_post` helpers.
+- `src/pynteracta/api/_utils.py` — snake_case → camelCase body/query builders for request DTOs.
+- `src/pynteracta/api/auth.py` — `AuthAPI` (`current_user_data`, `create_access_token_raw` via unauthenticated transport).
+- `src/pynteracta/api/users.py` — `UsersAPI` (list/list_raw/iterate, me, profile, get_for_edit); profile validates against `UserProfileInfoDTO1`.
+- `src/pynteracta/api/posts.py` — `PostsAPI` (get with attachment query flags, list_in_community/list_in_community_raw/iterate_in_community, comments/comments_raw/iterate_comments).
+- `src/pynteracta/pagination.py` — `PageIterator[T]` (lazy fetch, stops on empty token, propagates errors).
+- `src/pynteracta/client.py` — `InteractaClient` façade wiring dual transports (auth + API), `TokenManager`, `token_invalidator`, `WebUrls`, context manager.
+- `src/pynteracta/urls.py` — `WebUrls` already present from M1 (post/user trailing-slash/community).
+- `tests/unit/api_helpers.py` — shared respx helpers for API tests.
+- `tests/unit/test_pagination.py`, `test_api_auth.py`, `test_api_users.py`, `test_api_posts.py`, `test_client.py` — respx unit tests for all §8 endpoints, pagination, and client wiring.
+- `pyproject.toml` — `pythonpath = ["tests/unit"]` for test helper imports.
+
+### Decisions made beyond the plan
+
+- **Dual transports in `InteractaClient`:** unauthenticated transport for SA token exchange; authenticated transport (`token_provider` + `token_invalidator`) for resource APIs — avoids recursive token fetch.
+- **Iterate return type:** methods return `PageIterator[T]` (not bare `Iterator[T]`) so mypy strict mode validates the pagination protocol cleanly.
+- **Q5 typed DTO variants:** iterators and facade `items_typed()` use `ListSystemUsersElementDTOModel`, `BaseListPostsElementDTOModel`, `PostCommentDTO1`; profile endpoint validates `UserProfileInfoDTO1` directly.
+
+### Follow-ups for later milestones
+
+- M6: CLI commands (`auth whoami`, `users list`, `posts get`, etc.) backed by these resource clients; `--web-url` flag.
+- Confirm Q4 (`raw` vs `Bearer` auth header) via opt-in integration test against cert tenant.
+- M7: document `InteractaClient` usage and endpoint distinctions (`users me` vs `users profile`).
