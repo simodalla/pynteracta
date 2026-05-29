@@ -50,6 +50,8 @@ class HttpTransport:
             :func:`~pynteracta.urls.build_api_base`).
         token_provider: Callable that returns a valid access token string.
             When ``None``, the ``Authorization`` header is not injected.
+        token_invalidator: Callable invoked before raising :class:`AuthenticationError`
+            on HTTP 401 (used to purge stale cached tokens).
         hooks: Observer implementing :class:`~pynteracta.hooks.ClientHooks`.
         timeout: Request timeout in seconds (default 30).
         user_agent: Override the default ``User-Agent`` header.
@@ -62,6 +64,7 @@ class HttpTransport:
         base_url: str,
         *,
         token_provider: Callable[[], str] | None = None,
+        token_invalidator: Callable[[], None] | None = None,
         hooks: ClientHooks | None = None,
         timeout: float = 30.0,
         user_agent: str | None = None,
@@ -69,6 +72,7 @@ class HttpTransport:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._token_provider = token_provider
+        self._token_invalidator = token_invalidator
         self._hooks = hooks
         self._user_agent = user_agent or _DEFAULT_USER_AGENT
         self._auth_scheme = auth_scheme
@@ -195,6 +199,8 @@ class HttpTransport:
                 return ValidationError("Validation failed", errors=errors, **common)
             return ValidationError("Bad request", **common)
         if status == _HTTP_401:
+            if self._token_invalidator is not None:
+                self._token_invalidator()
             return AuthenticationError("Unauthorized", **common)
         if status == _HTTP_403:
             return InteractaPermissionError("Forbidden", **common)

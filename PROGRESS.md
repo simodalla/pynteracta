@@ -124,3 +124,37 @@
   - `CurrentUserDataDTO` (stub) → **`CurrentUserDataDTOModel`** (typed).
 
   M5 resource clients and paginator iterators must use the typed `Model`/`1` variants.
+
+---
+
+## M4 — Service-account JWT + token cache (real auth call) — completed 2026-05-29
+
+### Done
+
+- `src/pynteracta/auth.py` — full implementation:
+  - `load_service_account_key()` with Q1 field aliases (`clientId`/`email`, `privateKey`, `tokenAudience`, optional `kid`).
+  - Extended `ServiceAccountKey` (`token_audience`, `kid`).
+  - `FileTokenCache` — JSON serialization, POSIX `0o700`/`0o600` enforcement, corrupt-cache recovery, Windows one-time warning.
+  - `TokenManager` — RS256 JWT assertion, `POST core/auth/create-access-token-by-service-account`, JWT `exp` decode (Q3), thread-safe refresh with 60 s skew, structlog events (`auth.token_obtained`, `auth.token_refreshed`, `auth.token_cache_loaded`).
+- `src/pynteracta/transport.py` — optional `token_invalidator` callback invoked on HTTP 401 (cache purge wiring point for M5).
+- Runtime deps: `PyJWT`, `cryptography`.
+- `.pre-commit-config.yaml` — mypy hook `additional_dependencies` extended with `PyJWT`, `cryptography`.
+- `tests/fixtures/sa_key.json` — synthetic RSA key fixture for unit tests.
+- `tests/unit/test_auth.py` — expanded (key load, file cache modes, refresh-near-expiry, assertion RS256, 401 invalidation).
+- `tests/unit/test_transport.py` — `token_invalidator` on 401 test.
+- `tests/integration/test_auth_integration.py` + `tests/integration/.env.example` — opt-in manual auth smoke test.
+
+### Decisions made beyond the plan
+
+- **Q1 resolved (fixture-based):** canonical fields `clientId`, `privateKey`, `tokenAudience`, optional `kid`; aliases accepted for forward compatibility.
+- **Q2 resolved:** JWT assertion algorithm = **RS256**; `kid` included in JOSE header when present in the key file.
+- **Q3 resolved (M3 carry-over):** expiry taken from decoded access-token `exp` claim; no `expiresIn`/`expiresAt` in API response.
+- **Q4 provisional:** project-wide default remains **raw token** (`auth_scheme=None` on `HttpTransport`); `Bearer` mode stays available for integration verification.
+- **401 → cache purge:** implemented via `token_invalidator` callback on `HttpTransport` rather than a circular `TokenManager`↔`transport` dependency; M5 client wires `token_invalidator=token_manager.invalidate`.
+
+### Follow-ups for later milestones
+
+- M5: construct `InteractaClient` with `TokenManager`, wire `token_provider` + `token_invalidator`, expose auth API.
+- M6: `auth login` / `auth logout` CLI commands; `--token-cache` flags.
+- Run the opt-in integration test against the cert tenant to confirm Q4 (`raw` vs `Bearer`) and assertion claim shape.
+- Q8: add `filelock` if multi-process cache contention appears in integration testing.

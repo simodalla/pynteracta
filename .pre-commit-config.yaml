@@ -10,7 +10,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.15
     hooks:
       - id: ruff
         args: [--fix]
@@ -29,6 +29,8 @@ repos:
           - structlog
           - platformdirs
           - tomlkit
+          - PyJWT
+          - cryptography
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0

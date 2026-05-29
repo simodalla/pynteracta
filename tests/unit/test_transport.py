@@ -293,6 +293,15 @@ def test_jwt_redacted_in_logs() -> None:
                 assert _FAKE_JWT not in val, f"JWT leaked into log entry: {entry}"
 
 
+@respx.mock
+def test_token_invalidator_called_on_401() -> None:
+    called: list[str] = []
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(401))
+    with pytest.raises(AuthenticationError):
+        _make_transport(token_invalidator=lambda: called.append("yes")).request("GET", _PATH)
+    assert called == ["yes"]
+
+
 # ---------------------------------------------------------------------------
 # Context manager
 # ---------------------------------------------------------------------------

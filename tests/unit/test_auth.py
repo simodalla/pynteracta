@@ -1,9 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
+"""Unit tests for authentication and token caching."""
+
+from __future__ import annotations
+
+import json
+import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import jwt
 import pytest
+import respx
+from httpx import Response
 
 from pynteracta.auth import (
     CachedToken,
@@ -12,9 +21,18 @@ from pynteracta.auth import (
     ServiceAccountKey,
     TokenCache,
     TokenManager,
+    _decode_token_expiry,
+    load_service_account_key,
 )
+from pynteracta.exceptions import AuthenticationError
 from pynteracta.transport import HttpTransport
 
+_EXPECTED_FILE_MODE = 0o600
+_FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
+_SA_KEY_PATH = _FIXTURES / "sa_key.json"
+_BASE = "https://api.example.com/portal/api/external/v2"
+_AUTH_PATH = "/core/auth/create-access-token-by-service-account"
+_AUTH_URL = f"{_BASE}{_AUTH_PATH}"
 _EXPIRY_SHORT = 30
 _EXPIRY_LONG = 3600
 
@@ -28,16 +46,61 @@ def _token(*, seconds_until_expiry: float = _EXPIRY_LONG) -> CachedToken:
     )
 
 
+def _make_access_jwt(*, exp: int | None = None) -> str:
+    if exp is None:
+        exp = int((datetime.now(tz=UTC) + timedelta(hours=1)).timestamp())
+    return jwt.encode({"sub": "user", "exp": exp}, "secret", algorithm="HS256")
+
+
+def _load_fixture_key() -> ServiceAccountKey:
+    return load_service_account_key(_SA_KEY_PATH)
+
+
+def _make_token_manager(
+    *,
+    cache: MemoryTokenCache | FileTokenCache | None = None,
+    transport: HttpTransport | None = None,
+    key: ServiceAccountKey | None = None,
+    clock: MagicMock | None = None,
+) -> TokenManager:
+    return TokenManager(
+        key=key or _load_fixture_key(),
+        cache=cache or MemoryTokenCache(),
+        transport=transport or MagicMock(spec=HttpTransport),
+        clock=clock or (lambda: datetime.now(tz=UTC)),
+    )
+
+
+class TestLoadServiceAccountKey:
+    def test_loads_fixture(self) -> None:
+        key = load_service_account_key(_SA_KEY_PATH)
+        assert key.client_id == "test-sa@example.it"
+        assert "BEGIN PRIVATE KEY" in key.private_key_pem
+        assert key.token_audience.startswith("https://")
+        assert key.kid == "test-kid-1"
+
+    def test_missing_field_raises(self, tmp_path: Path) -> None:
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps({"clientId": "x"}))
+        with pytest.raises(AuthenticationError, match="missing required field"):
+            load_service_account_key(path)
+
+    def test_invalid_json_raises(self, tmp_path: Path) -> None:
+        path = tmp_path / "bad.json"
+        path.write_text("{not json")
+        with pytest.raises(AuthenticationError, match="Invalid JSON"):
+            load_service_account_key(path)
+
+
 class TestServiceAccountKey:
     def test_frozen(self) -> None:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
+        key = ServiceAccountKey(
+            client_id="cid",
+            private_key_pem="pem",
+            token_audience="aud",
+        )
         with pytest.raises(AttributeError):
             key.client_id = "other"  # type: ignore[misc]
-
-    def test_fields(self) -> None:
-        key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
-        assert key.client_id == "cid"
-        assert key.private_key_pem == "pem"
 
 
 class TestMemoryTokenCache:
@@ -63,43 +126,67 @@ class TestMemoryTokenCache:
         assert isinstance(MemoryTokenCache(), TokenCache)
 
 
-class TestFileTokenCacheStub:
-    _CACHE_DIR = Path("/tmp")
+class TestFileTokenCache:
+    def test_round_trip(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path)
+        t = _token()
+        cache.save("dev", t)
+        loaded = cache.load("dev")
+        assert loaded is not None
+        assert loaded.access_token == t.access_token
+        assert loaded.expires_at == t.expires_at
+        assert loaded.obtained_at == t.obtained_at
 
-    def test_load_raises(self) -> None:
-        fc = FileTokenCache(self._CACHE_DIR)
-        with pytest.raises(NotImplementedError):
-            fc.load("dev")
+    def test_save_creates_mode_0600(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path)
+        cache.save("dev", _token())
+        path = tmp_path / "dev.token.json"
+        assert path.exists()
+        if hasattr(stat, "S_IMODE"):
+            assert stat.S_IMODE(path.stat().st_mode) == _EXPECTED_FILE_MODE
 
-    def test_save_raises(self) -> None:
-        fc = FileTokenCache(self._CACHE_DIR)
-        with pytest.raises(NotImplementedError):
-            fc.save("dev", _token())
+    def test_refuses_overly_permissive_file(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path)
+        cache.save("dev", _token())
+        path = tmp_path / "dev.token.json"
+        path.chmod(0o644)
+        with pytest.raises(AuthenticationError, match="Refusing to use token cache file"):
+            cache.load("dev")
 
-    def test_clear_raises(self) -> None:
-        fc = FileTokenCache(self._CACHE_DIR)
-        with pytest.raises(NotImplementedError):
-            fc.clear("dev")
+    def test_corrupt_cache_returns_none(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path)
+        path = tmp_path / "dev.token.json"
+        path.write_text("{broken", encoding="utf-8")
+        path.chmod(0o600)
+        assert cache.load("dev") is None
+
+    def test_clear_removes_file(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path)
+        cache.save("dev", _token())
+        cache.clear("dev")
+        assert not (tmp_path / "dev.token.json").exists()
 
 
-def _make_token_manager(cache: MemoryTokenCache | None = None) -> TokenManager:
-    key = ServiceAccountKey(client_id="cid", private_key_pem="pem")
-    transport = MagicMock(spec=HttpTransport)
-    return TokenManager(key=key, cache=cache or MemoryTokenCache(), transport=transport)
+class TestDecodeTokenExpiry:
+    def test_reads_exp_claim(self) -> None:
+        exp = int(datetime(2026, 6, 1, 12, 0, tzinfo=UTC).timestamp())
+        token = _make_access_jwt(exp=exp)
+        assert _decode_token_expiry(token) == datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+
+    def test_missing_exp_raises(self) -> None:
+        token = jwt.encode({"sub": "user"}, "secret", algorithm="HS256")
+        with pytest.raises(AuthenticationError, match="missing exp"):
+            _decode_token_expiry(token)
 
 
 class TestTokenManager:
-    def test_get_token_raises_not_implemented(self) -> None:
-        tm = _make_token_manager()
-        with pytest.raises(NotImplementedError):
-            tm.get_token()
-
     def test_invalidate_clears_cache(self) -> None:
         cache = MemoryTokenCache()
-        cache.save("cid", _token())
-        tm = _make_token_manager(cache=cache)
+        key = _load_fixture_key()
+        cache.save(key.client_id, _token())
+        tm = _make_token_manager(cache=cache, key=key)
         tm.invalidate()
-        assert cache.load("cid") is None
+        assert cache.load(key.client_id) is None
 
     def test_needs_refresh_when_near_expiry(self) -> None:
         tm = _make_token_manager()
@@ -110,3 +197,86 @@ class TestTokenManager:
         tm = _make_token_manager()
         valid = _token(seconds_until_expiry=_EXPIRY_LONG)
         assert tm._needs_refresh(valid) is False
+
+    def test_get_token_uses_cache_when_valid(self) -> None:
+        cache = MemoryTokenCache()
+        key = _load_fixture_key()
+        cached = _token(seconds_until_expiry=_EXPIRY_LONG)
+        cache.save(key.client_id, cached)
+        transport = MagicMock(spec=HttpTransport)
+        tm = _make_token_manager(cache=cache, transport=transport, key=key)
+        assert tm.get_token() == cached.access_token
+        transport.request.assert_not_called()
+
+    @respx.mock
+    def test_get_token_refreshes_when_near_expiry(self) -> None:
+        cache = MemoryTokenCache()
+        key = _load_fixture_key()
+        stale = _token(seconds_until_expiry=_EXPIRY_SHORT)
+        cache.save(key.client_id, stale)
+        access = _make_access_jwt()
+        respx.post(_AUTH_URL).mock(
+            return_value=Response(200, json={"accessToken": access}),
+        )
+        transport = HttpTransport(base_url=_BASE)
+        tm = _make_token_manager(cache=cache, transport=transport, key=key)
+        assert tm.get_token() == access
+        saved = cache.load(key.client_id)
+        assert saved is not None
+        assert saved.access_token == access
+
+    @respx.mock
+    def test_fetch_token_posts_assertion(self) -> None:
+        access = _make_access_jwt()
+        route = respx.post(_AUTH_URL).mock(
+            return_value=Response(200, json={"accessToken": access}),
+        )
+        transport = HttpTransport(base_url=_BASE)
+        tm = _make_token_manager(transport=transport)
+        token = tm.get_token()
+        assert token == access
+        assert route.called
+        body = json.loads(route.calls[0].request.content)
+        assert "jwtAssertion" in body
+        header = jwt.get_unverified_header(body["jwtAssertion"])
+        assert header["alg"] == "RS256"
+        assert header.get("kid") == "test-kid-1"
+
+    def test_build_assertion_uses_rs256(self) -> None:
+        tm = _make_token_manager()
+        assertion = tm._build_assertion()
+        header = jwt.get_unverified_header(assertion)
+        assert header["alg"] == "RS256"
+
+
+class TestTokenInvalidationOn401:
+    @respx.mock
+    def test_transport_calls_invalidator_on_401(self) -> None:
+        cache = MemoryTokenCache()
+        key = _load_fixture_key()
+        cache.save(key.client_id, _token())
+        invalidated: list[str] = []
+
+        transport = HttpTransport(
+            base_url=_BASE,
+            token_invalidator=lambda: invalidated.append("yes"),
+        )
+        respx.get(_BASE + "/core/auth/current-user-data").mock(return_value=Response(401))
+        with pytest.raises(AuthenticationError):
+            transport.request("GET", "/core/auth/current-user-data")
+        assert invalidated == ["yes"]
+
+    @respx.mock
+    def test_token_manager_invalidate_wired_to_transport(self) -> None:
+        cache = MemoryTokenCache()
+        key = _load_fixture_key()
+        cache.save(key.client_id, _token())
+        tm = _make_token_manager(cache=cache, key=key, transport=HttpTransport(base_url=_BASE))
+        transport = HttpTransport(
+            base_url=_BASE,
+            token_invalidator=tm.invalidate,
+        )
+        respx.get(_BASE + "/core/auth/current-user-data").mock(return_value=Response(401))
+        with pytest.raises(AuthenticationError):
+            transport.request("GET", "/core/auth/current-user-data")
+        assert cache.load(key.client_id) is None
