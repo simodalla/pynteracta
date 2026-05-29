@@ -1,0 +1,34 @@
+{
+  "userData": {
+    "id": 1042,
+    "firstName": "Maria",
+    "lastName": "Rossi",
+    "caption": "Maria Rossi",
+    "contactEmail": "m.rossi@example.it",
+    "serviceAccount": false,
+    "systemAccount": false,
+    "activeDWD": true,
+    "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+    "deleted": false,
+    "blocked": false,
+    "externalId": "EXT-1042",
+    "privateProfile": false
+  },
+  "userPreferences": {
+    "language": {"code": "it", "description": "Italiano"},
+    "timezone": {"id": 1, "code": "Europe/Rome", "zoneId": "Europe/Rome", "description": "Europe/Rome"},
+    "termsAcceptTimestamp": 1700000000000,
+    "emailNotificationsEnabled": true
+  },
+  "userInfo": {
+    "area": null,
+    "businessUnit": null,
+    "privateEmail": null,
+    "privateEmailVerified": false,
+    "privateEmailVerificationRequired": false
+  },
+  "hasGoogleCredentials": false,
+  "hasMicrosoftCredentials": false,
+  "hasCustomCredentials": true,
+  "canManageCustomCredentials": false
+}

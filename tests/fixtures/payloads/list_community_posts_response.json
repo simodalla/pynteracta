@@ -1,0 +1,42 @@
+{
+  "items": [
+    {
+      "id": 21269,
+      "communityId": 79,
+      "customId": "POST-21269",
+      "title": "Aggiornamento procedure sicurezza Q2 2026",
+      "descriptionPlainText": "Si comunicano le nuove procedure di sicurezza.",
+      "descriptionDelta": null,
+      "visibility": 1,
+      "announcement": false,
+      "workflowStateDescription": null,
+      "workflowStateColor": null,
+      "currentWorkflowState": null,
+      "customData": null,
+      "creatorUser": null,
+      "creationTimestamp": 1748000000000,
+      "lastModifyUser": null,
+      "lastModifyTimestamp": null,
+      "lastOperationTimestamp": 1748000000000,
+      "mainAttachment": null,
+      "watchersCount": 3,
+      "attachmentsCount": 0,
+      "imageAttachmentsCount": 0,
+      "videoAttachmentsCount": 0,
+      "commentsCount": 2,
+      "tasksCount": 0,
+      "totalStandardTasksCount": 0,
+      "viewsCount": 14,
+      "viewedByUsersCount": 10,
+      "showLikeSection": true,
+      "likesCount": 1,
+      "viewedByMe": true,
+      "likedByMe": false,
+      "followedByMe": true,
+      "capabilities": null,
+      "coverImage": null
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 1
+}

@@ -1,0 +1,21 @@
+{
+  "id": 1042,
+  "firstName": "Maria",
+  "lastName": "Rossi",
+  "caption": "Maria Rossi",
+  "highResAccountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042?size=high",
+  "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+  "customPhotoUrl": null,
+  "googlePhotoUrl": null,
+  "microsoftPhotoUrl": null,
+  "contactEmail": "m.rossi@example.it",
+  "privateEmail": null,
+  "privateEmailVerified": false,
+  "phone": "+39 02 12345678",
+  "internalPhone": "1234",
+  "mobilePhone": null,
+  "place": "Milano",
+  "biography": "Senior developer at Example S.r.l.",
+  "businessUnit": {"id": 10, "name": "IT Department"},
+  "area": {"id": 5, "name": "Software Engineering"}
+}

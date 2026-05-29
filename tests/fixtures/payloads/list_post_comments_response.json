@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": 5501,
+      "commentDelta": "{\"ops\":[{\"insert\":\"Ottimo aggiornamento, grazie!\\n\"}]}",
+      "commentPlainText": "Ottimo aggiornamento, grazie!",
+      "clientUid": "uid-abc123",
+      "creatorUser": {
+        "id": 1099,
+        "firstName": "Luca",
+        "lastName": "Bianchi",
+        "caption": "Luca Bianchi",
+        "contactEmail": "l.bianchi@example.it",
+        "serviceAccount": false,
+        "systemAccount": false,
+        "activeDWD": true,
+        "accountPhotoUrl": null,
+        "deleted": false,
+        "blocked": false,
+        "externalId": null,
+        "privateProfile": false
+      },
+      "creationTimestamp": 1748001000000,
+      "lastModifyTimestamp": null,
+      "mentions": [],
+      "attachments": [],
+      "deleted": false,
+      "parentComment": null,
+      "likesCount": 0,
+      "likedByMe": false,
+      "showLikeSection": true,
+      "rightAlignText": false,
+      "customFieldInfo": null,
+      "streamingTimestamp": null,
+      "capabilities": null
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 1
+}

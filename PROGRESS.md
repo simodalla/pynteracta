@@ -74,3 +74,53 @@
 ### Follow-ups for later milestones
 - M4: implement `FileTokenCache` (0o600 enforcement, JSON serialization, cross-platform warning); implement `TokenManager.get_token()` / `_build_assertion()` / `_fetch_token()` once Q1-Q4 are resolved; set the project-wide default for `auth_scheme` once Q4 is answered.
 - M6: expose `--token-cache` and `--token-cache-dir` CLI flags; wire CLI flag overrides into `resolve_profile(overrides=...)`.
+
+---
+
+## M3 — Model generation pipeline — completed 2026-05-29
+
+### Done
+
+- `scripts/generate_models.py` — downloads Swagger from cert tenant (Q12 decision), lifts
+  Swagger 2.0 `definitions` into an OpenAPI 3.0 envelope via a fixed-name temp file for
+  idempotent output, runs `datamodel-code-generator`, writes
+  `src/pynteracta/models/generated/external_v2.py`. `--offline` mode skips the download.
+- `tests/fixtures/swagger.json` — pinned Swagger 2.0 snapshot from the cert tenant
+  (201,330 bytes; 219 definitions).
+- `src/pynteracta/models/generated/external_v2.py` — 4715-line auto-generated Pydantic v2
+  models; **never hand-edit**.
+- `src/pynteracta/models/facade/auth.py`, `users.py`, `posts.py` — hand-written ergonomic
+  wrappers for all 8 §8 endpoints. `.raw` is the documented public escape hatch.
+  `items_typed()` helpers re-validate `RootModel[Any]` list items into fully-typed models.
+- `src/pynteracta/models/__init__.py` — re-exports all facade types; consumers import from
+  `pynteracta.models`.
+- `tests/fixtures/payloads/` — 7 realistic JSON fixtures (one per in-scope response DTO).
+- `tests/contract/test_models.py` — 29 contract tests (schema-superset + facade smoke);
+  marker `@pytest.mark.contract`.
+
+### Decisions made beyond the plan
+
+- **Q12 resolved**: v0.1 uses the cert tenant
+  (`cert.development.lab.interacta.space`) as the canonical Swagger source.
+  Production Swagger tracking is deferred.
+- **Swagger 2.0 → OAS3 lifting**: The script converts `definitions` to
+  `components/schemas` in a temp file with a fixed name
+  (`interacta_external_v2_oas3.json`) to ensure idempotent codegen output.
+- `datamodel-code-generator` added to `[dependency-groups] dev` in `pyproject.toml`.
+
+### Follow-ups for M4 / M5 (Q5 surprises)
+
+- **Q3 — Token expiry**: `CreateAccessTokenByServiceAccountResponseDTO` contains only
+  `accessToken`; no `expiresIn` or `expiresAt` field. The `TokenManager` (M4) must decode
+  the JWT `exp` claim to determine expiry.
+- **Q5 — DTO naming collisions**: Several DTOs generate as `RootModel[Any]` stubs in the
+  generated code, with typed equivalents under different names:
+  - `UserProfileInfoDTO` (stub) → **`UserProfileInfoDTO1`** (typed). The `UserProfile`
+    facade wraps `UserProfileInfoDTO1`. M5 API layer must validate the
+    `/core/user-profile/info` response against `UserProfileInfoDTO1` directly.
+  - `ListSystemUsersElementDTO` (stub) → **`ListSystemUsersElementDTOModel`** (typed).
+  - `PostCommentDTO` (stub) → **`PostCommentDTO1`** (typed).
+  - `BaseListPostsElementDTO` (stub) → **`BaseListPostsElementDTOModel`** (typed).
+  - `CurrentUserDataDTO` (stub) → **`CurrentUserDataDTOModel`** (typed).
+
+  M5 resource clients and paginator iterators must use the typed `Model`/`1` variants.

@@ -1,0 +1,22 @@
+{
+  "firstname": "Maria",
+  "lastname": "Rossi",
+  "contactEmail": "m.rossi@example.it",
+  "privateEmail": null,
+  "privateEmailVerified": false,
+  "externalId": "EXT-1042",
+  "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+  "userPreferences": {
+    "language": {"code": "it", "description": "Italiano"},
+    "timezone": {"id": 1, "code": "Europe/Rome", "zoneId": "Europe/Rome", "description": "Europe/Rome"}
+  },
+  "userInfo": {
+    "area": {"id": 5, "name": "Software Engineering"},
+    "businessUnit": {"id": 10, "name": "IT Department"},
+    "privateEmail": null,
+    "privateEmailVerified": false,
+    "privateEmailVerificationRequired": false
+  },
+  "occToken": 42,
+  "blocked": false
+}

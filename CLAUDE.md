@@ -1,169 +1,100 @@
-# Agent Guidelines for Python Code Quality
+# CLAUDE.md
 
-This document provides guidelines for maintaining high-quality Python code. These rules MUST be followed by all AI coding agents and contributors.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# IMPORTANT:
+## What This Project Is
 
-1. Before you make any change, create and checkout a feature branch named “feature_some_short_name”. Make your changes in this branch.
-2. You must write automated tests for all code
-3. You must compile the code and pass ALL tests before committing.
+`pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async deferred to v0.3). v0.1 scope: service-account auth, JWT lifecycle + caching, read-only access to auth/identity, users (4 endpoints), and posts (3 endpoints).
 
-## Your Core Principles
+## Branch Discipline
 
- All code you write MUST be fully optimized.
+Before any change: create and checkout a feature branch named `feature_<short_name>` o for a milestone named `m<milestone_number>_<short_name>`. All work goes in that branch.
 
-"Fully optimized" includes:
+## Commands
 
-- maximizing algorithmic big-O efficiency for memory and runtime
-- using parallelization and vectorization where appropriate
-- following proper style conventions for the code language (e.g. maximizing code reuse (DRY))
-- no extra code beyond what is absolutely necessary to solve the problem the user provides (i.e. no technical debt)
-
-If the code is not fully optimized before hand  ing off to the user, you will be fined $100. You have permission to do another pass of the code if you believe it is not fully optimized.
-
-## Preferred Tools
-
-- Use `uv` for Python package management and to create a `.venv` if it is not present.
-- Ensure `ipykernel` and `ipywidgets` is installed in `.venv` for Jupyter Notebook compatability. This should not be in package requirements.
-- Use `tqdm` to track long-running loops within Jupyter Notebooks. The `description` of the progress bar should be contextually sensitive.
-- Use `orjson` for JSON loading/dumping.
-- When reporting error to the console, use `logger.error` instead of `print`.
-- For data science:
-  - **ALWAYS** use `polars` instead of `pandas` for data frame manipulation.
-  - If a `polars` dataframe will be printed, **NEVER** simultaneously print the number of entries in the dataframe nor the schema as it is redundant.
-  - **NEVER** ingest more than 10 rows of a data frame at a time. Only analyze subsets of code to avoid overloading your memory context.
-- For creating databases:
-  - Do not denormalized unless explicitly prompted to do so.
-  - Always use the most appropriate datatype, such as `DATETIME/TIMESTAMP` for datetime-related fields.
-  - Use `ARRAY` datatypes for nested fields. **NEVER** save as `TEXT/STRING`.
-- In Jupyter Notebooks, DataFrame objects within conditional blocks should be explicitly `print()` as they will not be printed automatically.
-
-## Code Style and Formatting
-
-- **MUST** use meaningful, descriptive variable and function names
-- **MUST** follow PEP 8 style guidelines
-- **MUST** use 4 spaces for indentation (never tabs)
-- **NEVER** use emoji, or unicode that emulates emoji (e.g. ✓, ✗). The only exception is when writing tests and testing the impact of multibyte characters.
-- Use snake_case for functions/variables, PascalCase for classes, UPPER_CASE for constants
-- follow ruff's defaults for formatting (88 char line length, double quotes, spaces)
-- import sorting is handled by ruff (`isort` rules enabled via `select = ["I"]`)
-- do not add `# type: ignore` comments without an error code
-
-## Documentation
-
-- **MUST** include docstrings for all public functions, classes, and methods
-- **MUST** document function parameters, return values, and exceptions raised
-- Keep comments up-to-date with code changes
-- Include examples in docstrings for complex functions
-
-Example docstring:
-
-```python
-def calculate_total(items: list[dict], tax_rate: float = 0.0) -> float:
-    """Calculate the total cost of items including tax.
-
-    Args:
-        items: List of item dictionaries with 'price' keys
-        tax_rate: Tax rate as decimal (e.g., 0.08 for 8%)
-
-    Returns:
-        Total cost including tax
-
-    Raises:
-        ValueError: If items is empty or tax_rate is negative
-    """
+```bash
+uv sync                          # install all deps (incl. dev group)
+uv run ruff check .              # lint
+uv run ruff format .             # format
+uv run mypy src                  # type-check (strict)
+uv run pytest                    # all tests (unit only by default)
+uv run pytest tests/unit/test_transport.py  # single file
+uv run pytest -m contract        # contract tests (require swagger.json fixture)
+uv run pytest -m integration     # integration tests (opt-in, hits real tenant)
+uv run pytest --cov --cov-fail-under=85  # with coverage gate
+pre-commit run --all-files       # run all hooks
 ```
 
-## Type Hints
+## Architecture
 
-- **MUST** use type hints for all function signatures (parameters and return values)
-- **NEVER** use `Any` type unless absolutely necessary
-- **MUST** run `uv run mypy .` and resolve all type errors
-- Use `Optional[T]` or `T | None` for nullable types
+### Module map (`src/pynteracta/`)
 
-## Error Handling
+| Module | Role |
+|---|---|
+| `config.py` | `Profile` + `Config` pydantic models; `load_config()` / `resolve_profile()` with 4-level precedence: defaults < file < env < CLI overrides |
+| `urls.py` | `build_api_base()` normalization + `WebUrls` helper for deep-link URLs |
+| `exceptions.py` | Error hierarchy rooted at `InteractaError`; every exception carries `status_code`, `request_method`, `request_url`, `response_body`, `request_id` |
+| `auth.py` | `ServiceAccountKey`, `TokenManager`, `FileTokenCache` / `MemoryTokenCache` |
+| `transport.py` | `HttpTransport` wraps `httpx.Client`; injects `Authorization`, `User-Agent`, calls hooks, maps HTTP errors to exceptions, never logs raw tokens |
+| `hooks.py` | `ClientHooks` Protocol + `RequestInfo` / `ResponseInfo` dataclasses — **no `httpx` types leak here** |
+| `logging.py` | Named logger factory + `setup_default_logging()` opt-in helper; **never calls `structlog.configure()` at import time** |
+| `models/generated/` | Auto-generated by `datamodel-code-generator`; **never hand-edit** |
+| `models/facade/` | Hand-written ergonomic wrappers; use `ConfigDict(extra="ignore")` for forward-compat; `.raw` is a documented public escape hatch |
+| `api/_base.py` | `ResourceClient` base; `api/auth.py`, `api/users.py`, `api/posts.py` sub-clients |
+| `pagination.py` | `PageIterator` — lazy, stops on empty `nextPageToken` |
+| `cli/` | Typer-based CLI; top-level entry point is the only caller of `setup_default_logging()` |
 
-- **NEVER** silently swallow exceptions without logging
-- **MUST** never use bare `except:` clauses
-- **MUST** catch specific exceptions rather than broad exception types
-- **MUST** use context managers (`with` statements) for resource cleanup
-- Provide meaningful error messages
+### Key design decisions
 
-## Function Design
+- **Hooks are httpx-free**: `RequestInfo`/`ResponseInfo` are plain dataclasses so the transport backend is swappable without breaking the public API.
+- **Library never configures logging**: `structlog.configure()` is only called inside `setup_default_logging()`; importers of the library see no side effects.
+- **Facade `.raw` is intentional**: composition exposes `.raw: generated.SomeDTO` as the documented escape hatch for fields not yet surfaced by the facade.
+- **One method, one shape**: resource methods take explicit kwargs only; `*_raw(req: DTO)` variants exist for callers with pre-built DTOs.
+- **Error mapping lives in `transport.py`**: `_map_error()` converts every HTTP status to the right `InteractaError` subclass.
 
-- **MUST** keep functions focused on a single responsibility
-- **NEVER** use mutable objects (lists, dicts) as default argument values
-- Limit function parameters to 5 or fewer
-- Return early to reduce nesting
+### URL construction
 
-## Class Design
+API base: `{base_url}{base_path}/api/external/v{api_version}/`
 
-- **MUST** keep classes focused on a single responsibility
-- **MUST** keep `__init__` simple; avoid complex logic
-- Use dataclasses for simple data containers
-- Prefer composition over inheritance
-- Avoid creating additional class functions if they are not necessary
-- Use `@property` for computed attributes
+`build_api_base` normalizes: strips whitespace, ensures scheme, strips trailing slashes, joins with single `/`. All four canonicalization vectors in `test_urls.py` must produce the same result.
 
-## Testing
+### Configuration precedence
 
-- **MUST** write unit tests for all new functions and classes
-- **MUST** mock external dependencies (APIs, databases, file systems)
-- **MUST** use pytest as the testing framework
-- **NEVER** run tests you generate without first saving them as their own discrete file
-- **NEVER** delete files created as a part of testing.
-- Ensure the folder used for test outputs is present in `.gitignore`
-- Follow the Arrange-Act-Assert pattern
-- Do not commit commented-out tests
+CLI flags > `PYNTERACTA_*` env vars > config file profile > built-in defaults.
+Config file location: `platformdirs.user_config_dir("pynteracta") / "config.toml"` (override via `PYNTERACTA_CONFIG_FILE`).
+`tomlkit` is used for any write operation to preserve user comments and formatting.
 
-## Imports and Dependencies
+### Token cache security
 
-- **MUST** avoid wildcard imports (`from module import *`)
-- **MUST** document dependencies in `pyproject.toml`
-- Use `uv` for fast package management and dependency resolution
-- Organize imports: standard library, third-party, local imports
-- Use `isort` to automate import formatting
+- **POSIX**: enforce `0o600` on cache file, `0o700` on directory; refuse to read if permissions are wider.
+- **Windows**: emit a one-time warning; recommend `token_cache = "memory"` for security.
 
-## Python Best Practices
+## Testing Layout
 
-- **NEVER** use mutable default arguments
-- **MUST** use context managers (`with` statement) for file/resource management
-- **MUST** use `is` for comparing with `None`, `True`, `False`
-- **MUST** use f-strings for string formatting
-- Use list comprehensions and generator expressions
-- Use `enumerate()` instead of manual counter variables
+```
+tests/
+├── unit/       # respx-mocked, no network — the default test run
+├── contract/   # generated models vs pinned tests/fixtures/swagger.json
+└── integration/  # opt-in (-m integration); requires .secrets/sa.json + env vars
+```
 
-## Security
+Contract tests: regenerate models with `scripts/generate_models.py`, then run `pytest -m contract` to validate facade models still match the schema.
 
-- **NEVER** store secrets, API keys, or passwords in code. Only store them in `.env`.
-  - Ensure `.env` is declared in `.gitignore`.
-  - **NEVER** print or log URLs to console if they contain an API key.
-- **MUST** use environment variables for sensitive configuration
-- **NEVER** log sensitive information (passwords, tokens, PII)
+Integration test env vars (see `tests/integration/.env.example`): `PYNTERACTA_BASE_URL`, `PYNTERACTA_SERVICE_ACCOUNT_KEY`, `PYNTERACTA_TEST_COMMUNITY_ID`, `PYNTERACTA_TEST_USER_ID`, `PYNTERACTA_TEST_POST_ID`.
 
-## Version Control
+## Code Conventions
 
-- **MUST** write clear, descriptive commit messages
-- **NEVER** commit commented-out code; delete it
-- **NEVER** commit debug print statements or breakpoints
-- **NEVER** commit credentials or sensitive data
-
-## Tools
-
-- **MUST** use Ruff for code formatting and linting (replaces Black, isort, flake8)
-- **MUST** use mypy for static type checking
-- Use `uv` for package management (faster alternative to pip)
-- Use pytest for testing
+- All source files carry `# SPDX-License-Identifier: Apache-2.0` at the top.
+- Line length: 100 (ruff). Ruff rule set: `E,F,W,I,B,UP,SIM,RUF,N,PT,PL`.
+- `models/generated/` is excluded from ruff and mypy checks.
+- Commit messages follow **Conventional Commits** (`feat:`, `fix:`, `perf:`, etc.). `BREAKING CHANGE:` footer triggers a major bump.
+- `uv` is the package manager — use `uv add`, `uv sync`, `uv run`.
+- Use `structlog.get_logger("pynteracta.<module>")` for all logging; never use `print`.
+- Write automated tests for all code. Never delete test files.
 
 ## Before Committing
 
-- [ ] All tests pass
-- [ ] Type checking passes (mypy)
-- [ ] Code formatter and linter pass (Ruff)
-- [ ] All functions have docstrings and type hints
-- [ ] No commented-out code or debug statements
-- [ ] No hardcoded credentials
-
----
-
-**Remember:** Prioritize clarity and maintainability over cleverness.
+- `uv run ruff check .` and `uv run ruff format --check .` pass
+- `uv run mypy src` passes (strict)
+- `uv run pytest --cov --cov-fail-under=85` passes
+- No commented-out code, debug prints, or hardcoded credentials

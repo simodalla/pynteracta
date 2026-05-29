@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "id": 1042,
+      "firstName": "Maria",
+      "lastName": "Rossi",
+      "caption": "Maria Rossi",
+      "contactEmail": "m.rossi@example.it",
+      "serviceAccount": false,
+      "systemAccount": false,
+      "activeDWD": true,
+      "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+      "deleted": false,
+      "blocked": false,
+      "externalId": "EXT-1042",
+      "privateProfile": false
+    },
+    {
+      "id": 1099,
+      "firstName": "Luca",
+      "lastName": "Bianchi",
+      "caption": "Luca Bianchi",
+      "contactEmail": "l.bianchi@example.it",
+      "serviceAccount": false,
+      "systemAccount": false,
+      "activeDWD": true,
+      "accountPhotoUrl": null,
+      "deleted": false,
+      "blocked": false,
+      "externalId": null,
+      "privateProfile": false
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}
