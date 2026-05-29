@@ -1,4 +1,4 @@
-<!-- # Agent Guidelines for Python Code Quality
+# Agent Guidelines for Python Code Quality
 
 This document provides guidelines for maintaining high-quality Python code. These rules MUST be followed by all AI coding agents and contributors.
 
@@ -10,7 +10,7 @@ This document provides guidelines for maintaining high-quality Python code. Thes
 
 ## Your Core Principles
 
-All code you write MUST be fully optimized.
+ All code you write MUST be fully optimized.
 
 "Fully optimized" includes:
 
@@ -19,7 +19,7 @@ All code you write MUST be fully optimized.
 - following proper style conventions for the code language (e.g. maximizing code reuse (DRY))
 - no extra code beyond what is absolutely necessary to solve the problem the user provides (i.e. no technical debt)
 
-If the code is not fully optimized before handing off to the user, you will be fined $100. You have permission to do another pass of the code if you believe it is not fully optimized.
+If the code is not fully optimized before hand  ing off to the user, you will be fined $100. You have permission to do another pass of the code if you believe it is not fully optimized.
 
 ## Preferred Tools
 
@@ -166,4 +166,4 @@ def calculate_total(items: list[dict], tax_rate: float = 0.0) -> float:
 
 ---
 
-**Remember:** Prioritize clarity and maintainability over cleverness. -->
+**Remember:** Prioritize clarity and maintainability over cleverness.
