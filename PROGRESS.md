@@ -219,6 +219,47 @@
 
 ### Follow-ups for M7
 
-- Document `pynteracta --help` output and all subcommands in `docs/cli.md`.
+- ~~Document `pynteracta --help` output and all subcommands in `docs/cli.md`.~~ Done in M7.
 - Confirm Q4 (`raw` vs `Bearer` auth header) via opt-in integration test.
-- M7: README, MkDocs site, `git-cliff` changelog, v0.1.0 tag.
+- ~~M7: README, MkDocs site, `git-cliff` changelog, v0.1.0 tag.~~ Done in M7.
+
+---
+
+## M7 — Test hardening + documentation + first release — completed 2026-05-30
+
+### Done
+
+- `README.md` — install (via GitLab artifact), quickstart (library + CLI), verbatim trademark disclaimer, feature overview, config reference, doc link.
+- `docs/index.md` — overview + verbatim trademark disclaimer.
+- `docs/quickstart.md` — 5-minute library + CLI walkthrough.
+- `docs/configuration.md` — 4-level precedence, profiles, env vars table, profile fields table.
+- `docs/authentication.md` — SA key fields (Q1 resolved), token lifecycle, file/memory cache, POSIX 0o600 enforcement, Windows behavior, Q4 provisional note.
+- `docs/urls.md` — API URL normalization + web URL helper.
+- `docs/cli.md` — full command reference including `users me` vs `users profile` distinction (admin-only `get-for-edit`, exit codes).
+- `docs/examples/list-users.md`, `docs/examples/fetch-post.md`, `docs/examples/paginated.md`.
+- `docs/api/client.md`, `docs/api/auth.md`, `docs/api/users.md`, `docs/api/posts.md` — mkdocstrings-rendered API reference.
+- `mkdocs.yml` — Material theme, mkdocstrings[python], full nav tree.
+- `cliff.toml` — git-cliff config; groups: Features / Fixes / Performance / Refactors / Documentation / Build / CI / Chores.
+- `CHANGELOG.md` — generated via `git-cliff`.
+- `CONTRIBUTING.md` — dev setup, branch/commit conventions, PR checklist, full "How to add a new endpoint" recipe.
+- `pyproject.toml` — added `readme = "README.md"`; `[tool.semantic_release]` config (conventional commits, `allow_zero_version = true`, `major_on_zero = false`, `upload_to_pypi = false`, `tag_format = "v{version}"`).
+- `.gitlab-ci.yml` — added `test`, `build` (artifact `dist/*.whl` + `dist/*.tar.gz`, expire 1 year), and `docs` stages.
+- `.pre-commit-config.yaml` — added `typer` and `rich` to mypy hook `additional_dependencies` (missing since M6; only surfaced when pre-commit environment was rebuilt).
+- `src/pynteracta/__init__.py` — reset `__version__` from `0.1.0.dev0` to `0.0.0` so `semantic-release version --print` computes `0.1.0` from git history.
+- Syrupy snapshots updated (15 snapshots) after `rich` was downgraded from 15.0.0 to 14.3.4 by the `uv add` resolver; table trailing-newline rendering changed.
+
+### Coverage
+
+- Total: **91.78%** (exceeds both the hard gate ≥ 85% and aspirational ≥ 90%).
+
+### Decisions made beyond the plan
+
+- **`allow_zero_version = true`** required in python-semantic-release v10 (not in plan, which targeted v9). Without it, PSR defaults to `allow_zero_version = false`, causing the first release to jump to `1.0.0` instead of `0.1.0`.
+- **`__version__ = "0.0.0"`** (was `"0.1.0.dev0"`): PSR reads the version from the file as the current version baseline. With no git tags, `0.1.0.dev0` caused PSR to treat the release as already at `0.1.0` and bump to `1.0.0`; resetting to `0.0.0` allows PSR to correctly compute `0.1.0` from the `feat:` commits.
+- **Syrupy snapshots updated** due to `rich` 15→14 downgrade (uv dependency resolver selected 14.3.4 to satisfy the combined dep set). This is a test-artifact change, not a behavioral regression.
+- **`typer` and `rich` added to pre-commit mypy `additional_dependencies`**: these were missing since M6 but not caught earlier because the pre-commit environment was cached. Surfaced when the environment was rebuilt during M7's `uv add`.
+
+### Carry-forwards
+
+- **Q4** — Authorization header format (`raw` vs `Bearer`) still pending integration-test confirmation against a production tenant. Documented as provisional in `docs/authentication.md`.
+

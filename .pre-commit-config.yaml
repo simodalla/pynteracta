@@ -31,6 +31,8 @@ repos:
           - tomlkit
           - PyJWT
           - cryptography
+          - typer
+          - rich
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0
