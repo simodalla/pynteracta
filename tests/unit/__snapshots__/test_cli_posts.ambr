@@ -1,0 +1,71 @@
+# serializer version: 1
+# name: TestPostsComments.test_table_output
+  '''
+                   Comments (post 21269)                  
+  ┏━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+  ┃ id   ┃ text                          ┃ creation_ts   ┃
+  ┡━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+  │ 5501 │ Ottimo aggiornamento, grazie! │ 1748001000000 │
+  └──────┴───────────────────────────────┴───────────────┘
+  
+  '''
+# ---
+# name: TestPostsGet.test_json_output
+  '''
+  {
+    "id": 21269,
+    "title": "Aggiornamento procedure sicurezza Q2 2026",
+    "community_id": 79,
+    "description": "Si comunicano le nuove procedure di sicurezza in vigore dal 1 luglio 2026.",
+    "creation_ts": 1748000000000,
+    "last_modify_ts": null,
+    "comments_count": 2,
+    "likes_count": 1
+  }
+  
+  '''
+# ---
+# name: TestPostsGet.test_table_output
+  '''
+                                     Post 21269                                   
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value                                                       ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 21269                                                       │
+  │ title          │ Aggiornamento procedure sicurezza Q2 2026                   │
+  │ community_id   │ 79                                                          │
+  │ description    │ Si comunicano le nuove procedure di sicurezza in vigore dal │
+  │                │ 1 luglio 2026.                                              │
+  │ creation_ts    │ 1748000000000                                               │
+  │ last_modify_ts │                                                             │
+  │ comments_count │ 2                                                           │
+  │ likes_count    │ 1                                                           │
+  └────────────────┴─────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsList.test_json_output
+  '''
+  [
+    {
+      "id": 21269,
+      "title": "Aggiornamento procedure sicurezza Q2 2026",
+      "community_id": 79,
+      "creation_ts": 1748000000000
+    }
+  ]
+  
+  '''
+# ---
+# name: TestPostsList.test_table_output
+  '''
+                                Posts (community 79)                              
+  ┏━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+  ┃ id    ┃ title                                 ┃ community_id ┃ creation_ts   ┃
+  ┡━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+  │ 21269 │ Aggiornamento procedure sicurezza Q2  │ 79           │ 1748000000000 │
+  │       │ 2026                                  │              │               │
+  └───────┴───────────────────────────────────────┴──────────────┴───────────────┘
+  
+  '''
+# ---

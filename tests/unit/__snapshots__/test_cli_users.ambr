@@ -1,0 +1,133 @@
+# serializer version: 1
+# name: TestUsersGetForEdit.test_json_output
+  '''
+  {
+    "first_name": "Maria",
+    "last_name": "Rossi",
+    "contact_email": "m.rossi@example.it",
+    "external_id": "EXT-1042",
+    "blocked": false,
+    "account_photo_url": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042"
+  }
+  
+  '''
+# ---
+# name: TestUsersGetForEdit.test_table_output
+  '''
+                                     User 1042                                    
+  ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key               ┃ Value                                                    ┃
+  ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ first_name        │ Maria                                                    │
+  │ last_name         │ Rossi                                                    │
+  │ contact_email     │ m.rossi@example.it                                       │
+  │ external_id       │ EXT-1042                                                 │
+  │ blocked           │ False                                                    │
+  │ account_photo_url │ https://interacta.example.it/portal/api/external/v2/cor… │
+  └───────────────────┴──────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersList.test_json_output
+  '''
+  [
+    {
+      "id": 1042,
+      "first_name": "Maria",
+      "last_name": "Rossi",
+      "email": "m.rossi@example.it"
+    },
+    {
+      "id": 1099,
+      "first_name": "Luca",
+      "last_name": "Bianchi",
+      "email": "l.bianchi@example.it"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestUsersList.test_table_output
+  '''
+                           Users                          
+  ┏━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ id   ┃ first_name ┃ last_name ┃ email                ┃
+  ┡━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+  │ 1042 │ Maria      │ Rossi     │ m.rossi@example.it   │
+  │ 1099 │ Luca       │ Bianchi   │ l.bianchi@example.it │
+  └──────┴────────────┴───────────┴──────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersMe.test_json_output
+  '''
+  {
+    "id": 1042,
+    "firstName": "Maria",
+    "lastName": "Rossi",
+    "caption": "Maria Rossi",
+    "contactEmail": "m.rossi@example.it",
+    "serviceAccount": false,
+    "systemAccount": false,
+    "activeDWD": true,
+    "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+    "deleted": false,
+    "blocked": false,
+    "externalId": "EXT-1042",
+    "privateProfile": false
+  }
+  
+  '''
+# ---
+# name: TestUsersMe.test_table_output
+  '''
+                                    Current User                                  
+  ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key             ┃ Value                                                      ┃
+  ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id              │ 1042                                                       │
+  │ firstName       │ Maria                                                      │
+  │ lastName        │ Rossi                                                      │
+  │ caption         │ Maria Rossi                                                │
+  │ contactEmail    │ m.rossi@example.it                                         │
+  │ serviceAccount  │ False                                                      │
+  │ systemAccount   │ False                                                      │
+  │ activeDWD       │ True                                                       │
+  │ accountPhotoUrl │ https://interacta.example.it/portal/api/external/v2/core/… │
+  │ deleted         │ False                                                      │
+  │ blocked         │ False                                                      │
+  │ externalId      │ EXT-1042                                                   │
+  │ privateProfile  │ False                                                      │
+  └─────────────────┴────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersProfile.test_json_output
+  '''
+  {
+    "id": 1042,
+    "first_name": "Maria",
+    "last_name": "Rossi",
+    "caption": "Maria Rossi",
+    "contact_email": "m.rossi@example.it",
+    "account_photo_url": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042"
+  }
+  
+  '''
+# ---
+# name: TestUsersProfile.test_table_output
+  '''
+                                    User Profile                                  
+  ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key               ┃ Value                                                    ┃
+  ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id                │ 1042                                                     │
+  │ first_name        │ Maria                                                    │
+  │ last_name         │ Rossi                                                    │
+  │ caption           │ Maria Rossi                                              │
+  │ contact_email     │ m.rossi@example.it                                       │
+  │ account_photo_url │ https://interacta.example.it/portal/api/external/v2/cor… │
+  └───────────────────┴──────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
