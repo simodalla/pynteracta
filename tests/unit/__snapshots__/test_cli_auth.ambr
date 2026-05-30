@@ -1,0 +1,44 @@
+# serializer version: 1
+# name: TestAuthWhoami.test_json_output
+  '''
+  {
+    "id": 1042,
+    "firstName": "Maria",
+    "lastName": "Rossi",
+    "caption": "Maria Rossi",
+    "contactEmail": "m.rossi@example.it",
+    "serviceAccount": false,
+    "systemAccount": false,
+    "activeDWD": true,
+    "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
+    "deleted": false,
+    "blocked": false,
+    "externalId": "EXT-1042",
+    "privateProfile": false
+  }
+  
+  '''
+# ---
+# name: TestAuthWhoami.test_table_output
+  '''
+                                    Current User                                  
+  ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key             ┃ Value                                                      ┃
+  ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id              │ 1042                                                       │
+  │ firstName       │ Maria                                                      │
+  │ lastName        │ Rossi                                                      │
+  │ caption         │ Maria Rossi                                                │
+  │ contactEmail    │ m.rossi@example.it                                         │
+  │ serviceAccount  │ False                                                      │
+  │ systemAccount   │ False                                                      │
+  │ activeDWD       │ True                                                       │
+  │ accountPhotoUrl │ https://interacta.example.it/portal/api/external/v2/core/… │
+  │ deleted         │ False                                                      │
+  │ blocked         │ False                                                      │
+  │ externalId      │ EXT-1042                                                   │
+  │ privateProfile  │ False                                                      │
+  └─────────────────┴────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---

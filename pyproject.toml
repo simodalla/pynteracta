@@ -32,6 +32,12 @@ dependencies = [
     "cryptography>=48.0.0",
 ]
 
+[project.scripts]
+pynteracta = "pynteracta.cli:app"
+
+[project.optional-dependencies]
+yaml = ["ruamel.yaml>=0.18"]
+
 [project.urls]
 Homepage = "https://gitlab.com/pynteracta/pynteracta"
 Repository = "https://gitlab.com/pynteracta/pynteracta"
@@ -44,6 +50,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "respx",
+    "syrupy",
     "datamodel-code-generator>=0.59.0",
 ]
 
@@ -79,6 +86,7 @@ omit = ["src/pynteracta/models/generated/*"]
 fail_under = 85
 
 [tool.pytest.ini_options]
+pythonpath = ["tests/unit"]
 markers = [
     "contract: validates generated models against the pinned swagger snapshot",
     "integration: hits a real tenant read-only (opt-in)",
