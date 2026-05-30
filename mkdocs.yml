@@ -1,0 +1,56 @@
+site_name: pynteracta
+site_description: Unofficial third-party Python client for the Interacta platform.
+site_url: https://pynteracta.gitlab.io/pynteracta/
+repo_url: https://gitlab.com/pynteracta/pynteracta
+repo_name: gitlab.com/pynteracta/pynteracta
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Configuration: configuration.md
+  - Authentication: authentication.md
+  - URL Construction: urls.md
+  - CLI Reference: cli.md
+  - Examples:
+      - List Users: examples/list-users.md
+      - Fetch a Post: examples/fetch-post.md
+      - Paginated Iteration: examples/paginated.md
+  - API Reference:
+      - Client: api/client.md
+      - Auth: api/auth.md
+      - Users: api/users.md
+      - Posts: api/posts.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true

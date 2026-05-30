@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
+readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "httpx",
@@ -27,7 +28,7 @@ dependencies = [
     "rich",
     "structlog",
     "platformdirs",
-    "tomlkit",
+    "tomlkit>=0.15.0",
     "pyjwt>=2.13.0",
     "cryptography>=48.0.0",
 ]
@@ -52,6 +53,9 @@ dev = [
     "respx",
     "syrupy",
     "datamodel-code-generator>=0.59.0",
+    "mkdocs-material>=9",
+    "mkdocstrings[python]>=0.29",
+    "python-semantic-release>=9",
 ]
 
 [tool.hatch.version]
@@ -91,3 +95,29 @@ markers = [
     "contract: validates generated models against the pinned swagger snapshot",
     "integration: hits a real tenant read-only (opt-in)",
 ]
+
+[tool.semantic_release]
+version_toml = []
+version_variables = ["src/pynteracta/__init__.py:__version__"]
+changelog_file = "CHANGELOG.md"
+upload_to_pypi = false
+upload_to_release = false
+build_command = "uv build"
+tag_format = "v{version}"
+commit_parser = "conventional"
+major_on_zero = false
+allow_zero_version = true
+
+[tool.semantic_release.branches.main]
+match = "(main|feature_.*)"
+prerelease = false
+
+[tool.semantic_release.changelog.default_templates.changelog_sections]
+Features = ["feat"]
+"Bug Fixes" = ["fix"]
+Performance = ["perf"]
+Refactors = ["refactor"]
+Documentation = ["docs"]
+Build = ["build"]
+CI = ["ci"]
+Chores = ["chore", "test"]
