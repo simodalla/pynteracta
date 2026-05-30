@@ -132,6 +132,57 @@ def config_list(
     raise typer.Exit(EXIT_SUCCESS)
 
 
+@app.command("add-profile")
+def add_profile(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="New profile name.")],
+    base_url: Annotated[
+        str | None,
+        typer.Option("--base-url", help="Tenant URL for the new profile."),
+    ] = None,
+) -> None:
+    """Add a new profile to config.toml."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    config_path = config_path_from_state(state)
+    doc, existed = _load_doc(config_path)
+    if not existed:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    profiles_table = _ensure_profile_table(doc, name)
+    if base_url is not None:
+        profiles_table[name]["base_url"] = base_url
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    console.print(f"[green]✓[/green] Profile '{name}' added.")
+    raise typer.Exit(EXIT_SUCCESS)
+
+
+@app.command("remove-profile")
+def remove_profile(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Profile name to remove.")],
+) -> None:
+    """Remove a profile from config.toml."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    config_path = config_path_from_state(state)
+
+    if not config_path.exists():
+        typer.echo("No config file found.", err=True)
+        raise typer.Exit(1)
+
+    doc, _ = _load_doc(config_path)
+    profiles_table = doc.get("profiles")
+    if profiles_table is None or name not in profiles_table:
+        typer.echo(f"Profile '{name}' not found.", err=True)
+        raise typer.Exit(1)
+
+    del profiles_table[name]
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    console.print(f"[green]✓[/green] Profile '{name}' removed.")
+    raise typer.Exit(EXIT_SUCCESS)
+
+
 @app.command("use-profile")
 def use_profile(
     ctx: typer.Context,
