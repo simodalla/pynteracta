@@ -177,6 +177,13 @@ def test_user_agent_override() -> None:
 
 
 @respx.mock
+def test_auth_scheme_default_bearer() -> None:
+    route = respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    _make_transport(token_provider=lambda: "rawtoken").request("GET", _PATH)
+    assert route.calls[0].request.headers.get("authorization") == "Bearer rawtoken"
+
+
+@respx.mock
 def test_auth_scheme_none_sends_raw_token() -> None:
     route = respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
     _make_transport(token_provider=lambda: "rawtoken", auth_scheme=None).request("GET", _PATH)
@@ -297,6 +304,17 @@ def test_jwt_redacted_in_logs() -> None:
 def test_token_invalidator_called_on_401() -> None:
     called: list[str] = []
     respx.get(_FULL_URL).mock(return_value=httpx.Response(401))
+    with pytest.raises(AuthenticationError):
+        _make_transport(token_invalidator=lambda: called.append("yes")).request("GET", _PATH)
+    assert called == ["yes"]
+
+
+@respx.mock
+def test_401_invalid_auth_token_header_calls_invalidator() -> None:
+    called: list[str] = []
+    respx.get(_FULL_URL).mock(
+        return_value=httpx.Response(401, headers={"WWW-Authenticate": "INVALID_AUTH_TOKEN"})
+    )
     with pytest.raises(AuthenticationError):
         _make_transport(token_invalidator=lambda: called.append("yes")).request("GET", _PATH)
     assert called == ["yes"]

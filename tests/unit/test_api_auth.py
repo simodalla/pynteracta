@@ -50,4 +50,4 @@ class TestAuthAPI:
         route = mock_json("GET", "core/auth/current-user-data", payload)
         api = AuthAPI(make_transport())
         api.current_user_data()
-        assert route.calls[0].request.headers["authorization"] == FAKE_JWT
+        assert route.calls[0].request.headers["authorization"] == f"Bearer {FAKE_JWT}"

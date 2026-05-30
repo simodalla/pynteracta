@@ -261,5 +261,32 @@
 
 ### Carry-forwards
 
-- **Q4** — Authorization header format (`raw` vs `Bearer`) still pending integration-test confirmation against a production tenant. Documented as provisional in `docs/authentication.md`.
+~~**Q4** — Authorization header format (`raw` vs `Bearer`) still pending integration-test confirmation against a production tenant.~~ Resolved in Post-M7 auth correction (see below).
+
+---
+
+## Post-M7 — Auth correction (vendor docs) — completed 2026-05-30
+
+Breaking change against v0.1.0 prototype. Library version bumped to **v0.2.0**.
+
+### Schema / algorithm / audience / header corrections (against vendor docs)
+
+| # | Question | v0.1 (provisional) | v0.2 (vendor-confirmed) |
+|---|---|---|---|
+| Q1 | SA key file schema | `clientId`/`email`, `privateKey`, `tokenAudience`, optional `kid` (string aliases) | `{"type":"service_account","private_key_id":int,"private_key":str,"client_id":int}` — strict, no aliases |
+| Q2 | JWT signing algorithm | RS256 | **RS512** |
+| Q3 | Token expiry source | Decoded from `exp` claim (no `expiresIn` in response) | Unchanged; confirmed by vendor docs. Server emits `WWW-Authenticate: INVALID_AUTH_TOKEN` on expiry. |
+| Q4 | Authorization header | Raw token (no prefix), provisional | **`Bearer <token>`** — default `auth_scheme="Bearer"` on `HttpTransport` |
+
+### Changes made
+
+- `src/pynteracta/auth.py`:
+  - `load_service_account_key()` validates `type == "service_account"`, reads `private_key_id` (int), `private_key` (str), `client_id` (int). All legacy aliases removed.
+  - `ServiceAccountKey`: fields `client_id:int`, `private_key_id:int`, `private_key_pem:str`. `token_audience` and `kid` removed.
+  - `TokenManager`: `AUDIENCE = "injenia/portal-authenticator"`, `ALGORITHM = "RS512"`, `ASSERTION_TTL_SECONDS = 300` (vendor cap 600). `_build_assertion()` sets JOSE `{"kid": private_key_id (int), "alg":"RS512"}` and body `{"jti": uuid4().hex, "aud": AUDIENCE, "iss": client_id (int), "iat", "exp"}`. Enforces `exp - iat <= 600`.
+- `src/pynteracta/transport.py`: default `auth_scheme="Bearer"`. On HTTP 401 with `WWW-Authenticate: INVALID_AUTH_TOKEN`, logs `auth.token_invalidated_by_server`.
+- `tests/fixtures/sa_key.json`: rewritten to canonical schema with fresh synthetic RSA key.
+- `tests/unit/test_auth.py`: updated for new schema/algorithm; added cases for RS512 header, numeric `kid`/`iss`, constant `aud`, unique `jti`, TTL cap enforcement.
+- `tests/unit/test_transport.py`: added `test_auth_scheme_default_bearer`; added `test_401_invalid_auth_token_header_calls_invalidator`.
+- `docs/authentication.md`: rewritten per vendor docs; Q4 provisional note removed.
 

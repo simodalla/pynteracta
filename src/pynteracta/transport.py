@@ -55,8 +55,8 @@ class HttpTransport:
         hooks: Observer implementing :class:`~pynteracta.hooks.ClientHooks`.
         timeout: Request timeout in seconds (default 30).
         user_agent: Override the default ``User-Agent`` header.
-        auth_scheme: Prefix for the ``Authorization`` value (e.g. ``"Bearer"``).
-            ``None`` sends the raw token with no prefix.
+        auth_scheme: Prefix for the ``Authorization`` value. Default ``"Bearer"``.
+            Pass ``None`` to send the raw token with no prefix.
     """
 
     def __init__(  # noqa: PLR0913
@@ -68,7 +68,7 @@ class HttpTransport:
         hooks: ClientHooks | None = None,
         timeout: float = 30.0,
         user_agent: str | None = None,
-        auth_scheme: str | None = None,
+        auth_scheme: str | None = "Bearer",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._token_provider = token_provider
@@ -199,6 +199,9 @@ class HttpTransport:
                 return ValidationError("Validation failed", errors=errors, **common)
             return ValidationError("Bad request", **common)
         if status == _HTTP_401:
+            www_auth = response.headers.get("WWW-Authenticate", "")
+            if www_auth == "INVALID_AUTH_TOKEN":
+                _log.warning("auth.token_invalidated_by_server", www_authenticate=www_auth)
             if self._token_invalidator is not None:
                 self._token_invalidator()
             return AuthenticationError("Unauthorized", **common)

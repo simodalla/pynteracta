@@ -156,7 +156,7 @@ def logout(ctx: typer.Context) -> None:
     if profile_obj.service_account_key is not None:
         try:
             sa = load_service_account_key(profile_obj.service_account_key)
-            key_id = sa.client_id
+            key_id = str(sa.client_id)
         except Exception:
             pass
 

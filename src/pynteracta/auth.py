@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import stat
 import sys
@@ -12,9 +13,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+from uuid import uuid4
 
 import jwt
 import structlog
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.models.facade.auth import (
@@ -26,7 +31,6 @@ from pynteracta.transport import HttpTransport
 _log = structlog.get_logger("pynteracta.auth")
 
 _AUTH_PATH = "core/auth/create-access-token-by-service-account"
-_ASSERTION_TTL = timedelta(minutes=5)
 _FILE_MODE = 0o600
 _DIR_MODE = 0o700
 _WINDOWS_WARNED = False
@@ -74,15 +78,20 @@ def _parse_iso(value: str) -> datetime:
 def load_service_account_key(path: Path) -> ServiceAccountKey:
     """Parse a service-account key JSON file into :class:`ServiceAccountKey`.
 
-    Supported field names (Q1 — first match wins per role):
+    Expected schema (per official vendor docs):
 
-    * ``client_id``: ``clientId``, ``email``, ``client_id``
-    * ``private_key_pem``: ``privateKey``, ``private_key``
-    * ``token_audience``: ``tokenAudience``, ``token_audience``, ``audience``
-    * ``kid``: ``kid`` (optional)
+    .. code-block:: json
+
+        {
+            "type": "service_account",
+            "private_key_id": 42,
+            "private_key": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n",
+            "client_id": 1001
+        }
 
     Raises:
-        AuthenticationError: If the file is unreadable or required fields are missing.
+        AuthenticationError: If the file is unreadable, not valid JSON, ``type`` is not
+            ``"service_account"``, or required fields are missing.
     """
     try:
         raw: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
@@ -91,19 +100,24 @@ def load_service_account_key(path: Path) -> ServiceAccountKey:
     except json.JSONDecodeError as exc:
         raise AuthenticationError(f"Invalid JSON in service account key: {path}") from exc
 
-    client_id = raw.get("clientId") or raw.get("email") or raw.get("client_id")
-    private_key = raw.get("privateKey") or raw.get("private_key")
-    token_audience = raw.get("tokenAudience") or raw.get("token_audience") or raw.get("audience")
-    kid = raw.get("kid")
+    key_type = raw.get("type")
+    if key_type != "service_account":
+        raise AuthenticationError(
+            f"Service account key {path}: expected type 'service_account', got {key_type!r}"
+        )
+
+    private_key_id = raw.get("private_key_id")
+    private_key = raw.get("private_key")
+    client_id = raw.get("client_id")
 
     missing = [
         name
         for name, value in (
-            ("clientId/email", client_id),
-            ("privateKey", private_key),
-            ("tokenAudience", token_audience),
+            ("private_key_id", private_key_id),
+            ("private_key", private_key),
+            ("client_id", client_id),
         )
-        if not value
+        if value is None
     ]
     if missing:
         raise AuthenticationError(
@@ -111,21 +125,19 @@ def load_service_account_key(path: Path) -> ServiceAccountKey:
         )
 
     return ServiceAccountKey(
-        client_id=str(client_id),
+        client_id=int(client_id),  # type: ignore[arg-type]
+        private_key_id=int(private_key_id),  # type: ignore[arg-type]
         private_key_pem=str(private_key),
-        token_audience=str(token_audience),
-        kid=str(kid) if kid is not None else None,
     )
 
 
 @dataclass(frozen=True)
 class ServiceAccountKey:
-    """Parsed service-account key (Q1 schema)."""
+    """Parsed service-account key (vendor schema)."""
 
-    client_id: str
+    client_id: int
+    private_key_id: int
     private_key_pem: str
-    token_audience: str
-    kid: str | None = None
 
 
 @dataclass
@@ -224,6 +236,10 @@ class FileTokenCache:
 class TokenManager:
     """Manages token lifecycle: obtain, cache, refresh."""
 
+    AUDIENCE = "injenia/portal-authenticator"
+    ALGORITHM = "RS512"
+    ASSERTION_TTL_SECONDS = 300
+    _MAX_TTL_SECONDS = 600
     _SKEW_SECONDS: int = 60
 
     def __init__(
@@ -238,7 +254,7 @@ class TokenManager:
         self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
-        self._profile: str = key.client_id
+        self._profile: str = str(key.client_id)
 
     def get_token(self) -> str:
         """Return a valid access token, refreshing if near expiry."""
@@ -273,22 +289,26 @@ class TokenManager:
 
     def _build_assertion(self) -> str:
         now = self._clock()
+        iat = int(now.timestamp())
+        exp = iat + self.ASSERTION_TTL_SECONDS
+        if exp - iat > self._MAX_TTL_SECONDS:
+            raise AuthenticationError(
+                f"Assertion TTL {exp - iat}s exceeds vendor cap of {self._MAX_TTL_SECONDS}s"
+            )
         claims = {
+            "jti": uuid4().hex,
+            "aud": self.AUDIENCE,
             "iss": self._key.client_id,
-            "sub": self._key.client_id,
-            "aud": self._key.token_audience,
-            "iat": int(now.timestamp()),
-            "exp": int((now + _ASSERTION_TTL).timestamp()),
+            "iat": iat,
+            "exp": exp,
         }
-        headers: dict[str, str] = {}
-        if self._key.kid is not None:
-            headers["kid"] = self._key.kid
+        # Build a compact JWT manually so that numeric iss and kid are preserved as JSON
+        # numbers (PyJWT rejects non-string iss via its payload validator).
         try:
-            return jwt.encode(
-                claims,
-                self._key.private_key_pem,
-                algorithm="RS256",
-                headers=headers or None,
+            return _encode_rs512(
+                header={"alg": "RS512", "typ": "JWT", "kid": self._key.private_key_id},
+                payload=claims,
+                pem=self._key.private_key_pem,
             )
         except Exception as exc:
             raise AuthenticationError("Failed to build JWT assertion") from exc
@@ -315,13 +335,27 @@ class TokenManager:
         )
 
 
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def _encode_rs512(header: dict[str, Any], payload: dict[str, Any], pem: str) -> str:
+    """Produce a compact RS512 JWT preserving numeric claim values verbatim."""
+    header_b64 = _b64url(json.dumps(header, separators=(",", ":")).encode())
+    payload_b64 = _b64url(json.dumps(payload, separators=(",", ":")).encode())
+    signing_input = f"{header_b64}.{payload_b64}".encode()
+    private_key: RSAPrivateKey = serialization.load_pem_private_key(pem.encode(), password=None)  # type: ignore[assignment]
+    signature = private_key.sign(signing_input, asym_padding.PKCS1v15(), hashes.SHA512())
+    return f"{header_b64}.{payload_b64}.{_b64url(signature)}"
+
+
 def _decode_token_expiry(access_token: str) -> datetime:
-    """Extract ``exp`` from the access-token JWT (Q3 — no ``expiresIn`` in API response)."""
+    """Extract ``exp`` from the access-token JWT (no ``expiresIn`` in API response)."""
     try:
         payload = jwt.decode(
             access_token,
             options={"verify_signature": False},
-            algorithms=["RS256", "HS256", "ES256"],
+            algorithms=["RS256", "RS512", "HS256", "ES256"],
         )
     except jwt.PyJWTError as exc:
         raise AuthenticationError("Cannot decode access token expiry") from exc
@@ -329,3 +363,7 @@ def _decode_token_expiry(access_token: str) -> datetime:
     if exp is None:
         raise AuthenticationError("Access token missing exp claim")
     return datetime.fromtimestamp(int(exp), tz=UTC)
+
+
+def _assertion_ttl() -> timedelta:
+    return timedelta(seconds=TokenManager.ASSERTION_TTL_SECONDS)

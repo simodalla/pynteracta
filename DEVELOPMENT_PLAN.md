@@ -1,18 +1,20 @@
-# `pynteracta` — Development Plan (v0.1)
+# `pynteracta` — Development Plan (v0.2)
 
 > Unofficial third-party Python client (library + CLI) for the **Interacta™** platform by Dinova S.r.l. / Maggioli S.p.A. Neither sponsored nor endorsed by the vendor.
+
+> **Revision 2 (2026-05-30).** §6 (Authentication) rewritten against the official vendor documentation ([INJENIA / Interacta External API — Autenticazione](https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione)). Open questions **Q1, Q2, Q4** are now resolved at the source. Q3 is resolved as documented (the API response only carries `accessToken`; the expiry is decoded from the JWT `exp` claim, and the server emits a `WWW-Authenticate: INVALID_AUTH_TOKEN` header on expiry). Library target version bumped from v0.1 to v0.2 because the corrected SA key file format and signing algorithm are breaking with respect to the v0.1.0 prototype released after M7.
 
 ---
 
 ## 1. Overview and Objectives
 
-`pynteracta` is a Python 3.12+ library and CLI providing a Pythonic, type-safe interface to the Interacta REST API (`external_v2`). The first release (**v0.1**) is intentionally narrow in scope and emphasizes **robustness, observability and testability** over feature breadth, because:
+`pynteracta` is a Python 3.12+ library and CLI providing a Pythonic, type-safe interface to the Interacta REST API (`external_v2`). The first stable-enough release (**v0.2**) is intentionally narrow in scope and emphasizes **robustness, observability and testability** over feature breadth, because:
 
 - The Interacta API is owned by a third party and may change without notice.
 - The library is expected to be used in long-running automations where silent breakage is unacceptable.
 
-### In scope for v0.1
-- Service-account authentication, JWT lifecycle and caching.
+### In scope for v0.2
+- Service-account authentication (per official vendor docs), JWT lifecycle and caching.
 - **Read-only** access to: auth/identity, users (4 endpoints), posts (3 endpoints).
 - Library API + Typer-based CLI.
 - 4-level configuration (defaults → file → env → CLI), multi-profile.
@@ -21,12 +23,12 @@
 - Comprehensive testing (unit/contract/integration/snapshot).
 - Self-hosted GitLab CI; v0.x wheel distributed as a GitLab artifact only.
 
-### Out of scope for v0.1 (future roadmap)
+### Out of scope for v0.2 (future roadmap)
 - All mutations (create/edit/delete) on posts, users, comments, groups, etc.
 - Tasks, attachments upload/download, admin manage beyond `getUserForEdit`, workspaces, catalogs, hashtags, surveys.
-- Google OAuth2 authentication.
+- Alternate authentication modes documented by the vendor but not yet implemented: Username/Password, Google OAuth2, Microsoft OAuth2.
 - Automatic retry/backoff.
-- Async API (`AsyncInteractaClient` planned for v0.3+).
+- Async API (`AsyncInteractaClient` planned for v0.4+).
 - Public PyPI publication (planned for v1.0 once the API surface stabilizes).
 
 ### Non-goals
@@ -40,12 +42,13 @@
 | Concern | Choice |
 |---|---|
 | Python | 3.12, 3.13 (test matrix) |
-| HTTP client | `httpx` (sync only in v0.1) |
+| HTTP client | `httpx` (sync only in v0.2) |
 | Models | `pydantic` v2 |
 | Settings/config | `pydantic-settings` (layered precedence sources) |
 | CLI | `typer` |
 | CLI rendering | `rich` |
 | Logging | `structlog` |
+| JWT signing | `PyJWT` + `cryptography` (RS512) |
 | Packaging | `uv` + `pyproject.toml` (PEP 621) |
 | Lint/format | `ruff` (check + format) |
 | Typing | `mypy --strict` |
@@ -77,7 +80,7 @@ pynteracta/
 │       ├── __init__.py           # public re-exports + __version__
 │       ├── py.typed              # PEP 561 marker (ships typing info)
 │       ├── client.py             # InteractaClient façade
-│       ├── auth.py               # ServiceAccountCredentials, TokenManager, TokenCache
+│       ├── auth.py               # ServiceAccountKey, TokenManager, TokenCache
 │       ├── config.py             # Config, Profile, loader (defaults<file<env<flags)
 │       ├── exceptions.py         # error hierarchy
 │       ├── transport.py          # httpx wrapper, request/response logging, redaction
@@ -128,13 +131,13 @@ pynteracta/
 
 ### Module roles
 - `client.py`: top-level `InteractaClient` façade aggregating `auth`, `users`, `posts`, `web_urls`.
-- `auth.py`: credentials parsing, JWT lifecycle, file cache (mode 0o600) or in-memory cache.
-- `transport.py`: `HttpTransport` wraps `httpx.Client`, injects `Authorization`, custom `User-Agent`, request/response hooks, error mapping.
+- `auth.py`: credentials parsing, RS512 JWT assertion build, token lifecycle, file cache (mode 0o600) or in-memory cache.
+- `transport.py`: `HttpTransport` wraps `httpx.Client`, injects `Authorization: Bearer <token>`, custom `User-Agent`, request/response hooks, error mapping; on 401 inspects `WWW-Authenticate` to decide cache invalidation.
 - `hooks.py`: framework-agnostic `RequestInfo`/`ResponseInfo` dataclasses and the public `ClientHooks` Protocol (see §12); deliberately free of `httpx` types.
 - `logging.py`: exposes the named logger factory (`structlog.get_logger("pynteracta")`) and the opt-in `setup_default_logging` helper; **never mutates global logging state on import** (does not call `structlog.configure()`).
 - `api/_base.py`: shared `ResourceClient` (URL build, body validation, error translation).
 - `models/generated/`: untouched output of `datamodel-code-generator`.
-- `models/facade/`: hand-written, narrower, ergonomic versions for the in-scope endpoints; expose only the fields we actually use in v0.1.
+- `models/facade/`: hand-written, narrower, ergonomic versions for the in-scope endpoints; expose only the fields we actually use in v0.2.
 
 ---
 
@@ -252,15 +255,65 @@ Exposed as `client.web_urls`.
 
 ## 6. Authentication
 
+This section is aligned with the official Interacta documentation:
+[INJENIA / Interacta External API — Autenticazione](https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione).
+The vendor documents four authentication modes: Username/Password, Google OAuth2, Microsoft OAuth2, and Server-to-Server via Service Account. **v0.2 implements only the Service Account flow** (the others are future-roadmap — see §1 and §19).
+
 ### Service Account flow
-1. Read SA key file (JSON) — schema TBD (**Open question Q1**); presumed fields: `kid`, `email`/`clientId`, `privateKey` (PEM), `tokenAudience`.
-2. Build a signed JWT *assertion* (algorithm TBD — likely RS256; **Open question Q2**).
-3. `POST /core/auth/create-access-token-by-service-account` with body `CreateAccessTokenByServiceAccountRequestDTO`.
-4. Receive `CreateAccessTokenByServiceAccountResponseDTO` → contains the access token (JWT) and presumably `expiresIn` (**Open question Q3**).
-5. Cache token; attach as `Authorization: <token>` header (Swagger spec defines security scheme `portal_api_jwt_token` as apiKey in `Authorization`; whether it expects raw token vs `Bearer <token>` prefix → **Open question Q4**).
+1. Read the SA key file (JSON) provided by Interacta support.
+2. Build a signed JWT assertion using **RS512** and the private key from the file (full structure below).
+3. `POST /core/auth/create-access-token-by-service-account` with body `{"jwtAssertion": "<assertion>"}`.
+4. Receive `CreateAccessTokenByServiceAccountResponseDTO`. The response carries only `accessToken`; **there is no `expiresIn`/`expiresAt`**. The token's expiry is decoded from the JWT `exp` claim.
+5. Cache the token and attach it on every subsequent API call as `Authorization: Bearer <token>`.
+
+On token expiry the server returns **HTTP 401** with header `WWW-Authenticate: INVALID_AUTH_TOKEN`. The transport layer uses this header as the authoritative expiry signal (triggers cache invalidation and a single retry after refresh); the JWT `exp` claim is used as a proactive refresh hint with a 60 s skew so the common case avoids the 401 round-trip altogether.
+
+### Service Account key file (vendor-defined schema)
+The JSON file contains four fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | Constant `"service_account"`. Validated on load. |
+| `private_key_id` | **JSON number** | Key identifier. Used as the `kid` claim in the JOSE header (kept numeric — see note below). |
+| `private_key` | string | RSA private key in PEM format (RFC 7468). |
+| `client_id` | **JSON number** | Client identifier. May be negative. Used as the `iss` claim in the assertion body (kept numeric). |
+
+Example (verbatim from the vendor docs):
+```json
+{
+  "type": "service_account",
+  "private_key_id": 10,
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIICdQIBAD....<omitted>....\n-----END PRIVATE KEY-----",
+  "client_id": -4
+}
+```
+
+**Important — numeric types.** `private_key_id` and `client_id` are emitted by Interacta as JSON numbers, not strings, and the assertion must preserve that numeric type when serializing the JOSE header and the body. The vendor docs are explicit on this point for `kid` ("Attenzione che è un tipo JSON number, non una stringa"); we apply the same rule to `iss` since it carries `client_id` verbatim. Practical consequence: when building the assertion, do **not** coerce these values to `str`.
+
+### JWT assertion structure
+
+JOSE header:
+```json
+{
+  "kid": <private_key_id as JSON number>,
+  "alg": "RS512"
+}
+```
+
+Body claims:
+
+| Claim | Value |
+|---|---|
+| `jti` | Unique identifier per assertion (`uuid4().hex`). |
+| `aud` | Constant `"injenia/portal-authenticator"`. |
+| `iss` | `client_id` from the SA key file, as JSON number. |
+| `iat` | Unix timestamp at issue time. |
+| `exp` | Unix timestamp of expiry. **Vendor cap:** `exp - iat ≤ 600` (10 minutes). Library default: 300 seconds, enforced at build time. |
+
+The assertion is signed with the private key from `private_key` using RS512 and submitted to the token endpoint.
 
 ### `TokenManager` responsibilities
-- `get_token() -> str`: returns valid token, refreshing if `now + skew >= expires_at` (skew = 60 s).
+- `get_token() -> str`: returns a valid token, refreshing when `now + 60s >= access_token.exp`, or eagerly when the previous request observed `WWW-Authenticate: INVALID_AUTH_TOKEN`.
 - Thread-safe (single `threading.Lock`).
 - Pluggable `TokenCache` backend: `FileTokenCache` (default) or `MemoryTokenCache`.
 
@@ -272,22 +325,28 @@ Exposed as `client.web_urls`.
 
 ### Cross-platform behavior
 - **POSIX (Linux/macOS):** enforce `0o700` on the cache directory and `0o600` on the cache file. On read, if permissions are wider than `0o600`, refuse to read and raise a clear error.
-- **Windows:** best effort only. POSIX modes do not apply (`os.chmod(0o600)` is effectively a no-op), so the library emits a one-time warning (`pynteracta.token_cache.windows_permissions`) clarifying that protection relies on user-level NTFS ACLs. The library does **not** attempt to set Windows ACLs in v0.1 (out of scope; deferred — see **Q13**).
+- **Windows:** best effort only. POSIX modes do not apply (`os.chmod(0o600)` is effectively a no-op), so the library emits a one-time warning (`pynteracta.token_cache.windows_permissions`) clarifying that protection relies on user-level NTFS ACLs. The library does **not** attempt to set Windows ACLs in v0.2 (out of scope; deferred — see **Q13**).
 - **Decision:** Windows users who require strong at-rest protection should prefer the in-memory cache (`token_cache = "memory"`).
 
 ### Security
-- Never log SA private key, raw assertion, or access token (see Redaction in §12).
+- Never log the SA private key, the raw assertion, or the access token (see Redaction in §12).
 - Memory mode: token kept only inside the process.
 
 ### Indicative interfaces
 ```python
 @dataclass(frozen=True)
 class ServiceAccountKey:
-    client_id: str
-    private_key_pem: str
-    # TBD additional fields
+    client_id: int           # JSON number, may be negative
+    private_key_id: int      # JSON number; mapped to JOSE `kid` without coercion
+    private_key_pem: str     # PEM (RFC 7468)
+    # `type` is validated on load (must equal "service_account") but not retained
 
 class TokenManager:
+    AUDIENCE: ClassVar[str] = "injenia/portal-authenticator"
+    ALGORITHM: ClassVar[str] = "RS512"
+    ASSERTION_TTL_SECONDS: ClassVar[int] = 300   # vendor cap is 600
+    REFRESH_SKEW_SECONDS: ClassVar[int] = 60
+
     def __init__(self, transport: HttpTransport, key: ServiceAccountKey,
                  cache: TokenCache, clock: Callable[[], datetime] = utcnow): ...
     def get_token(self) -> str: ...
@@ -305,11 +364,11 @@ class TokenManager:
 
 ### Façade models (hand-written)
 - One file per resource in `models/facade/`.
-- Re-export only the **fields actually used** by v0.1 (narrower, better documented).
+- Re-export only the **fields actually used** by v0.2 (narrower, better documented).
 - Use composition: `class Post(BaseModel): raw: generated.GetPostDetailResponseDTO`, with computed properties for ergonomics.
 - Forward-compatibility: unknown fields ignored (`model_config = ConfigDict(extra="ignore")`).
 
-> **Decision — `.raw` is part of the public contract.** Composition is intentional: the façade deliberately narrows the API surface to the fields v0.1 supports, and `.raw` (the underlying generated DTO) is the **documented escape hatch** for anything the façade does not yet expose. Users reaching for `.raw` is an expected, supported pattern, not a workaround.
+> **Decision — `.raw` is part of the public contract.** Composition is intentional: the façade deliberately narrows the API surface to the fields v0.2 supports, and `.raw` (the underlying generated DTO) is the **documented escape hatch** for anything the façade does not yet expose. Users reaching for `.raw` is an expected, supported pattern, not a workaround.
 
 ### Regeneration workflow
 1. Bump pinned Swagger URL/snapshot in `scripts/generate_models.py`.
@@ -325,7 +384,7 @@ class TokenManager:
 
 | # | Method | Path | Request DTO | Response DTO | Path params | Query params | Errors |
 |---|---|---|---|---|---|---|---|
-| 1 | POST | `/core/auth/create-access-token-by-service-account` | `CreateAccessTokenByServiceAccountRequestDTO` | `CreateAccessTokenByServiceAccountResponseDTO` | – | – | (auth-specific) |
+| 1 | POST | `/core/auth/create-access-token-by-service-account` | `{"jwtAssertion": <RS512-signed JWT>}` | `CreateAccessTokenByServiceAccountResponseDTO` (`accessToken` only) | – | – | (auth-specific) |
 | 2 | GET | `/core/auth/current-user-data` | – | `CurrentUserDataResponseDTO` | – | – | 401 |
 | 3 | POST | `/admin/data/users` | `ListSystemUsersRequestDTO` | `ListSystemUsersResponseDTO` | – | – | 403 |
 | 4 | GET | `/core/user-profile/info` | – | `UserProfileInfoDTO` | – | – | 401 |
@@ -342,7 +401,7 @@ Timestamps: `creationTimestampFrom/To`, `lastAccessTimestampFrom/To`.
 Profile flags: `peopleSectionEnabled`, `visibleInPeopleSection`, `reducedProfile`, `viewUserProfiles`.
 Sorting: `orderTypeId`, `orderDesc`.
 
-> Fields of `CreateAccessTokenByServiceAccountRequestDTO`, `ListCommunityPostsFilteredRequestDTO`, `ListPostCommentsRequestDTO` could not be enumerated from the Swagger summary fetched at planning time — see **Open question Q5**.
+> Fields of `ListCommunityPostsFilteredRequestDTO` and `ListPostCommentsRequestDTO` are resolved by the model-generation pipeline in M3 (see §7); the façade design must be revisited against the generated DTOs.
 
 ### Resource client design
 
@@ -351,7 +410,7 @@ class ResourceClient:
     def __init__(self, transport: HttpTransport): ...
 
 class AuthAPI(ResourceClient):
-    def create_access_token(self, req: CreateAccessTokenByServiceAccountRequestDTO) -> CreateAccessTokenByServiceAccountResponseDTO: ...
+    def create_access_token(self, assertion: str) -> CreateAccessTokenByServiceAccountResponseDTO: ...
     def current_user_data(self) -> CurrentUserDataResponseDTO: ...
 
 class UsersAPI(ResourceClient):
@@ -447,7 +506,7 @@ InteractaError                       # base
 | 400 with `validationErrors` | `ValidationError` | `.errors: list[FieldError]` |
 | 400 with `customFieldValidationErrors` | `CustomFieldValidationError` | |
 | 400 other | `ValidationError` | `.errors = []` |
-| 401 | `AuthenticationError` | triggers token invalidation |
+| 401 | `AuthenticationError` | when `WWW-Authenticate: INVALID_AUTH_TOKEN` is present, triggers token-cache invalidation |
 | 403 | `PermissionError` | |
 | 404 | `NotFoundError` | |
 | 409 | `ConcurrencyError` | |
@@ -456,7 +515,7 @@ InteractaError                       # base
 
 Every exception carries `status_code`, `request_method`, `request_url` (with token redacted), `response_body` (parsed if JSON), and `request_id` if returned by the API.
 
-No automatic retry in v0.1.
+No automatic retry in v0.2 (apart from the single retry-after-refresh that the transport performs once when it observes `WWW-Authenticate: INVALID_AUTH_TOKEN`).
 
 ---
 
@@ -512,12 +571,13 @@ As a library, `pynteracta` must not hijack a host application's logging configur
 - `auth.token_obtained` (expires_at).
 - `auth.token_refreshed`.
 - `auth.token_cache_loaded`.
+- `auth.token_invalidated_by_server` (raised on 401 + `WWW-Authenticate: INVALID_AUTH_TOKEN`).
 
 ### Redaction processor
 - `Authorization` header → `***REDACTED***`.
 - SA private key → `***REDACTED***`.
 - JWT-looking strings (`eyJ...`) → `***REDACTED***`.
-- Body fields whose key matches `(?i)token|password|secret|privateKey` → `***REDACTED***`.
+- Body fields whose key matches `(?i)token|password|secret|privateKey|jwtAssertion` → `***REDACTED***`.
 
 ### Hooks
 The public hook Protocol is framework-agnostic and **does not leak `httpx` types**, so the transport backend stays an implementation detail (changing it is not a breaking change). The dataclasses live in `hooks.py` (see §3).
@@ -592,7 +652,7 @@ These call two different endpoints; the names are kept short, so the distinction
 - `--output table|json|yaml` (default: `table`). Implemented in `cli/_common.py`.
 - Tables rendered with `rich.table.Table`.
 - JSON uses pydantic `model_dump_json(indent=2)`.
-- YAML uses `ruamel.yaml` (optional dep) — **Open question Q6: include YAML by default or as `pip install pynteracta[yaml]`?**
+- YAML uses `ruamel.yaml` (optional dep) — installed via `pip install pynteracta[yaml]`.
 
 ### Exit codes
 | Code | Meaning |
@@ -628,8 +688,8 @@ tests/
 - One module per source module. Examples:
   - `test_urls.py`: every normalization vector from §5.
   - `test_config.py`: precedence resolution (defaults < file < env < flag).
-  - `test_auth.py`: token refresh near expiry; file cache mode 0o600; corrupt cache recovery.
-  - `test_transport.py`: error mapping table from §10; redaction.
+  - `test_auth.py`: SA key parsing (`type` validation, numeric `client_id`/`private_key_id`); RS512 assertion build (numeric `kid` in JOSE header, numeric `iss`, constant `aud`, presence and uniqueness of `jti`, rejection of `exp − iat > 600`); token refresh near expiry; file cache mode 0o600; corrupt cache recovery.
+  - `test_transport.py`: error mapping table from §10 (default `auth_scheme="Bearer"`); 401 with `WWW-Authenticate: INVALID_AUTH_TOKEN` triggers `token_invalidator`; redaction.
   - `test_pagination.py`: stop on empty `nextPageToken`; propagate errors.
   - `test_api_users.py` / `test_api_posts.py`: each endpoint mocked with `respx`, asserting URL, headers, body, parsing.
 
@@ -674,7 +734,7 @@ docs/
 ├── index.md              # what is pynteracta, disclaimer
 ├── quickstart.md         # 5-minute library + CLI walkthrough
 ├── configuration.md      # profiles, precedence, env vars
-├── authentication.md     # SA key, token cache
+├── authentication.md     # SA key, JWT assertion, token cache; cite vendor docs
 ├── urls.md               # API + web URL construction
 ├── cli.md                # full command reference
 ├── examples/
@@ -689,6 +749,7 @@ docs/
 ```
 - README: install, quickstart (library + CLI), trademark disclaimer (mandatory).
 - All public modules/functions/classes use **Google-style docstrings**.
+- `docs/authentication.md` cites the vendor documentation as the source of truth for the SA key format and the JWT assertion structure.
 
 ### Trademark disclaimer (verbatim)
 The README (and `docs/index.md`) must carry this exact text:
@@ -830,8 +891,8 @@ No `publish` job in v0.x — wheels are downloaded from the pipeline artifacts.
 - **Depends on**: M0.
 
 ### M2 — Transport + error mapping + structured logging
-- **Deliverables**: `transport.py` with `httpx.Client` wrapper, redaction processor, error mapping for every row of §10, User-Agent.
-- **Acceptance**: respx-based unit tests for each error mapping row; redaction tests prove `Authorization` never appears in log output.
+- **Deliverables**: `transport.py` with `httpx.Client` wrapper, redaction processor, error mapping for every row of §10, User-Agent. Default `auth_scheme="Bearer"`. 401 + `WWW-Authenticate: INVALID_AUTH_TOKEN` triggers `token_invalidator`.
+- **Acceptance**: respx-based unit tests for each error mapping row; redaction tests prove `Authorization` never appears in log output; the `WWW-Authenticate` handler is covered.
 - **Depends on**: M1.
 
 ### M3 — Model generation pipeline
@@ -840,9 +901,9 @@ No `publish` job in v0.x — wheels are downloaded from the pipeline artifacts.
 - **Depends on**: M2.
 
 ### M4 — Service-account JWT + token cache (real auth call)
-- **Deliverables**: complete `auth.py` (JWT assertion build, `TokenManager`, `FileTokenCache`, `MemoryTokenCache`).
-- **Acceptance**: unit tests cover refresh-near-expiry, 0o600 enforcement, cache invalidation on 401; one integration test (manual) successfully authenticates against the cert tenant.
-- **Depends on**: M3 and resolution of **Q1–Q4**.
+- **Deliverables**: complete `auth.py` per §6 (SA key file parsing with `type`/`private_key_id`/`private_key`/`client_id` schema; RS512 JWT assertion with numeric `kid` and `iss`, constant `aud="injenia/portal-authenticator"`, `jti=uuid4().hex`, `exp − iat ≤ 600`; `TokenManager`; `FileTokenCache`; `MemoryTokenCache`).
+- **Acceptance**: unit tests cover refresh-near-expiry, `exp` decoding, 0o600 enforcement, cache invalidation on 401+`WWW-Authenticate: INVALID_AUTH_TOKEN`, RS512 signature verification using the public key derived from the test fixture; one integration test (manual) successfully authenticates against the cert tenant.
+- **Depends on**: M3 (Q1–Q4 resolved per vendor docs — see §6).
 
 ### M5 — Resource clients (auth, users, posts) + pagination + web URLs
 - **Deliverables**: `api/auth.py`, `api/users.py`, `api/posts.py`, `pagination.py`, `urls.WebUrls`, façade models.
@@ -855,33 +916,33 @@ No `publish` job in v0.x — wheels are downloaded from the pipeline artifacts.
 - **Depends on**: M5.
 
 ### M7 — Test hardening + documentation + first release
-- **Deliverables**: coverage meeting the §14 policy (hard gate ≥ 85% on `src/pynteracta/` excl. `models/generated/`; aspirational ≥ 90%), integration test suite documented (`.env.example`, secrets layout), MkDocs site, README with disclaimer, `git-cliff` first changelog, `v0.1.0` tag via semantic-release.
-- **Acceptance**: docs build green; semantic-release dry-run shows `v0.1.0`; CI artifact contains usable wheel.
+- **Deliverables**: coverage meeting the §14 policy (hard gate ≥ 85% on `src/pynteracta/` excl. `models/generated/`; aspirational ≥ 90%), integration test suite documented (`.env.example`, secrets layout), MkDocs site, README with disclaimer, `git-cliff` first changelog, `v0.2.0` tag via semantic-release.
+- **Acceptance**: docs build green; semantic-release dry-run shows `v0.2.0`; CI artifact contains usable wheel.
 - **Depends on**: M6.
 
-### Post-v0.1 roadmap (informational)
-- v0.2: write operations on posts/comments (out-of-scope today).
-- v0.3: async client.
-- v0.4: Google OAuth2.
-- v0.5: automatic retry/backoff with jitter.
+### Post-v0.2 roadmap (informational)
+- v0.3: write operations on posts/comments (out-of-scope today).
+- v0.4: async client.
+- v0.5: alternate authentication modes documented by the vendor — Username/Password, Google OAuth2, Microsoft OAuth2.
+- v0.6: automatic retry/backoff with jitter.
 - v1.0: PyPI publication.
 
 ---
 
 ## 20. Assumptions and Open Questions
 
-The following items could not be resolved from the Swagger snapshot available at plan-writing time. They must be confirmed before / during the milestone in which they first matter — they are NOT to be guessed.
+The following items have either been resolved against vendor documentation or remain open for confirmation during the milestone in which they first matter. Resolved items are kept in the list for traceability.
 
-- **Q1 — Service account key file schema.** The exact JSON layout (field names, encoding of the private key, presence of `kid`/`tokenAudience`) is not documented in the Swagger. Needed by M4. **Action**: obtain a sample SA key from a tenant administrator and pin its schema.
-- **Q2 — JWT assertion algorithm.** Expected to be RS256, but not stated in the Swagger. Needed by M4.
-- **Q3 — Token expiry signaling.** Whether `CreateAccessTokenByServiceAccountResponseDTO` returns `expiresIn` (seconds), `expiresAt` (epoch/ISO) or only the JWT (with `exp` claim to be decoded) is unknown. Needed by M4.
-- **Q4 — `Authorization` header format.** Swagger declares `portal_api_jwt_token` as apiKey in the `Authorization` header. We must confirm whether the raw token or a `Bearer <token>` prefix is expected. Needed by M4.
-- **Q5 — Fields of `CreateAccessTokenByServiceAccountRequestDTO`, `ListCommunityPostsFilteredRequestDTO`, `ListPostCommentsRequestDTO`.** The Swagger fetch at planning time did not expose schemas for these. Will be resolved automatically when the Swagger is downloaded in M3 and models are generated; the façade design in §8 must be revisited at that point.
-- **Q6 — YAML output dependency.** Make `ruamel.yaml` (or `pyyaml`) a hard dep or an extra (`pynteracta[yaml]`)? Recommendation: extra, to keep the install lean.
+- **Q1 — Service account key file schema. RESOLVED** ([vendor docs](https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3624075265/Autenticazione)). Fields: `type` (string, `"service_account"`), `private_key_id` (JSON number), `private_key` (PEM, RFC 7468), `client_id` (JSON number, may be negative). See §6 for the canonical schema and the numeric-type requirement on `kid`/`iss`.
+- **Q2 — JWT assertion algorithm. RESOLVED** (vendor docs). Algorithm is **RS512**.
+- **Q3 — Token expiry signaling. RESOLVED**. `CreateAccessTokenByServiceAccountResponseDTO` returns only `accessToken`; the library decodes the JWT `exp` claim for proactive refresh and treats `HTTP 401` with `WWW-Authenticate: INVALID_AUTH_TOKEN` as the authoritative server-side expiry signal.
+- **Q4 — `Authorization` header format. RESOLVED** (vendor docs). The header is `Authorization: Bearer <access_token>`.
+- **Q5 — Fields of `ListCommunityPostsFilteredRequestDTO`, `ListPostCommentsRequestDTO`.** Resolved automatically when the Swagger is downloaded in M3 and models are generated; the façade design in §8 is revisited at that point. (Note: `CreateAccessTokenByServiceAccountRequestDTO` is no longer relevant — the request body is the simple JSON object `{"jwtAssertion": "<assertion>"}` per vendor docs.)
+- **Q6 — YAML output dependency. RESOLVED.** Shipped as the `pynteracta[yaml]` extra (keeps the default install lean).
 - **Q7 — Documented validation error DTOs.** Whether 400 responses use `ValidationErrorResponseDTO`, `CustomFieldValidationErrorResponseDTO`, both, or other shapes was not enumerated in the planning-phase Swagger extract. Needed by M2 for precise mapping.
 - **Q8 — Token cache cross-process safety.** A file lock (`filelock`) may be needed when multiple processes share the same profile. Recommendation: add `filelock` in M4 if integration tests reveal contention.
-- **Q9 — Server-Side request IDs.** Whether the API returns an `X-Request-Id` (or similar) header is not documented. If present, surface it on every exception (§10).
-- **Q10 — Pre-1.0 semver vs strict semver.** Confirm whether breaking changes during v0.x bump minor (lenient, as planned) or major (strict semver).
+- **Q9 — Server-side request IDs.** Whether the API returns an `X-Request-Id` (or similar) header is not documented. If present, surface it on every exception (§10).
+- **Q10 — Pre-1.0 semver vs strict semver. RESOLVED.** During v0.x, breaking changes bump the minor (lenient convention), as captured in §18.
 - **Q11 — Self-hosted GitLab runner tags & registry image.** Placeholders left in `.gitlab-ci.yml`; the actual values must be filled by the platform owner.
-- **Q12 — Public tenant for contract test fixtures.** Whether the cert tenant (`cert.development.lab.interacta.space`) is the canonical source for the pinned Swagger snapshot, or whether production Swagger should be tracked separately.
-- **Q13 — Windows ACL hardening (deferred).** The token cache file relies on POSIX modes (`0o600`/`0o700`), which do not apply on Windows; v0.1 only emits a one-time warning and recommends the in-memory cache (see §6). Setting Windows NTFS ACLs is deferred to a later milestone if demand emerges.
+- **Q12 — Public tenant for contract test fixtures. RESOLVED.** The cert tenant (`cert.development.lab.interacta.space`) is the canonical source for the pinned Swagger snapshot; production Swagger tracking is deferred.
+- **Q13 — Windows ACL hardening (deferred).** The token cache file relies on POSIX modes (`0o600`/`0o700`), which do not apply on Windows; v0.2 only emits a one-time warning and recommends the in-memory cache (see §6). Setting Windows NTFS ACLs is deferred to a later milestone if demand emerges.

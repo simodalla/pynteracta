@@ -155,9 +155,7 @@ class TestConfigRemoveProfile:
         assert "staging" not in content
         assert "dev" in content
 
-    def test_remove_nonexistent_profile_exits_1(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_remove_nonexistent_profile_exits_1(self, runner: CliRunner, tmp_path: Path) -> None:
         config_file = tmp_path / "config.toml"
         config_file.write_text('[profiles.dev]\nbase_url = "https://dev.example.com"\n')
         result = runner.invoke(
