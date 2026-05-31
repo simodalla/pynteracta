@@ -2,13 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## STOP — Workflow obbligatorio prima di ogni modifica
+
+> **Non toccare alcun file finché non sei sul branch corretto.**
+
+1. Crea e fai checkout del branch:
+   - feature: `git checkout -b feature_<short_name>`
+   - milestone: `git checkout -b m<n>_<short_name>`
+   - bugfix: `git checkout -b bugfix_<short_name>`
+2. Verifica: `git branch --show-current` — non deve essere `main`.
+3. Solo allora modifica file o crea commit.
+
+---
+
 ## What This Project Is
 
 `pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async deferred to v0.3). v0.1 scope: service-account auth, JWT lifecycle + caching, read-only access to auth/identity, users (4 endpoints), and posts (3 endpoints).
 
 ## Branch Discipline
 
-Before any change: create and checkout a feature branch named `feature_<short_name>` o for a milestone named `m<milestone_number>_<short_name>`. All work goes in that branch.
+Vedi la sezione **STOP** in cima a questo file. Ogni modifica deve avvenire su un branch dedicato, mai su `main`.
 
 ## Commands
 

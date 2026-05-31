@@ -29,7 +29,7 @@ Stores the service-account key path in the active profile and validates the cred
 fetching a token.
 
 ```bash
-pynteracta auth login --service-account-key sa.json --base-url https://interacta.example.it
+pynteracta --base-url https://interacta.example.it auth login --service-account-key sa.json
 ```
 
 ### `auth whoami`
@@ -67,7 +67,7 @@ pynteracta config get base_url
 ### `config list`
 
 ```bash
-pynteracta config list              # active profile
+pynteracta config list              # all profiles
 pynteracta config list --profile staging
 ```
 
@@ -150,7 +150,6 @@ Fetches a post by ID.
 ```bash
 pynteracta posts get 21269
 pynteracta posts get 21269 --web-url --output json
-pynteracta posts get 21269 --load-main-attachment
 ```
 
 ### `posts list`
