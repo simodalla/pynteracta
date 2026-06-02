@@ -39,3 +39,5 @@ site/
 
 # secrets
 *.env
+
+audit.log
