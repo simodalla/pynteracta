@@ -1,0 +1,14 @@
+{
+  "communities": [
+    {
+      "id": 10,
+      "name": "Engineering",
+      "description": "Engineering team community."
+    },
+    {
+      "id": 20,
+      "name": "Marketing",
+      "description": null
+    }
+  ]
+}

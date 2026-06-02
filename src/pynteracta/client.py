@@ -10,6 +10,8 @@ from typing import Any
 import platformdirs
 
 from pynteracta.api.auth import AuthAPI
+from pynteracta.api.catalogs import CatalogsAPI
+from pynteracta.api.communities import CommunitiesAPI
 from pynteracta.api.posts import PostsAPI
 from pynteracta.api.users import UsersAPI
 from pynteracta.auth import (
@@ -42,7 +44,7 @@ def _build_token_cache(profile: Profile) -> TokenCache:
 
 
 class InteractaClient:
-    """Façade aggregating auth, users, posts resource clients and web URL helpers."""
+    """Façade aggregating auth, users, posts, communities, and catalogs resource clients."""
 
     def __init__(  # noqa: PLR0913
         self,
@@ -127,6 +129,8 @@ class InteractaClient:
         )
         self.users = UsersAPI(api_transport)
         self.posts = PostsAPI(api_transport)
+        self.communities = CommunitiesAPI(api_transport)
+        self.catalogs = CatalogsAPI(api_transport)
 
     def _build_token_manager(  # noqa: PLR0913
         self,

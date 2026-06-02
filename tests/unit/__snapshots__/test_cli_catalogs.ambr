@@ -1,0 +1,59 @@
+# serializer version: 1
+# name: TestCatalogsEntries.test_json_output
+  '''
+  [
+    {
+      "id": 100,
+      "label": "Engineering",
+      "external_id": "ENG"
+    },
+    {
+      "id": 101,
+      "label": "Marketing",
+      "external_id": "MKT"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCatalogsEntries.test_table_output
+  '''
+           Catalog 5 Entries         
+  ┏━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+  ┃ id  ┃ label       ┃ external_id ┃
+  ┡━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+  │ 100 │ Engineering │ ENG         │
+  │ 101 │ Marketing   │ MKT         │
+  └─────┴─────────────┴─────────────┘
+  
+  '''
+# ---
+# name: TestCatalogsList.test_json_output
+  '''
+  [
+    {
+      "id": 5,
+      "name": "Departments",
+      "paged": false
+    },
+    {
+      "id": 8,
+      "name": "Locations",
+      "paged": true
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCatalogsList.test_table_output
+  '''
+            Catalogs          
+  ┏━━━━┳━━━━━━━━━━━━━┳━━━━━━━┓
+  ┃ id ┃ name        ┃ paged ┃
+  ┡━━━━╇━━━━━━━━━━━━━╇━━━━━━━┩
+  │ 5  │ Departments │ False │
+  │ 8  │ Locations   │ True  │
+  └────┴─────────────┴───────┘
+  
+  '''
+# ---

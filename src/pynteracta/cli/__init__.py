@@ -9,6 +9,8 @@ from typing import Annotated, Literal, cast
 import typer
 
 from pynteracta.cli import auth as _auth_cli
+from pynteracta.cli import catalogs as _catalogs_cli
+from pynteracta.cli import communities as _communities_cli
 from pynteracta.cli import config as _config_cli
 from pynteracta.cli import posts as _posts_cli
 from pynteracta.cli import users as _users_cli
@@ -21,6 +23,8 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(_auth_cli.app, name="auth")
+app.add_typer(_catalogs_cli.app, name="catalogs")
+app.add_typer(_communities_cli.app, name="communities")
 app.add_typer(_config_cli.app, name="config")
 app.add_typer(_users_cli.app, name="users")
 app.add_typer(_posts_cli.app, name="posts")

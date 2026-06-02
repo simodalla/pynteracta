@@ -14,6 +14,13 @@ from __future__ import annotations
 import pytest
 
 from pynteracta.models.facade.auth import CurrentUserResponse, ServiceAccountTokenResponse
+from pynteracta.models.facade.catalogs import CatalogEntryList, CatalogList
+from pynteracta.models.facade.communities import (
+    CommunityDetail,
+    CommunityList,
+    PostDefinition,
+    PostDefinitionMap,
+)
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
 from pynteracta.models.facade.users import SystemUserList, UserForEdit, UserProfile
 from pynteracta.models.generated import external_v2 as generated
@@ -34,6 +41,16 @@ _COMMUNITY_ID = 79
 _COMMENT_ID = 5501
 _USER_LIST_COUNT = 2
 _POST_COMMENTS_COUNT = 2
+# M9: community settings + catalogs
+_SETTINGS_COMMUNITY_ID_1 = 10
+_SETTINGS_COMMUNITY_ID_2 = 20
+_SETTINGS_COMMUNITY_COUNT = 2
+_CATALOG_ID_1 = 5
+_CATALOG_ID_2 = 8
+_CATALOG_COUNT = 2
+_CATALOG_ENTRY_ID_1 = 100
+_CATALOG_ENTRY_COUNT = 2
+_POST_DEF_FIELD_COUNT = 2
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -331,3 +348,155 @@ class TestListPostComments:
         assert len(items) == 1
         assert items[0].id == _COMMENT_ID
         assert items[0].commentPlainText == "Ottimo aggiornamento, grazie!"
+
+
+# ---------------------------------------------------------------------------
+# 9. ListCommunitiesRequestDTO / ListCommunitiesResponseDTO
+# ---------------------------------------------------------------------------
+
+
+class TestListCommunities:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListCommunitiesRequestDTO",
+            generated.ListCommunitiesRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListCommunitiesResponseDTO",
+            generated.ListCommunitiesResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("communities_list.json")
+        facade = CommunityList.from_dict(payload)
+        assert facade.raw is not None
+        items = facade.items_typed
+        assert len(items) == _SETTINGS_COMMUNITY_COUNT
+        assert items[0].id == _SETTINGS_COMMUNITY_ID_1
+        assert items[0].name == "Engineering"
+
+
+# ---------------------------------------------------------------------------
+# 10. GetCommunityDetailsResponseDTO
+# ---------------------------------------------------------------------------
+
+
+class TestGetCommunityDetails:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetCommunityDetailsResponseDTO",
+            generated.GetCommunityDetailsResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("community_details.json")
+        facade = CommunityDetail.from_dict(payload)
+        assert facade.community is not None
+        assert facade.community.id == _SETTINGS_COMMUNITY_ID_1
+
+
+# ---------------------------------------------------------------------------
+# 11. GetPostDefinitionResponseDTOModel / ListPostDefinitionsResponseDTO
+# ---------------------------------------------------------------------------
+
+
+class TestGetPostDefinition:
+    def test_response_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetPostDefinitionResponseDTO",
+            generated.GetPostDefinitionResponseDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("post_definition.json")
+        facade = PostDefinition.from_dict(payload)
+        assert facade.community_id == _SETTINGS_COMMUNITY_ID_1
+        assert len(facade.field_definitions) == _POST_DEF_FIELD_COUNT
+
+    def test_list_response_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostDefinitionsResponseDTO",
+            generated.ListPostDefinitionsResponseDTO,
+        )
+
+    def test_post_definition_map_facade(self) -> None:
+        payload = load_payload("post_definitions_map.json")
+        facade = PostDefinitionMap.from_dict(payload)
+        defs = facade.definitions
+        assert _SETTINGS_COMMUNITY_ID_1 in defs
+        assert defs[_SETTINGS_COMMUNITY_ID_1].community_id == _SETTINGS_COMMUNITY_ID_1
+
+
+# ---------------------------------------------------------------------------
+# 12. GetPostDefinitionCatalogsRequestDTO / ResponseDTO
+# ---------------------------------------------------------------------------
+
+
+class TestGetPostDefinitionCatalogs:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetPostDefinitionCatalogsRequestDTO",
+            generated.GetPostDefinitionCatalogsRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetPostDefinitionCatalogsResponseDTO",
+            generated.GetPostDefinitionCatalogsResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("catalogs.json")
+        facade = CatalogList.from_dict(payload)
+        assert facade.raw is not None
+        items = facade.items_typed
+        assert len(items) == _CATALOG_COUNT
+        assert items[0].id == _CATALOG_ID_1
+        assert items[0].name == "Departments"
+
+
+# ---------------------------------------------------------------------------
+# 13. ListPostDefinitionCatalogEntriesRequestDTO / ResponseDTO
+# ---------------------------------------------------------------------------
+
+
+class TestListCatalogEntries:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostDefinitionCatalogEntriesRequestDTO",
+            generated.ListPostDefinitionCatalogEntriesRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostDefinitionCatalogEntriesResponseDTO",
+            generated.ListPostDefinitionCatalogEntriesResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("catalog_entries.json")
+        facade = CatalogEntryList.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.next_page_token is None
+        assert facade.total_items_count == _CATALOG_ENTRY_COUNT
+
+    def test_facade_items_typed(self) -> None:
+        payload = load_payload("catalog_entries.json")
+        facade = CatalogEntryList.from_dict(payload)
+        items = facade.items_typed
+        assert len(items) == _CATALOG_ENTRY_COUNT
+        assert items[0].id == _CATALOG_ENTRY_ID_1
+        assert items[0].label == "Engineering"
+        assert items[0].external_id == "ENG"

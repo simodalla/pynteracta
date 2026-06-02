@@ -354,3 +354,75 @@ Targets a minor bump (v0.2 → v0.3) via the `feat:` commit; SA flow unchanged.
 - Switch the hand-written facade to a generated DTO if a future swagger snapshot includes the
   endpoint.
 
+---
+
+## M9 — Communication Settings (communities + catalogs) — completed 2026-06-02
+
+Additive read-only feature covering the *CommunicationSettingsV2RestApi* vendor doc (7 endpoints).
+Targets a minor bump (v0.3 → v0.4) via the `feat:` commit; all prior flows unchanged.
+
+### Done
+
+- `src/pynteracta/models/facade/communities.py` — `FieldType(IntEnum)` (vendor table 1–15);
+  `Community` / `CommunityList` / `CommunityDetail` / `PostFieldDefinition` / `PostDefinition` /
+  `PostDefinitionMap` facades; `ListCommunitiesRequestDTO` re-export.
+- `src/pynteracta/models/facade/catalogs.py` — `Catalog` / `CatalogList` / `CatalogEntry` /
+  `CatalogEntryList` facades; `GetPostDefinitionCatalogsRequestDTO` /
+  `ListPostDefinitionCatalogEntriesRequestDTO` re-exports.
+- `src/pynteracta/models/facade/__init__.py` + `src/pynteracta/models/__init__.py` — all new
+  public types added to import blocks and `__all__`.
+- `src/pynteracta/api/communities.py` — `CommunitiesAPI`: `list`, `details`, `details_bulk` /
+  `details_bulk_raw`, `post_definition`, `post_definitions` / `post_definitions_raw`.
+- `src/pynteracta/api/catalogs.py` — `CatalogsAPI`: `list` / `list_raw`, `entries` /
+  `entries_raw`, `iterate_entries` (paginated, `PageIterator[CatalogEntry]`).
+- `src/pynteracta/client.py` — `self.communities = CommunitiesAPI(api_transport)` and
+  `self.catalogs = CatalogsAPI(api_transport)` wired next to `self.posts`.
+- `src/pynteracta/cli/communities.py` — `list`, `details` (+ `--web-url`), `details-bulk`,
+  `post-definition`, `post-definitions`.
+- `src/pynteracta/cli/catalogs.py` — `list` (+ `--id`, `--load-entries`), `entries`
+  (+ `--all`, `--page-size`, `--label`, `--order-by`, `--order-asc/--order-desc`).
+- `src/pynteracta/cli/__init__.py` — registered both new Typer apps (`communities`, `catalogs`).
+- `tests/fixtures/payloads/` — 6 new JSON fixtures: `communities_list.json`,
+  `community_details.json`, `post_definition.json`, `post_definitions_map.json`,
+  `catalogs.json`, `catalog_entries.json`.
+- `tests/unit/test_api_communities.py`, `test_api_catalogs.py` — respx unit tests for all 7
+  endpoints, bulk requests, `loadEntries` query param, pagination via `iterate_entries`, body
+  camelCase shaping.
+- `tests/unit/test_facade_communities.py` — `FieldType` mapping (all 15 values, out-of-range
+  tolerance, `None` passthrough), `CommunityList`, `CommunityDetail`, `PostDefinition`,
+  `PostDefinitionMap` (integer key verification), catalog facades.
+- `tests/unit/test_cli_communities.py`, `test_cli_catalogs.py` — syrupy snapshot tests (table +
+  json), `--web-url` present/absent, `--all` pagination.
+- `tests/unit/test_client.py` — added wiring assertion for `CommunitiesAPI` and `CatalogsAPI`.
+- `tests/contract/test_models.py` — 5 new contract test classes (suites 9–13): schema-superset +
+  facade smoke for all new request/response DTOs; marker `@pytest.mark.contract`.
+- `tests/integration/test_communities_integration.py` + `.env.example` update
+  (`PYNTERACTA_TEST_CATALOG_ID`).
+- `docs/api/communities.md`, `docs/api/catalogs.md` — mkdocstrings pages.
+- `docs/cli.md` — documented `communities` and `catalogs` command groups.
+- `mkdocs.yml` — added both API pages to the nav.
+
+### Decisions made beyond the plan
+
+- **PDF path discrepancy resolved**: the doc prints `POST /post-definitions/catalogs` but the
+  real path (and swagger) is singular: `POST /post-definition/catalogs`. Used the swagger path.
+- **Additional stub→typed mappings** (Q5 pattern, as in M3/M5):
+  `CommunityDTO` → `CommunityDTO1`, `CatalogEntryDTO` → `CatalogEntryDTO1`,
+  `HashtagDTOModel` (stub) → `HashtagDTO` (typed), `PostFieldDefinitionDTO` → `PostFieldDefinitionDTO1`,
+  `GetPostDefinitionResponseDTO` → `GetPostDefinitionResponseDTOModel`, `CatalogDTO` → `CatalogDTOModel`.
+- **`FieldType.type` out-of-range tolerance**: returns `None` for unknown values; raw int
+  accessible via `PostFieldDefinition.type_raw`.
+- **Only catalog entries paginated**: `nextPageToken` is present only on endpoint 7; the five
+  community endpoints and the catalog-list endpoint are unpaginated — no `PageIterator` wired
+  for them.
+- **`PostDefinitionMap` uses integer keys**: vendor returns `dict[str, ...]`; facade converts to
+  `dict[int, PostDefinition]` for ergonomic access.
+
+### Follow-ups
+
+- Confirm `CommunityDTO1`, `CatalogEntryDTO1`, `CatalogDTOModel` typed variants if a future
+  swagger snapshot changes the generated naming.
+- Microsoft OAuth2 / username-password token exchange follows the same pattern (noted in M8).
+- Enrich `PostFieldDefinition` facade with `enum_values` and `validations` typed wrappers if
+  needed by callers.
+
