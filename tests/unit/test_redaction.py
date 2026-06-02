@@ -79,5 +79,37 @@ class TestRedactBody:
     def test_non_dict_none_unchanged(self) -> None:
         assert redact_body(None) is None
 
-    def test_non_dict_list_unchanged(self) -> None:
+    def test_list_of_ints_unchanged(self) -> None:
         assert redact_body([1, 2]) == [1, 2]
+
+    def test_nested_dict_sensitive_key_redacted(self) -> None:
+        body = {"user": {"password": "secret123", "email": "a@b.com"}}
+        result = redact_body(body)
+        assert isinstance(result, dict)
+        assert result["user"]["password"] == _REDACTED
+        assert result["user"]["email"] == "a@b.com"
+
+    def test_list_of_dicts_redacted(self) -> None:
+        body = [{"token": "abc"}, {"name": "alice"}]
+        result = redact_body(body)
+        assert isinstance(result, list)
+        assert result[0]["token"] == _REDACTED
+        assert result[1]["name"] == "alice"
+
+    def test_jwt_in_string_value_redacted(self) -> None:
+        fake_jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signature"
+        body = {"description": f"auth={fake_jwt}"}
+        result = redact_body(body)
+        assert isinstance(result, dict)
+        assert fake_jwt not in result["description"]
+        assert _REDACTED in result["description"]
+
+    def test_deeply_nested_sensitive_key(self) -> None:
+        body = {"outer": {"inner": {"secret": "xyz"}}}
+        result = redact_body(body)
+        assert result["outer"]["inner"]["secret"] == _REDACTED
+
+    def test_string_with_jwt_redacted(self) -> None:
+        fake_jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signature"
+        assert fake_jwt not in redact_body(fake_jwt)
+        assert _REDACTED in redact_body(fake_jwt)

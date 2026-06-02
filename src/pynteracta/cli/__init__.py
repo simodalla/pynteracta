@@ -85,6 +85,33 @@ def _main(  # noqa: PLR0913
         bool,
         typer.Option("--quiet", help="Suppress non-error output."),
     ] = False,
+    audit_log: Annotated[
+        bool,
+        typer.Option("--audit-log", help="Enable audit logging of API calls."),
+    ] = False,
+    audit_log_file: Annotated[
+        Path | None,
+        typer.Option("--audit-log-file", help="Path for rotating JSON-lines audit log file."),
+    ] = None,
+    audit_log_bodies: Annotated[
+        bool,
+        typer.Option("--audit-bodies", help="Include request/response bodies in audit log."),
+    ] = False,
+    audit_log_raw: Annotated[
+        bool,
+        typer.Option(
+            "--audit-raw",
+            help="Bypass redaction in audit log (unsafe — never use in production).",
+        ),
+    ] = False,
+    audit_log_max_bytes: Annotated[
+        int,
+        typer.Option("--audit-max-bytes", help="Max bytes per audit log file before rotation."),
+    ] = 10_000_000,
+    audit_log_backups: Annotated[
+        int,
+        typer.Option("--audit-backups", help="Number of rotated audit log files to keep."),
+    ] = 5,
 ) -> None:
     ctx.ensure_object(CliState)
 
@@ -105,6 +132,9 @@ def _main(  # noqa: PLR0913
         )
         raise typer.Exit(2)
 
+    # --audit-log-file implies --audit-log (convenience).
+    effective_audit_log = audit_log or audit_log_file is not None
+
     ctx.obj = CliState(
         profile=profile,
         config_file=config_file,
@@ -119,6 +149,12 @@ def _main(  # noqa: PLR0913
         log_level=log_level,
         no_color=no_color,
         quiet=quiet,
+        audit_log=effective_audit_log,
+        audit_log_file=audit_log_file,
+        audit_log_bodies=audit_log_bodies,
+        audit_log_raw=audit_log_raw,
+        audit_log_max_bytes=audit_log_max_bytes,
+        audit_log_backups=audit_log_backups,
     )
 
     setup_default_logging(level=log_level)

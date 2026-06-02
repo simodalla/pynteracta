@@ -32,6 +32,12 @@ class Profile(BaseModel):
     token_cache_dir: Path | None = None
     timeout_seconds: float = 30.0
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    audit_log: bool = False
+    audit_log_file: Path | None = None
+    audit_log_bodies: bool = False
+    audit_log_raw: bool = False
+    audit_log_max_bytes: int = 10_000_000
+    audit_log_backups: int = 5
 
 
 class Config(BaseModel):
@@ -62,6 +68,12 @@ class _EnvSettings(BaseSettings):
     # Field name "timeout" → env var PYNTERACTA_TIMEOUT (matches the documented table).
     timeout: float | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] | None = None
+    audit_log: bool | None = None
+    audit_log_file: Path | None = None
+    audit_log_bodies: bool | None = None
+    audit_log_raw: bool | None = None
+    audit_log_max_bytes: int | None = None
+    audit_log_backups: int | None = None
 
     def to_profile_overrides(self) -> dict[str, Any]:
         data: dict[str, Any] = {}

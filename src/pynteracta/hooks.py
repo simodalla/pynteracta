@@ -8,8 +8,8 @@ detail and can be swapped without breaking callers.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class RequestInfo:
     method: str
     url: str
     headers: Mapping[str, str]
+    body: Any = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,7 @@ class ResponseInfo:
     headers: Mapping[str, str]
     elapsed_ms: float
     request_id: str | None
+    body: Any = field(default=None)
 
 
 @runtime_checkable

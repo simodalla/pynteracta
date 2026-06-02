@@ -107,3 +107,23 @@ class TestInteractaClientGoogleOAuth2:
         with InteractaClient("https://api.example.com") as client:
             assert isinstance(client.communities, CommunitiesAPI)
             assert isinstance(client.catalogs, CatalogsAPI)
+
+    def test_audit_kwargs_propagate_to_api_transport(self) -> None:
+        with InteractaClient("https://api.example.com", audit=True, audit_bodies=True) as client:
+            assert client._api_transport._audit is True
+            assert client._api_transport._audit_bodies is True
+
+    def test_audit_disabled_by_default(self) -> None:
+        with InteractaClient("https://api.example.com") as client:
+            assert client._api_transport._audit is False
+            assert client._api_transport._audit_bodies is False
+
+    def test_audit_from_profile(self) -> None:
+        profile = Profile(
+            base_url="https://api.example.com",  # type: ignore[arg-type]
+            audit_log=True,
+            audit_log_bodies=True,
+        )
+        with InteractaClient(profile=profile) as client:
+            assert client._api_transport._audit is True
+            assert client._api_transport._audit_bodies is True
