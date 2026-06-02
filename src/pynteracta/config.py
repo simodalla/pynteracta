@@ -23,7 +23,11 @@ class Profile(BaseModel):
     base_url: HttpUrl
     base_path: str = "/portal"
     api_version: int = 2
+    auth_method: Literal["service_account", "google_oauth2"] = "service_account"
     service_account_key: Path | None = None
+    # Google OAuth2 access token; supplied per-session via env/flag, never persisted to
+    # config.toml by the CLI (short-lived + sensitive).
+    google_oauth2_token: str | None = None
     token_cache: Literal["file", "memory"] = "file"
     token_cache_dir: Path | None = None
     timeout_seconds: float = 30.0
@@ -50,7 +54,9 @@ class _EnvSettings(BaseSettings):
     base_url: str | None = None
     base_path: str | None = None
     api_version: int | None = None
+    auth_method: Literal["service_account", "google_oauth2"] | None = None
     service_account_key: Path | None = None
+    google_oauth2_token: str | None = None
     token_cache: Literal["file", "memory"] | None = None
     token_cache_dir: Path | None = None
     # Field name "timeout" → env var PYNTERACTA_TIMEOUT (matches the documented table).

@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pynteracta.client import InteractaClient
-from pynteracta.config import resolve_profile
+from pynteracta.config import load_config, resolve_profile
 from pynteracta.exceptions import (
     AuthenticationError,
     InteractaError,
@@ -104,7 +104,10 @@ def build_client(state: CliState) -> InteractaClient:
         config_file=state.config_file,
         overrides=overrides,
     )
-    return InteractaClient(profile=profile)
+    # Resolve the effective profile name so the Google-OAuth2 token cache key matches the one
+    # used by `auth logout` (state.profile or current_profile).
+    name = state.profile or load_config(state.config_file).current_profile
+    return InteractaClient(profile=profile, profile_name=name)
 
 
 def config_path_from_state(state: CliState) -> Path:

@@ -48,7 +48,9 @@ pynteracta config list
 | `PYNTERACTA_BASE_URL` | `base_url` |
 | `PYNTERACTA_BASE_PATH` | `base_path` |
 | `PYNTERACTA_API_VERSION` | `api_version` |
+| `PYNTERACTA_AUTH_METHOD` | `auth_method` (`service_account` or `google_oauth2`) |
 | `PYNTERACTA_SERVICE_ACCOUNT_KEY` | `service_account_key` |
+| `PYNTERACTA_GOOGLE_OAUTH2_TOKEN` | `google_oauth2_token` (not persisted to config) |
 | `PYNTERACTA_TOKEN_CACHE` | `token_cache` (`file` or `memory`) |
 | `PYNTERACTA_TOKEN_CACHE_DIR` | `token_cache_dir` |
 | `PYNTERACTA_TIMEOUT` | `timeout_seconds` |
@@ -62,7 +64,9 @@ pynteracta config list
 | `base_url` | `HttpUrl` | — (required) | Interacta tenant URL |
 | `base_path` | `str` | `/portal` | URL path prefix |
 | `api_version` | `int` | `2` | API version |
+| `auth_method` | `"service_account"` or `"google_oauth2"` | `service_account` | Authentication method |
 | `service_account_key` | `Path` | `None` | Path to SA key JSON |
+| `google_oauth2_token` | `str` | `None` | Google access token; supply via env/flag, **not** persisted to config |
 | `token_cache` | `"file"` or `"memory"` | `file` | Cache backend |
 | `token_cache_dir` | `Path` | platformdirs user cache | Override cache directory |
 | `timeout_seconds` | `float` | `30.0` | HTTP timeout |

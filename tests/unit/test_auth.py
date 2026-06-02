@@ -19,14 +19,18 @@ from httpx import Response
 from pynteracta.auth import (
     CachedToken,
     FileTokenCache,
+    GoogleOAuth2Credentials,
+    GoogleOAuth2TokenManager,
     MemoryTokenCache,
     ServiceAccountKey,
     TokenCache,
     TokenManager,
+    TokenProvider,
     _decode_token_expiry,
     load_service_account_key,
 )
 from pynteracta.exceptions import AuthenticationError
+from pynteracta.models.facade.auth import GoogleOAuth2AccessTokenResponse
 from pynteracta.transport import HttpTransport
 
 _EXPECTED_FILE_MODE = 0o600
@@ -35,6 +39,11 @@ _SA_KEY_PATH = _FIXTURES / "sa_key.json"
 _BASE = "https://api.example.com/portal/api/external/v2"
 _AUTH_PATH = "/core/auth/create-access-token-by-service-account"
 _AUTH_URL = f"{_BASE}{_AUTH_PATH}"
+# Google exchange endpoint is under /portal/api/core/... (no /external/v2/ prefix).
+_GOOGLE_BASE = "https://api.example.com/portal/api"
+_GOOGLE_AUTH_PATH = "/core/auth/create-access-token-by-google-oauth2-access-token-credentials"
+_GOOGLE_AUTH_URL = f"{_GOOGLE_BASE}{_GOOGLE_AUTH_PATH}"
+_GOOGLE_CACHE_KEY = "default"
 _EXPIRY_SHORT = 30
 _EXPIRY_LONG = 3600
 _FIXTURE_CLIENT_ID = 1001
@@ -340,3 +349,135 @@ class TestTokenInvalidationOn401:
         with pytest.raises(AuthenticationError):
             transport.request("GET", "/core/auth/current-user-data")
         assert cache.load(str(key.client_id)) is None
+
+
+def _make_google_manager(
+    *,
+    cache: TokenCache | None = None,
+    transport: HttpTransport | None = None,
+    credentials: GoogleOAuth2Credentials | None = None,
+    clock: MagicMock | None = None,
+) -> GoogleOAuth2TokenManager:
+    return GoogleOAuth2TokenManager(
+        credentials or GoogleOAuth2Credentials(token="google-access-token"),
+        cache or MemoryTokenCache(),
+        transport or MagicMock(spec=HttpTransport),
+        cache_key=_GOOGLE_CACHE_KEY,
+        clock=clock or (lambda: datetime.now(tz=UTC)),
+    )
+
+
+class TestGoogleOAuth2Credentials:
+    def test_requires_exactly_one_source_neither(self) -> None:
+        with pytest.raises(AuthenticationError):
+            GoogleOAuth2Credentials()
+
+    def test_requires_exactly_one_source_both(self) -> None:
+        with pytest.raises(AuthenticationError):
+            GoogleOAuth2Credentials(token="x", token_provider=lambda: "y")
+
+    def test_static_token(self) -> None:
+        creds = GoogleOAuth2Credentials(token="abc")
+        assert creds.get_google_token() == "abc"
+
+    def test_provider_callable(self) -> None:
+        calls: list[int] = []
+
+        def provider() -> str:
+            calls.append(1)
+            return "fresh"
+
+        creds = GoogleOAuth2Credentials(token_provider=provider)
+        assert creds.get_google_token() == "fresh"
+        assert creds.get_google_token() == "fresh"
+        assert calls == [1, 1]  # provider consulted on each call
+
+
+class TestGoogleOAuth2AccessTokenResponse:
+    def test_reads_camelcase(self) -> None:
+        resp = GoogleOAuth2AccessTokenResponse.from_dict({"accessToken": "tok"})
+        assert resp.access_token == "tok"
+
+    def test_falls_back_to_snake_case(self) -> None:
+        resp = GoogleOAuth2AccessTokenResponse.from_dict({"access_token": "tok"})
+        assert resp.access_token == "tok"
+
+    def test_missing_returns_none(self) -> None:
+        assert GoogleOAuth2AccessTokenResponse.from_dict({}).access_token is None
+
+
+class TestGoogleOAuth2TokenManager:
+    def test_satisfies_token_provider_protocol(self) -> None:
+        assert isinstance(_make_google_manager(), TokenProvider)
+
+    @respx.mock
+    def test_fetch_posts_google_token_in_body(self) -> None:
+        access = _make_access_jwt()
+        route = respx.post(_GOOGLE_AUTH_URL).mock(
+            return_value=Response(200, json={"accessToken": access}),
+        )
+        creds = GoogleOAuth2Credentials(token="my-google-token")
+        tm = _make_google_manager(credentials=creds, transport=HttpTransport(base_url=_GOOGLE_BASE))
+        assert tm.get_token() == access
+        assert route.called
+        body = json.loads(route.calls[0].request.content)
+        assert body == {"googleOAuth2Token": "my-google-token"}
+
+    @respx.mock
+    def test_tolerates_snake_case_response(self) -> None:
+        access = _make_access_jwt()
+        respx.post(_GOOGLE_AUTH_URL).mock(
+            return_value=Response(200, json={"access_token": access}),
+        )
+        tm = _make_google_manager(transport=HttpTransport(base_url=_GOOGLE_BASE))
+        assert tm.get_token() == access
+
+    @respx.mock
+    def test_missing_access_token_raises(self) -> None:
+        respx.post(_GOOGLE_AUTH_URL).mock(return_value=Response(200, json={}))
+        tm = _make_google_manager(transport=HttpTransport(base_url=_GOOGLE_BASE))
+        with pytest.raises(AuthenticationError, match="missing accessToken"):
+            tm.get_token()
+
+    @respx.mock
+    def test_uses_cache_when_valid(self) -> None:
+        cache = MemoryTokenCache()
+        cached = _token()
+        cache.save(_GOOGLE_CACHE_KEY, cached)
+        route = respx.post(_GOOGLE_AUTH_URL).mock(return_value=Response(200, json={}))
+        tm = _make_google_manager(cache=cache, transport=HttpTransport(base_url=_GOOGLE_BASE))
+        assert tm.get_token() == cached.access_token
+        assert not route.called
+
+    @respx.mock
+    def test_refreshes_when_near_expiry(self) -> None:
+        cache = MemoryTokenCache()
+        cache.save(_GOOGLE_CACHE_KEY, _token(seconds_until_expiry=_EXPIRY_SHORT))
+        access = _make_access_jwt()
+        respx.post(_GOOGLE_AUTH_URL).mock(
+            return_value=Response(200, json={"accessToken": access}),
+        )
+        tm = _make_google_manager(cache=cache, transport=HttpTransport(base_url=_GOOGLE_BASE))
+        assert tm.get_token() == access
+        saved = cache.load(_GOOGLE_CACHE_KEY)
+        assert saved is not None
+        assert saved.access_token == access
+
+    @respx.mock
+    def test_provider_token_used_on_fetch(self) -> None:
+        access = _make_access_jwt()
+        route = respx.post(_GOOGLE_AUTH_URL).mock(
+            return_value=Response(200, json={"accessToken": access}),
+        )
+        creds = GoogleOAuth2Credentials(token_provider=lambda: "provided-token")
+        tm = _make_google_manager(credentials=creds, transport=HttpTransport(base_url=_GOOGLE_BASE))
+        assert tm.get_token() == access
+        body = json.loads(route.calls[0].request.content)
+        assert body == {"googleOAuth2Token": "provided-token"}
+
+    def test_invalidate_clears_cache(self) -> None:
+        cache = MemoryTokenCache()
+        cache.save(_GOOGLE_CACHE_KEY, _token())
+        tm = _make_google_manager(cache=cache)
+        tm.invalidate()
+        assert cache.load(_GOOGLE_CACHE_KEY) is None

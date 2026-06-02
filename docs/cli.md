@@ -25,12 +25,36 @@ Options:
 
 ### `auth login`
 
-Stores the service-account key path in the active profile and validates the credentials by
-fetching a token.
+Configures an authentication method for the active profile and validates it by fetching a
+token. Choose **one** of the two methods (they are mutually exclusive):
+
+**Service account** — stores the key path in the profile:
 
 ```bash
 pynteracta --base-url https://interacta.example.it auth login --service-account-key sa.json
 ```
+
+**Google OAuth2** — persists only `auth_method = "google_oauth2"`; the Google access token is
+read from `--google-token` or `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN` and is **never written to
+disk**:
+
+```bash
+export PYNTERACTA_GOOGLE_OAUTH2_TOKEN="ya29.<google-access-token>"
+pynteracta --base-url https://interacta.example.it auth login --google
+
+# or pass it inline:
+pynteracta --base-url https://interacta.example.it auth login --google-token "ya29.<...>"
+```
+
+| Option | Description |
+|---|---|
+| `--service-account-key PATH` | Use service-account auth; persists the key path. |
+| `--google` | Use Google OAuth2 auth (token from `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`). |
+| `--google-token TOKEN` | Google access token (implies `--google`). |
+| `--profile NAME` | Profile to update (default: active profile). |
+
+See [Authentication → Google OAuth2](authentication.md#google-oauth2) for how to obtain a
+Google access token and its prerequisites.
 
 ### `auth whoami`
 

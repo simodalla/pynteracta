@@ -6,14 +6,24 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
 import jwt
+import pytest
 import respx
-from api_helpers import load_payload, mock_json
+from api_helpers import BASE_URL, load_payload, mock_json
 
-from pynteracta.auth import load_service_account_key
+from pynteracta.auth import GoogleOAuth2TokenManager, load_service_account_key
 from pynteracta.client import InteractaClient
+from pynteracta.config import Profile
+from pynteracta.exceptions import AuthenticationError
 
 _SA_KEY = Path(__file__).resolve().parent.parent / "fixtures" / "sa_key.json"
+# Google exchange is at /portal/api/core/... (no /external/v2/ prefix).
+# BASE_URL is "https://api.example.com/portal/api/external/v2"; strip the external part.
+_GOOGLE_BASE = BASE_URL.rsplit("/external/", 1)[0]
+_GOOGLE_EXCHANGE_URL = (
+    f"{_GOOGLE_BASE}/core/auth/create-access-token-by-google-oauth2-access-token-credentials"
+)
 
 
 def _access_token() -> str:
@@ -48,3 +58,45 @@ class TestInteractaClient:
         with client:
             pass
         client.close()
+
+
+class TestInteractaClientGoogleOAuth2:
+    @respx.mock
+    def test_with_google_token_wires_manager(self) -> None:
+        token_payload = {"accessToken": _access_token()}
+        user_payload = load_payload("current_user_data_response.json")
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json=token_payload)
+        )
+        me_route = mock_json("GET", "core/auth/current-user-data", user_payload)
+        with InteractaClient("https://api.example.com", google_token="g-tok") as client:
+            assert isinstance(client._token_manager, GoogleOAuth2TokenManager)
+            client.users.me()
+        assert exchange.called
+        body = exchange.calls[0].request.content
+        assert b"g-tok" in body
+        assert me_route.calls[0].request.headers.get("authorization") is not None
+
+    @respx.mock
+    def test_with_google_token_provider(self) -> None:
+        token_payload = {"accessToken": _access_token()}
+        user_payload = load_payload("current_user_data_response.json")
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json=token_payload)
+        )
+        mock_json("GET", "core/auth/current-user-data", user_payload)
+        with InteractaClient(
+            "https://api.example.com",
+            google_token_provider=lambda: "provided-tok",
+        ) as client:
+            assert isinstance(client._token_manager, GoogleOAuth2TokenManager)
+            client.users.me()
+        assert b"provided-tok" in exchange.calls[0].request.content
+
+    def test_google_auth_method_without_token_raises(self) -> None:
+        profile = Profile(
+            base_url="https://api.example.com",  # type: ignore[arg-type]
+            auth_method="google_oauth2",
+        )
+        with pytest.raises(AuthenticationError, match="no Google access token"):
+            InteractaClient(profile=profile)

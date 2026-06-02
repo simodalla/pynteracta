@@ -290,3 +290,67 @@ Breaking change against v0.1.0 prototype. Library version bumped to **v0.2.0**.
 - `tests/unit/test_transport.py`: added `test_auth_scheme_default_bearer`; added `test_401_invalid_auth_token_header_calls_invalidator`.
 - `docs/authentication.md`: rewritten per vendor docs; Q4 provisional note removed.
 
+---
+
+## M8 — Google OAuth2 authentication (additive) — completed 2026-06-02
+
+Additive second auth method alongside the service-account flow (vendor *Autenticazione* doc).
+Targets a minor bump (v0.2 → v0.3) via the `feat:` commit; SA flow unchanged.
+
+### Done
+
+- `src/pynteracta/models/facade/auth.py` — hand-written `GoogleOAuth2AccessTokenResponse`
+  facade (the exchange endpoint is absent from the pinned `swagger.json`, so no generated
+  DTO). `from_dict()` reads `accessToken`, falling back to `access_token`.
+- `src/pynteracta/auth.py`:
+  - `GoogleOAuth2Credentials` frozen dataclass — exactly one of `token` / `token_provider`.
+  - `GoogleOAuth2TokenManager` — exchanges the Google token at
+    `POST core/auth/create-access-token-by-google-oauth2-access-token-credentials` with body
+    `{"googleOAuth2Token": <token>}`; reuses `CachedToken`, `TokenCache`, `_decode_token_expiry`,
+    60 s skew, and the thread lock. Cache key = profile name (no `client_id`).
+  - `TokenProvider` Protocol (`get_token` / `invalidate`) satisfied by both managers.
+- `src/pynteracta/config.py` — `Profile.auth_method`
+  (`service_account` | `google_oauth2`, default `service_account`) and
+  `Profile.google_oauth2_token`; matching `_EnvSettings` fields
+  (`PYNTERACTA_AUTH_METHOD`, `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`).
+- `src/pynteracta/client.py` — `google_token` / `google_token_provider` kwargs; new
+  `_build_token_manager()` selects SA vs Google (explicit SA credentials win; raises
+  `AuthenticationError` if `auth_method="google_oauth2"` and no token/provider). Dual-transport
+  pattern preserved (unauthenticated transport performs the exchange).
+- `src/pynteracta/cli/auth.py` — `login` gained `--google` / `--google-token`
+  (mutually exclusive with `--service-account-key`); persists only
+  `auth_method = "google_oauth2"`, never the token (read from flag/env).
+  `src/pynteracta/cli/_common.py` — `build_client()` now passes the resolved profile name so
+  the Google cache key matches `auth logout`.
+- Tests: `tests/unit/test_auth.py` (credentials/facade/manager), `tests/unit/test_client.py`
+  (Google wiring + missing-token error), `tests/unit/test_cli_auth.py` (login `--google`,
+  token-not-persisted, mutual exclusivity, missing token);
+  `tests/integration/test_auth_integration.py` + `.env.example`
+  (`PYNTERACTA_GOOGLE_OAUTH2_TOKEN`).
+- Docs: `docs/authentication.md` (Google OAuth2 section incl. *how to obtain a Google access
+  token*), `docs/cli.md` (`auth login --google`), `docs/configuration.md`
+  (`auth_method`, `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`).
+
+### Decisions made beyond the plan
+
+- **Exchange-only**: the library does not implement a Google browser/PKCE flow; the caller
+  supplies the Google access token (min scope `profile`, linked Interacta identity).
+- **Google token never persisted** to `config.toml` (short-lived + sensitive) — supplied per
+  session via `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`, `--google-token`, or `google_token_provider`.
+- **Hand-written facade** (endpoint absent from pinned swagger); response parsing tolerates
+  both `accessToken` and `access_token` — exact field name to be confirmed at integration.
+- **Cache key** for the Google flow is the profile name.
+
+### Notes / follow-ups
+
+- Fixed a pre-existing test-isolation gap surfaced during this work: the unit suite read the
+  developer's real `user_config_dir("pynteracta")/config.toml` when `--config-file` was absent
+  (e.g. a `default` profile carrying a `service_account_key`), polluting the run (it failed on
+  `main` too). Added an autouse `_isolate_config` fixture in `tests/unit/conftest.py` that
+  points `PYNTERACTA_CONFIG_FILE` at an isolated non-existent path per test.
+- Microsoft OAuth2 (`create-access-token-by-microsoft-oauth2-access-token-credentials`) and
+  username/password (`create-access-token-by-credentials`) follow the identical exchange
+  pattern if/when needed.
+- Switch the hand-written facade to a generated DTO if a future swagger snapshot includes the
+  endpoint.
+
