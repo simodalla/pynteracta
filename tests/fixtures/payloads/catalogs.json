@@ -1,0 +1,18 @@
+{
+  "catalogs": [
+    {
+      "id": 5,
+      "name": "Departments",
+      "etag": 1,
+      "paged": false,
+      "entries": null
+    },
+    {
+      "id": 8,
+      "name": "Locations",
+      "etag": 2,
+      "paged": true,
+      "entries": null
+    }
+  ]
+}

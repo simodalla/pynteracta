@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "id": 100,
+      "catalogId": 5,
+      "label": "Engineering",
+      "externalId": "ENG",
+      "parentIds": []
+    },
+    {
+      "id": 101,
+      "catalogId": 5,
+      "label": "Marketing",
+      "externalId": "MKT",
+      "parentIds": []
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}

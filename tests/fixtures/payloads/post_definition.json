@@ -1,0 +1,68 @@
+{
+  "communityId": 10,
+  "titleEnabled": 1,
+  "descriptionEnabled": 1,
+  "customFieldsEnabled": true,
+  "attachmentEnabled": true,
+  "likeEnabled": true,
+  "fieldDefinitions": [
+    {
+      "id": 1459,
+      "name": "column_1459",
+      "label": "Rate the experience",
+      "description": null,
+      "type": 12,
+      "parentId": null,
+      "required": false,
+      "readonly": false,
+      "searchable": true,
+      "sortable": true,
+      "visibleInPreview": true,
+      "visibleInDetail": true,
+      "visibleInCreate": true,
+      "visibleInEdit": true,
+      "enumValues": [],
+      "metadata": {
+        "feedback_max_value": "10",
+        "feedback_min_value": "0",
+        "feedback_icon_type": "star",
+        "feedback_step": "1"
+      },
+      "validations": [
+        {
+          "id": 1224,
+          "fieldId": 1459,
+          "validationTypeId": 3,
+          "parameter": "10",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "id": 1460,
+      "name": "column_1460",
+      "label": "Category",
+      "description": "Select a category.",
+      "type": 7,
+      "parentId": null,
+      "required": true,
+      "readonly": false,
+      "searchable": true,
+      "sortable": false,
+      "visibleInPreview": false,
+      "visibleInDetail": true,
+      "visibleInCreate": true,
+      "visibleInEdit": true,
+      "enumValues": [],
+      "metadata": {},
+      "validations": []
+    }
+  ],
+  "hashtags": [
+    {
+      "id": 186,
+      "name": "allegato",
+      "deleted": false
+    }
+  ]
+}

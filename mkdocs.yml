@@ -43,6 +43,8 @@ nav:
       - Auth: api/auth.md
       - Users: api/users.md
       - Posts: api/posts.md
+      - Communities: api/communities.md
+      - Catalogs: api/catalogs.md
 
 markdown_extensions:
   - admonition

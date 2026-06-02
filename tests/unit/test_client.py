@@ -12,6 +12,8 @@ import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, mock_json
 
+from pynteracta.api.catalogs import CatalogsAPI
+from pynteracta.api.communities import CommunitiesAPI
 from pynteracta.auth import GoogleOAuth2TokenManager, load_service_account_key
 from pynteracta.client import InteractaClient
 from pynteracta.config import Profile
@@ -100,3 +102,8 @@ class TestInteractaClientGoogleOAuth2:
         )
         with pytest.raises(AuthenticationError, match="no Google access token"):
             InteractaClient(profile=profile)
+
+    def test_communities_and_catalogs_wired(self) -> None:
+        with InteractaClient("https://api.example.com") as client:
+            assert isinstance(client.communities, CommunitiesAPI)
+            assert isinstance(client.catalogs, CatalogsAPI)

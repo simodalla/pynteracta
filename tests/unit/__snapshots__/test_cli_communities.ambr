@@ -1,0 +1,84 @@
+# serializer version: 1
+# name: TestCommunitiesDetails.test_json_output
+  '''
+  {
+    "id": 10,
+    "name": "Engineering",
+    "description": "Engineering team community."
+  }
+  
+  '''
+# ---
+# name: TestCommunitiesDetails.test_table_output
+  '''
+                  Community 10                 
+  ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key         ┃ Value                       ┃
+  ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id          │ 10                          │
+  │ name        │ Engineering                 │
+  │ description │ Engineering team community. │
+  └─────────────┴─────────────────────────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesList.test_json_output
+  '''
+  [
+    {
+      "id": 10,
+      "name": "Engineering"
+    },
+    {
+      "id": 20,
+      "name": "Marketing"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCommunitiesList.test_table_output
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesPostDefinition.test_json_output
+  '''
+  [
+    {
+      "id": 1459,
+      "name": "column_1459",
+      "label": "Rate the experience",
+      "type": "FEEDBACK",
+      "required": false
+    },
+    {
+      "id": 1460,
+      "name": "column_1460",
+      "label": "Category",
+      "type": "ENUM",
+      "required": true
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCommunitiesPostDefinition.test_table_output
+  '''
+                    Post Definition — Community 10                  
+  ┏━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+  ┃ id   ┃ name        ┃ label               ┃ type     ┃ required ┃
+  ┡━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
+  │ 1459 │ column_1459 │ Rate the experience │ FEEDBACK │ False    │
+  │ 1460 │ column_1460 │ Category            │ ENUM     │ True     │
+  └──────┴─────────────┴─────────────────────┴──────────┴──────────┘
+  
+  '''
+# ---

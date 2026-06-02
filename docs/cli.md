@@ -195,6 +195,84 @@ pynteracta posts comments 21269
 pynteracta posts comments 21269 --all --output json
 ```
 
+---
+
+## `communities` commands
+
+Retrieve community configuration settings.
+
+### `communities list`
+
+List all communities the authenticated principal can post in.
+
+```bash
+pynteracta communities list
+pynteracta communities list --output json
+```
+
+### `communities details COMMUNITY_ID`
+
+Show details for a single community.
+
+```bash
+pynteracta communities details 10
+pynteracta communities details 10 --web-url --output json
+```
+
+### `communities details-bulk`
+
+Retrieve details for multiple communities in one call.
+
+```bash
+pynteracta communities details-bulk --id 10 --id 20
+```
+
+### `communities post-definition COMMUNITY_ID`
+
+Show the post structure (custom field definitions) for a community. Includes field type names from the `FieldType` enum.
+
+```bash
+pynteracta communities post-definition 10
+pynteracta communities post-definition 10 --output json
+```
+
+### `communities post-definitions`
+
+Show post definitions for multiple communities.
+
+```bash
+pynteracta communities post-definitions --id 10 --id 20
+```
+
+---
+
+## `catalogs` commands
+
+Retrieve post-definition catalogs and their entries.
+
+### `catalogs list`
+
+List all post-definition catalogs (optionally filtered by ID).
+
+```bash
+pynteracta catalogs list
+pynteracta catalogs list --id 5 --id 8
+pynteracta catalogs list --load-entries
+```
+
+### `catalogs entries CATALOG_ID`
+
+List entries for a catalog. Use `--all` to paginate through all pages.
+
+```bash
+pynteracta catalogs entries 5
+pynteracta catalogs entries 5 --all --page-size 50
+pynteracta catalogs entries 5 --label "Eng" --order-by label --order-asc
+pynteracta catalogs entries 5 --output json
+```
+
+---
+
 ## Exit codes
 
 | Code | Meaning |

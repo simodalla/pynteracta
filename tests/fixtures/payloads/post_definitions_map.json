@@ -1,0 +1,38 @@
+{
+  "communityPostDefinitionMap": {
+    "10": {
+      "communityId": 10,
+      "customFieldsEnabled": true,
+      "fieldDefinitions": [
+        {
+          "id": 1459,
+          "name": "column_1459",
+          "label": "Rate the experience",
+          "description": null,
+          "type": 12,
+          "parentId": null,
+          "required": false,
+          "readonly": false,
+          "searchable": true,
+          "sortable": true,
+          "visibleInPreview": true,
+          "visibleInDetail": true,
+          "visibleInCreate": true,
+          "visibleInEdit": true,
+          "enumValues": [],
+          "metadata": {
+            "feedback_max_value": "10"
+          },
+          "validations": []
+        }
+      ],
+      "hashtags": []
+    },
+    "20": {
+      "communityId": 20,
+      "customFieldsEnabled": false,
+      "fieldDefinitions": [],
+      "hashtags": []
+    }
+  }
+}
