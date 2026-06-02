@@ -125,3 +125,56 @@ class TestExplicitOverrides:
             overrides={"timeout_seconds": _FULL_TIMEOUT_OVERRIDE},
         )
         assert profile.timeout_seconds == _FULL_TIMEOUT_OVERRIDE
+
+
+_AUDIT_MAX_BYTES_DEFAULT = 10_000_000
+_AUDIT_BACKUPS_DEFAULT = 5
+_AUDIT_MAX_BYTES_CUSTOM = 5_000_000
+_AUDIT_BACKUPS_CUSTOM = 3
+
+
+class TestAuditFields:
+    def test_audit_defaults(self, tmp_path: Path) -> None:
+        profile = resolve_profile("dev", _write(tmp_path, _MINIMAL_TOML))
+        assert profile.audit_log is False
+        assert profile.audit_log_file is None
+        assert profile.audit_log_bodies is False
+        assert profile.audit_log_raw is False
+        assert profile.audit_log_max_bytes == _AUDIT_MAX_BYTES_DEFAULT
+        assert profile.audit_log_backups == _AUDIT_BACKUPS_DEFAULT
+
+    def test_audit_fields_from_file(self, tmp_path: Path) -> None:
+        toml = """\
+[profiles.dev]
+base_url = "https://interacta.example.it"
+audit_log = true
+audit_log_bodies = true
+audit_log_max_bytes = 5000000
+audit_log_backups = 3
+"""
+        profile = resolve_profile("dev", _write(tmp_path, toml))
+        assert profile.audit_log is True
+        assert profile.audit_log_bodies is True
+        assert profile.audit_log_max_bytes == _AUDIT_MAX_BYTES_CUSTOM
+        assert profile.audit_log_backups == _AUDIT_BACKUPS_CUSTOM
+
+    def test_audit_log_env_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PYNTERACTA_AUDIT_LOG", "true")
+        profile = resolve_profile("dev", _write(tmp_path, _MINIMAL_TOML))
+        assert profile.audit_log is True
+
+    def test_audit_log_bodies_env_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PYNTERACTA_AUDIT_LOG_BODIES", "true")
+        profile = resolve_profile("dev", _write(tmp_path, _MINIMAL_TOML))
+        assert profile.audit_log_bodies is True
+
+    def test_audit_override_wins_over_file(self, tmp_path: Path) -> None:
+        profile = resolve_profile(
+            "dev",
+            _write(tmp_path, _MINIMAL_TOML),
+            overrides={"audit_log": True, "audit_log_bodies": True},
+        )
+        assert profile.audit_log is True
+        assert profile.audit_log_bodies is True

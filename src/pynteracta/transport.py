@@ -26,9 +26,10 @@ from pynteracta.exceptions import (
 # Aliased to avoid shadowing the builtin PermissionError in this module.
 from pynteracta.exceptions import PermissionError as InteractaPermissionError
 from pynteracta.hooks import ClientHooks, RequestInfo, ResponseInfo
-from pynteracta.logging import redact_headers, redact_string
+from pynteracta.logging import redact_body, redact_headers, redact_string
 
 _log = structlog.get_logger("pynteracta.transport")
+_audit_log = structlog.get_logger("pynteracta.audit")
 
 _PY_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 _DEFAULT_USER_AGENT = f"pynteracta/{__version__} python/{_PY_VERSION} httpx/{httpx.__version__}"
@@ -40,6 +41,10 @@ _HTTP_404 = 404
 _HTTP_409 = 409
 _HTTP_5XX_LOW = 500
 _HTTP_5XX_HIGH = 600
+
+# Maximum response body bytes captured for audit (avoids logging huge payloads).
+_AUDIT_BODY_MAX_BYTES = 65_536
+_AUDIT_BODY_TRUNCATED_MARKER = "...[truncated]"
 
 
 class HttpTransport:
@@ -57,6 +62,10 @@ class HttpTransport:
         user_agent: Override the default ``User-Agent`` header.
         auth_scheme: Prefix for the ``Authorization`` value. Default ``"Bearer"``.
             Pass ``None`` to send the raw token with no prefix.
+        audit: Emit ``audit.request`` / ``audit.response`` events via the
+            ``pynteracta.audit`` logger. Default ``False``.
+        audit_bodies: When ``True`` (and ``audit=True``), include request and response
+            bodies in the audit events. Default ``False``.
     """
 
     def __init__(  # noqa: PLR0913
@@ -69,6 +78,8 @@ class HttpTransport:
         timeout: float = 30.0,
         user_agent: str | None = None,
         auth_scheme: str | None = "Bearer",
+        audit: bool = False,
+        audit_bodies: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._token_provider = token_provider
@@ -76,6 +87,8 @@ class HttpTransport:
         self._hooks = hooks
         self._user_agent = user_agent or _DEFAULT_USER_AGENT
         self._auth_scheme = auth_scheme
+        self._audit = audit
+        self._audit_bodies = audit_bodies
         self._client = httpx.Client(timeout=timeout)
 
     # ------------------------------------------------------------------
@@ -100,9 +113,23 @@ class HttpTransport:
 
         redacted_headers = redact_headers(headers)
         redacted_url = redact_string(url)
+        req_body = redact_body(json) if (self._audit and self._audit_bodies) else None
 
-        req_info = RequestInfo(method=method, url=redacted_url, headers=redacted_headers)
+        req_info = RequestInfo(
+            method=method,
+            url=redacted_url,
+            headers=redacted_headers,
+            body=req_body,
+        )
         _log.debug("http.request", method=method, url=redacted_url)
+        if self._audit:
+            _audit_log.debug(
+                "audit.request",
+                method=method,
+                url=redacted_url,
+                headers=redacted_headers,
+                body=req_body,
+            )
         if self._hooks is not None:
             self._hooks.on_request(req_info)
 
@@ -124,18 +151,31 @@ class HttpTransport:
             raise err from exc
 
         request_id = response.headers.get("x-request-id")
+        capture_body = self._audit and self._audit_bodies
+        resp_body = self._capture_response_body(response) if capture_body else None
         resp_info = ResponseInfo(
             status_code=response.status_code,
             url=redacted_url,
             headers=dict(response.headers),
             elapsed_ms=elapsed_ms,
             request_id=request_id,
+            body=resp_body,
         )
         _log.debug(
             "http.response",
             status=response.status_code,
             duration_ms=round(elapsed_ms, 2),
         )
+        if self._audit:
+            _audit_log.debug(
+                "audit.response",
+                status=response.status_code,
+                url=redacted_url,
+                headers=dict(response.headers),
+                duration_ms=round(elapsed_ms, 2),
+                request_id=request_id,
+                body=resp_body,
+            )
         if self._hooks is not None:
             self._hooks.on_response(resp_info)
 
@@ -168,6 +208,17 @@ class HttpTransport:
             auth_value = f"{self._auth_scheme} {token}" if self._auth_scheme else token
             headers["Authorization"] = auth_value
         return headers
+
+    def _capture_response_body(self, response: httpx.Response) -> Any:
+        """Parse (and size-cap) the response body for audit purposes."""
+        content = response.content
+        if len(content) > _AUDIT_BODY_MAX_BYTES:
+            truncated = content[:_AUDIT_BODY_MAX_BYTES].decode("utf-8", errors="replace")
+            return truncated + _AUDIT_BODY_TRUNCATED_MARKER
+        try:
+            return response.json()
+        except Exception:
+            return response.text or None
 
     def _map_error(  # noqa: PLR0911
         self, response: httpx.Response, redacted_url: str

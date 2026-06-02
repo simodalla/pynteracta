@@ -61,6 +61,8 @@ class InteractaClient:
         auth_scheme: str | None = None,
         config_file: Path | None = None,
         profile_name: str | None = None,
+        audit: bool = False,
+        audit_bodies: bool = False,
     ) -> None:
         if profile is None and base_url is None:
             profile = resolve_profile(profile_name=profile_name, config_file=config_file)
@@ -80,6 +82,8 @@ class InteractaClient:
                 credentials = load_service_account_key(profile.service_account_key)
             if google_token is None:
                 google_token = profile.google_oauth2_token
+            audit = audit or profile.audit_log
+            audit_bodies = audit_bodies or profile.audit_log_bodies
         elif base_url is None:
             msg = "Either base_url or profile must be provided"
             raise ValueError(msg)
@@ -92,9 +96,19 @@ class InteractaClient:
         # (no /external/v{n}/ prefix), so it needs a separate transport base.
         google_auth_base = f"{base_url.rstrip('/')}/{base_path.strip('/')}/api"
 
-        auth_transport = HttpTransport(base_url=api_base, hooks=hooks, timeout=timeout_seconds)
+        auth_transport = HttpTransport(
+            base_url=api_base,
+            hooks=hooks,
+            timeout=timeout_seconds,
+            audit=audit,
+            audit_bodies=audit_bodies,
+        )
         google_exchange_transport = HttpTransport(
-            base_url=google_auth_base, hooks=hooks, timeout=timeout_seconds
+            base_url=google_auth_base,
+            hooks=hooks,
+            timeout=timeout_seconds,
+            audit=audit,
+            audit_bodies=audit_bodies,
         )
         token_manager = self._build_token_manager(
             auth_method=auth_method,
@@ -114,6 +128,8 @@ class InteractaClient:
                 hooks=hooks,
                 timeout=timeout_seconds,
                 auth_scheme=auth_scheme,
+                audit=audit,
+                audit_bodies=audit_bodies,
             )
         else:
             api_transport = auth_transport

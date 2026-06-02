@@ -19,7 +19,15 @@ Options:
   --log-level [DEBUG|INFO|WARNING|ERROR]
   --no-color                   Disable rich color output
   --quiet                      Suppress non-essential output
+  --audit-log                  Enable API call audit logging
+  --audit-log-file PATH        Path for rotating JSON-lines audit log file
+  --audit-bodies               Include request/response bodies in audit log
+  --audit-raw                  Bypass redaction (unsafe — never use in production)
+  --audit-max-bytes INTEGER    Max bytes per audit log file before rotation (default: 10000000)
+  --audit-backups INTEGER      Number of rotated audit log files to keep (default: 5)
 ```
+
+See [Audit Logging](logging.md) for full details on redaction guarantees, file format, and security considerations.
 
 ## auth
 

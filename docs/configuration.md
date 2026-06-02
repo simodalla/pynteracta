@@ -55,6 +55,12 @@ pynteracta config list
 | `PYNTERACTA_TOKEN_CACHE_DIR` | `token_cache_dir` |
 | `PYNTERACTA_TIMEOUT` | `timeout_seconds` |
 | `PYNTERACTA_LOG_LEVEL` | `log_level` |
+| `PYNTERACTA_AUDIT_LOG` | `audit_log` — enable audit logging |
+| `PYNTERACTA_AUDIT_LOG_FILE` | `audit_log_file` — rotating file path (implies audit on) |
+| `PYNTERACTA_AUDIT_LOG_BODIES` | `audit_log_bodies` — capture request/response bodies |
+| `PYNTERACTA_AUDIT_LOG_RAW` | `audit_log_raw` — bypass redaction (unsafe) |
+| `PYNTERACTA_AUDIT_LOG_MAX_BYTES` | `audit_log_max_bytes` — max bytes per log file |
+| `PYNTERACTA_AUDIT_LOG_BACKUPS` | `audit_log_backups` — rotated file count |
 | `PYNTERACTA_CONFIG_FILE` | config file path override |
 
 ## Profile fields
@@ -71,3 +77,9 @@ pynteracta config list
 | `token_cache_dir` | `Path` | platformdirs user cache | Override cache directory |
 | `timeout_seconds` | `float` | `30.0` | HTTP timeout |
 | `log_level` | `DEBUG`/`INFO`/`WARNING`/`ERROR` | `INFO` | Log verbosity |
+| `audit_log` | `bool` | `false` | Enable API call audit logging |
+| `audit_log_file` | `path` | _(none)_ | Rotating JSON-lines audit file path |
+| `audit_log_bodies` | `bool` | `false` | Capture request/response bodies (opt-in) |
+| `audit_log_raw` | `bool` | `false` | Bypass redaction — **unsafe, never use in production** |
+| `audit_log_max_bytes` | `int` | `10000000` | Max bytes per audit log file before rotation |
+| `audit_log_backups` | `int` | `5` | Number of rotated backup files to keep |

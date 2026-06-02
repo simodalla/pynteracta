@@ -331,3 +331,89 @@ def test_context_manager() -> None:
     with _make_transport() as t:
         resp = t.request("GET", _PATH)
     assert resp.status_code == _HTTP_200
+
+
+# ---------------------------------------------------------------------------
+# Audit logging
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_audit_disabled_emits_no_audit_events() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    with capture_logs() as logs:
+        _make_transport(audit=False).request("GET", _PATH)
+    audit_events = [e for e in logs if "audit" in e.get("event", "")]
+    assert audit_events == []
+
+
+@respx.mock
+def test_audit_enabled_emits_request_and_response_events() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={"id": 1}))
+    with capture_logs() as logs:
+        _make_transport(audit=True).request("GET", _PATH)
+    events = [e["event"] for e in logs]
+    assert "audit.request" in events
+    assert "audit.response" in events
+
+
+@respx.mock
+def test_audit_request_contains_headers() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, token_provider=lambda: "tok").request("GET", _PATH)
+    req_entry = next(e for e in logs if e.get("event") == "audit.request")
+    assert "headers" in req_entry
+
+
+@respx.mock
+def test_audit_bodies_false_no_body_in_events() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={"id": 1}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=False).request("GET", _PATH)
+    for e in logs:
+        if "audit" in e.get("event", ""):
+            assert e.get("body") is None
+
+
+@respx.mock
+def test_audit_bodies_true_includes_response_body() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={"id": 1}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=True).request("GET", _PATH)
+    resp_entry = next(e for e in logs if e.get("event") == "audit.response")
+    assert resp_entry.get("body") == {"id": 1}
+
+
+@respx.mock
+def test_audit_bodies_true_includes_request_body() -> None:
+    respx.post(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=True).request("POST", _PATH, json={"name": "test"})
+    req_entry = next(e for e in logs if e.get("event") == "audit.request")
+    assert req_entry.get("body") == {"name": "test"}
+
+
+@respx.mock
+def test_audit_authorization_redacted_in_audit_headers() -> None:
+    respx.get(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, token_provider=lambda: _FAKE_JWT).request("GET", _PATH)
+    req_entry = next(e for e in logs if e.get("event") == "audit.request")
+    headers = req_entry.get("headers", {})
+    auth = headers.get("Authorization", headers.get("authorization", ""))
+    assert _FAKE_JWT not in auth
+    assert auth == _REDACTED
+
+
+@respx.mock
+def test_audit_sensitive_body_key_redacted() -> None:
+    respx.post(_FULL_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=True).request(
+            "POST", _PATH, json={"token": "secret-value", "name": "test"}
+        )
+    req_entry = next(e for e in logs if e.get("event") == "audit.request")
+    body = req_entry.get("body", {})
+    assert body.get("token") == _REDACTED
+    assert body.get("name") == "test"

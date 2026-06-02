@@ -37,6 +37,16 @@ def test_request_info_frozen() -> None:
         pass
 
 
+def test_request_info_body_defaults_none() -> None:
+    req = RequestInfo(method="GET", url="https://example.com", headers={})
+    assert req.body is None
+
+
+def test_request_info_body_stored() -> None:
+    req = RequestInfo(method="POST", url="https://example.com", headers={}, body={"key": "val"})
+    assert req.body == {"key": "val"}
+
+
 def test_response_info_frozen() -> None:
     resp = ResponseInfo(
         status_code=200,
@@ -50,6 +60,29 @@ def test_response_info_frozen() -> None:
         raise AssertionError("should have raised")
     except AttributeError:
         pass
+
+
+def test_response_info_body_defaults_none() -> None:
+    resp = ResponseInfo(
+        status_code=200,
+        url="https://example.com",
+        headers={},
+        elapsed_ms=10.0,
+        request_id=None,
+    )
+    assert resp.body is None
+
+
+def test_response_info_body_stored() -> None:
+    resp = ResponseInfo(
+        status_code=200,
+        url="https://example.com",
+        headers={},
+        elapsed_ms=10.0,
+        request_id="req-1",
+        body={"result": "ok"},
+    )
+    assert resp.body == {"result": "ok"}
 
 
 def test_request_info_no_httpx_types() -> None:

@@ -26,6 +26,7 @@ from pynteracta.exceptions import (
     ValidationError,
 )
 from pynteracta.exceptions import PermissionError as InteractaPermissionError
+from pynteracta.logging import setup_default_logging
 
 OutputFormat = Literal["table", "json", "yaml"]
 
@@ -75,25 +76,45 @@ class CliState:
     log_level: str = "INFO"
     no_color: bool = False
     quiet: bool = False
+    audit_log: bool = False
+    audit_log_file: Path | None = None
+    audit_log_bodies: bool = False
+    audit_log_raw: bool = False
+    audit_log_max_bytes: int = 10_000_000
+    audit_log_backups: int = 5
+
+
+_AUDIT_MAX_BYTES_DEFAULT = 10_000_000
+_AUDIT_BACKUPS_DEFAULT = 5
 
 
 def _profile_overrides(state: CliState) -> dict[str, Any]:
     overrides: dict[str, Any] = {}
-    if state.base_url is not None:
-        overrides["base_url"] = state.base_url
-    if state.base_path is not None:
-        overrides["base_path"] = state.base_path
-    if state.api_version is not None:
-        overrides["api_version"] = state.api_version
-    if state.service_account_key is not None:
-        overrides["service_account_key"] = state.service_account_key
-    if state.token_cache is not None:
-        overrides["token_cache"] = state.token_cache
-    if state.token_cache_dir is not None:
-        overrides["token_cache_dir"] = state.token_cache_dir
+    _set_if_not_none(overrides, "base_url", state.base_url)
+    _set_if_not_none(overrides, "base_path", state.base_path)
+    _set_if_not_none(overrides, "api_version", state.api_version)
+    _set_if_not_none(overrides, "service_account_key", state.service_account_key)
+    _set_if_not_none(overrides, "token_cache", state.token_cache)
+    _set_if_not_none(overrides, "token_cache_dir", state.token_cache_dir)
     if state.timeout is not None:
         overrides["timeout_seconds"] = state.timeout
+    if state.audit_log:
+        overrides["audit_log"] = state.audit_log
+    _set_if_not_none(overrides, "audit_log_file", state.audit_log_file)
+    if state.audit_log_bodies:
+        overrides["audit_log_bodies"] = state.audit_log_bodies
+    if state.audit_log_raw:
+        overrides["audit_log_raw"] = state.audit_log_raw
+    if state.audit_log_max_bytes != _AUDIT_MAX_BYTES_DEFAULT:
+        overrides["audit_log_max_bytes"] = state.audit_log_max_bytes
+    if state.audit_log_backups != _AUDIT_BACKUPS_DEFAULT:
+        overrides["audit_log_backups"] = state.audit_log_backups
     return overrides
+
+
+def _set_if_not_none(d: dict[str, Any], key: str, value: Any) -> None:
+    if value is not None:
+        d[key] = value
 
 
 def build_client(state: CliState) -> InteractaClient:
@@ -107,7 +128,24 @@ def build_client(state: CliState) -> InteractaClient:
     # Resolve the effective profile name so the Google-OAuth2 token cache key matches the one
     # used by `auth logout` (state.profile or current_profile).
     name = state.profile or load_config(state.config_file).current_profile
-    return InteractaClient(profile=profile, profile_name=name)
+
+    # Wire audit settings from the resolved profile (merged CLI flags are already in overrides).
+    setup_default_logging(
+        level=state.log_level,
+        audit=profile.audit_log,
+        audit_file=profile.audit_log_file,
+        audit_max_bytes=profile.audit_log_max_bytes,
+        audit_backups=profile.audit_log_backups,
+        audit_bodies=profile.audit_log_bodies,
+        audit_raw=profile.audit_log_raw,
+    )
+
+    return InteractaClient(
+        profile=profile,
+        profile_name=name,
+        audit=profile.audit_log,
+        audit_bodies=profile.audit_log_bodies,
+    )
 
 
 def config_path_from_state(state: CliState) -> Path:

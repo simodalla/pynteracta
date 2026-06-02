@@ -63,6 +63,7 @@ pynteracta posts list --community 79 --all --web-url
 - Lazy pagination iterator — `client.users.iterate()`, `client.posts.iterate_in_community()`.
 - 4-level configuration: built-in defaults → config file → env vars → CLI flags.
 - Structured logging with token redaction (never logs SA key or access tokens).
+- Optional API call audit logging: headers and bodies to console + rotating JSON-lines file, with full redaction and an opt-in raw override for debugging.
 - Typer-based CLI with `table`, `json`, and `yaml` output formats.
 
 ## Configuration

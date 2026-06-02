@@ -426,3 +426,101 @@ Targets a minor bump (v0.3 → v0.4) via the `feat:` commit; all prior flows unc
 - Enrich `PostFieldDefinition` facade with `enum_values` and `validations` typed wrappers if
   needed by callers.
 
+---
+
+## M10 — API Call Audit Logging — completed 2026-06-02
+
+Additive opt-in feature for logging HTTP request/response headers and bodies to console and/or
+an external rotating JSON-lines file.  All audit output is redacted by default; raw output
+requires an explicit opt-in with a loud warning.  Targets a minor bump (v0.4 → v0.5) via the
+`feat:` commit; all prior flows unchanged when audit is disabled (the default).
+
+### Done
+
+- `src/pynteracta/hooks.py` — `RequestInfo.body` and `ResponseInfo.body` fields added (`Any`,
+  default `None`); backward-compatible (existing constructors unchanged).
+- `src/pynteracta/logging.py`:
+  - `redact_body()` upgraded from shallow to **recursive** (walks nested `dict`/`list`,
+    applies `redact_string()` to leaf strings).
+  - `redaction_processor()` extended to handle the new `body` key.
+  - `build_audit_file_handler(path, *, max_bytes, backup_count)` — returns a
+    `RotatingFileHandler` with the full redaction processor chain and `JSONRenderer`.
+    Creates parent directories automatically.
+  - `setup_default_logging()` gains `audit`, `audit_file`, `audit_max_bytes`,
+    `audit_backups`, `audit_bodies`, `audit_raw` params.  The dedicated
+    `pynteracta.audit` logger is wired with `propagate=False` so it does not
+    double-emit on the root `pynteracta` logger.  `audit_raw=True` bypasses
+    redaction on the audit channel only and emits a one-time `WARNING`
+    (`audit.redaction_disabled`) tracked by a module-level `_AUDIT_RAW_WARNED` guard.
+  - `_AUDIT_LOGGER_NAME = "pynteracta.audit"` exported (used by tests).
+- `src/pynteracta/transport.py`:
+  - Constructor gains `audit: bool = False` and `audit_bodies: bool = False`.
+  - `request()` emits `audit.request` / `audit.response` at `DEBUG` on
+    `pynteracta.audit` when `audit=True`.  Headers always included; bodies only
+    when `audit_bodies=True`.  Response body capped at 64 KB with a
+    `...[truncated]` marker via `_capture_response_body()`.
+- `src/pynteracta/config.py` — `Profile` gains `audit_log`, `audit_log_file`,
+  `audit_log_bodies`, `audit_log_raw`, `audit_log_max_bytes`, `audit_log_backups`.
+  `_EnvSettings` mirrors all six fields
+  (`PYNTERACTA_AUDIT_LOG`, `PYNTERACTA_AUDIT_LOG_FILE`, etc.).
+- `src/pynteracta/client.py` — `InteractaClient.__init__` gains `audit` / `audit_bodies`
+  kwargs; reads them from the resolved `Profile`; passes them to all three
+  `HttpTransport` instances (auth, Google-exchange, and API).
+- `src/pynteracta/cli/__init__.py` — six new global flags: `--audit-log`,
+  `--audit-log-file`, `--audit-bodies`, `--audit-raw`, `--audit-max-bytes`,
+  `--audit-backups`; `--audit-log-file` implies `--audit-log` (convenience).
+- `src/pynteracta/cli/_common.py` — `CliState` gains all six audit fields;
+  `_profile_overrides()` refactored with `_set_if_not_none` helper to stay under the
+  PLR0912 branch limit; `build_client()` calls `setup_default_logging()` with fully
+  resolved audit settings after the profile is merged.
+- `tests/unit/test_hooks.py` — added body default/storage tests for both dataclasses.
+- `tests/unit/test_redaction.py` — extended for recursive `redact_body` (nested dicts,
+  lists, JWT leaf strings, deeply nested keys).
+- `tests/unit/test_transport.py` — 9 new audit tests: disabled emits nothing; enabled
+  emits `audit.request`/`audit.response`; headers always present; bodies absent/present
+  by flag; Authorization redacted; sensitive body key redacted.
+- `tests/unit/test_logging.py` (new) — `build_audit_file_handler`: rotating handler,
+  parent-dir creation, JSON-lines output, `maxBytes`/`backupCount` config, file
+  redaction; `setup_default_logging`: audit-off no handlers, audit-on console handler,
+  file handler, file-implies-audit, raw warning, no propagation.
+- `tests/unit/test_config.py` — `TestAuditFields`: defaults, file values, env overrides
+  (`PYNTERACTA_AUDIT_LOG`, `PYNTERACTA_AUDIT_LOG_BODIES`), CLI-override wins.
+- `tests/unit/test_client.py` — audit kwargs propagate to API transport; disabled by
+  default; profile audit fields propagate.
+- `docs/logging.md` (new) — full audit logging reference: what is captured, config-file
+  / env / CLI activation, JSON-lines format example, redaction guarantees, `--audit-raw`
+  warning, library-API usage.
+- `docs/configuration.md` — six new profile fields + six new env-var rows.
+- `docs/cli.md` — six new global flags in the options block.
+- `mkdocs.yml` — `Audit Logging: logging.md` added to nav.
+- `README.md` — one-line feature entry for audit logging.
+
+### Coverage
+
+- Total: **92.21%** (unchanged; new tests keep the gate well above 85%).
+
+### Decisions made beyond the plan
+
+- **Dedicated `pynteracta.audit` logger with `propagate=False`**: prevents double-emission
+  on the root `pynteracta` logger (console would otherwise show every audit event twice).
+- **Response body size cap = 64 KB** (`_AUDIT_BODY_MAX_BYTES = 65_536`): keeps audit logs
+  from exploding on large API responses; truncation marker `...[truncated]` appended.
+- **`audit_raw` guarded by `_AUDIT_RAW_WARNED` module flag**: the loud `WARNING` fires only
+  once per process invocation, not once per `setup_default_logging()` call.
+- **`--audit-log-file` implies `--audit-log`**: convenience that avoids a confusing
+  "file path set but nothing written" state.
+- **`_set_if_not_none` helper in `_common.py`**: refactored `_profile_overrides()` to keep
+  branch count ≤ 12 (PLR0912) while adding 6 new conditional assignments.
+- **All three transports audited**: unauthenticated auth, Google-exchange, and API transports
+  all receive the same `audit`/`audit_bodies` flags — token exchange calls are high-value
+  for debugging.
+
+### Follow-ups
+
+- Async transport parity (when the async transport is added in a future version).
+- Optional per-endpoint or per-method audit filtering (e.g. skip `GET` bodies).
+- Structured per-field redaction config (allow callers to declare additional sensitive keys).
+- `syslog` / external-sink handler support.
+- Add `filelock` if multi-process audit-file contention is observed in integration testing
+  (mirrors the Q8 token-cache note from M4).
+
