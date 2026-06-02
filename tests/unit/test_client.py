@@ -53,7 +53,37 @@ class TestInteractaClient:
         with InteractaClient("https://api.example.com", credentials=key) as client:
             assert client._token_manager is not None
             client.users.me()
-            assert route.calls[0].request.headers.get("authorization") is not None
+            auth = route.calls[0].request.headers.get("authorization")
+            # Regression: the API silently returns 200 with an empty body for a raw
+            # (non-"Bearer") token, so the default scheme must prefix "Bearer ".
+            assert auth is not None
+            assert auth.startswith("Bearer ")
+
+    @respx.mock
+    def test_default_auth_scheme_is_bearer(self) -> None:
+        """Regression for the missing-Bearer auth bug: omitting auth_scheme must send Bearer."""
+        token_payload = {"accessToken": _access_token()}
+        user_payload = load_payload("current_user_data_response.json")
+        mock_json("POST", "core/auth/create-access-token-by-service-account", token_payload)
+        route = mock_json("GET", "core/auth/current-user-data", user_payload)
+        key = load_service_account_key(_SA_KEY)
+        with InteractaClient("https://api.example.com", credentials=key) as client:
+            client.users.me()
+        assert route.calls[0].request.headers["authorization"].startswith("Bearer ")
+
+    @respx.mock
+    def test_explicit_none_auth_scheme_sends_raw_token(self) -> None:
+        """Passing auth_scheme=None explicitly still disables the prefix (raw token)."""
+        token_payload = {"accessToken": _access_token()}
+        user_payload = load_payload("current_user_data_response.json")
+        mock_json("POST", "core/auth/create-access-token-by-service-account", token_payload)
+        route = mock_json("GET", "core/auth/current-user-data", user_payload)
+        key = load_service_account_key(_SA_KEY)
+        with InteractaClient(
+            "https://api.example.com", credentials=key, auth_scheme=None
+        ) as client:
+            client.users.me()
+        assert not route.calls[0].request.headers["authorization"].startswith("Bearer ")
 
     def test_context_manager_closes(self) -> None:
         client = InteractaClient("https://api.example.com")
