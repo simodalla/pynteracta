@@ -10,13 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-import platformdirs
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from pynteracta.client import InteractaClient
-from pynteracta.config import load_config, resolve_profile
+from pynteracta.config import _xdg_config_dir, load_config, resolve_profile
 from pynteracta.exceptions import (
     AuthenticationError,
     InteractaError,
@@ -155,7 +154,7 @@ def config_path_from_state(state: CliState) -> Path:
     env_file = os.environ.get("PYNTERACTA_CONFIG_FILE")
     if env_file:
         return Path(env_file)
-    return Path(platformdirs.user_config_dir("pynteracta")) / "config.toml"
+    return _xdg_config_dir() / "config.toml"
 
 
 def make_console(state: CliState) -> Console:

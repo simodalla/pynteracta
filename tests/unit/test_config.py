@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
+import sys
 from pathlib import Path
 
+import platformdirs
 import pytest
 
-from pynteracta.config import Config, load_config, resolve_profile
+from pynteracta.config import Config, _xdg_config_dir, load_config, resolve_profile
 
 _MINIMAL_TOML = """\
 [profiles.dev]
@@ -178,3 +180,30 @@ audit_log_backups = 3
         )
         assert profile.audit_log is True
         assert profile.audit_log_bodies is True
+
+
+class TestXdgConfigDir:
+    def test_default_returns_dot_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        result = _xdg_config_dir()
+        assert result == Path.home() / ".config" / "pynteracta"
+
+    def test_xdg_config_home_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.setattr(sys, "platform", "linux")
+        result = _xdg_config_dir()
+        assert result == tmp_path / "pynteracta"
+
+    def test_macos_uses_dot_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(sys, "platform", "darwin")
+        result = _xdg_config_dir()
+        assert result == Path.home() / ".config" / "pynteracta"
+
+    def test_windows_uses_platformdirs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "win32")
+        result = _xdg_config_dir()
+        assert result == Path(platformdirs.user_config_dir("pynteracta"))
