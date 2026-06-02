@@ -57,7 +57,10 @@ def test_service_account_authentication(api_base: str, sa_key) -> None:
 def test_google_oauth2_authentication(api_base: str) -> None:
     """Manual integration check: exchange a real Google access token for an Interacta token."""
     google_token = _require_env("PYNTERACTA_GOOGLE_OAUTH2_TOKEN")
-    transport = HttpTransport(base_url=api_base)
+    base_url = _require_env("PYNTERACTA_BASE_URL")
+    base_path = os.environ.get("PYNTERACTA_BASE_PATH", "/portal")
+    google_auth_base = f"{base_url.rstrip('/')}/{base_path.strip('/')}/api"
+    transport = HttpTransport(base_url=google_auth_base)
     cache = MemoryTokenCache()
     manager = GoogleOAuth2TokenManager(
         GoogleOAuth2Credentials(token=google_token),
