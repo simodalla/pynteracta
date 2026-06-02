@@ -524,3 +524,60 @@ requires an explicit opt-in with a loud warning.  Targets a minor bump (v0.4 →
 - Add `filelock` if multi-process audit-file contention is observed in integration testing
   (mirrors the Q8 token-cache note from M4).
 
+---
+
+## Bugfix — Authorization scheme regression (CLI sent raw token) — completed 2026-06-02
+
+Branch `bugfix_bearer_auth_scheme`, merged to `main` (`--no-ff`). Fixes a silent
+authentication failure where every CLI/library API call was sent **unauthenticated**
+despite a successful token exchange.
+
+### Root cause
+
+The Post-M7 auth correction (Q4) set `auth_scheme="Bearer"` as the default on
+`HttpTransport`, but `InteractaClient.__init__` declared its *own* `auth_scheme: str | None
+= None` and passed it straight through to the API transport
+(`HttpTransport(..., auth_scheme=auth_scheme)`). In the transport, `auth_scheme=None` means
+*"send the raw token with no prefix"* (`f"{scheme} {token}" if scheme else token`). Because
+the CLI never sets `auth_scheme`, the client's `None` default silently **overrode** the
+transport's `"Bearer"` default for the shared `api_transport`. So requests went out as
+`Authorization: <token>` instead of `Authorization: Bearer <token>`.
+
+### Why it was silent (hard to spot)
+
+The Interacta API does **not** return 401 for a raw (non-`Bearer`) token: it returns **200
+with an empty, unauthenticated body** (e.g. `current-user-data` → `userData: null`,
+`occToken: 0`). Auth therefore *appeared* to succeed — `auth login`/`whoami` printed
+`Authenticated as: (unknown)` — while every resource call behaved as anonymous. The defect
+affected **all** resources (`users`, `posts`, `communities`, `catalogs`) since they share the
+single `api_transport`, and both auth methods (service-account and Google OAuth2), as the
+token-exchange path was unaffected.
+
+### Changes made
+
+- `src/pynteracta/client.py` — `InteractaClient.__init__` default `auth_scheme: str | None =
+  None` → `"Bearer"`; added an explanatory comment at the API-transport construction site
+  warning that a raw token yields a silent 200, not a 401. Passing `auth_scheme=None`
+  explicitly still sends the raw token (escape hatch preserved).
+- `tests/unit/test_client.py`:
+  - Strengthened `test_with_credentials_wires_token` — it previously only asserted the
+    `authorization` header was *present* (which masked the bug); now asserts it starts with
+    `"Bearer "`.
+  - Added `test_default_auth_scheme_is_bearer` (omitting `auth_scheme` → `Bearer`) and
+    `test_explicit_none_auth_scheme_sends_raw_token` (explicit `None` → raw token).
+
+### Verification
+
+- Full unit suite green (335 passed, 8 skipped); coverage **92.23%** (≥ 85% gate).
+- End-to-end against the production tenant (`interacta.unionerenolavinosamoggia.bo.it`) via
+  Google OAuth2: identity resolved correctly (`whoami` → user 3872 *Simone Dalla*), and
+  `communities post-definition 67` returned the same 21 field definitions (matching ids) as a
+  direct `curl` with `Authorization: Bearer …`.
+
+### Note
+
+The existing wiring tests (`test_with_credentials_wires_token`,
+`test_with_google_token_wires_manager`) used `respx` mocks that accept any `Authorization`
+value, so they passed even with the raw token — the assertion was too weak to catch the
+regression. The strengthened/added tests now pin the `Bearer ` prefix.
+
