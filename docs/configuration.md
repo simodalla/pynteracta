@@ -11,8 +11,9 @@
 
 Location: `platformdirs.user_config_dir("pynteracta") / "config.toml"`.
 
-- Linux/macOS: `~/.config/pynteracta/config.toml`.
-- Override with `PYNTERACTA_CONFIG_FILE` or `--config-file`.
+- Linux/macOS: `~/.config/pynteracta/config.toml` (XDG; override with `XDG_CONFIG_HOME`).
+- Windows: `%LOCALAPPDATA%\pynteracta\config.toml`.
+- Override the path with `PYNTERACTA_CONFIG_FILE` or `--config-file`.
 
 ```toml
 current_profile = "default"

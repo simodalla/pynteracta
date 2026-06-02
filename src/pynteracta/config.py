@@ -8,6 +8,7 @@ CLI-flag overrides are applied in M6 via the ``overrides`` dict of
 from __future__ import annotations
 
 import os
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any, Literal
@@ -84,8 +85,17 @@ class _EnvSettings(BaseSettings):
         return data
 
 
+def _xdg_config_dir() -> Path:
+    """Return the pynteracta config directory using XDG conventions on Linux/macOS."""
+    if sys.platform == "win32":
+        return Path(platformdirs.user_config_dir("pynteracta"))
+    xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    base = Path(xdg) if xdg else Path("~/.config").expanduser()
+    return base / "pynteracta"
+
+
 def _default_config_path() -> Path:
-    return Path(platformdirs.user_config_dir("pynteracta")) / "config.toml"
+    return _xdg_config_dir() / "config.toml"
 
 
 def load_config(config_file: Path | None = None) -> Config:
