@@ -28,3 +28,4 @@ Interacta REST API (`external_v2`).
 - [Quickstart](quickstart.md) — up and running in 5 minutes.
 - [CLI Reference](cli.md) — all commands and flags.
 - [API Reference](api/client.md) — auto-rendered module docs.
+- [Testing](testing.md) — unit, contract, and integration test guide.

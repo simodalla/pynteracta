@@ -36,3 +36,6 @@ tests/integration/.secrets/
 # OS / editor cruft
 .DS_Store
 site/
+
+# secrets
+*.env
