@@ -58,7 +58,7 @@ class InteractaClient:
         profile: Profile | None = None,
         hooks: ClientHooks | None = None,
         timeout: float | None = None,
-        auth_scheme: str | None = None,
+        auth_scheme: str | None = "Bearer",
         config_file: Path | None = None,
         profile_name: str | None = None,
         audit: bool = False,
@@ -127,6 +127,9 @@ class InteractaClient:
                 token_invalidator=token_manager.invalidate,
                 hooks=hooks,
                 timeout=timeout_seconds,
+                # Default "Bearer": the API rejects a raw token by silently returning
+                # 200 with an empty (unauthenticated) body instead of 401. Pass
+                # auth_scheme=None explicitly only when the raw token is intended.
                 auth_scheme=auth_scheme,
                 audit=audit,
                 audit_bodies=audit_bodies,
