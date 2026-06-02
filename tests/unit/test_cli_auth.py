@@ -10,13 +10,14 @@ import httpx
 import jwt
 import pytest
 import respx
-from api_helpers import load_payload, mock_json
+from api_helpers import BASE_URL, load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.auth import CachedToken, MemoryTokenCache
 from pynteracta.cli import app
 from pynteracta.cli._common import (
     EXIT_AUTH,
+    EXIT_CONFIG,
     EXIT_NOT_FOUND,
     EXIT_PERMISSION,
     EXIT_SERVER,
@@ -32,6 +33,11 @@ def runner() -> CliRunner:
 BASE_ENV = {
     "PYNTERACTA_BASE_URL": "https://api.example.com",
 }
+# Google exchange is at /portal/api/core/... (no /external/v2/ prefix).
+_GOOGLE_BASE = BASE_URL.rsplit("/external/", 1)[0]
+_GOOGLE_EXCHANGE_URL = (
+    f"{_GOOGLE_BASE}/core/auth/create-access-token-by-google-oauth2-access-token-credentials"
+)
 
 _SA_KEY_PATH = Path(__file__).parent.parent / "fixtures" / "sa_key.json"
 
@@ -121,6 +127,95 @@ class TestAuthLogin:
         assert result.exit_code == 0, result.output
         updated = config_file.read_text(encoding="utf-8")
         assert "# my config comment" in updated, "tomlkit should preserve comments"
+
+
+class TestAuthLoginGoogle:
+    @respx.mock
+    def test_login_google_persists_method_not_token(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        token_payload = {"accessToken": _fake_token()}
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(return_value=httpx.Response(200, json=token_payload))
+        payload = load_payload("current_user_data_response.json")
+        mock_json("GET", "core/auth/current-user-data", payload)
+
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--google",
+                "--profile",
+                "gprofile",
+            ],
+            env={
+                "PYNTERACTA_BASE_URL": "https://api.example.com",
+                "PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "super-secret-google-token",
+            },
+        )
+        assert result.exit_code == 0, result.output
+        content = config_file.read_text(encoding="utf-8")
+        assert 'auth_method = "google_oauth2"' in content
+        assert "super-secret-google-token" not in content, "token must never be persisted"
+
+    @respx.mock
+    def test_login_google_token_flag(self, runner: CliRunner, tmp_path: Path) -> None:
+        token_payload = {"accessToken": _fake_token()}
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json=token_payload)
+        )
+        payload = load_payload("current_user_data_response.json")
+        mock_json("GET", "core/auth/current-user-data", payload)
+
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--google-token",
+                "flag-google-token",
+            ],
+            env={"PYNTERACTA_BASE_URL": "https://api.example.com"},
+        )
+        assert result.exit_code == 0, result.output
+        assert b"flag-google-token" in exchange.calls[0].request.content
+
+    def test_login_mutually_exclusive(self, runner: CliRunner, tmp_path: Path) -> None:
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--google",
+                "--service-account-key",
+                str(_SA_KEY_PATH),
+            ],
+            env={
+                "PYNTERACTA_BASE_URL": "https://api.example.com",
+                "PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok",
+            },
+        )
+        assert result.exit_code == EXIT_CONFIG
+        assert "mutually exclusive" in result.output
+
+    def test_login_google_missing_token(self, runner: CliRunner, tmp_path: Path) -> None:
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            ["--config-file", str(config_file), "auth", "login", "--google"],
+            env={"PYNTERACTA_BASE_URL": "https://api.example.com"},
+        )
+        assert result.exit_code == EXIT_CONFIG
+        assert "Google access token" in result.output
 
 
 class TestAuthLogout:

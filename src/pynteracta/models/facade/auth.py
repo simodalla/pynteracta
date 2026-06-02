@@ -2,8 +2,9 @@
 """Facade models for the authentication endpoints.
 
 Endpoints covered:
-  POST /core/auth/create-access-token-by-service-account  (endpoints 1)
-  GET  /core/auth/current-user-data                       (endpoint 2)
+  POST /core/auth/create-access-token-by-service-account                      (endpoint 1)
+  GET  /core/auth/current-user-data                                           (endpoint 2)
+  POST /core/auth/create-access-token-by-google-oauth2-access-token-credentials  (endpoint 3)
 """
 
 from __future__ import annotations
@@ -47,6 +48,44 @@ class ServiceAccountTokenResponse:
         """
         raw = generated.CreateAccessTokenByServiceAccountResponseDTO.model_validate(data)
         return cls(raw)
+
+
+class GoogleOAuth2AccessTokenResponse:
+    """Facade over the Google-OAuth2 token-exchange response.
+
+    The exchange endpoint
+    ``POST /core/auth/create-access-token-by-google-oauth2-access-token-credentials`` is not
+    present in the pinned ``swagger.json``, so there is no generated DTO for it.  The response
+    envelope mirrors the service-account flow.  The vendor prose names the field
+    ``access_token`` while the service-account envelope uses ``accessToken``; this facade
+    tolerates both (verified at integration).
+
+    Attributes:
+        raw: The parsed response dict; access additional fields via this escape hatch.
+    """
+
+    def __init__(self, raw: dict) -> None:  # type: ignore[type-arg]
+        self.raw = raw
+
+    @property
+    def access_token(self) -> str | None:
+        """Interacta access token (JWT), or ``None`` if absent."""
+        token = self.raw.get("accessToken")
+        if token is None:
+            token = self.raw.get("access_token")
+        return str(token) if token is not None else None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> GoogleOAuth2AccessTokenResponse:  # type: ignore[type-arg]
+        """Parse from a raw API response dict.
+
+        Args:
+            data: Parsed JSON response body.
+
+        Returns:
+            A new :class:`GoogleOAuth2AccessTokenResponse`.
+        """
+        return cls(dict(data))
 
 
 class CurrentUserResponse:

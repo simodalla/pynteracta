@@ -4,6 +4,7 @@
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
     CurrentUserResponse,
+    GoogleOAuth2AccessTokenResponse,
     ServiceAccountTokenResponse,
 )
 from pynteracta.models.facade.posts import (
@@ -23,6 +24,7 @@ from pynteracta.models.facade.users import (
 __all__ = [
     "CreateAccessTokenByServiceAccountRequestDTO",
     "CurrentUserResponse",
+    "GoogleOAuth2AccessTokenResponse",
     "ListCommunityPostsFilteredRequestDTO",
     "ListPostCommentsRequestDTO",
     "ListSystemUsersRequestDTO",

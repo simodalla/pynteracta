@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
+    GoogleOAuth2AccessTokenResponse,
     ServiceAccountTokenResponse,
 )
 from pynteracta.transport import HttpTransport
@@ -31,6 +32,7 @@ from pynteracta.transport import HttpTransport
 _log = structlog.get_logger("pynteracta.auth")
 
 _AUTH_PATH = "core/auth/create-access-token-by-service-account"
+_GOOGLE_AUTH_PATH = "core/auth/create-access-token-by-google-oauth2-access-token-credentials"
 _FILE_MODE = 0o600
 _DIR_MODE = 0o700
 _WINDOWS_WARNED = False
@@ -140,6 +142,37 @@ class ServiceAccountKey:
     private_key_pem: str
 
 
+@dataclass(frozen=True)
+class GoogleOAuth2Credentials:
+    """Credentials for the Google-OAuth2 authentication method.
+
+    Supply **exactly one** of:
+
+    - ``token``: a static Google OAuth2 access token (min scope ``profile``), or
+    - ``token_provider``: a callable returning a fresh Google access token on demand.
+
+    The library never runs a Google browser/PKCE flow; obtaining the Google access token is
+    the caller's responsibility (see ``docs/authentication.md``).  The Google identity must
+    already be linked to an Interacta user.
+    """
+
+    token: str | None = None
+    token_provider: Callable[[], str] | None = None
+
+    def __post_init__(self) -> None:
+        if (self.token is None) == (self.token_provider is None):
+            raise AuthenticationError(
+                "GoogleOAuth2Credentials requires exactly one of 'token' or 'token_provider'"
+            )
+
+    def get_google_token(self) -> str:
+        """Return the current Google access token (static value or provider result)."""
+        if self.token_provider is not None:
+            return self.token_provider()
+        assert self.token is not None  # guaranteed by __post_init__
+        return self.token
+
+
 @dataclass
 class CachedToken:
     """A cached access token with its validity window."""
@@ -231,6 +264,15 @@ class FileTokenCache:
         path = self._path_for(profile)
         if path.exists():
             path.unlink()
+
+
+@runtime_checkable
+class TokenProvider(Protocol):
+    """Common surface for token managers consumed by :class:`HttpTransport`."""
+
+    def get_token(self) -> str: ...
+
+    def invalidate(self) -> None: ...
 
 
 class TokenManager:
@@ -326,6 +368,80 @@ class TokenManager:
         access_token = parsed.access_token
         if not access_token:
             raise AuthenticationError("Auth response missing accessToken")
+        obtained_at = self._clock()
+        expires_at = _decode_token_expiry(access_token)
+        return CachedToken(
+            access_token=access_token,
+            expires_at=expires_at,
+            obtained_at=obtained_at,
+        )
+
+
+class GoogleOAuth2TokenManager:
+    """Obtains an Interacta access token by exchanging a Google OAuth2 access token.
+
+    Mirrors :class:`TokenManager`'s public surface (:meth:`get_token` / :meth:`invalidate`)
+    so it is interchangeable as a :class:`HttpTransport` token provider/invalidator.  The
+    Interacta access token is cached and refreshed exactly like the service-account flow; the
+    cache key is the profile name (the Google flow has no ``client_id``).
+    """
+
+    _SKEW_SECONDS: int = TokenManager._SKEW_SECONDS
+
+    def __init__(
+        self,
+        credentials: GoogleOAuth2Credentials,
+        cache: TokenCache,
+        transport: HttpTransport,
+        *,
+        cache_key: str,
+        clock: Callable[[], datetime] = _utcnow,
+    ) -> None:
+        self._credentials = credentials
+        self._cache = cache
+        self._transport = transport
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._profile = cache_key
+
+    def get_token(self) -> str:
+        """Return a valid Interacta access token, refreshing if near expiry."""
+        with self._lock:
+            cached = self._cache.load(self._profile)
+            if cached is not None and not self._needs_refresh(cached):
+                _log.debug("auth.token_cache_loaded", profile=self._profile)
+                return cached.access_token
+
+            refreshed = cached is not None
+            token = self._fetch_token()
+            self._cache.save(self._profile, token)
+            if refreshed:
+                _log.info("auth.token_refreshed", expires_at=_iso(token.expires_at))
+            else:
+                _log.info("auth.token_obtained", expires_at=_iso(token.expires_at))
+            return token.access_token
+
+    def invalidate(self) -> None:
+        """Discard any cached token for the current profile."""
+        with self._lock:
+            self._cache.clear(self._profile)
+
+    def _needs_refresh(self, token: CachedToken) -> bool:
+        now = self._clock()
+        delta = (token.expires_at - now).total_seconds()
+        return delta < self._SKEW_SECONDS
+
+    def _fetch_token(self) -> CachedToken:
+        google_token = self._credentials.get_google_token()
+        response = self._transport.request(
+            "POST",
+            _GOOGLE_AUTH_PATH,
+            json={"googleOAuth2Token": google_token},
+        )
+        parsed = GoogleOAuth2AccessTokenResponse.from_dict(response.json())
+        access_token = parsed.access_token
+        if not access_token:
+            raise AuthenticationError("Google OAuth2 auth response missing accessToken")
         obtained_at = self._clock()
         expires_at = _decode_token_expiry(access_token)
         return CachedToken(

@@ -9,6 +9,7 @@ as the documented escape hatch.
 from pynteracta.models.facade import (
     CreateAccessTokenByServiceAccountRequestDTO,
     CurrentUserResponse,
+    GoogleOAuth2AccessTokenResponse,
     ListCommunityPostsFilteredRequestDTO,
     ListPostCommentsRequestDTO,
     ListSystemUsersRequestDTO,
@@ -24,6 +25,7 @@ from pynteracta.models.facade import (
 __all__ = [
     "CreateAccessTokenByServiceAccountRequestDTO",
     "CurrentUserResponse",
+    "GoogleOAuth2AccessTokenResponse",
     "ListCommunityPostsFilteredRequestDTO",
     "ListPostCommentsRequestDTO",
     "ListSystemUsersRequestDTO",

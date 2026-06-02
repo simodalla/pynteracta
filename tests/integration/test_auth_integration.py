@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from pynteracta.auth import MemoryTokenCache, TokenManager, load_service_account_key
+from pynteracta.auth import (
+    GoogleOAuth2Credentials,
+    GoogleOAuth2TokenManager,
+    MemoryTokenCache,
+    TokenManager,
+    load_service_account_key,
+)
 from pynteracta.transport import HttpTransport
 from pynteracta.urls import build_api_base
 
@@ -43,6 +49,22 @@ def test_service_account_authentication(api_base: str, sa_key) -> None:
     transport = HttpTransport(base_url=api_base)
     cache = MemoryTokenCache()
     manager = TokenManager(key=sa_key, cache=cache, transport=transport)
+    token = manager.get_token()
+    assert token
+    assert len(token.split(".")) == 3  # noqa: PLR2004 — JWT has three segments
+
+
+def test_google_oauth2_authentication(api_base: str) -> None:
+    """Manual integration check: exchange a real Google access token for an Interacta token."""
+    google_token = _require_env("PYNTERACTA_GOOGLE_OAUTH2_TOKEN")
+    transport = HttpTransport(base_url=api_base)
+    cache = MemoryTokenCache()
+    manager = GoogleOAuth2TokenManager(
+        GoogleOAuth2Credentials(token=google_token),
+        cache,
+        transport,
+        cache_key="integration",
+    )
     token = manager.get_token()
     assert token
     assert len(token.split(".")) == 3  # noqa: PLR2004 — JWT has three segments
