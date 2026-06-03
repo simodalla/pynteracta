@@ -29,6 +29,27 @@ Options:
 
 See [Audit Logging](logging.md) for full details on redaction guarantees, file format, and security considerations.
 
+### Output format
+
+`--output` (short: `-o`) controls the rendering format. It can be placed either **before** the
+command path (global position) or **after** a data-emitting command (per-command position).
+When both are supplied the command-level value wins.
+
+```bash
+# Global position (before the command path)
+pynteracta --output json communities list
+
+# Per-command position (after the command name)
+pynteracta communities details 79 --output json
+
+# Short flag works too
+pynteracta communities details 79 -o yaml
+```
+
+Data-emitting commands (`auth whoami`, all `users`, `posts`, `communities`, and `catalogs`
+sub-commands) accept `--output` / `-o` directly. Configuration meta-commands (`config set`,
+`config get`, etc.) do not; use the global form if you need to control their output format.
+
 ## auth
 
 ### `auth login`

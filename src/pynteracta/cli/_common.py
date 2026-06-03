@@ -8,7 +8,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
@@ -39,6 +39,24 @@ EXIT_VALIDATION = 6
 EXIT_TRANSPORT = 7
 EXIT_SERVER = 8
 EXIT_INTERNAL = 10
+
+OutputOption = Annotated[
+    str | None,
+    typer.Option("--output", "-o", help="Output format: table, json, or yaml."),
+]
+
+
+def resolve_output(state: CliState, output: str | None) -> OutputFormat:
+    """Apply command-level > global precedence, then validate."""
+    fmt = output if output is not None else state.output
+    if fmt not in ("table", "json", "yaml"):
+        typer.echo(
+            f"Invalid --output value '{fmt}'. Must be 'table', 'json', or 'yaml'.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_CONFIG)
+    return fmt  # type: ignore[return-value]
+
 
 _EXIT_MAP: dict[type[InteractaError], int] = {
     AuthenticationError: EXIT_AUTH,

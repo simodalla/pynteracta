@@ -10,10 +10,12 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    OutputOption,
     build_client,
     handle_error,
     make_console,
     print_output,
+    resolve_output,
 )
 from pynteracta.exceptions import InteractaError
 
@@ -43,6 +45,7 @@ def posts_get(
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """Fetch a single post by ID."""
     state: CliState = ctx.obj
@@ -62,7 +65,7 @@ def posts_get(
             }
             if show_web_url:
                 data["web_url"] = client.web_urls.post(post_id)
-        print_output(data, state.output, console=console, title=f"Post {post_id}")
+        print_output(data, resolve_output(state, output), console=console, title=f"Post {post_id}")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -88,6 +91,7 @@ def posts_list(  # noqa: PLR0913
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """List posts in a community."""
     state: CliState = ctx.obj
@@ -113,7 +117,8 @@ def posts_list(  # noqa: PLR0913
                     pid = getattr(item, "id", None)
                     wu = client.web_urls.post(int(pid)) if show_web_url and pid else None
                     rows.append(_post_element_to_row(item, web_url=wu))
-        print_output(rows, state.output, console=console, title=f"Posts (community {community})")
+        fmt = resolve_output(state, output)
+        print_output(rows, fmt, console=console, title=f"Posts (community {community})")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -131,6 +136,7 @@ def posts_comments(
         bool,
         typer.Option("--all", help="Iterate through all pages."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """List comments on a post."""
     state: CliState = ctx.obj
@@ -155,7 +161,8 @@ def posts_comments(
                         "creation_ts": getattr(item, "creationTimestamp", None),
                     }
                     rows.append(row)
-        print_output(rows, state.output, console=console, title=f"Comments (post {post_id})")
+        fmt = resolve_output(state, output)
+        print_output(rows, fmt, console=console, title=f"Comments (post {post_id})")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

@@ -10,10 +10,12 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    OutputOption,
     build_client,
     handle_error,
     make_console,
     print_output,
+    resolve_output,
 )
 from pynteracta.exceptions import InteractaError
 
@@ -31,6 +33,7 @@ def catalogs_list(
         bool,
         typer.Option("--load-entries", help="Include entries in the response."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """List post-definition catalogs (POST /communication/settings/post-definition/catalogs)."""
     state: CliState = ctx.obj
@@ -41,7 +44,7 @@ def catalogs_list(
             rows: list[dict[str, object]] = [
                 {"id": c.id, "name": c.name, "paged": c.paged} for c in result.items_typed
             ]
-        print_output(rows, state.output, console=console, title="Catalogs")
+        print_output(rows, resolve_output(state, output), console=console, title="Catalogs")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -71,6 +74,7 @@ def catalogs_entries(  # noqa: PLR0913
         bool | None,
         typer.Option("--order-desc/--order-asc", help="Sort descending (default) or ascending."),
     ] = None,
+    output: OutputOption = None,
 ) -> None:
     """List entries for a catalog."""
     state: CliState = ctx.obj
@@ -108,7 +112,8 @@ def catalogs_entries(  # noqa: PLR0913
                             "external_id": entry.external_id,
                         }
                     )
-        print_output(rows, state.output, console=console, title=f"Catalog {catalog_id} Entries")
+        fmt = resolve_output(state, output)
+        print_output(rows, fmt, console=console, title=f"Catalog {catalog_id} Entries")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

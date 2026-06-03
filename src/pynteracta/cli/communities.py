@@ -10,10 +10,12 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    OutputOption,
     build_client,
     handle_error,
     make_console,
     print_output,
+    resolve_output,
 )
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.communities import FieldType
@@ -22,7 +24,7 @@ app = typer.Typer(help="Community settings commands.", no_args_is_help=True)
 
 
 @app.command("list")
-def communities_list(ctx: typer.Context) -> None:
+def communities_list(ctx: typer.Context, output: OutputOption = None) -> None:
     """List communities the caller can post in (GET /communication/settings/communities)."""
     state: CliState = ctx.obj
     console = make_console(state)
@@ -32,7 +34,7 @@ def communities_list(ctx: typer.Context) -> None:
             rows: list[dict[str, object]] = [
                 {"id": c.id, "name": c.name} for c in result.items_typed
             ]
-        print_output(rows, state.output, console=console, title="Communities")
+        print_output(rows, resolve_output(state, output), console=console, title="Communities")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -46,6 +48,7 @@ def communities_details(
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """Show details for a single community."""
     state: CliState = ctx.obj
@@ -61,7 +64,8 @@ def communities_details(
             }
             if show_web_url:
                 data["web_url"] = client.web_urls.community(community_id)
-        print_output(data, state.output, console=console, title=f"Community {community_id}")
+        fmt = resolve_output(state, output)
+        print_output(data, fmt, console=console, title=f"Community {community_id}")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -74,6 +78,7 @@ def communities_details_bulk(
         list[int],
         typer.Option("--id", help="Community ID (repeat for multiple)."),
     ],
+    output: OutputOption = None,
 ) -> None:
     """Show details for multiple communities (POST /communication/settings/communities/details)."""
     state: CliState = ctx.obj
@@ -84,7 +89,7 @@ def communities_details_bulk(
             rows: list[dict[str, object]] = [
                 {"id": c.id, "name": c.name} for c in result.items_typed
             ]
-        print_output(rows, state.output, console=console, title="Communities")
+        print_output(rows, resolve_output(state, output), console=console, title="Communities")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -94,6 +99,7 @@ def communities_details_bulk(
 def communities_post_definition(
     ctx: typer.Context,
     community_id: Annotated[int, typer.Argument(help="Community ID.")],
+    output: OutputOption = None,
 ) -> None:
     """Show the post structure (field definitions) for a community."""
     state: CliState = ctx.obj
@@ -115,7 +121,7 @@ def communities_post_definition(
                 )
         print_output(
             rows,
-            state.output,
+            resolve_output(state, output),
             console=console,
             title=f"Post Definition — Community {community_id}",
         )
@@ -131,6 +137,7 @@ def communities_post_definitions(
         list[int],
         typer.Option("--id", help="Community ID (repeat for multiple)."),
     ],
+    output: OutputOption = None,
 ) -> None:
     """Show post definitions for multiple communities."""
     state: CliState = ctx.obj
@@ -151,7 +158,7 @@ def communities_post_definitions(
                             "required": f.required,
                         }
                     )
-        print_output(rows, state.output, console=console, title="Post Definitions")
+        print_output(rows, resolve_output(state, output), console=console, title="Post Definitions")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

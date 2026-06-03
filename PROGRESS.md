@@ -581,3 +581,48 @@ The existing wiring tests (`test_with_credentials_wires_token`,
 value, so they passed even with the raw token — the assertion was too weak to catch the
 regression. The strengthened/added tests now pin the `Bearer ` prefix.
 
+## Bugfix — Hybrid `--output` placement — completed 2026-06-03
+
+### Problem
+
+`--output` was declared only on the root Typer callback (`cli/__init__.py`). Because Click
+consumes group-level options before the subcommand, placing `--output` after the command path
+(e.g. `pynteracta communities details 79 --output json`) silently fell through to Typer's
+unknown-option handling and was ignored or errored. The documentation already showed per-command
+placement, but it only worked by accident for the global position.
+
+### Decision
+
+Adopted **hybrid placement**: kept `--output` on the global callback unchanged (backward
+compatible) and added it as an explicit per-command option to every data-emitting command.
+Command-level value wins when both are supplied:
+`fmt = output if output is not None else state.output`.
+
+### Changes made
+
+- `src/pynteracta/cli/_common.py`:
+  - Added `OutputOption = Annotated[str | None, typer.Option("--output", "-o", ...)]` as a
+    reusable type alias (`None` sentinel = "not passed").
+  - Added `resolve_output(state, output) -> OutputFormat` — applies precedence rule and
+    validates the value, raising `typer.Exit(EXIT_CONFIG)` on invalid input.
+- `src/pynteracta/cli/auth.py` — `whoami` gains `output: OutputOption = None`.
+- `src/pynteracta/cli/users.py` — `list`, `me`, `profile`, `get-for-edit` gain
+  `output: OutputOption = None`.
+- `src/pynteracta/cli/posts.py` — `get`, `list`, `comments` gain `output: OutputOption = None`.
+- `src/pynteracta/cli/communities.py` — `list`, `details`, `details-bulk`,
+  `post-definition`, `post-definitions` gain `output: OutputOption = None`.
+- `src/pynteracta/cli/catalogs.py` — `list`, `entries` gain `output: OutputOption = None`.
+- `docs/cli.md` — new "Output format" subsection under Global options documents both
+  placement forms and the precedence rule.
+- `tests/unit/test_cli_output_placement.py` — 7 new tests: per-command position, short `-o`
+  flag, command-level wins precedence, global fallback, invalid value exits `EXIT_CONFIG (2)`,
+  excluded `config` command has no per-command `--output`.
+
+Commands excluded (no per-command flag): `auth login`, `auth logout`, all `config` commands.
+
+### Verification
+
+- Full unit suite green (346 passed, 8 skipped); coverage **92.29%** (≥ 85% gate).
+- `uv run mypy src` — no issues in 35 source files.
+- Both invocation orders produce identical output for the same format; command-level wins when
+  both are supplied.

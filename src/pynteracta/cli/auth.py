@@ -15,12 +15,14 @@ from pynteracta.auth import FileTokenCache, MemoryTokenCache, load_service_accou
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    OutputOption,
     _profile_overrides,
     build_client,
     config_path_from_state,
     handle_error,
     make_console,
     print_output,
+    resolve_output,
 )
 from pynteracta.client import InteractaClient, _default_token_cache_dir
 from pynteracta.config import Profile, load_config, resolve_profile
@@ -208,7 +210,7 @@ def _login_google(
 
 
 @app.command("whoami")
-def whoami(ctx: typer.Context) -> None:
+def whoami(ctx: typer.Context, output: OutputOption = None) -> None:
     """Show identity of the authenticated principal."""
     state: CliState = ctx.obj
     console = make_console(state)
@@ -223,7 +225,7 @@ def whoami(ctx: typer.Context) -> None:
                     "has_google_credentials": me.has_google_credentials,
                     "has_microsoft_credentials": me.has_microsoft_credentials,
                 }
-            print_output(data, state.output, console=console, title="Current User")
+            print_output(data, resolve_output(state, output), console=console, title="Current User")
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 
