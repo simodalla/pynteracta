@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import platformdirs
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +39,15 @@ class Profile(BaseModel):
     audit_log_raw: bool = False
     audit_log_max_bytes: int = 10_000_000
     audit_log_backups: int = 5
+
+    @field_validator(
+        "service_account_key", "token_cache_dir", "audit_log_file", mode="before"
+    )
+    @classmethod
+    def expand_user_paths(cls, v: Path | None) -> Path | None:
+        if v is None:
+            return None
+        return Path(v).expanduser()
 
 
 class Config(BaseModel):

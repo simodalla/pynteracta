@@ -5,7 +5,7 @@ from pathlib import Path
 import platformdirs
 import pytest
 
-from pynteracta.config import Config, _xdg_config_dir, load_config, resolve_profile
+from pynteracta.config import Config, Profile, _xdg_config_dir, load_config, resolve_profile
 
 _MINIMAL_TOML = """\
 [profiles.dev]
@@ -207,3 +207,40 @@ class TestXdgConfigDir:
         monkeypatch.setattr(sys, "platform", "win32")
         result = _xdg_config_dir()
         assert result == Path(platformdirs.user_config_dir("pynteracta"))
+
+
+class TestPathExpansion:
+    def test_service_account_key_tilde_expansion(self) -> None:
+        profile = Profile(
+            base_url="https://example.it",
+            service_account_key=Path("~/.config/pynteracta/sa.json"),
+        )
+        expected = Path.home() / ".config" / "pynteracta" / "sa.json"
+        assert profile.service_account_key == expected
+
+    def test_token_cache_dir_tilde_expansion(self) -> None:
+        profile = Profile(
+            base_url="https://example.it",
+            token_cache_dir=Path("~/.cache/pynteracta"),
+        )
+        expected = Path.home() / ".cache" / "pynteracta"
+        assert profile.token_cache_dir == expected
+
+    def test_audit_log_file_tilde_expansion(self) -> None:
+        profile = Profile(
+            base_url="https://example.it",
+            audit_log_file=Path("~/logs/audit.log"),
+        )
+        expected = Path.home() / "logs" / "audit.log"
+        assert profile.audit_log_file == expected
+
+    def test_none_paths_remain_none(self) -> None:
+        profile = Profile(
+            base_url="https://example.it",
+            service_account_key=None,
+            token_cache_dir=None,
+            audit_log_file=None,
+        )
+        assert profile.service_account_key is None
+        assert profile.token_cache_dir is None
+        assert profile.audit_log_file is None
