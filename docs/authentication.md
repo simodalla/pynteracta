@@ -164,7 +164,8 @@ itself expired you must provide a fresh one (e.g. via `google_token_provider`).
 ### File cache (default)
 
 - Location: `{token_cache_dir}/{profile}.token.json`.
-- Default dir: `platformdirs.user_cache_dir("pynteracta")`.
+- Default dir: `~/.config/pynteracta/tokens/` (Linux/macOS, XDG; respects `XDG_CONFIG_HOME`).
+  Windows: `%LOCALAPPDATA%\pynteracta\tokens\`.
 - File permissions: `0o600`; directory: `0o700`.
 
 #### POSIX (Linux/macOS)
