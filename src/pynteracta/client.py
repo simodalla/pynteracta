@@ -7,8 +7,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import platformdirs
-
 from pynteracta.api.auth import AuthAPI
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
@@ -25,7 +23,7 @@ from pynteracta.auth import (
     TokenProvider,
     load_service_account_key,
 )
-from pynteracta.config import Profile, resolve_profile
+from pynteracta.config import Profile, _xdg_config_dir, resolve_profile
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.hooks import ClientHooks
 from pynteracta.transport import HttpTransport
@@ -33,7 +31,7 @@ from pynteracta.urls import WebUrls, build_api_base
 
 
 def _default_token_cache_dir() -> Path:
-    return Path(platformdirs.user_cache_dir("pynteracta")) / "tokens"
+    return _xdg_config_dir() / "tokens"
 
 
 def _build_token_cache(profile: Profile) -> TokenCache:

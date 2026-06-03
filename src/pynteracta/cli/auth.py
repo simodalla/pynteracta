@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import Annotated, Any
 
-import platformdirs
 import tomlkit
 import typer
 from rich.console import Console
@@ -23,7 +22,7 @@ from pynteracta.cli._common import (
     make_console,
     print_output,
 )
-from pynteracta.client import InteractaClient
+from pynteracta.client import InteractaClient, _default_token_cache_dir
 from pynteracta.config import Profile, load_config, resolve_profile
 from pynteracta.exceptions import InteractaError
 
@@ -252,9 +251,7 @@ def logout(ctx: typer.Context) -> None:
     if profile_obj.token_cache == "memory":
         cache: MemoryTokenCache | FileTokenCache = MemoryTokenCache()
     else:
-        cache_dir = profile_obj.token_cache_dir or (
-            Path(platformdirs.user_cache_dir("pynteracta")) / "tokens"
-        )
+        cache_dir = profile_obj.token_cache_dir or _default_token_cache_dir()
         cache = FileTokenCache(cache_dir)
 
     key_id = profile_name

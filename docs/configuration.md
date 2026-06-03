@@ -75,7 +75,7 @@ pynteracta config list
 | `service_account_key` | `Path` | `None` | Path to SA key JSON |
 | `google_oauth2_token` | `str` | `None` | Google access token; supply via env/flag, **not** persisted to config |
 | `token_cache` | `"file"` or `"memory"` | `file` | Cache backend |
-| `token_cache_dir` | `Path` | platformdirs user cache | Override cache directory |
+| `token_cache_dir` | `Path` | `~/.config/pynteracta/tokens/` (XDG) | Override cache directory |
 | `timeout_seconds` | `float` | `30.0` | HTTP timeout |
 | `log_level` | `DEBUG`/`INFO`/`WARNING`/`ERROR` | `INFO` | Log verbosity |
 | `audit_log` | `bool` | `false` | Enable API call audit logging |
