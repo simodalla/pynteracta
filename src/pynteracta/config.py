@@ -40,9 +40,7 @@ class Profile(BaseModel):
     audit_log_max_bytes: int = 10_000_000
     audit_log_backups: int = 5
 
-    @field_validator(
-        "service_account_key", "token_cache_dir", "audit_log_file", mode="before"
-    )
+    @field_validator("service_account_key", "token_cache_dir", "audit_log_file", mode="before")
     @classmethod
     def expand_user_paths(cls, v: Path | None) -> Path | None:
         if v is None:
