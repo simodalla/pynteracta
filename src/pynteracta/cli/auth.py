@@ -238,7 +238,7 @@ def whoami(
                 }
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(me)
+            full_data = dump_full(me, exclude_none=fields is None)
             if fields is not None:
                 field_list = [f.strip() for f in fields.split(",") if f.strip()]
                 rendered: dict[str, object] = select_fields(full_data, field_list)

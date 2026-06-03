@@ -461,3 +461,202 @@ class TestOptionPlacement:
         # --full before subcommand should NOT be accepted by global callback
         result = runner.invoke(app, ["--full", "users", "list"], env=BASE_ENV)
         assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# Bug regression: --fields must not crash on null-valued fields (Bug 1)
+# ---------------------------------------------------------------------------
+
+
+class TestFieldsNullValues:
+    """Regression tests: requesting a schema field that is null must NOT raise EXIT_CONFIG."""
+
+    @respx.mock
+    def test_fields_null_field_single_object(self, runner: CliRunner) -> None:
+        """posts get --fields currentWorkflowState on a post where that field is null."""
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "get", "21269", "--output", "json", "--fields", "id,currentWorkflowState"],
+            env=BASE_ENV,
+        )
+        # Must succeed, not EXIT_CONFIG
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert "id" in data
+        # The null field is present in the output (value is null / None)
+        assert "currentWorkflowState" in data
+        assert data["currentWorkflowState"] is None
+
+    @respx.mock
+    def test_fields_null_field_list_command(self, runner: CliRunner) -> None:
+        """posts list --fields descriptionDelta on items where that field is null."""
+        mock_json(
+            "POST",
+            "communication/posts/data/list/community/79",
+            load_payload("list_community_posts_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--output",
+                "json",
+                "--fields",
+                "id,descriptionDelta",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert isinstance(data, list)
+        if data:
+            assert "id" in data[0]
+            assert "descriptionDelta" in data[0]
+            # The field is null in the fixture
+            assert data[0]["descriptionDelta"] is None
+
+    @respx.mock
+    def test_genuinely_unknown_field_still_exits_config(self, runner: CliRunner) -> None:
+        """A field name that does not exist in the schema → EXIT_CONFIG (no regression)."""
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "get", "21269", "--fields", "totallyBogusField"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == EXIT_CONFIG
+        assert "Unknown field" in result.output
+        assert "totallyBogusField" in result.output
+        assert "Valid top-level fields:" in result.output
+
+    @respx.mock
+    def test_full_still_omits_nulls(self, runner: CliRunner) -> None:
+        """--full must continue to omit null values (exclude_none=True, no regression)."""
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "get", "21269", "--output", "json", "--full"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0
+        data = _json_output(result)
+        assert isinstance(data, dict)
+        # currentWorkflowState is null in fixture → must be absent under --full
+        assert "currentWorkflowState" not in data
+
+
+# ---------------------------------------------------------------------------
+# Bug regression: --web-url honored with --full / --fields on list commands (Bug 2)
+# ---------------------------------------------------------------------------
+
+
+class TestWebUrlWithFullAndFields:
+    """Regression tests: --web-url must be preserved when combined with --full / --fields."""
+
+    @respx.mock
+    def test_posts_list_web_url_with_full(self, runner: CliRunner) -> None:
+        mock_json(
+            "POST",
+            "communication/posts/data/list/community/79",
+            load_payload("list_community_posts_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--output",
+                "json",
+                "--full",
+                "--web-url",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert isinstance(data, list)
+        if data:
+            assert "web_url" in data[0]
+
+    @respx.mock
+    def test_posts_list_web_url_with_fields(self, runner: CliRunner) -> None:
+        mock_json(
+            "POST",
+            "communication/posts/data/list/community/79",
+            load_payload("list_community_posts_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--output",
+                "json",
+                "--fields",
+                "id,web_url",
+                "--web-url",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert isinstance(data, list)
+        if data:
+            assert "web_url" in data[0]
+            assert "id" in data[0]
+
+    @respx.mock
+    def test_users_list_web_url_with_full(self, runner: CliRunner) -> None:
+        mock_json(
+            "POST",
+            "admin/data/users",
+            load_payload("list_system_users_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            ["users", "list", "--output", "json", "--full", "--web-url"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert isinstance(data, list)
+        if data:
+            assert "web_url" in data[0]
+
+    @respx.mock
+    def test_posts_get_web_url_with_full(self, runner: CliRunner) -> None:
+        """Single-object command: --web-url --full must still include web_url (no regression)."""
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "get", "21269", "--output", "json", "--full", "--web-url"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        data = _json_output(result)
+        assert isinstance(data, dict)
+        assert "web_url" in data

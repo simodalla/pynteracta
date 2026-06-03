@@ -87,7 +87,7 @@ def communities_details(  # noqa: PLR0913
         community = result.community
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(result)
+            full_data = dump_full(result, exclude_none=fields is None)
             if web_url is not None:
                 full_data["web_url"] = web_url
             if fields is not None:
@@ -213,9 +213,7 @@ def communities_post_definitions(
         with build_client(state) as client:
             defn_map = client.communities.post_definitions(ids)
 
-        def _curated_field_with_community(
-            community_id: int, f: object
-        ) -> dict[str, object]:
+        def _curated_field_with_community(community_id: int, f: object) -> dict[str, object]:
             ft = getattr(f, "type", None)
             return {
                 "community_id": community_id,
@@ -234,7 +232,7 @@ def communities_post_definitions(
                     row["community_id"] = community_id
                     rows.append(row)
                 elif fields is not None:
-                    full_row = dump_full(f)
+                    full_row = dump_full(f, exclude_none=False)
                     full_row["community_id"] = community_id
                     field_list = [x.strip() for x in fields.split(",") if x.strip()]
                     rows.append(select_fields(full_row, field_list))
