@@ -626,3 +626,64 @@ Commands excluded (no per-command flag): `auth login`, `auth logout`, all `confi
 - `uv run mypy src` — no issues in 35 source files.
 - Both invocation orders produce identical output for the same format; command-level wins when
   both are supplied.
+
+---
+
+## Feature — `--full` and `--fields` per-command output options — 2026-06-03
+
+### Motivation
+
+CLI data commands previously emitted a curated subset of fields. Users had no way to access the
+complete API field set. Every facade object already wraps the full pydantic DTO (via `.raw`), so
+the full field set is `model_dump(by_alias=True, mode="json", exclude_none=True)` away.
+
+### Changes made
+
+- `src/pynteracta/cli/_common.py`:
+  - `FullOption` / `FieldsOption` — reusable `Annotated` type aliases for the two new flags.
+  - `validate_full_fields(full, fields)` — exits `EXIT_CONFIG(2)` when both are supplied.
+  - `dump_full(obj) -> dict` — dumps the underlying pydantic DTO; if `obj` has `.raw`, dumps
+    `.raw`; uses `by_alias=True, mode="json", exclude_none=True`.
+  - `select_fields(data, fields) -> dict` — resolves dotted paths; unknown top-level key →
+    `EXIT_CONFIG(2)` with valid-key list; requested fields kept even if null.
+  - `render_output(fmt, items, curated_fn, *, full, fields, console, title)` — unified
+    rendering entry point for list commands: selects curated / full / subset, then renders.
+  - `_print_vertical_records(records, ...)` — vertical per-record key/value tables for
+    `table + --full`; nested values as compact JSON.
+  - `_compact_json(value)` — renders dicts/lists as compact JSON in table cells (also used for
+    all table rows now, replacing `str(v)` fallback).
+- `src/pynteracta/cli/auth.py` — `whoami` gains `--full` / `--fields`.
+- `src/pynteracta/cli/users.py` — `list`, `me`, `profile`, `get-for-edit` gain `--full` / `--fields`.
+- `src/pynteracta/cli/posts.py` — `get`, `list`, `comments` gain `--full` / `--fields`.
+- `src/pynteracta/cli/communities.py` — `list`, `details`, `details-bulk`,
+  `post-definition`, `post-definitions` gain `--full` / `--fields`.
+- `src/pynteracta/cli/catalogs.py` — `list`, `entries` gain `--full` / `--fields`.
+- `docs/cli.md` — new subsections documenting `--full`, `--fields`, mutual exclusion, null
+  handling, dotted paths, unknown-field error, interaction table with `--output` / `--web-url`.
+- `tests/unit/test_cli_full_fields.py` — 25 new unit tests covering: mutual exclusion
+  (`EXIT_CONFIG`), unknown field with valid-key message, `--full` JSON camelCase keys + nulls
+  omitted, `--full` table vertical layout (snapshot), `--fields` subset JSON, `--fields` table
+  narrow columns (snapshot), regression guards for curated default, per-command vs
+  global option placement.
+
+### Decisions made beyond the spec
+
+- **`_compact_json` for all table cells**: extended `_print_table_rows` to use `_compact_json`
+  rather than `str(v)`, so nested values in `--fields` table columns render as compact JSON.
+  This is a minor improvement to the default curated table too (dicts/lists now render cleanly
+  instead of Python repr).
+- **`post-definitions` `--full` handled inline** rather than via `render_output`: the command
+  iterates over `(community_id, field)` pairs, and `render_output` assumes a flat item list.
+  Inlining avoids awkward closure gymnastics while keeping the behaviour consistent.
+- **Dotted paths keep flat keys in output**: `select_fields` returns `{"a.b": value}` rather
+  than re-nesting into `{"a": {"b": value}}`. This is simpler and the key exactly matches what
+  the user typed.
+- **Mapping custom-field IDs to human labels is out of scope** — noted in spec, deferred.
+
+### Verification
+
+- `uv run ruff check .` / `uv run ruff format --check .` — pass (3 pre-existing errors in
+  integration test file only).
+- `uv run mypy src` — no issues in 35 source files.
+- `uv run pytest tests/unit/ --cov --cov-fail-under=85` — 326 passed, 1 skipped;
+  coverage **89.79%** (≥ 85% gate); 32 snapshots passed.

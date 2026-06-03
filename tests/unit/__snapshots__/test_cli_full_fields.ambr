@@ -1,0 +1,123 @@
+# serializer version: 1
+# name: TestCatalogsListFull.test_no_flags_curated_unchanged
+  '''
+            Catalogs          
+  ┏━━━━┳━━━━━━━━━━━━━┳━━━━━━━┓
+  ┃ id ┃ name        ┃ paged ┃
+  ┡━━━━╇━━━━━━━━━━━━━╇━━━━━━━┩
+  │ 5  │ Departments │ False │
+  │ 8  │ Locations   │ True  │
+  └────┴─────────────┴───────┘
+  
+  '''
+# ---
+# name: TestCommunitiesListFull.test_no_flags_curated_unchanged
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
+# name: TestPostsGetFull.test_no_flags_curated_unchanged
+  '''
+                                     Post 21269                                   
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value                                                       ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 21269                                                       │
+  │ title          │ Aggiornamento procedure sicurezza Q2 2026                   │
+  │ community_id   │ 79                                                          │
+  │ description    │ Si comunicano le nuove procedure di sicurezza in vigore dal │
+  │                │ 1 luglio 2026.                                              │
+  │ creation_ts    │ 1748000000000                                               │
+  │ last_modify_ts │                                                             │
+  │ comments_count │ 2                                                           │
+  │ likes_count    │ 1                                                           │
+  └────────────────┴─────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersListFull.test_fields_table_output_narrow_columns
+  '''
+         Users        
+  ┏━━━━━━┳━━━━━━━━━━━┓
+  ┃ id   ┃ firstName ┃
+  ┡━━━━━━╇━━━━━━━━━━━┩
+  │ 1042 │ Maria     │
+  │ 1099 │ Luca      │
+  └──────┴───────────┘
+  
+  '''
+# ---
+# name: TestUsersListFull.test_full_table_output_vertical_layout
+  '''
+                                     Users [1]                                    
+  ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Field           ┃ Value                                                      ┃
+  ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id              │ 1042                                                       │
+  │ firstName       │ Maria                                                      │
+  │ lastName        │ Rossi                                                      │
+  │ caption         │ Maria Rossi                                                │
+  │ contactEmail    │ m.rossi@example.it                                         │
+  │ serviceAccount  │ False                                                      │
+  │ systemAccount   │ False                                                      │
+  │ activeDWD       │ True                                                       │
+  │ accountPhotoUrl │ https://interacta.example.it/portal/api/external/v2/core/… │
+  │ deleted         │ False                                                      │
+  │ blocked         │ False                                                      │
+  │ externalId      │ EXT-1042                                                   │
+  │ privateProfile  │ False                                                      │
+  └─────────────────┴────────────────────────────────────────────────────────────┘
+                  Users [2]                
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Field          ┃ Value                ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 1099                 │
+  │ firstName      │ Luca                 │
+  │ lastName       │ Bianchi              │
+  │ caption        │ Luca Bianchi         │
+  │ contactEmail   │ l.bianchi@example.it │
+  │ serviceAccount │ False                │
+  │ systemAccount  │ False                │
+  │ activeDWD      │ True                 │
+  │ deleted        │ False                │
+  │ blocked        │ False                │
+  │ privateProfile │ False                │
+  └────────────────┴──────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersListFull.test_no_flags_curated_output_unchanged
+  '''
+                           Users                          
+  ┏━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ id   ┃ first_name ┃ last_name ┃ email                ┃
+  ┡━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+  │ 1042 │ Maria      │ Rossi     │ m.rossi@example.it   │
+  │ 1099 │ Luca       │ Bianchi   │ l.bianchi@example.it │
+  └──────┴────────────┴───────────┴──────────────────────┘
+  
+  '''
+# ---
+# name: TestUsersProfileFull.test_no_flags_curated_unchanged
+  '''
+                                    User Profile                                  
+  ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key               ┃ Value                                                    ┃
+  ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id                │ 1042                                                     │
+  │ first_name        │ Maria                                                    │
+  │ last_name         │ Rossi                                                    │
+  │ caption           │ Maria Rossi                                              │
+  │ contact_email     │ m.rossi@example.it                                       │
+  │ account_photo_url │ https://interacta.example.it/portal/api/external/v2/cor… │
+  └───────────────────┴──────────────────────────────────────────────────────────┘
+  
+  '''
+# ---

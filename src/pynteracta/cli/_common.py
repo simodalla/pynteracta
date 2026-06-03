@@ -45,6 +45,19 @@ OutputOption = Annotated[
     typer.Option("--output", "-o", help="Output format: table, json, or yaml."),
 ]
 
+FullOption = Annotated[
+    bool,
+    typer.Option("--full", help="Emit all fields of the underlying DTO (camelCase, nulls omitted)."),  # noqa: E501
+]
+
+FieldsOption = Annotated[
+    str | None,
+    typer.Option(
+        "--fields",
+        help="Comma-separated list of field names (camelCase) to emit. Dotted paths supported.",
+    ),
+]
+
 
 def resolve_output(state: CliState, output: str | None) -> OutputFormat:
     """Apply command-level > global precedence, then validate."""
@@ -190,6 +203,130 @@ def _check_yaml_available() -> None:
         raise typer.Exit(EXIT_CONFIG) from None
 
 
+def validate_full_fields(full: bool, fields: str | None) -> None:
+    """Exit with EXIT_CONFIG if --full and --fields are both provided."""
+    if full and fields is not None:
+        typer.echo("--full and --fields are mutually exclusive.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+
+
+def dump_full(obj: Any) -> dict[str, Any]:
+    """Return a full JSON-serializable dict from a facade or generated pydantic model.
+
+    If the object exposes ``.raw`` (facade pattern), dump ``.raw``; otherwise dump directly.
+    Uses ``by_alias=True, mode="json", exclude_none=True`` — API-native camelCase keys, no nulls.
+    """
+    from pydantic import BaseModel  # noqa: PLC0415
+
+    target = obj.raw if hasattr(obj, "raw") else obj
+    if isinstance(target, BaseModel):
+        return target.model_dump(by_alias=True, mode="json", exclude_none=True)
+    return dict(obj) if hasattr(obj, "__iter__") else {}
+
+
+def _resolve_dotted(data: dict[str, Any], path: str) -> Any:
+    """Resolve a dotted key path through dicts/lists; raise KeyError on missing segment."""
+    parts = path.split(".")
+    node: Any = data
+    for part in parts:
+        if isinstance(node, dict):
+            node = node[part]
+        elif isinstance(node, list):
+            node = node[int(part)]
+        else:
+            raise KeyError(part)
+    return node
+
+
+def select_fields(data: dict[str, Any], fields: list[str]) -> dict[str, Any]:
+    """Return a subset of *data* containing only the requested *fields* (dotted paths OK).
+
+    Unknown top-level fields cause an exit with EXIT_CONFIG listing valid top-level keys.
+    Requested fields whose resolved value is None are kept (user asked explicitly).
+    """
+    top_level = set(data.keys())
+    unknown = [f for f in fields if f.split(".")[0] not in top_level]
+    if unknown:
+        valid = ", ".join(sorted(top_level))
+        typer.echo(
+            f"Unknown field(s): {', '.join(unknown)}. Valid top-level fields: {valid}",
+            err=True,
+        )
+        raise typer.Exit(EXIT_CONFIG)
+
+    result: dict[str, Any] = {}
+    for field in fields:
+        try:
+            result[field] = _resolve_dotted(data, field)
+        except (KeyError, IndexError, ValueError):
+            result[field] = None
+    return result
+
+
+def _compact_json(value: Any) -> str:
+    """Render a value as compact JSON for nested cells in tables."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str, separators=(",", ":"))
+    return str(value) if value is not None else ""
+
+
+def render_output(  # noqa: PLR0913
+    fmt: OutputFormat,
+    items: list[Any],
+    curated_fn: Any,
+    *,
+    full: bool = False,
+    fields: str | None = None,
+    console: Console,
+    title: str | None = None,
+) -> None:
+    """Unified rendering entry point for data-emitting commands.
+
+    *items* is a list of objects (facades or generated DTOs).
+    *curated_fn(obj) -> dict* produces the existing curated mapping (used when neither flag set).
+    """
+    if full:
+        full_list = [dump_full(obj) for obj in items]
+        if fmt in ("json", "yaml"):
+            data: dict[str, Any] | list[dict[str, Any]] = full_list
+            print_output(data, fmt, console=console, title=title)
+        else:
+            _print_vertical_records(full_list, console=console, title=title)
+    elif fields is not None:
+        field_list = [f.strip() for f in fields.split(",") if f.strip()]
+        if items:
+            first_full = dump_full(items[0])
+            # Validate fields against first item — exits on unknown
+            _validate_field_list(first_full, field_list)
+        rows = []
+        for obj in items:
+            full_data = dump_full(obj)
+            rows.append(select_fields(full_data, field_list))
+        if fmt in ("json", "yaml"):
+            print_output(rows, fmt, console=console, title=title)
+        else:
+            _print_table_rows(rows, console=console, title=title)
+    else:
+        rows_curated = [curated_fn(obj) for obj in items]
+        data_or_list: dict[str, Any] | list[dict[str, Any]] = (
+            rows_curated[0] if len(rows_curated) == 1 else rows_curated
+        )
+        print_output(data_or_list, fmt, console=console, title=title)
+
+
+def _validate_field_list(data: dict[str, Any], fields: list[str]) -> None:
+    """Exit with EXIT_CONFIG if any top-level field name is not in data."""
+    top_level = set(data.keys())
+    unknown = [f for f in fields if f.split(".")[0] not in top_level]
+    if unknown:
+        valid = ", ".join(sorted(top_level))
+        typer.echo(
+            f"Unknown field(s): {', '.join(unknown)}. Valid top-level fields: {valid}",
+            err=True,
+        )
+        raise typer.Exit(EXIT_CONFIG)
+
+
 def print_output(
     data: dict[str, Any] | list[dict[str, Any]],
     fmt: OutputFormat,
@@ -225,7 +362,7 @@ def _print_table_rows(
     for col in rows[0]:
         table.add_column(str(col))
     for row in rows:
-        table.add_row(*[str(v) if v is not None else "" for v in row.values()])
+        table.add_row(*[_compact_json(v) for v in row.values()])
     console.print(table)
 
 
@@ -241,6 +378,26 @@ def _print_kv_table(
     for k, v in data.items():
         table.add_row(str(k), str(v) if v is not None else "")
     console.print(table)
+
+
+def _print_vertical_records(
+    records: list[dict[str, Any]],
+    *,
+    console: Console,
+    title: str | None = None,
+) -> None:
+    """Print each record as its own key/value table (for --full + table output)."""
+    if not records:
+        console.print("[dim]No results.[/dim]")
+        return
+    for i, record in enumerate(records):
+        rec_title = f"{title} [{i + 1}]" if title else f"Record {i + 1}"
+        table = Table(title=rec_title, show_header=True, header_style="bold")
+        table.add_column("Field")
+        table.add_column("Value")
+        for k, v in record.items():
+            table.add_row(str(k), _compact_json(v))
+        console.print(table)
 
 
 def handle_error(exc: InteractaError, *, console: Console) -> typer.Exit:

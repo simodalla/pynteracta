@@ -50,6 +50,57 @@ Data-emitting commands (`auth whoami`, all `users`, `posts`, `communities`, and 
 sub-commands) accept `--output` / `-o` directly. Configuration meta-commands (`config set`,
 `config get`, etc.) do not; use the global form if you need to control their output format.
 
+### `--full` — emit all DTO fields
+
+`--full` is a **per-command** flag available on all data-emitting commands (written after the
+command, like `--web-url`). It dumps the complete field set of the underlying API DTO using
+`model_dump(by_alias=True, mode="json", exclude_none=True)` — API-native camelCase keys, nested
+structure preserved, null/absent fields omitted.
+
+```bash
+pynteracta users list --full --output json
+pynteracta posts get 21269 --full
+pynteracta communities list --full --output yaml
+```
+
+With `--output table`, `--full` switches to a **vertical per-record layout**: each record is
+printed as its own key/value table (Field | Value), records visually separated. Nested values
+are rendered as compact JSON inside the cell.
+
+### `--fields <csv>` — emit selected fields
+
+`--fields` is a **per-command** flag accepting a comma-separated list of field names in
+camelCase (the keys of the full dump). Dotted paths are supported for nested values
+(e.g. `attachments.0.name`, `customData.123`).
+
+```bash
+pynteracta users list --fields id,firstName,contactEmail
+pynteracta posts get 21269 --output json --fields id,title,communityId
+```
+
+- **Null handling**: fields requested via `--fields` are always present in the output, even if
+  their value is null (rendered as empty string in table, `null` in JSON/YAML).
+- **Unknown field**: if a requested top-level field does not exist in the full dump, the command
+  exits with code 2 (`EXIT_CONFIG`) and prints a message listing valid top-level keys.
+
+### Mutual exclusion
+
+`--full` and `--fields` cannot be used together. Providing both exits with code 2 (`EXIT_CONFIG`)
+and an explanatory message.
+
+### Interaction with `--output` and `--web-url`
+
+`--full` / `--fields` compose with `--output` and `--web-url`:
+
+| flags | `--output table` | `--output json/yaml` |
+|-------|------------------|----------------------|
+| neither | curated columns (default) | curated dict/list |
+| `--full` | vertical per-record layout | complete nested dump |
+| `--fields a,b` | narrow table (selected columns) | object(s) with selected keys |
+
+When `--web-url` is set the computed URL is appended as an extra field in the output regardless
+of which mode is active.
+
 ## auth
 
 ### `auth login`
