@@ -10,10 +10,12 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    OutputOption,
     build_client,
     handle_error,
     make_console,
     print_output,
+    resolve_output,
 )
 from pynteracta.exceptions import InteractaError
 
@@ -37,7 +39,7 @@ def _user_element_to_row(item: object, *, web_url: str | None = None) -> dict[st
 
 
 @app.command("list")
-def users_list(
+def users_list(  # noqa: PLR0913
     ctx: typer.Context,
     full_text: Annotated[
         str | None,
@@ -55,6 +57,7 @@ def users_list(
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """List system users."""
     state: CliState = ctx.obj
@@ -78,14 +81,14 @@ def users_list(
                     uid = getattr(item, "id", None)
                     wu = client.web_urls.user(int(uid)) if show_web_url and uid else None
                     rows.append(_user_element_to_row(item, web_url=wu))
-        print_output(rows, state.output, console=console, title="Users")
+        print_output(rows, resolve_output(state, output), console=console, title="Users")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 
 
 @app.command("me")
-def users_me(ctx: typer.Context) -> None:
+def users_me(ctx: typer.Context, output: OutputOption = None) -> None:
     """Show identity of the authenticated principal (GET /core/auth/current-user-data)."""
     state: CliState = ctx.obj
     console = make_console(state)
@@ -100,14 +103,14 @@ def users_me(ctx: typer.Context) -> None:
                     "has_google_credentials": me.has_google_credentials,
                     "has_microsoft_credentials": me.has_microsoft_credentials,
                 }
-        print_output(data, state.output, console=console, title="Current User")
+        print_output(data, resolve_output(state, output), console=console, title="Current User")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 
 
 @app.command("profile")
-def users_profile(ctx: typer.Context) -> None:
+def users_profile(ctx: typer.Context, output: OutputOption = None) -> None:
     """Show people-directory profile (GET /core/user-profile/info)."""
     state: CliState = ctx.obj
     console = make_console(state)
@@ -122,7 +125,7 @@ def users_profile(ctx: typer.Context) -> None:
                 "contact_email": prof.contact_email,
                 "account_photo_url": prof.account_photo_url,
             }
-        print_output(data, state.output, console=console, title="User Profile")
+        print_output(data, resolve_output(state, output), console=console, title="User Profile")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -136,6 +139,7 @@ def users_get_for_edit(
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    output: OutputOption = None,
 ) -> None:
     """Fetch a user record for editing (requires admin permissions)."""
     state: CliState = ctx.obj
@@ -153,7 +157,7 @@ def users_get_for_edit(
             }
             if show_web_url:
                 data["web_url"] = client.web_urls.user(user_id)
-        print_output(data, state.output, console=console, title=f"User {user_id}")
+        print_output(data, resolve_output(state, output), console=console, title=f"User {user_id}")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
