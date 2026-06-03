@@ -86,23 +86,30 @@ def users_list(  # noqa: PLR0913
                 result = client.users.list(page_size=page_size, **filters)
                 items = list(result.items_typed)
 
+            fmt = resolve_output(state, output)
+
+            def _curated(obj: object) -> dict[str, object]:
+                uid = getattr(obj, "id", None)
+                wu = client.web_urls.user(int(uid)) if show_web_url and uid else None
+                return _user_element_to_row(obj, web_url=wu)
+
+            def _extra(obj: object) -> dict[str, Any]:
+                uid = getattr(obj, "id", None)
+                return {"web_url": client.web_urls.user(int(uid))} if show_web_url and uid else {}
+
             if full or fields is not None:
-                fmt = resolve_output(state, output)
-
-                def curated(obj: object) -> dict[str, object]:
-                    uid = getattr(obj, "id", None)
-                    wu = client.web_urls.user(int(uid)) if show_web_url and uid else None
-                    return _user_element_to_row(obj, web_url=wu)
-
                 render_output(
-                    fmt, items, curated, full=full, fields=fields, console=console, title="Users"
+                    fmt,
+                    items,
+                    _curated,
+                    full=full,
+                    fields=fields,
+                    extra_fn=_extra if show_web_url else None,
+                    console=console,
+                    title="Users",
                 )
             else:
-                rows: list[dict[str, object]] = []
-                for item in items:
-                    uid = getattr(item, "id", None)
-                    wu = client.web_urls.user(int(uid)) if show_web_url and uid else None
-                    rows.append(_user_element_to_row(item, web_url=wu))
+                rows: list[dict[str, object]] = [_curated(item) for item in items]
                 print_output(rows, resolve_output(state, output), console=console, title="Users")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
@@ -133,7 +140,7 @@ def users_me(
                 }
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(me)
+            full_data = dump_full(me, exclude_none=fields is None)
             if fields is not None:
                 field_list = [f.strip() for f in fields.split(",") if f.strip()]
                 rendered: dict[str, object] = select_fields(full_data, field_list)
@@ -163,7 +170,7 @@ def users_profile(
             prof = client.users.profile()
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(prof)
+            full_data = dump_full(prof, exclude_none=fields is None)
             if fields is not None:
                 field_list = [f.strip() for f in fields.split(",") if f.strip()]
                 rendered: dict[str, object] = select_fields(full_data, field_list)
@@ -207,7 +214,7 @@ def users_get_for_edit(  # noqa: PLR0913
             web_url = client.web_urls.user(user_id) if show_web_url else None
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(user)
+            full_data = dump_full(user, exclude_none=fields is None)
             if web_url is not None:
                 full_data["web_url"] = web_url
             if fields is not None:

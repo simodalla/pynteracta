@@ -65,7 +65,7 @@ def posts_get(  # noqa: PLR0913
             web_url = client.web_urls.post(post_id) if show_web_url else None
         fmt = resolve_output(state, output)
         if full or fields is not None:
-            full_data = dump_full(post)
+            full_data = dump_full(post, exclude_none=fields is None)
             if web_url is not None:
                 full_data["web_url"] = web_url
             if fields is not None:
@@ -140,22 +140,29 @@ def posts_list(  # noqa: PLR0913
 
             fmt = resolve_output(state, output)
             title = f"Posts (community {community})"
+
+            def _curated(obj: object) -> dict[str, object]:
+                pid = getattr(obj, "id", None)
+                wu = client.web_urls.post(int(pid)) if show_web_url and pid else None
+                return _post_element_to_row(obj, web_url=wu)
+
+            def _extra(obj: object) -> dict[str, Any]:
+                pid = getattr(obj, "id", None)
+                return {"web_url": client.web_urls.post(int(pid))} if show_web_url and pid else {}
+
             if full or fields is not None:
-
-                def curated(obj: object) -> dict[str, object]:
-                    pid = getattr(obj, "id", None)
-                    wu = client.web_urls.post(int(pid)) if show_web_url and pid else None
-                    return _post_element_to_row(obj, web_url=wu)
-
                 render_output(
-                    fmt, items, curated, full=full, fields=fields, console=console, title=title
+                    fmt,
+                    items,
+                    _curated,
+                    full=full,
+                    fields=fields,
+                    extra_fn=_extra if show_web_url else None,
+                    console=console,
+                    title=title,
                 )
             else:
-                rows: list[dict[str, object]] = []
-                for item in items:
-                    pid = getattr(item, "id", None)
-                    wu = client.web_urls.post(int(pid)) if show_web_url and pid else None
-                    rows.append(_post_element_to_row(item, web_url=wu))
+                rows: list[dict[str, object]] = [_curated(item) for item in items]
                 print_output(rows, fmt, console=console, title=title)
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:

@@ -47,7 +47,9 @@ OutputOption = Annotated[
 
 FullOption = Annotated[
     bool,
-    typer.Option("--full", help="Emit all fields of the underlying DTO (camelCase, nulls omitted)."),  # noqa: E501
+    typer.Option(
+        "--full", help="Emit all fields of the underlying DTO (camelCase, nulls omitted)."
+    ),  # noqa: E501
 ]
 
 FieldsOption = Annotated[
@@ -210,17 +212,19 @@ def validate_full_fields(full: bool, fields: str | None) -> None:
         raise typer.Exit(EXIT_CONFIG)
 
 
-def dump_full(obj: Any) -> dict[str, Any]:
+def dump_full(obj: Any, *, exclude_none: bool = True) -> dict[str, Any]:
     """Return a full JSON-serializable dict from a facade or generated pydantic model.
 
     If the object exposes ``.raw`` (facade pattern), dump ``.raw``; otherwise dump directly.
-    Uses ``by_alias=True, mode="json", exclude_none=True`` — API-native camelCase keys, no nulls.
+    Uses ``by_alias=True, mode="json"`` — API-native camelCase keys.
+    Pass ``exclude_none=False`` (e.g. the ``--fields`` path) to retain null-valued fields so
+    that ``select_fields`` can find them and the user gets explicit null output, not an error.
     """
     from pydantic import BaseModel  # noqa: PLC0415
 
     target = obj.raw if hasattr(obj, "raw") else obj
     if isinstance(target, BaseModel):
-        return target.model_dump(by_alias=True, mode="json", exclude_none=True)
+        return target.model_dump(by_alias=True, mode="json", exclude_none=exclude_none)
     return dict(obj) if hasattr(obj, "__iter__") else {}
 
 
@@ -277,6 +281,7 @@ def render_output(  # noqa: PLR0913
     *,
     full: bool = False,
     fields: str | None = None,
+    extra_fn: Any = None,
     console: Console,
     title: str | None = None,
 ) -> None:
@@ -284,9 +289,16 @@ def render_output(  # noqa: PLR0913
 
     *items* is a list of objects (facades or generated DTOs).
     *curated_fn(obj) -> dict* produces the existing curated mapping (used when neither flag set).
+    *extra_fn(obj) -> dict* (optional) — extra computed fields (e.g. web_url) merged into each
+    object's dict in the ``--full`` / ``--fields`` path.  Not called in the curated path.
     """
     if full:
-        full_list = [dump_full(obj) for obj in items]
+        full_list = []
+        for obj in items:
+            d: dict[str, Any] = dump_full(obj)
+            if extra_fn is not None:
+                d.update(extra_fn(obj))
+            full_list.append(d)
         if fmt in ("json", "yaml"):
             data: dict[str, Any] | list[dict[str, Any]] = full_list
             print_output(data, fmt, console=console, title=title)
@@ -294,13 +306,12 @@ def render_output(  # noqa: PLR0913
             _print_vertical_records(full_list, console=console, title=title)
     elif fields is not None:
         field_list = [f.strip() for f in fields.split(",") if f.strip()]
-        if items:
-            first_full = dump_full(items[0])
-            # Validate fields against first item — exits on unknown
-            _validate_field_list(first_full, field_list)
         rows = []
         for obj in items:
-            full_data = dump_full(obj)
+            # exclude_none=False so null-valued schema fields are present — user asked for them
+            full_data: dict[str, Any] = dump_full(obj, exclude_none=False)
+            if extra_fn is not None:
+                full_data.update(extra_fn(obj))
             rows.append(select_fields(full_data, field_list))
         if fmt in ("json", "yaml"):
             print_output(rows, fmt, console=console, title=title)
@@ -312,19 +323,6 @@ def render_output(  # noqa: PLR0913
             rows_curated[0] if len(rows_curated) == 1 else rows_curated
         )
         print_output(data_or_list, fmt, console=console, title=title)
-
-
-def _validate_field_list(data: dict[str, Any], fields: list[str]) -> None:
-    """Exit with EXIT_CONFIG if any top-level field name is not in data."""
-    top_level = set(data.keys())
-    unknown = [f for f in fields if f.split(".")[0] not in top_level]
-    if unknown:
-        valid = ", ".join(sorted(top_level))
-        typer.echo(
-            f"Unknown field(s): {', '.join(unknown)}. Valid top-level fields: {valid}",
-            err=True,
-        )
-        raise typer.Exit(EXIT_CONFIG)
 
 
 def print_output(

@@ -687,3 +687,64 @@ the full field set is `model_dump(by_alias=True, mode="json", exclude_none=True)
 - `uv run mypy src` — no issues in 35 source files.
 - `uv run pytest tests/unit/ --cov --cov-fail-under=85` — 326 passed, 1 skipped;
   coverage **89.79%** (≥ 85% gate); 32 snapshots passed.
+
+## bugfix_fields_null_and_weburl — completed 2026-06-03
+
+### Bug fixes
+
+**Bug 1 — `--fields` crashed on null-valued schema fields (EXIT_CONFIG 2).**
+Root cause: `dump_full()` always used `exclude_none=True`, so null fields were absent from the
+dumped dict. `select_fields()` / `_validate_field_list()` then treated the absent key as an
+unknown field and exited with EXIT_CONFIG. Fix: `dump_full()` gained an `exclude_none` keyword
+argument (default `True` to preserve `--full` behaviour). All `--fields` code paths — in
+`render_output` and every single-object command (`posts get`, `users me`, `users profile`,
+`users get-for-edit`, `communities details`, `auth whoami`, `communities post-definitions`) —
+now pass `exclude_none=False` so that null-valued fields are present in the dict before
+`select_fields` runs.
+
+**Bug 2 — `--web-url` was silently dropped when combined with `--full` / `--fields` on list commands.**
+Root cause: in `posts list` and `users list`, the `curated_fn` closure (which computed web_url)
+was passed to `render_output` but only ever called in the no-flags `else` branch; the
+`--full` / `--fields` branches only called `dump_full()` and ignored the curated_fn. Fix:
+`render_output` gained an optional `extra_fn(obj) -> dict` parameter merged into each object's
+dict in the full/fields branches. `posts list` and `users list` now pass `extra_fn` for web_url
+alongside the curated_fn (which still handles the no-flags path). Single-object commands
+(`posts get`, `users get-for-edit`, `communities details`) already merged web_url correctly and
+needed no structural change.
+
+### Optional cleanup done
+
+- Removed `_validate_field_list()` (duplicate of the inline validation already in
+  `select_fields()`). The pre-validation call in `render_output` was also removed; per-row
+  validation by `select_fields` with the full (exclude_none=False) dict is sufficient.
+
+### Files changed
+
+- `src/pynteracta/cli/_common.py` — `dump_full` gains `exclude_none` kwarg; `render_output`
+  gains `extra_fn` kwarg; `_validate_field_list` removed (deduplication).
+- `src/pynteracta/cli/posts.py` — `posts get` uses `exclude_none=fields is None`; `posts list`
+  passes `extra_fn` for web_url.
+- `src/pynteracta/cli/users.py` — single-object commands use `exclude_none=fields is None`;
+  `users list` passes `extra_fn` for web_url.
+- `src/pynteracta/cli/communities.py` — `communities details` and `communities post-definitions`
+  use `exclude_none=False` in the fields path.
+- `src/pynteracta/cli/auth.py` — `auth whoami` uses `exclude_none=fields is None`.
+- `tests/unit/test_cli_full_fields.py` — 8 new regression tests (TestFieldsNullValues,
+  TestWebUrlWithFullAndFields).
+
+### Decisions made beyond the spec
+
+- **`extra_fn` is only called in the full/fields path** — the no-flags curated path still
+  constructs the full row (including web_url) via `curated_fn` / direct `print_output` call,
+  keeping no behavioural change for users who don't pass `--full` or `--fields`.
+- **`communities post-definitions` kept as an inline loop** — it iterates over
+  `(community_id, field)` pairs, so `extra_fn` in `render_output` doesn't apply naturally.
+  Fixed by passing `exclude_none=False` to the inline `dump_full` call.
+
+### Verification
+
+- `uv run ruff check src/` — pass.
+- `uv run ruff format --check src/` — pass.
+- `uv run mypy src` — no issues in 35 source files.
+- `uv run pytest --cov --cov-fail-under=85` — 379 passed, 8 skipped; coverage **90.34%**;
+  32 snapshots passed.
