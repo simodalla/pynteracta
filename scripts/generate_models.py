@@ -66,13 +66,13 @@ def _to_oas3(swagger2: dict) -> dict:  # type: ignore[type-arg]
     }
 
 
-_PATCHED_FIELDS = {"customData", "currentWorkflowScreenData"}
+_PATCHED_FIELDS = {"customData", "currentWorkflowScreenData", "workflowScreenData"}
 
 
 def _patch_schema(oas3: dict) -> dict:  # type: ignore[type-arg]
     """Patch fields whose additionalProperties is typed as a plain object.
 
-    The Swagger schema declares customData and currentWorkflowScreenData with
+    The Swagger schema declares customData, currentWorkflowScreenData and workflowScreenData with
     ``additionalProperties: {"type": "object"}``, which the code generator maps to
     ``dict[str, dict[str, Any]]``. The real API returns heterogeneous values (null,
     lists, strings) for these keys, so the inner type must be ``Any``.
