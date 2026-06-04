@@ -757,7 +757,7 @@ class PostContextDataDTO1(BaseModel):
         ),
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Dati custom del post')
+        dict[str, Any] | None, Field(description='Dati custom del post')
     ] = None
     deltaAreaFormat: Annotated[
         int | None,
@@ -2231,9 +2231,9 @@ class BaseListPostsElementDTOModel(BaseModel):
         PostWorkflowDefinitionStateDTO | None,
         Field(description='Stato workflow corrente.'),
     ] = None
-    customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Campi custom.')
-    ] = None
+    customData: Annotated[dict[str, Any] | None, Field(description='Campi custom.')] = (
+        None
+    )
     creatorUser: Annotated[UserDTO | None, Field(description='Creatore del post.')] = (
         None
     )
@@ -2769,10 +2769,10 @@ class GetPostDetailResponseDTO(BaseModel):
         Field(description='Stato workflow corrente.'),
     ] = None
     currentWorkflowScreenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Valore campi screen.')
+        dict[str, Any] | None, Field(description='Valore campi screen.')
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Valore campi custom.')
+        dict[str, Any] | None, Field(description='Valore campi custom.')
     ] = None
     creatorUser: Annotated[UserDTO | None, Field(description='Creatore del post.')] = (
         None
@@ -3205,9 +3205,9 @@ class BasePostsStreamChunkElementDTOModel(BaseModel):
         PostWorkflowDefinitionStateDTO | None,
         Field(description='Stato workflow corrente.'),
     ] = None
-    customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Campi custom.')
-    ] = None
+    customData: Annotated[dict[str, Any] | None, Field(description='Campi custom.')] = (
+        None
+    )
     creatorUser: Annotated[UserDTO | None, Field(description='Creatore del post.')] = (
         None
     )
@@ -3648,8 +3648,8 @@ class PostEditableContentDataDTO1(BaseModel):
     descriptionPlainText: str | None = None
     visibility: int | None = None
     announcement: bool | None = None
-    customData: dict[str, dict[str, Any]] | None = None
-    currentWorkflowScreenData: dict[str, dict[str, Any]] | None = None
+    customData: dict[str, Any] | None = None
+    currentWorkflowScreenData: dict[str, Any] | None = None
     attachments: list[PostAttachmentDataDTO] | None = None
     mentions: list[UserDTO] | None = None
     watchers: list[UserDTO] | None = None
@@ -3873,10 +3873,10 @@ class PostDetailDTO1(BaseModel):
         Field(description='Stato workflow corrente.'),
     ] = None
     currentWorkflowScreenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Valore campi screen.')
+        dict[str, Any] | None, Field(description='Valore campi screen.')
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Valore campi custom.')
+        dict[str, Any] | None, Field(description='Valore campi custom.')
     ] = None
     creatorUser: Annotated[UserDTO | None, Field(description='Creatore del post.')] = (
         None
@@ -4006,7 +4006,7 @@ class CreateCustomPostRequest(BaseModel):
         ),
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None,
+        dict[str, Any] | None,
         Field(
             description="Dati custom del post. Un dizionario formato dall'identificativo del campo custom e il suo valorePer capire come funzionano i campi custom: https://injenia.atlassian.net/wiki/spaces/IEAD/pages/3390210094/Open+API+Documentation+for+Confluence",
             examples=['{1:"true", 2:"campo html", 3:11}'],
@@ -4152,7 +4152,7 @@ class EditCustomPostRequestDTO(BaseModel):
         ),
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Dati custom del post')
+        dict[str, Any] | None, Field(description='Dati custom del post')
     ] = None
     deltaAreaFormat: Annotated[
         int | None,
@@ -4198,7 +4198,7 @@ class EditCustomPostRequestDTO(BaseModel):
 
 class EditPostCustomDataRequestDTO(BaseModel):
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Dati custom del post')
+        dict[str, Any] | None, Field(description='Dati custom del post')
     ] = None
     deltaAreaFormat: Annotated[
         int | None,
@@ -4294,7 +4294,7 @@ class CopyCustomPostRequestDTO(BaseModel):
         ),
     ] = None
     customData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Dati custom del post')
+        dict[str, Any] | None, Field(description='Dati custom del post')
     ] = None
     deltaAreaFormat: Annotated[
         int | None,

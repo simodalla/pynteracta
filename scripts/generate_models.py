@@ -66,6 +66,31 @@ def _to_oas3(swagger2: dict) -> dict:  # type: ignore[type-arg]
     }
 
 
+_PATCHED_FIELDS = {"customData", "currentWorkflowScreenData"}
+
+
+def _patch_schema(oas3: dict) -> dict:  # type: ignore[type-arg]
+    """Patch fields whose additionalProperties is typed as a plain object.
+
+    The Swagger schema declares customData and currentWorkflowScreenData with
+    ``additionalProperties: {"type": "object"}``, which the code generator maps to
+    ``dict[str, dict[str, Any]]``. The real API returns heterogeneous values (null,
+    lists, strings) for these keys, so the inner type must be ``Any``.
+
+    Replacing with ``additionalProperties: {}`` (= any JSON value) causes the
+    generator to emit ``dict[str, Any]`` instead.
+    """
+    schemas = oas3.get("components", {}).get("schemas", {})
+    for schema in schemas.values():
+        props = schema.get("properties", {})
+        for field_name in _PATCHED_FIELDS:
+            if field_name in props:
+                field = props[field_name]
+                if field.get("additionalProperties") == {"type": "object"}:
+                    field["additionalProperties"] = {}
+    return oas3
+
+
 def run_codegen() -> None:
     """Run ``datamodel-code-generator`` on the committed Swagger snapshot."""
     if not SWAGGER_SNAPSHOT.exists():
@@ -79,7 +104,7 @@ def run_codegen() -> None:
     GENERATED_OUT.parent.mkdir(parents=True, exist_ok=True)
 
     swagger2 = json.loads(SWAGGER_SNAPSHOT.read_bytes())
-    oas3 = _to_oas3(swagger2)
+    oas3 = _patch_schema(_to_oas3(swagger2))
 
     # Use a fixed filename so the "filename:" comment in the generated header is stable
     # across runs (a random tmp name would break idempotency).
