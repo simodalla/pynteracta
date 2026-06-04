@@ -77,9 +77,7 @@ class TestMutualExclusion:
             "admin/data/users",
             load_payload("list_system_users_response.json"),
         )
-        result = runner.invoke(
-            app, ["users", "list", "--full", "--fields", "id"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["users", "list", "--full", "--fields", "id"], env=BASE_ENV)
         assert result.exit_code == EXIT_CONFIG
         assert "--full and --fields are mutually exclusive" in result.output
 
@@ -111,9 +109,7 @@ class TestUnknownField:
             "admin/data/users",
             load_payload("list_system_users_response.json"),
         )
-        result = runner.invoke(
-            app, ["users", "list", "--fields", "nonExistentField"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["users", "list", "--fields", "nonExistentField"], env=BASE_ENV)
         assert result.exit_code == EXIT_CONFIG
         assert "Unknown field" in result.output
         assert "nonExistentField" in result.output
@@ -125,9 +121,7 @@ class TestUnknownField:
             "admin/data/users",
             load_payload("list_system_users_response.json"),
         )
-        result = runner.invoke(
-            app, ["users", "list", "--fields", "bogusField"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["users", "list", "--fields", "bogusField"], env=BASE_ENV)
         assert result.exit_code == EXIT_CONFIG
         assert "Valid top-level fields:" in result.output
 
@@ -145,9 +139,7 @@ class TestUsersListFull:
             "admin/data/users",
             load_payload("list_system_users_response.json"),
         )
-        result = runner.invoke(
-            app, ["users", "list", "--output", "json", "--full"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["users", "list", "--output", "json", "--full"], env=BASE_ENV)
         assert result.exit_code == 0
         data = _json_output(result)
         assert isinstance(data, list)
@@ -194,9 +186,7 @@ class TestUsersListFull:
             "admin/data/users",
             load_payload("list_system_users_response.json"),
         )
-        result = runner.invoke(
-            app, ["users", "list", "--fields", "id,firstName"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["users", "list", "--fields", "id,firstName"], env=BASE_ENV)
         assert result.exit_code == 0
         assert "id" in result.output
         assert "firstName" in result.output

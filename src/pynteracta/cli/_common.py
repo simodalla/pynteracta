@@ -28,6 +28,7 @@ from pynteracta.exceptions import PermissionError as InteractaPermissionError
 from pynteracta.logging import setup_default_logging
 
 OutputFormat = Literal["table", "json", "yaml"]
+ExportFormat = Literal["csv", "json", "yaml", "parquet"]
 
 EXIT_SUCCESS = 0
 EXIT_GENERIC = 1
@@ -49,7 +50,7 @@ FullOption = Annotated[
     bool,
     typer.Option(
         "--full", help="Emit all fields of the underlying DTO (camelCase, nulls omitted)."
-    ),  # noqa: E501
+    ),
 ]
 
 FieldsOption = Annotated[
@@ -57,6 +58,19 @@ FieldsOption = Annotated[
     typer.Option(
         "--fields",
         help="Comma-separated list of field names (camelCase) to emit. Dotted paths supported.",
+    ),
+]
+
+ExportOption = Annotated[
+    Path | None,
+    typer.Option("--export", help="Write output to PATH (format inferred from extension)."),
+]
+
+ExportFormatOption = Annotated[
+    str | None,
+    typer.Option(
+        "--export-format",
+        help="Export format override: csv, json, yaml, or parquet.",
     ),
 ]
 
@@ -196,13 +210,21 @@ def make_console(state: CliState) -> Console:
 
 def _check_yaml_available() -> None:
     try:
-        import ruamel.yaml  # type: ignore[import-not-found]  # noqa: F401, PLC0415
+        import ruamel.yaml  # noqa: F401, PLC0415
     except ImportError:
         typer.echo(
             "YAML output requires ruamel.yaml. Install it with: pip install pynteracta[yaml]",
             err=True,
         )
         raise typer.Exit(EXIT_CONFIG) from None
+
+
+def validate_export_options(export: Path | None, export_format: str | None) -> None:
+    """Pre-flight check: infer and validate the export format before making the API call."""
+    if export is not None:
+        from pynteracta.cli._export import infer_export_format  # noqa: PLC0415
+
+        infer_export_format(export, export_format)
 
 
 def validate_full_fields(full: bool, fields: str | None) -> None:
@@ -274,7 +296,7 @@ def _compact_json(value: Any) -> str:
     return str(value) if value is not None else ""
 
 
-def render_output(  # noqa: PLR0913
+def render_output(  # noqa: PLR0912, PLR0913
     fmt: OutputFormat,
     items: list[Any],
     curated_fn: Any,
@@ -284,6 +306,10 @@ def render_output(  # noqa: PLR0913
     extra_fn: Any = None,
     console: Console,
     title: str | None = None,
+    export_path: Path | None = None,
+    export_format: str | None = None,
+    quiet: bool = False,
+    single_command: bool = False,
 ) -> None:
     """Unified rendering entry point for data-emitting commands.
 
@@ -291,37 +317,53 @@ def render_output(  # noqa: PLR0913
     *curated_fn(obj) -> dict* produces the existing curated mapping (used when neither flag set).
     *extra_fn(obj) -> dict* (optional) — extra computed fields (e.g. web_url) merged into each
     object's dict in the ``--full`` / ``--fields`` path.  Not called in the curated path.
+    When *export_path* is set the resolved records are written to file instead of console.
     """
+    # Resolve the record list (same logic regardless of output destination)
     if full:
-        full_list = []
+        records: list[dict[str, Any]] = []
         for obj in items:
             d: dict[str, Any] = dump_full(obj)
             if extra_fn is not None:
                 d.update(extra_fn(obj))
-            full_list.append(d)
-        if fmt in ("json", "yaml"):
-            data: dict[str, Any] | list[dict[str, Any]] = full_list
-            print_output(data, fmt, console=console, title=title)
-        else:
-            _print_vertical_records(full_list, console=console, title=title)
+            records.append(d)
     elif fields is not None:
         field_list = [f.strip() for f in fields.split(",") if f.strip()]
-        rows = []
+        records = []
         for obj in items:
-            # exclude_none=False so null-valued schema fields are present — user asked for them
             full_data: dict[str, Any] = dump_full(obj, exclude_none=False)
             if extra_fn is not None:
                 full_data.update(extra_fn(obj))
-            rows.append(select_fields(full_data, field_list))
-        if fmt in ("json", "yaml"):
-            print_output(rows, fmt, console=console, title=title)
-        else:
-            _print_table_rows(rows, console=console, title=title)
+            records.append(select_fields(full_data, field_list))
     else:
-        rows_curated = [curated_fn(obj) for obj in items]
-        data_or_list: dict[str, Any] | list[dict[str, Any]] = (
-            rows_curated[0] if len(rows_curated) == 1 else rows_curated
-        )
+        records = [curated_fn(obj) for obj in items]
+
+    # Export path: write to file, print summary, return
+    if export_path is not None:
+        from pynteracta.cli._export import export_records, infer_export_format  # noqa: PLC0415
+
+        efmt = infer_export_format(export_path, export_format)
+        n = export_records(records, export_path, efmt, single=single_command)
+        if not quiet:
+            typer.echo(f"Wrote {n} record{'s' if n != 1 else ''} to {export_path} ({efmt})")
+        return
+
+    # Console rendering path
+    single_val = single_command and len(records) == 1
+    if full:
+        if fmt in ("json", "yaml"):
+            data: dict[str, Any] | list[dict[str, Any]] = records[0] if single_val else records
+            print_output(data, fmt, console=console, title=title)
+        else:
+            _print_vertical_records(records, console=console, title=title)
+    elif fields is not None:
+        if fmt in ("json", "yaml"):
+            fdata: dict[str, Any] | list[dict[str, Any]] = records[0] if single_val else records
+            print_output(fdata, fmt, console=console, title=title)
+        else:
+            _print_table_rows(records, console=console, title=title)
+    else:
+        data_or_list: dict[str, Any] | list[dict[str, Any]] = records[0] if single_val else records
         print_output(data_or_list, fmt, console=console, title=title)
 
 
