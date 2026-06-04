@@ -1,19 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Facade models for the posts endpoints.
-
-Endpoints covered:
-  GET  /communication/posts/data/post-detail-by-id/{postId}          (endpoint 6)
-  POST /communication/posts/data/list/community/{communityId}        (endpoint 7)
-  POST /communication/posts/data/comments-list/{postId}              (endpoint 8)
-"""
+"""Facade models for the posts endpoints."""
 
 from __future__ import annotations
 
 from pynteracta.models.generated import external_v2 as generated
 
-# Re-exported for use by the posts API layer (M5).
+# Re-exported for use by the posts API layer.
 ListCommunityPostsFilteredRequestDTO = generated.ListCommunityPostsFilteredRequestDTO
+ListCommunityPostsRequestDTO = generated.ListCommunityPostsRequestDTO
 ListPostCommentsRequestDTO = generated.ListPostCommentsRequestDTO
+ListPostHistoryEventsRequestDTO = generated.ListPostHistoryEventsRequestDTO
+CheckVisibilityRequestDTO = generated.CheckVisibilityRequestDTO
 
 
 class Post:
@@ -185,4 +182,150 @@ class PostCommentList:
             A new :class:`PostCommentList`.
         """
         raw = generated.ListPostCommentsResponseDTO.model_validate(data)
+        return cls(raw)
+
+
+class GlobalPostStream:
+    """Narrow facade over :class:`~generated.GlobalPostsStreamResponseDTO`.
+
+    Attributes:
+        raw: The underlying generated DTO.
+    """
+
+    def __init__(self, raw: generated.GlobalPostsStreamResponseDTO) -> None:
+        self.raw = raw
+
+    @property
+    def next_page_token(self) -> str | None:
+        return self.raw.nextPageToken
+
+    @property
+    def next_sync_token(self) -> str | None:
+        return self.raw.nextSyncToken
+
+    @property
+    def items_typed(self) -> list[generated.BasePostsStreamChunkElementDTOModel]:
+        if not self.raw.items:
+            return []
+        result = []
+        for item in self.raw.items:
+            root = item.root if hasattr(item, "root") else item
+            if isinstance(root, dict):
+                result.append(generated.BasePostsStreamChunkElementDTOModel.model_validate(root))
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> GlobalPostStream:  # type: ignore[type-arg]
+        raw = generated.GlobalPostsStreamResponseDTO.model_validate(data)
+        return cls(raw)
+
+
+class PostCapabilities:
+    """Narrow facade over :class:`~generated.GetPostCapabilitiesResponseDTO1`.
+
+    Attributes:
+        raw: The underlying generated DTO.
+    """
+
+    def __init__(self, raw: generated.GetPostCapabilitiesResponseDTO1) -> None:
+        self.raw = raw
+
+    @property
+    def can_view_detail(self) -> bool | None:
+        return self.raw.canViewDetail
+
+    @property
+    def can_modify(self) -> bool | None:
+        return self.raw.canModify
+
+    @property
+    def can_delete(self) -> bool | None:
+        return self.raw.canDelete
+
+    @property
+    def can_view_comment(self) -> bool | None:
+        return self.raw.canViewComment
+
+    @property
+    def can_add_comment(self) -> bool | None:
+        return self.raw.canAddComment
+
+    @property
+    def can_edit_like(self) -> bool | None:
+        return self.raw.canEditLike
+
+    @property
+    def can_edit_follow(self) -> bool | None:
+        return self.raw.canEditFollow
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PostCapabilities:  # type: ignore[type-arg]
+        # GetPostCapabilitiesResponseDTO is a RootModel[Any] stub; bind to the typed variant.
+        raw = generated.GetPostCapabilitiesResponseDTO1.model_validate(data)
+        return cls(raw)
+
+
+class PostHistoryEventList:
+    """Narrow facade over :class:`~generated.ListPostHistoryEventsResponseDTO`.
+
+    Attributes:
+        raw: The underlying generated DTO.
+    """
+
+    def __init__(self, raw: generated.ListPostHistoryEventsResponseDTO) -> None:
+        self.raw = raw
+
+    @property
+    def next_page_token(self) -> str | None:
+        return self.raw.nextPageToken
+
+    @property
+    def total_items_count(self) -> int | None:
+        return self.raw.totalItemsCount
+
+    @property
+    def items_typed(self) -> list[generated.PostActivityHistoryEventDTO1]:
+        """Re-validate each opaque item into the typed event DTO."""
+        if not self.raw.items:
+            return []
+        result = []
+        for item in self.raw.items:
+            root = item.root if hasattr(item, "root") else item
+            if isinstance(root, dict):
+                result.append(generated.PostActivityHistoryEventDTO1.model_validate(root))
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PostHistoryEventList:  # type: ignore[type-arg]
+        raw = generated.ListPostHistoryEventsResponseDTO.model_validate(data)
+        return cls(raw)
+
+
+class VisibilityResult:
+    """Narrow facade over :class:`~generated.CheckVisibilityWithCommentsResponseDTO`.
+
+    Attributes:
+        raw: The underlying generated DTO.
+    """
+
+    def __init__(self, raw: generated.CheckVisibilityWithCommentsResponseDTO) -> None:
+        self.raw = raw
+
+    @property
+    def posts_typed(self) -> list[generated.CheckVisibilityWithCommentsResponseElementDTO1]:
+        """Re-validate each opaque element into the typed DTO."""
+        if not self.raw.posts:
+            return []
+        result = []
+        for item in self.raw.posts:
+            root = item.root if hasattr(item, "root") else item
+            if isinstance(root, dict):
+                result.append(
+                    generated.CheckVisibilityWithCommentsResponseElementDTO1.model_validate(root)
+                )
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> VisibilityResult:  # type: ignore[type-arg]
+        raw = generated.CheckVisibilityWithCommentsResponseDTO.model_validate(data)
         return cls(raw)

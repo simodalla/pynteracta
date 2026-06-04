@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "id": 1001,
+      "timestamp": 1700000000000,
+      "typeId": 1,
+      "typeDescription": "Creato post",
+      "postId": 21269,
+      "postCustomId": "POST-001",
+      "postCurrentTitle": "Test Post"
+    },
+    {
+      "id": 1002,
+      "timestamp": 1700001000000,
+      "typeId": 2,
+      "typeDescription": "Modificato post",
+      "postId": 21269,
+      "postCustomId": "POST-001",
+      "postCurrentTitle": "Test Post (edited)"
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}

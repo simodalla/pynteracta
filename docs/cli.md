@@ -319,6 +319,78 @@ pynteracta posts list --community 79 --all --web-url
 pynteracta posts list --community 79 --page-size 20 --output json
 ```
 
+### `posts get-by-client-uid`
+
+Fetches a post by its client UID (the `customId` field set by the API consumer).
+
+```bash
+pynteracta posts get-by-client-uid MY-UID-001
+pynteracta posts get-by-client-uid MY-UID-001 --web-url --output json
+```
+
+### `posts capabilities`
+
+Shows per-post capability flags for the authenticated principal (can view, modify, delete,
+comment, like, follow, etc.).
+
+```bash
+pynteracta posts capabilities 21269
+pynteracta posts capabilities 21269 --output json
+```
+
+Curated table shows the core flags (`can_view_detail`, `can_modify`, `can_delete`,
+`can_view_comment`, `can_add_comment`, `can_edit_like`, `can_edit_follow`). Use `--full` to
+expose all flags including `canEditComment`, `canEditWorkflowScreenData`, etc.
+
+### `posts history`
+
+Lists edit/event history entries for a post.
+
+```bash
+pynteracta posts history 21269
+pynteracta posts history 21269 --all --page-size 50
+pynteracta posts history 21269 --output json
+```
+
+### `posts global-stream`
+
+Cross-community home feed stream. Returns posts created/modified/touched/deleted across all
+communities the principal has access to.
+
+```bash
+pynteracta posts global-stream
+pynteracta posts global-stream --all
+pynteracta posts global-stream --sync-token <token>
+```
+
+### `posts community-list`
+
+Lists posts in a community using the lighter `data/community-list/{communityId}` endpoint
+(`ListCommunityPostsRequestDTO` — basic filters: title, description, date ranges, workflow
+status, etc.).
+
+**Distinction from `posts list`:** `posts list` calls the older `data/list/community/{communityId}`
+endpoint with `ListCommunityPostsFilteredRequestDTO`, which supports additional server-side
+filtering options (full-text search via `containsText`, `loadPostDetails` query flag, etc.).
+Use `posts list` when you need richer filtering; use `posts community-list` for simpler requests.
+
+```bash
+pynteracta posts community-list --community 79
+pynteracta posts community-list --community 79 --all --page-size 50
+pynteracta posts community-list --community 79 --output json
+```
+
+### `posts check-visibility`
+
+Checks which of the requested posts are visible to the current principal.
+Pass `--with-comments` to also resolve comment visibility per post.
+
+```bash
+pynteracta posts check-visibility 21269 21270
+pynteracta posts check-visibility 21269 21270 --with-comments
+pynteracta posts check-visibility 21269 --output json
+```
+
 ### `posts comments`
 
 Lists comments for a post.
