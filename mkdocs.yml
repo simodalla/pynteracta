@@ -47,6 +47,7 @@ nav:
       - Posts: api/posts.md
       - Communities: api/communities.md
       - Catalogs: api/catalogs.md
+      - Attachments: api/attachments.md
 
 markdown_extensions:
   - admonition

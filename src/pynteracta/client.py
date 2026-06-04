@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pynteracta.api.attachments import AttachmentsAPI
 from pynteracta.api.auth import AuthAPI
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
@@ -42,7 +43,10 @@ def _build_token_cache(profile: Profile) -> TokenCache:
 
 
 class InteractaClient:
-    """Façade aggregating auth, users, posts, communities, and catalogs resource clients."""
+    """Façade aggregating all resource clients.
+
+    Exposes ``auth``, ``users``, ``posts``, ``communities``, ``catalogs``, and ``attachments``.
+    """
 
     def __init__(  # noqa: PLR0913
         self,
@@ -148,6 +152,7 @@ class InteractaClient:
         self.posts = PostsAPI(api_transport)
         self.communities = CommunitiesAPI(api_transport)
         self.catalogs = CatalogsAPI(api_transport)
+        self.attachments = AttachmentsAPI(api_transport)
 
     def _build_token_manager(  # noqa: PLR0913
         self,

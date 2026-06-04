@@ -8,6 +8,7 @@ from typing import Annotated, Literal, cast
 
 import typer
 
+from pynteracta.cli import attachments as _attachments_cli
 from pynteracta.cli import auth as _auth_cli
 from pynteracta.cli import catalogs as _catalogs_cli
 from pynteracta.cli import communities as _communities_cli
@@ -22,6 +23,7 @@ app = typer.Typer(
     help="Unofficial Interacta™ REST API client.",
     no_args_is_help=True,
 )
+app.add_typer(_attachments_cli.app, name="attachments")
 app.add_typer(_auth_cli.app, name="auth")
 app.add_typer(_catalogs_cli.app, name="catalogs")
 app.add_typer(_communities_cli.app, name="communities")

@@ -1,0 +1,85 @@
+# serializer version: 1
+# name: TestAttachmentsCheckVisibility.test_json_output
+  '''
+  {
+    "visible_ids": [
+      3001,
+      3002
+    ]
+  }
+  
+  '''
+# ---
+# name: TestAttachmentsCheckVisibility.test_table_output
+  '''
+   Attachment visibility check  
+  ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+  ┃ Key         ┃ Value        ┃
+  ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+  │ visible_ids │ [3001, 3002] │
+  └─────────────┴──────────────┘
+  
+  '''
+# ---
+# name: TestAttachmentsGet.test_json_output
+  '''
+  {
+    "id": 3001,
+    "name": "report.pdf",
+    "content_mime_type": "application/pdf",
+    "size": 204800,
+    "type": 1,
+    "post_id": 21269
+  }
+  
+  '''
+# ---
+# name: TestAttachmentsGet.test_table_output
+  '''
+              Attachment 3001            
+  ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+  ┃ Key               ┃ Value           ┃
+  ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+  │ id                │ 3001            │
+  │ name              │ report.pdf      │
+  │ content_mime_type │ application/pdf │
+  │ size              │ 204800          │
+  │ type              │ 1               │
+  │ post_id           │ 21269           │
+  └───────────────────┴─────────────────┘
+  
+  '''
+# ---
+# name: TestAttachmentsList.test_json_output
+  '''
+  [
+    {
+      "id": 3001,
+      "name": "report.pdf",
+      "content_mime_type": "application/pdf",
+      "size": 204800,
+      "type": 1
+    },
+    {
+      "id": 3002,
+      "name": "photo.jpg",
+      "content_mime_type": "image/jpeg",
+      "size": 512000,
+      "type": 1
+    }
+  ]
+  
+  '''
+# ---
+# name: TestAttachmentsList.test_table_output
+  '''
+                  Attachments (post 21269)                 
+  ┏━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━┓
+  ┃ id   ┃ name       ┃ content_mime_type ┃ size   ┃ type ┃
+  ┡━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━┩
+  │ 3001 │ report.pdf │ application/pdf   │ 204800 │ 1    │
+  │ 3002 │ photo.jpg  │ image/jpeg        │ 512000 │ 1    │
+  └──────┴────────────┴───────────────────┴────────┴──────┘
+  
+  '''
+# ---

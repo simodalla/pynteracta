@@ -7,6 +7,8 @@ as the documented escape hatch.
 """
 
 from pynteracta.models.facade import (
+    AttachmentDetail,
+    AttachmentVisibility,
     Catalog,
     CatalogEntry,
     CatalogEntryList,
@@ -29,6 +31,8 @@ from pynteracta.models.facade import (
     ListPostHistoryEventsRequestDTO,
     ListSystemUsersRequestDTO,
     Post,
+    PostAttachment,
+    PostAttachmentList,
     PostCapabilities,
     PostCommentList,
     PostDefinition,
@@ -44,6 +48,8 @@ from pynteracta.models.facade import (
 )
 
 __all__ = [
+    "AttachmentDetail",
+    "AttachmentVisibility",
     "Catalog",
     "CatalogEntry",
     "CatalogEntryList",
@@ -66,6 +72,8 @@ __all__ = [
     "ListPostHistoryEventsRequestDTO",
     "ListSystemUsersRequestDTO",
     "Post",
+    "PostAttachment",
+    "PostAttachmentList",
     "PostCapabilities",
     "PostCommentList",
     "PostDefinition",
