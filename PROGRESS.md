@@ -846,3 +846,52 @@ console. The format is inferred from the file extension (`.csv`, `.json`, `.yaml
 - `uv run mypy src` — no issues in 36 source files.
 - `uv run pytest --cov --cov-fail-under=85` — 409 passed, 7 skipped; coverage **91.71%**;
   32 snapshots passed.
+
+
+## M15 — Posts read completeness (v0.2.0)
+
+### Done
+
+Seven posts `data/*` endpoints added to `PostsAPI` and CLI:
+
+1. `GET data/post-detail-by-client-uid/{clientUid}` → `PostsAPI.get_by_client_uid` / `posts get-by-client-uid`
+2. `GET data/post-capabilities/{postId}` → `PostsAPI.capabilities` / `posts capabilities`
+3. `POST data/history-list/{postId}` → `PostsAPI.history` + `iterate_history` / `posts history`
+4. `POST data/global-stream` → `PostsAPI.global_stream` + `iterate_global_stream` / `posts global-stream`
+5. `POST data/community-list/{communityId}` → `PostsAPI.community_list` + `iterate_community_list` / `posts community-list`
+6. `POST data/check-visibility` → `PostsAPI.check_visibility` / `posts check-visibility`
+7. `POST data/check-visibility-with-comments` → `PostsAPI.check_visibility_with_comments` / `posts check-visibility --with-comments`
+
+New facades: `PostCapabilities`, `PostHistoryEventList`, `VisibilityResult`, `GlobalPostStream`.
+
+### Open question resolutions
+
+**Q-v0.2-1 — `global-stream` request shape:** All parameters go via query params (`syncToken`,
+`pageToken`, `loadMainAttachment*`). No request body DTO. Confirmed from swagger inspection.
+
+**Q-v0.2-2 — `community-list` vs `list/community`:** `data/community-list` uses
+`ListCommunityPostsRequestDTO` (basic filters: title, description, date ranges, workflow status).
+`data/list/community` uses `ListCommunityPostsFilteredRequestDTO` (richer options including
+full-text `containsText`, `loadPostDetails` query flag, capabilities preloading). Documented
+in `docs/cli.md` to avoid confusion.
+
+**Q-v0.2-3 — capabilities field set:** Curated CLI table shows: `can_view_detail`, `can_modify`,
+`can_delete`, `can_view_comment`, `can_add_comment`, `can_edit_like`, `can_edit_follow`. Full
+fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (int enum),
+`canEditAttachments`, `canEditVisibility`, `canCreateTask`, `canEditWorkflowScreenData`,
+`workflowPermittedOperations`.
+
+**Codegen stub → typed mapping (Q5 pattern):**
+- `GetPostCapabilitiesResponseDTO` → `RootModel[Any]` stub; bind to `GetPostCapabilitiesResponseDTO1`
+- `PostActivityHistoryEventDTO` → `RootModel[Any]` stub; bind to `PostActivityHistoryEventDTO1`
+- `CheckVisibilityWithCommentsResponseElementDTO` → `RootModel[Any]` stub; bind to `CheckVisibilityWithCommentsResponseElementDTO1`
+- `BasePostsStreamChunkElementDTO` → `RootModel[Any]` stub; bind to `BasePostsStreamChunkElementDTOModel`
+
+### Verification
+
+- `uv run ruff check .` — all checks passed.
+- `uv run ruff format --check .` — all files formatted.
+- `uv run mypy src` — no issues in 36 source files.
+- `uv run pytest --cov --cov-fail-under=85` — 449 passed, 7 skipped; coverage **92.18%**;
+  44 snapshots passed.
+- `uv run pytest -m contract` — 45 passed.

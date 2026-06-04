@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "id": 21269,
+      "communityId": 79,
+      "title": "Stream Post One",
+      "descriptionPlainText": "Hello from stream",
+      "visibility": 1
+    }
+  ],
+  "nextSyncToken": "sync_abc123",
+  "nextPageToken": null
+}

@@ -1,0 +1,17 @@
+{
+  "canViewDetail": true,
+  "canModify": false,
+  "canCopy": true,
+  "canDelete": false,
+  "canViewComment": true,
+  "canAddComment": true,
+  "canEditComment": 1,
+  "canDeleteComment": 1,
+  "canEditLike": true,
+  "canEditFollow": true,
+  "canEditAttachments": false,
+  "canEditVisibility": false,
+  "canCreateTask": false,
+  "workflowPermittedOperations": [],
+  "canEditWorkflowScreenData": false
+}

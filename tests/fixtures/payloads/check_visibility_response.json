@@ -1,0 +1,12 @@
+{
+  "posts": [
+    {
+      "id": 21269,
+      "canViewComments": true
+    },
+    {
+      "id": 21270,
+      "canViewComments": false
+    }
+  ]
+}

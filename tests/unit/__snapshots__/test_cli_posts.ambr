@@ -1,4 +1,62 @@
 # serializer version: 1
+# name: TestPostsCapabilities.test_json_output
+  '''
+  {
+    "can_view_detail": true,
+    "can_modify": false,
+    "can_delete": false,
+    "can_view_comment": true,
+    "can_add_comment": true,
+    "can_edit_like": true,
+    "can_edit_follow": true
+  }
+  
+  '''
+# ---
+# name: TestPostsCapabilities.test_table_output
+  '''
+   Capabilities (post 21269)  
+  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+  ┃ Key              ┃ Value ┃
+  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+  │ can_view_detail  │ True  │
+  │ can_modify       │ False │
+  │ can_delete       │ False │
+  │ can_view_comment │ True  │
+  │ can_add_comment  │ True  │
+  │ can_edit_like    │ True  │
+  │ can_edit_follow  │ True  │
+  └──────────────────┴───────┘
+  
+  '''
+# ---
+# name: TestPostsCheckVisibility.test_json_output
+  '''
+  [
+    {
+      "id": 21269,
+      "can_view_comments": true
+    },
+    {
+      "id": 21270,
+      "can_view_comments": false
+    }
+  ]
+  
+  '''
+# ---
+# name: TestPostsCheckVisibility.test_table_output
+  '''
+        Visibility check       
+  ┏━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+  ┃ id    ┃ can_view_comments ┃
+  ┡━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+  │ 21269 │ True              │
+  │ 21270 │ False             │
+  └───────┴───────────────────┘
+  
+  '''
+# ---
 # name: TestPostsComments.test_table_output
   '''
                    Comments (post 21269)                  
@@ -7,6 +65,31 @@
   ┡━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
   │ 5501 │ Ottimo aggiornamento, grazie! │ 1748001000000 │
   └──────┴───────────────────────────────┴───────────────┘
+  
+  '''
+# ---
+# name: TestPostsCommunityList.test_json_output
+  '''
+  [
+    {
+      "id": 21269,
+      "title": "Aggiornamento procedure sicurezza Q2 2026",
+      "community_id": 79,
+      "creation_ts": 1748000000000
+    }
+  ]
+  
+  '''
+# ---
+# name: TestPostsCommunityList.test_table_output
+  '''
+                        Posts community-list (community 79)                       
+  ┏━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+  ┃ id    ┃ title                                 ┃ community_id ┃ creation_ts   ┃
+  ┡━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+  │ 21269 │ Aggiornamento procedure sicurezza Q2  │ 79           │ 1748000000000 │
+  │       │ 2026                                  │              │               │
+  └───────┴───────────────────────────────────────┴──────────────┴───────────────┘
   
   '''
 # ---
@@ -41,6 +124,95 @@
   │ comments_count │ 2                                                           │
   │ likes_count    │ 1                                                           │
   └────────────────┴─────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsGetByClientUid.test_json_output
+  '''
+  {
+    "id": 21269,
+    "title": "Aggiornamento procedure sicurezza Q2 2026",
+    "community_id": 79,
+    "description": "Si comunicano le nuove procedure di sicurezza in vigore dal 1 luglio 2026.",
+    "creation_ts": 1748000000000,
+    "last_modify_ts": null,
+    "comments_count": 2,
+    "likes_count": 1
+  }
+  
+  '''
+# ---
+# name: TestPostsGetByClientUid.test_table_output
+  '''
+                              Post (clientUid=uid-abc)                            
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value                                                       ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 21269                                                       │
+  │ title          │ Aggiornamento procedure sicurezza Q2 2026                   │
+  │ community_id   │ 79                                                          │
+  │ description    │ Si comunicano le nuove procedure di sicurezza in vigore dal │
+  │                │ 1 luglio 2026.                                              │
+  │ creation_ts    │ 1748000000000                                               │
+  │ last_modify_ts │                                                             │
+  │ comments_count │ 2                                                           │
+  │ likes_count    │ 1                                                           │
+  └────────────────┴─────────────────────────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsGlobalStream.test_json_output
+  '''
+  [
+    {
+      "id": 21269,
+      "title": "Stream Post One",
+      "community_id": 79,
+      "creation_ts": null
+    }
+  ]
+  
+  '''
+# ---
+# name: TestPostsGlobalStream.test_table_output
+  '''
+                       Global stream                      
+  ┏━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+  ┃ id    ┃ title           ┃ community_id ┃ creation_ts ┃
+  ┡━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+  │ 21269 │ Stream Post One │ 79           │             │
+  └───────┴─────────────────┴──────────────┴─────────────┘
+  
+  '''
+# ---
+# name: TestPostsHistory.test_json_output
+  '''
+  [
+    {
+      "id": 1001,
+      "type_id": 1,
+      "type_description": "Creato post",
+      "timestamp": 1700000000000
+    },
+    {
+      "id": 1002,
+      "type_id": 2,
+      "type_description": "Modificato post",
+      "timestamp": 1700001000000
+    }
+  ]
+  
+  '''
+# ---
+# name: TestPostsHistory.test_table_output
+  '''
+                  History (post 21269)                 
+  ┏━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+  ┃ id   ┃ type_id ┃ type_description ┃ timestamp     ┃
+  ┡━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+  │ 1001 │ 1       │ Creato post      │ 1700000000000 │
+  │ 1002 │ 2       │ Modificato post  │ 1700001000000 │
+  └──────┴─────────┴──────────────────┴───────────────┘
   
   '''
 # ---
