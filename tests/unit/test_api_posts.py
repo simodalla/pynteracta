@@ -192,6 +192,31 @@ class TestPostsAPI:
         assert result.items_typed[0].id == payload["items"][0]["id"]
 
     @respx.mock
+    def test_history_workflow_screen_data_nullable(self) -> None:
+        # Regression: API can return null values inside workflowScreenData dict
+        payload = {
+            "items": [
+                {
+                    "id": 1003,
+                    "timestamp": 1700002000000,
+                    "typeId": 6,
+                    "typeDescription": "Executed post workflow operation.",
+                    "postId": _POST_ID,
+                    "workflowScreenData": {"5139": None, "5170": [{"id": 1, "label": "Cat A"}]},
+                }
+            ],
+            "nextPageToken": None,
+            "totalItemsCount": 1,
+        }
+        respx.post(f"{BASE_URL}/communication/posts/data/history-list/{_POST_ID}").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        api = PostsAPI(make_transport())
+        result = api.history(_POST_ID)
+        item = result.items_typed[0]
+        assert item.workflowScreenData == {"5139": None, "5170": [{"id": 1, "label": "Cat A"}]}
+
+    @respx.mock
     def test_iterate_history(self) -> None:
         page1 = {
             "items": [{"id": 1, "typeId": 1, "typeDescription": "Creato", "timestamp": 1000}],

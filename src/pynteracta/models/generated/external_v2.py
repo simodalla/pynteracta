@@ -2998,7 +2998,7 @@ class PostActivityHistoryEventDTO1(BaseModel):
         ),
     ] = None
     workflowScreenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Campi screen di workflow.')
+        dict[str, Any] | None, Field(description='Campi screen di workflow.')
     ] = None
     updatedWorkflowScreenFieldIds: Annotated[
         list[int] | None,
