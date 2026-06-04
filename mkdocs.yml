@@ -35,6 +35,7 @@ nav:
   - URL Construction: urls.md
   - CLI Reference: cli.md
   - Audit Logging: logging.md
+  - Development Workflow: development-workflow.md
   - Examples:
       - List Users: examples/list-users.md
       - Fetch a Post: examples/fetch-post.md
