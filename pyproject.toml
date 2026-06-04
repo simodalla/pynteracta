@@ -38,6 +38,8 @@ pynteracta = "pynteracta.cli:app"
 
 [project.optional-dependencies]
 yaml = ["ruamel.yaml>=0.18"]
+parquet = ["pyarrow>=18"]
+export = ["ruamel.yaml>=0.18", "pyarrow>=18"]
 
 [project.urls]
 Homepage = "https://gitlab.com/pynteracta/pynteracta"
@@ -56,6 +58,8 @@ dev = [
     "mkdocs-material>=9",
     "mkdocstrings[python]>=0.29",
     "python-semantic-release>=9",
+    "ruamel.yaml>=0.18",
+    "pyarrow>=18",
 ]
 
 [tool.hatch.version]

@@ -40,9 +40,7 @@ class TestPerCommandOutputPlacement:
         mock_json(
             "GET", "communication/settings/communities", load_payload("communities_list.json")
         )
-        result = runner.invoke(
-            app, ["communities", "list", "--output", "json"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["communities", "list", "--output", "json"], env=BASE_ENV)
         assert result.exit_code == 0
         assert "[" in result.output
 
@@ -53,9 +51,7 @@ class TestPerCommandOutputPlacement:
             "communication/settings/communities/10/details",
             load_payload("community_details.json"),
         )
-        result = runner.invoke(
-            app, ["communities", "details", "10", "-o", "json"], env=BASE_ENV
-        )
+        result = runner.invoke(app, ["communities", "details", "10", "-o", "json"], env=BASE_ENV)
         assert result.exit_code == 0
         assert "{" in result.output
 

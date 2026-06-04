@@ -748,3 +748,76 @@ needed no structural change.
 - `uv run mypy src` — no issues in 35 source files.
 - `uv run pytest --cov --cov-fail-under=85` — 379 passed, 8 skipped; coverage **90.34%**;
   32 snapshots passed.
+
+---
+
+## M14 — Data export to external files (`--export`)  *(2026-06-03)*
+
+### Feature summary
+
+Added `--export PATH` and `--export-format {csv,json,yaml,parquet}` per-command options to all
+data-emitting commands (`auth whoami`; `users list/me/profile/get-for-edit`; `posts get/list/comments`;
+`communities list/details/details-bulk/post-definition/post-definitions`; `catalogs list/entries`).
+
+When `--export` is set the resolved records are written to the specified file instead of the
+console. The format is inferred from the file extension (`.csv`, `.json`, `.yaml`/`.yml`,
+`.parquet`); `--export-format` overrides the inferred format. A one-line summary
+(`Wrote N records to <path> (<format>)`) is printed to stdout; `--quiet` suppresses it.
+
+### Design decisions made beyond the spec
+
+- **`single_command` parameter added to `render_output`** — single-object commands
+  (`posts get`, `users me`, etc.) pass `single_command=True`. This controls both the export
+  shape (JSON/YAML: single dict vs array) and the console rendering (key-value table vs row
+  table) in a unified way, eliminating the previous `len(items)==1` heuristic that broke list
+  commands returning one result.
+- **Unified rendering path** — all commands (including the curated no-flags path) now go through
+  `render_output`. The previous split of `render_output` (full/fields only) + direct
+  `print_output` (curated) has been eliminated; this makes export handling uniform with no
+  per-command serialization code.
+- **Pre-flight format validation** — `validate_export_options(export, export_format)` is called
+  immediately after `validate_full_fields`, before the API call, so unknown-extension errors are
+  reported fast without a network round-trip.
+- **`communities post-definitions` handled inline** — this command uses a custom cross-community
+  loop; export is handled via a direct `export_records` call rather than going through
+  `render_output`.
+
+### New packaging extras
+
+- `[parquet]` = `pyarrow>=18`
+- `[export]` = `ruamel.yaml>=0.18` + `pyarrow>=18`
+- Both added to the `dev` dependency group so all four formats are exercised in CI.
+
+### Files changed
+
+- `src/pynteracta/cli/_export.py` — new module: `infer_export_format`, `export_records`,
+  `_write_csv/json/yaml/parquet`, `_ordered_union_columns`, `_check_parquet_available`.
+- `src/pynteracta/cli/_common.py` — `ExportOption`, `ExportFormatOption`, `ExportFormat` type,
+  `validate_export_options`; `render_output` gains `export_path`, `export_format`, `quiet`,
+  `single_command` params and unified curated/full/fields path.
+- `src/pynteracta/cli/posts.py` — all 3 commands wired; refactored to always use `render_output`.
+- `src/pynteracta/cli/users.py` — all 4 commands wired; refactored to always use `render_output`.
+- `src/pynteracta/cli/auth.py` — `whoami` wired.
+- `src/pynteracta/cli/communities.py` — all 5 commands wired.
+- `src/pynteracta/cli/catalogs.py` — both commands wired.
+- `pyproject.toml` — `[parquet]`, `[export]` extras; `ruamel.yaml`, `pyarrow` in dev deps.
+- `tests/unit/test_cli_export.py` — 29 new tests covering all four formats, format inference,
+  `--export-format` override, unknown-extension exit, summary line, `--quiet`, overwrite,
+  parent-dir creation, composition with `--full` / `--fields` / `--web-url`, nested values.
+- `docs/cli.md` — documented `--export`, `--export-format`, format inference table, composition rules.
+- `README.md` — documented `[parquet]` and `[export]` install extras.
+
+### Future enhancements (out of scope)
+
+- Streaming/chunked export for very large `--all` result sets.
+- Multiple `--export` targets in one run.
+- Mapping custom-field IDs to human labels.
+- Configurable CSV delimiter/encoding.
+
+### Verification
+
+- `uv run ruff check .` — all checks passed.
+- `uv run ruff format --check .` — 67 files already formatted.
+- `uv run mypy src` — no issues in 36 source files.
+- `uv run pytest --cov --cov-fail-under=85` — 409 passed, 7 skipped; coverage **91.71%**;
+  32 snapshots passed.

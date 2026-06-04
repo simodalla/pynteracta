@@ -15,18 +15,19 @@ from pynteracta.auth import FileTokenCache, MemoryTokenCache, load_service_accou
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    ExportFormatOption,
+    ExportOption,
     FieldsOption,
     FullOption,
     OutputOption,
     _profile_overrides,
     build_client,
     config_path_from_state,
-    dump_full,
     handle_error,
     make_console,
-    print_output,
+    render_output,
     resolve_output,
-    select_fields,
+    validate_export_options,
     validate_full_fields,
 )
 from pynteracta.client import InteractaClient, _default_token_cache_dir
@@ -215,38 +216,46 @@ def _login_google(
 
 
 @app.command("whoami")
-def whoami(
+def whoami(  # noqa: PLR0913
     ctx: typer.Context,
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """Show identity of the authenticated principal."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             me = client.users.me()
-            ud = me.user_data_typed
+
+        def _curated_me(obj: object) -> dict[str, object]:
+            ud = getattr(obj, "user_data_typed", None)
             if ud is not None:
-                curated: dict[str, object] = ud.model_dump(mode="json", exclude_none=True)
-            else:
-                curated = {
-                    "has_google_credentials": me.has_google_credentials,
-                    "has_microsoft_credentials": me.has_microsoft_credentials,
-                }
+                return ud.model_dump(mode="json", exclude_none=True)  # type: ignore[no-any-return]
+            return {
+                "has_google_credentials": getattr(obj, "has_google_credentials", None),
+                "has_microsoft_credentials": getattr(obj, "has_microsoft_credentials", None),
+            }
+
         fmt = resolve_output(state, output)
-        if full or fields is not None:
-            full_data = dump_full(me, exclude_none=fields is None)
-            if fields is not None:
-                field_list = [f.strip() for f in fields.split(",") if f.strip()]
-                rendered: dict[str, object] = select_fields(full_data, field_list)
-            else:
-                rendered = full_data
-            print_output(rendered, fmt, console=console, title="Current User")
-        else:
-            print_output(curated, fmt, console=console, title="Current User")
+        render_output(
+            fmt,
+            [me],
+            _curated_me,
+            full=full,
+            fields=fields,
+            console=console,
+            title="Current User",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 

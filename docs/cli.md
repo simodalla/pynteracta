@@ -101,6 +101,59 @@ and an explanatory message.
 When `--web-url` is set the computed URL is appended as an extra field in the output regardless
 of which mode is active.
 
+### `--export PATH` — write output to a file
+
+`--export` is a **per-command** flag available on all data-emitting commands. It writes the
+resolved data to an external file instead of printing it to the console. A one-line summary is
+printed to stdout (`Wrote N records to <path> (<format>)`), suppressed by `--quiet`.
+
+```bash
+pynteracta posts list --community 79 --export posts.json
+pynteracta users list --full --export users.csv
+pynteracta posts get 21269 --export post.yaml
+```
+
+**Format inference** — the format is inferred from the file extension:
+
+| Extension | Format |
+|-----------|--------|
+| `.csv` | CSV |
+| `.json` | JSON |
+| `.yaml`, `.yml` | YAML |
+| `.parquet` | Parquet |
+
+If the extension is unknown or absent use `--export-format` to specify the format explicitly:
+
+```bash
+pynteracta posts list --community 79 --export data.out --export-format csv
+```
+
+Providing an unknown extension without `--export-format` exits with code 2 (`EXIT_CONFIG`).
+Providing an unknown `--export-format` value also exits with code 2. `--export-format` without
+`--export` is silently ignored.
+
+**Composition with `--full` / `--fields` / `--web-url`** — export honours all three flags with
+the same semantics as console output. The file content is always driven by the export format;
+`--output` does not affect the file (it controls console rendering only, and when `--export` is
+set the data is not rendered to the console at all).
+
+**Single vs list shape** — single-object commands (e.g. `posts get`, `users me`) export exactly
+one record. For JSON and YAML the file contains a single object (not wrapped in an array). List
+commands (e.g. `posts list`, `users list`) always export an array.
+
+**CSV / Parquet specifics** — both formats are always row-oriented (single-object → header + 1
+row). Column set = ordered union of all record keys (first-seen order). Nested values (dicts /
+lists) are serialised as compact JSON strings in the cell. Missing keys in a given row → empty
+cell. `None` → empty string (CSV) or `null` (Parquet).
+
+**File creation** — existing files are overwritten (shell-redirect semantics). Missing parent
+directories are created automatically.
+
+### `--export-format {csv,json,yaml,parquet}` — explicit format override
+
+Optional per-command flag to override the format inferred from the file extension. See
+`--export` above for the full rules.
+
 ## auth
 
 ### `auth login`

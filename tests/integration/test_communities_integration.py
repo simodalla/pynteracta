@@ -21,9 +21,9 @@ def _require_env(name: str) -> str:
 
 @pytest.fixture
 def client() -> InteractaClient:
-    from pathlib import Path
+    from pathlib import Path  # noqa: PLC0415
 
-    from pynteracta.auth import load_service_account_key
+    from pynteracta.auth import load_service_account_key  # noqa: PLC0415
 
     base_url = _require_env("PYNTERACTA_BASE_URL")
     base_path = os.environ.get("PYNTERACTA_BASE_PATH", "/portal")
@@ -32,7 +32,9 @@ def client() -> InteractaClient:
     if not sa_path.exists():
         pytest.skip(f"Service account key not found: {sa_path}")
     credentials = load_service_account_key(sa_path)
-    return InteractaClient(base_url, base_path=base_path, api_version=api_version, credentials=credentials)
+    return InteractaClient(
+        base_url, base_path=base_path, api_version=api_version, credentials=credentials
+    )
 
 
 class TestCommunitiesIntegration:

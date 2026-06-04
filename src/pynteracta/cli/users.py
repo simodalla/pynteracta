@@ -10,17 +10,17 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    ExportFormatOption,
+    ExportOption,
     FieldsOption,
     FullOption,
     OutputOption,
     build_client,
-    dump_full,
     handle_error,
     make_console,
-    print_output,
     render_output,
     resolve_output,
-    select_fields,
+    validate_export_options,
     validate_full_fields,
 )
 from pynteracta.exceptions import InteractaError
@@ -66,11 +66,14 @@ def users_list(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """List system users."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
 
     filters: dict[str, Any] = {}
     if full_text is not None:
@@ -97,96 +100,112 @@ def users_list(  # noqa: PLR0913
                 uid = getattr(obj, "id", None)
                 return {"web_url": client.web_urls.user(int(uid))} if show_web_url and uid else {}
 
-            if full or fields is not None:
-                render_output(
-                    fmt,
-                    items,
-                    _curated,
-                    full=full,
-                    fields=fields,
-                    extra_fn=_extra if show_web_url else None,
-                    console=console,
-                    title="Users",
-                )
-            else:
-                rows: list[dict[str, object]] = [_curated(item) for item in items]
-                print_output(rows, resolve_output(state, output), console=console, title="Users")
+            render_output(
+                fmt,
+                items,
+                _curated,
+                full=full,
+                fields=fields,
+                extra_fn=_extra if show_web_url else None,
+                console=console,
+                title="Users",
+                export_path=export,
+                export_format=export_format,
+                quiet=state.quiet,
+            )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 
 
 @app.command("me")
-def users_me(
+def users_me(  # noqa: PLR0913
     ctx: typer.Context,
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """Show identity of the authenticated principal (GET /core/auth/current-user-data)."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             me = client.users.me()
-            ud = me.user_data_typed
+
+        def _curated_me(obj: object) -> dict[str, object]:
+            ud = getattr(obj, "user_data_typed", None)
             if ud is not None:
-                curated: dict[str, object] = ud.model_dump(mode="json", exclude_none=True)
-            else:
-                curated = {
-                    "has_google_credentials": me.has_google_credentials,
-                    "has_microsoft_credentials": me.has_microsoft_credentials,
-                }
+                return ud.model_dump(mode="json", exclude_none=True)  # type: ignore[no-any-return]
+            return {
+                "has_google_credentials": getattr(obj, "has_google_credentials", None),
+                "has_microsoft_credentials": getattr(obj, "has_microsoft_credentials", None),
+            }
+
         fmt = resolve_output(state, output)
-        if full or fields is not None:
-            full_data = dump_full(me, exclude_none=fields is None)
-            if fields is not None:
-                field_list = [f.strip() for f in fields.split(",") if f.strip()]
-                rendered: dict[str, object] = select_fields(full_data, field_list)
-            else:
-                rendered = full_data
-            print_output(rendered, fmt, console=console, title="Current User")
-        else:
-            print_output(curated, fmt, console=console, title="Current User")
+        render_output(
+            fmt,
+            [me],
+            _curated_me,
+            full=full,
+            fields=fields,
+            console=console,
+            title="Current User",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
 
 
 @app.command("profile")
-def users_profile(
+def users_profile(  # noqa: PLR0913
     ctx: typer.Context,
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """Show people-directory profile (GET /core/user-profile/info)."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             prof = client.users.profile()
-        fmt = resolve_output(state, output)
-        if full or fields is not None:
-            full_data = dump_full(prof, exclude_none=fields is None)
-            if fields is not None:
-                field_list = [f.strip() for f in fields.split(",") if f.strip()]
-                rendered: dict[str, object] = select_fields(full_data, field_list)
-            else:
-                rendered = full_data
-            print_output(rendered, fmt, console=console, title="User Profile")
-        else:
-            data: dict[str, object] = {
-                "id": prof.id,
-                "first_name": prof.first_name,
-                "last_name": prof.last_name,
-                "caption": prof.caption,
-                "contact_email": prof.contact_email,
-                "account_photo_url": prof.account_photo_url,
+
+        def _curated_profile(obj: object) -> dict[str, object]:
+            return {
+                "id": getattr(obj, "id", None),
+                "first_name": getattr(obj, "first_name", None),
+                "last_name": getattr(obj, "last_name", None),
+                "caption": getattr(obj, "caption", None),
+                "contact_email": getattr(obj, "contact_email", None),
+                "account_photo_url": getattr(obj, "account_photo_url", None),
             }
-            print_output(data, fmt, console=console, title="User Profile")
+
+        fmt = resolve_output(state, output)
+        render_output(
+            fmt,
+            [prof],
+            _curated_profile,
+            full=full,
+            fields=fields,
+            console=console,
+            title="User Profile",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -203,38 +222,48 @@ def users_get_for_edit(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """Fetch a user record for editing (requires admin permissions)."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             user = client.users.get_for_edit(user_id)
             web_url = client.web_urls.user(user_id) if show_web_url else None
-        fmt = resolve_output(state, output)
-        if full or fields is not None:
-            full_data = dump_full(user, exclude_none=fields is None)
-            if web_url is not None:
-                full_data["web_url"] = web_url
-            if fields is not None:
-                field_list = [f.strip() for f in fields.split(",") if f.strip()]
-                rendered: dict[str, object] = select_fields(full_data, field_list)
-            else:
-                rendered = full_data
-            print_output(rendered, fmt, console=console, title=f"User {user_id}")
-        else:
-            data: dict[str, object] = {
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "contact_email": user.contact_email,
-                "external_id": user.external_id,
-                "blocked": user.blocked,
-                "account_photo_url": user.account_photo_url,
+
+        def _curated(obj: object) -> dict[str, object]:
+            return {
+                "first_name": getattr(obj, "first_name", None),
+                "last_name": getattr(obj, "last_name", None),
+                "contact_email": getattr(obj, "contact_email", None),
+                "external_id": getattr(obj, "external_id", None),
+                "blocked": getattr(obj, "blocked", None),
+                "account_photo_url": getattr(obj, "account_photo_url", None),
+                **({"web_url": web_url} if web_url is not None else {}),
             }
-            if web_url is not None:
-                data["web_url"] = web_url
-            print_output(data, fmt, console=console, title=f"User {user_id}")
+
+        def _extra(obj: object) -> dict[str, Any]:
+            return {"web_url": web_url} if web_url is not None else {}
+
+        fmt = resolve_output(state, output)
+        render_output(
+            fmt,
+            [user],
+            _curated,
+            full=full,
+            fields=fields,
+            extra_fn=_extra if show_web_url else None,
+            console=console,
+            title=f"User {user_id}",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

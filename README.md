@@ -12,8 +12,12 @@ v1.0). Download the latest `dist/*.whl` from the pipeline artifacts, then:
 
 ```bash
 uv pip install pynteracta-0.1.0-py3-none-any.whl
-# or with the YAML output extra:
+# with YAML output support:
 uv pip install "pynteracta-0.1.0-py3-none-any.whl[yaml]"
+# with Parquet export support:
+uv pip install "pynteracta-0.1.0-py3-none-any.whl[parquet]"
+# with all export formats (yaml + parquet):
+uv pip install "pynteracta-0.1.0-py3-none-any.whl[export]"
 ```
 
 ## Quickstart — library

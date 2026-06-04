@@ -10,15 +10,17 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    ExportFormatOption,
+    ExportOption,
     FieldsOption,
     FullOption,
     OutputOption,
     build_client,
     handle_error,
     make_console,
-    print_output,
     render_output,
     resolve_output,
+    validate_export_options,
     validate_full_fields,
 )
 from pynteracta.exceptions import InteractaError
@@ -40,31 +42,31 @@ def catalogs_list(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """List post-definition catalogs (POST /communication/settings/post-definition/catalogs)."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             result = client.catalogs.list(ids, load_entries=load_entries)
             items = list(result.items_typed)
         fmt = resolve_output(state, output)
-        if full or fields is not None:
-            render_output(
-                fmt,
-                items,
-                lambda c: {"id": c.id, "name": c.name, "paged": c.paged},
-                full=full,
-                fields=fields,
-                console=console,
-                title="Catalogs",
-            )
-        else:
-            rows: list[dict[str, object]] = [
-                {"id": c.id, "name": c.name, "paged": c.paged} for c in items
-            ]
-            print_output(rows, fmt, console=console, title="Catalogs")
+        render_output(
+            fmt,
+            items,
+            lambda c: {"id": c.id, "name": c.name, "paged": c.paged},
+            full=full,
+            fields=fields,
+            console=console,
+            title="Catalogs",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -97,11 +99,14 @@ def catalogs_entries(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """List entries for a catalog."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
 
     common_kwargs: dict[str, Any] = {}
     if label is not None:
@@ -124,22 +129,18 @@ def catalogs_entries(  # noqa: PLR0913
                 items = list(result.items_typed)
 
         fmt = resolve_output(state, output)
-        title = f"Catalog {catalog_id} Entries"
-        if full or fields is not None:
-            render_output(
-                fmt,
-                items,
-                lambda e: {"id": e.id, "label": e.label, "external_id": e.external_id},
-                full=full,
-                fields=fields,
-                console=console,
-                title=title,
-            )
-        else:
-            rows: list[dict[str, object]] = [
-                {"id": e.id, "label": e.label, "external_id": e.external_id} for e in items
-            ]
-            print_output(rows, fmt, console=console, title=title)
+        render_output(
+            fmt,
+            items,
+            lambda e: {"id": e.id, "label": e.label, "external_id": e.external_id},
+            full=full,
+            fields=fields,
+            console=console,
+            title=f"Catalog {catalog_id} Entries",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

@@ -10,17 +10,17 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    ExportFormatOption,
+    ExportOption,
     FieldsOption,
     FullOption,
     OutputOption,
     build_client,
-    dump_full,
     handle_error,
     make_console,
-    print_output,
     render_output,
     resolve_output,
-    select_fields,
+    validate_export_options,
     validate_full_fields,
 )
 from pynteracta.exceptions import InteractaError
@@ -54,40 +54,50 @@ def posts_get(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """Fetch a single post by ID."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             post = client.posts.get(post_id)
             web_url = client.web_urls.post(post_id) if show_web_url else None
-        fmt = resolve_output(state, output)
-        if full or fields is not None:
-            full_data = dump_full(post, exclude_none=fields is None)
-            if web_url is not None:
-                full_data["web_url"] = web_url
-            if fields is not None:
-                field_list = [f.strip() for f in fields.split(",") if f.strip()]
-                rendered: dict[str, object] = select_fields(full_data, field_list)
-            else:
-                rendered = full_data
-            print_output(rendered, fmt, console=console, title=f"Post {post_id}")
-        else:
-            data: dict[str, object] = {
-                "id": post.id,
-                "title": post.title,
-                "community_id": post.community_id,
-                "description": post.description_plain_text,
-                "creation_ts": post.creation_timestamp,
-                "last_modify_ts": post.last_modify_timestamp,
-                "comments_count": post.comments_count,
-                "likes_count": post.likes_count,
+
+        def _curated(obj: object) -> dict[str, object]:
+            return {
+                "id": getattr(obj, "id", None),
+                "title": getattr(obj, "title", None),
+                "community_id": getattr(obj, "community_id", None),
+                "description": getattr(obj, "description_plain_text", None),
+                "creation_ts": getattr(obj, "creation_timestamp", None),
+                "last_modify_ts": getattr(obj, "last_modify_timestamp", None),
+                "comments_count": getattr(obj, "comments_count", None),
+                "likes_count": getattr(obj, "likes_count", None),
+                **({"web_url": web_url} if web_url is not None else {}),
             }
-            if web_url is not None:
-                data["web_url"] = web_url
-            print_output(data, fmt, console=console, title=f"Post {post_id}")
+
+        def _extra(obj: object) -> dict[str, Any]:
+            return {"web_url": web_url} if web_url is not None else {}
+
+        fmt = resolve_output(state, output)
+        render_output(
+            fmt,
+            [post],
+            _curated,
+            full=full,
+            fields=fields,
+            extra_fn=_extra if show_web_url else None,
+            console=console,
+            title=f"Post {post_id}",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -116,11 +126,14 @@ def posts_list(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """List posts in a community."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
 
     filters: dict[str, Any] = {}
     if full_text is not None:
@@ -150,20 +163,19 @@ def posts_list(  # noqa: PLR0913
                 pid = getattr(obj, "id", None)
                 return {"web_url": client.web_urls.post(int(pid))} if show_web_url and pid else {}
 
-            if full or fields is not None:
-                render_output(
-                    fmt,
-                    items,
-                    _curated,
-                    full=full,
-                    fields=fields,
-                    extra_fn=_extra if show_web_url else None,
-                    console=console,
-                    title=title,
-                )
-            else:
-                rows: list[dict[str, object]] = [_curated(item) for item in items]
-                print_output(rows, fmt, console=console, title=title)
+            render_output(
+                fmt,
+                items,
+                _curated,
+                full=full,
+                fields=fields,
+                extra_fn=_extra if show_web_url else None,
+                console=console,
+                title=title,
+                export_path=export,
+                export_format=export_format,
+                quiet=state.quiet,
+            )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
@@ -184,11 +196,14 @@ def posts_comments(  # noqa: PLR0913
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
 ) -> None:
     """List comments on a post."""
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
     try:
         with build_client(state) as client:
             items = []
@@ -199,36 +214,26 @@ def posts_comments(  # noqa: PLR0913
                 result = client.posts.comments(post_id, page_size=page_size)
                 items = list(result.items_typed)
 
+        def _curated_comment(obj: object) -> dict[str, object]:
+            return {
+                "id": getattr(obj, "id", None),
+                "text": getattr(obj, "commentPlainText", None),
+                "creation_ts": getattr(obj, "creationTimestamp", None),
+            }
+
         fmt = resolve_output(state, output)
-        title = f"Comments (post {post_id})"
-        if full or fields is not None:
-
-            def _curated_comment(obj: object) -> dict[str, object]:
-                return {
-                    "id": getattr(obj, "id", None),
-                    "text": getattr(obj, "commentPlainText", None),
-                    "creation_ts": getattr(obj, "creationTimestamp", None),
-                }
-
-            render_output(
-                fmt,
-                items,
-                _curated_comment,
-                full=full,
-                fields=fields,
-                console=console,
-                title=title,
-            )
-        else:
-            rows: list[dict[str, object]] = [
-                {
-                    "id": getattr(item, "id", None),
-                    "text": getattr(item, "commentPlainText", None),
-                    "creation_ts": getattr(item, "creationTimestamp", None),
-                }
-                for item in items
-            ]
-            print_output(rows, fmt, console=console, title=title)
+        render_output(
+            fmt,
+            items,
+            _curated_comment,
+            full=full,
+            fields=fields,
+            console=console,
+            title=f"Comments (post {post_id})",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+        )
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
