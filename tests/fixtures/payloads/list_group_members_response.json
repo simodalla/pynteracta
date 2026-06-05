@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "id": 1042,
+      "firstName": "Alice",
+      "lastName": "Rossi",
+      "caption": "Senior Engineer",
+      "contactEmail": "alice@example.com",
+      "deleted": false,
+      "blocked": false,
+      "externalId": "usr-1042",
+      "serviceAccount": false,
+      "systemAccount": false
+    },
+    {
+      "id": 1099,
+      "firstName": "Bob",
+      "lastName": "Bianchi",
+      "caption": "Tech Lead",
+      "contactEmail": "bob@example.com",
+      "deleted": false,
+      "blocked": false,
+      "externalId": "usr-1099",
+      "serviceAccount": false,
+      "systemAccount": false
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}

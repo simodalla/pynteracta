@@ -47,3 +47,6 @@ class WebUrls:
 
     def community(self, community_id: int) -> str:
         return f"{self._prefix}/community/{community_id}"
+
+    def group(self, group_id: int) -> str:
+        return f"{self._prefix}/admin/group/{group_id}"

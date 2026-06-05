@@ -545,6 +545,59 @@ pynteracta attachments check-visibility 3001 --output json
 
 ---
 
+## `groups` commands
+
+List groups, their members, and fetch group detail. `groups get` uses the
+`admin/manage/groups/{groupId}/edit` endpoint (returns members + `occToken`).
+`--web-url` on `groups get` deep-links to the admin group page.
+
+### `groups list`
+
+```bash
+pynteracta groups list
+pynteracta groups list --filter engineering
+pynteracta groups list --order-by name --order-asc --all
+pynteracta groups list --output json
+```
+
+Sort is via `order_type_id` internally; valid `--order-by` values: `name`, `email`.
+
+### `groups members GROUP_ID`
+
+```bash
+pynteracta groups members 201
+pynteracta groups members 201 --all --page-size 50
+pynteracta groups members 201 --output json
+```
+
+### `groups get GROUP_ID`
+
+```bash
+pynteracta groups get 201
+pynteracta groups get 201 --web-url     # includes admin group URL
+pynteracta groups get 201 --output json --full
+```
+
+`occToken` is only accessible via `.raw.occToken` (propaedeutic edit token for future write use).
+
+---
+
+## `hashtags` commands
+
+List hashtags for a community. Uses the admin endpoint.
+
+### `hashtags list COMMUNITY_ID`
+
+```bash
+pynteracta hashtags list 79
+pynteracta hashtags list 79 --name engineering
+pynteracta hashtags list 79 --include-deleted --all
+pynteracta hashtags list 79 --output json
+pynteracta hashtags list 79 --export hashtags.csv
+```
+
+---
+
 ## `tasks` commands
 
 Fetch task detail. A task belongs to a post (`post_id`); `--web-url` deep-links to the **parent post**, since tasks have no standalone web view (D-v0.4-3).

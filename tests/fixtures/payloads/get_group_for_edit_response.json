@@ -1,0 +1,38 @@
+{
+  "id": 201,
+  "name": "Engineering",
+  "email": "engineering@example.com",
+  "description": "Engineering team",
+  "creationTimestamp": 1700000000000,
+  "lastModifyTimestamp": 1710000000000,
+  "visible": true,
+  "systemAccount": false,
+  "deleted": false,
+  "externalId": "eng-001",
+  "occToken": 5,
+  "membersCount": 2,
+  "tags": [
+    {"id": 10, "name": "dev", "visible": true, "deleted": false}
+  ],
+  "checkUserMemberResult": false,
+  "members": [
+    {
+      "id": 1042,
+      "firstName": "Alice",
+      "lastName": "Rossi",
+      "caption": "Senior Engineer",
+      "contactEmail": "alice@example.com",
+      "deleted": false,
+      "blocked": false
+    },
+    {
+      "id": 1099,
+      "firstName": "Bob",
+      "lastName": "Bianchi",
+      "caption": "Tech Lead",
+      "contactEmail": "bob@example.com",
+      "deleted": false,
+      "blocked": false
+    }
+  ]
+}

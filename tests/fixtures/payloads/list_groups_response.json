@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": 201,
+      "name": "Engineering",
+      "email": "engineering@example.com",
+      "description": "Engineering team",
+      "creationTimestamp": 1700000000000,
+      "lastModifyTimestamp": 1710000000000,
+      "visible": true,
+      "systemAccount": false,
+      "deleted": false,
+      "externalId": "eng-001",
+      "occToken": 1,
+      "membersCount": 12,
+      "tags": [
+        {"id": 10, "name": "dev", "visible": true, "deleted": false}
+      ],
+      "checkUserMemberResult": false
+    },
+    {
+      "id": 202,
+      "name": "Design",
+      "email": "design@example.com",
+      "description": "Design team",
+      "creationTimestamp": 1700000001000,
+      "lastModifyTimestamp": 1710000001000,
+      "visible": true,
+      "systemAccount": false,
+      "deleted": false,
+      "externalId": "des-001",
+      "occToken": 2,
+      "membersCount": 5,
+      "tags": [],
+      "checkUserMemberResult": false
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}
