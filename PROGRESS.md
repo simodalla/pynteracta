@@ -976,3 +976,48 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 
 - Write endpoints (`POST create-task`, `PUT edit-task`, `DELETE delete-task`) — deferred to the
   future write line. `occToken` carried through `.raw` for future write use.
+
+## M18 — Groups & Hashtags read (v0.5.0)
+
+### Done
+
+- `models/facade/groups.py` — `Group`, `GroupList`, `GroupMember`, `GroupMemberList`,
+  `GroupForEdit`, `Tag` facades. RootModel stubs re-validated against typed siblings.
+  Re-exported from `models/facade/__init__.py` and `models/__init__.py`.
+- `models/facade/hashtags.py` — `Hashtag`, `HashtagList` facades. `AdminHashtagDTOModel`
+  (stub) re-validated against `AdminHashtagDTO` (plain BaseModel). Re-exported.
+- `api/groups.py` — `GroupsAPI` with `list_groups` / `list_groups_raw` / `iterate_groups`,
+  `list_members` / `iterate_members`, `get_for_edit`. Note: method named `list_groups` (not
+  `list`) to avoid shadowing the builtin `list` type (mypy strict).
+- `api/hashtags.py` — `HashtagsAPI` with `list_for_community` / `list_for_community_raw` /
+  `iterate_for_community`.
+- `urls.py` — added `WebUrls.group(group_id)` → `{prefix}/admin/group/{id}`.
+- `client.py` — `self.groups = GroupsAPI(...)` and `self.hashtags = HashtagsAPI(...)` registered.
+- `cli/groups.py` — `groups list`, `groups members`, `groups get` (with `--web-url`).
+- `cli/hashtags.py` — `hashtags list COMMUNITY_ID` (with `--include-deleted`, `--name`).
+- Tests: unit (api, facade, CLI with syrupy snapshots), contract, integration smoke.
+- Fixtures: `list_groups_response.json`, `list_group_members_response.json`,
+  `get_group_for_edit_response.json`, `list_community_hashtags_response.json`.
+- Docs: `docs/cli.md` (groups + hashtags), `docs/api/groups.md`, `docs/api/hashtags.md`,
+  `mkdocs.yml` nav.
+- `.env.example` — added `PYNTERACTA_TEST_GROUP_ID`.
+
+### Decisions made beyond the plan
+
+- **`list` → `list_groups` rename:** mypy strict flags using `list` as a method name because it
+  shadows the builtin `list` type inside type annotations within the method. Renamed to
+  `list_groups` / `iterate_groups` to keep strict compliance.
+- **Codegen stub → typed mapping (Q5 pattern confirmed):**
+  - `ListSystemGroupsElementDTO` → `RootModel[Any]` stub; bind to `ListSystemGroupsElementDTOModel`.
+  - `AdminHashtagDTOModel` → `RootModel[Any]` stub; bind to `AdminHashtagDTO` (plain BaseModel).
+  - `TagDTO` → `RootModel[Any]` stub; bind to `TagDTO1`.
+  - `UserDTO` → `RootModel[Any]` stub; bind to `UserDTOModel` for member lists.
+- **`orderTypeId` vs `orderBy`:** `ListSystemGroupsRequestDTO` uses `orderTypeId` (not
+  `orderBy`). The API kwarg is `order_type_id` which snake_to_camel converts correctly.
+- **Q-v0.5-1 — `--web-url` for groups:** Added `WebUrls.group(group_id)` →
+  `{prefix}/admin/group/{id}`. Exposed on `groups get` only (not `groups list`).
+
+### Follow-ups
+
+- Write endpoints (create/edit/delete group, add/remove members) — deferred to the write line.
+  `occToken` from `get_for_edit` is carried through `.raw` for future write use.

@@ -31,6 +31,19 @@ from pynteracta.models.facade.communities import (
     PostDefinitionMap,
     PostFieldDefinition,
 )
+from pynteracta.models.facade.groups import (
+    Group,
+    GroupForEdit,
+    GroupList,
+    GroupMember,
+    GroupMemberList,
+    Tag,
+)
+from pynteracta.models.facade.hashtags import (
+    AdminListHashtagsRequestDTO,
+    Hashtag,
+    HashtagList,
+)
 from pynteracta.models.facade.posts import (
     CheckVisibilityRequestDTO,
     GlobalPostStream,
@@ -59,6 +72,7 @@ from pynteracta.models.facade.users import (
 )
 
 __all__ = [
+    "AdminListHashtagsRequestDTO",
     "AttachmentDetail",
     "AttachmentVisibility",
     "Catalog",
@@ -75,6 +89,13 @@ __all__ = [
     "GetPostDefinitionCatalogsRequestDTO",
     "GlobalPostStream",
     "GoogleOAuth2AccessTokenResponse",
+    "Group",
+    "GroupForEdit",
+    "GroupList",
+    "GroupMember",
+    "GroupMemberList",
+    "Hashtag",
+    "HashtagList",
     "ListCommunitiesRequestDTO",
     "ListCommunityPostsFilteredRequestDTO",
     "ListCommunityPostsRequestDTO",
@@ -95,6 +116,7 @@ __all__ = [
     "ServiceAccountTokenResponse",
     "SubTask",
     "SystemUserList",
+    "Tag",
     "Task",
     "TaskCapabilities",
     "TaskReminder",

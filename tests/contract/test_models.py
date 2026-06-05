@@ -650,3 +650,127 @@ class TestGetTaskDetail:
         facade = Task.from_dict(payload)
         assert facade.raw.occToken == _TASK_OCC_TOKEN
         assert facade.raw.descriptionDelta is not None
+
+
+# ---------------------------------------------------------------------------
+# 18. Groups & Hashtags (M18)
+# ---------------------------------------------------------------------------
+
+_GROUP_ID_CONTRACT = 201
+_GROUP_COUNT_CONTRACT = 2
+_GROUP_OCC_TOKEN_CONTRACT = 5
+_HASHTAG_ID_CONTRACT = 301
+_HASHTAG_COUNT_CONTRACT = 2
+
+
+class TestListSystemGroups:
+    from pynteracta.models.facade.groups import GroupList  # noqa: PLC0415
+
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListSystemGroupsRequestDTO",
+            generated.ListSystemGroupsRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListSystemGroupsResponseDTO",
+            generated.ListSystemGroupsResponseDTO,
+        )
+
+    def test_element_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListSystemGroupsElementDTO",
+            generated.ListSystemGroupsElementDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        from pynteracta.models.facade.groups import GroupList  # noqa: PLC0415
+
+        payload = load_payload("list_groups_response.json")
+        facade = GroupList.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.total_items_count == _GROUP_COUNT_CONTRACT
+        items = facade.items_typed
+        assert len(items) == _GROUP_COUNT_CONTRACT
+        assert items[0].id == _GROUP_ID_CONTRACT
+
+
+class TestListGroupMembers:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListGroupMembersRequestDTO",
+            generated.ListGroupMembersRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListGroupMembersResponseDTO",
+            generated.ListGroupMembersResponseDTO,
+        )
+
+
+class TestGetGroupForEdit:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetGroupForEditResponseDTO",
+            generated.GetGroupForEditResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        from pynteracta.models.facade.groups import GroupForEdit  # noqa: PLC0415
+
+        payload = load_payload("get_group_for_edit_response.json")
+        facade = GroupForEdit.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _GROUP_ID_CONTRACT
+        assert facade.raw.occToken == _GROUP_OCC_TOKEN_CONTRACT
+
+    def test_tag_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "TagDTO",
+            generated.TagDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+
+class TestAdminListHashtags:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "AdminListHashtagsRequestDTO",
+            generated.AdminListHashtagsRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "AdminListHashtagsResponseDTO",
+            generated.AdminListHashtagsResponseDTO,
+        )
+
+    def test_hashtag_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "AdminHashtagDTO",
+            generated.AdminHashtagDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        from pynteracta.models.facade.hashtags import HashtagList  # noqa: PLC0415
+
+        payload = load_payload("list_community_hashtags_response.json")
+        facade = HashtagList.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.total_items_count == _HASHTAG_COUNT_CONTRACT
+        items = facade.items_typed
+        assert len(items) == _HASHTAG_COUNT_CONTRACT
+        assert items[0].id == _HASHTAG_ID_CONTRACT

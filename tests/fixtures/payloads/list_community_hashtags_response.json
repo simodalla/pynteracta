@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "id": 301,
+      "name": "engineering",
+      "communityId": 79,
+      "externalId": "ht-301",
+      "deleted": false
+    },
+    {
+      "id": 302,
+      "name": "design",
+      "communityId": 79,
+      "externalId": "ht-302",
+      "deleted": false
+    }
+  ],
+  "nextPageToken": null,
+  "totalItemsCount": 2
+}

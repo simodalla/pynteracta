@@ -7,6 +7,7 @@ as the documented escape hatch.
 """
 
 from pynteracta.models.facade import (
+    AdminListHashtagsRequestDTO,
     AttachmentDetail,
     AttachmentVisibility,
     Catalog,
@@ -23,6 +24,13 @@ from pynteracta.models.facade import (
     GetPostDefinitionCatalogsRequestDTO,
     GlobalPostStream,
     GoogleOAuth2AccessTokenResponse,
+    Group,
+    GroupForEdit,
+    GroupList,
+    GroupMember,
+    GroupMemberList,
+    Hashtag,
+    HashtagList,
     ListCommunitiesRequestDTO,
     ListCommunityPostsFilteredRequestDTO,
     ListCommunityPostsRequestDTO,
@@ -43,6 +51,7 @@ from pynteracta.models.facade import (
     ServiceAccountTokenResponse,
     SubTask,
     SystemUserList,
+    Tag,
     Task,
     TaskCapabilities,
     TaskReminder,
@@ -52,6 +61,7 @@ from pynteracta.models.facade import (
 )
 
 __all__ = [
+    "AdminListHashtagsRequestDTO",
     "AttachmentDetail",
     "AttachmentVisibility",
     "Catalog",
@@ -68,6 +78,13 @@ __all__ = [
     "GetPostDefinitionCatalogsRequestDTO",
     "GlobalPostStream",
     "GoogleOAuth2AccessTokenResponse",
+    "Group",
+    "GroupForEdit",
+    "GroupList",
+    "GroupMember",
+    "GroupMemberList",
+    "Hashtag",
+    "HashtagList",
     "ListCommunitiesRequestDTO",
     "ListCommunityPostsFilteredRequestDTO",
     "ListCommunityPostsRequestDTO",
@@ -88,6 +105,7 @@ __all__ = [
     "ServiceAccountTokenResponse",
     "SubTask",
     "SystemUserList",
+    "Tag",
     "Task",
     "TaskCapabilities",
     "TaskReminder",

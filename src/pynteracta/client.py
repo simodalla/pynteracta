@@ -11,6 +11,8 @@ from pynteracta.api.attachments import AttachmentsAPI
 from pynteracta.api.auth import AuthAPI
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
+from pynteracta.api.groups import GroupsAPI
+from pynteracta.api.hashtags import HashtagsAPI
 from pynteracta.api.posts import PostsAPI
 from pynteracta.api.tasks import TasksAPI
 from pynteracta.api.users import UsersAPI
@@ -47,7 +49,7 @@ class InteractaClient:
     """Façade aggregating all resource clients.
 
     Exposes ``auth``, ``users``, ``posts``, ``communities``, ``catalogs``,
-    ``attachments``, and ``tasks``.
+    ``attachments``, ``tasks``, ``groups``, and ``hashtags``.
     """
 
     def __init__(  # noqa: PLR0913
@@ -156,6 +158,8 @@ class InteractaClient:
         self.catalogs = CatalogsAPI(api_transport)
         self.attachments = AttachmentsAPI(api_transport)
         self.tasks = TasksAPI(api_transport)
+        self.groups = GroupsAPI(api_transport)
+        self.hashtags = HashtagsAPI(api_transport)
 
     def _build_token_manager(  # noqa: PLR0913
         self,

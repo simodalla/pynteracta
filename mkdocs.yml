@@ -49,6 +49,8 @@ nav:
       - Catalogs: api/catalogs.md
       - Attachments: api/attachments.md
       - Tasks: api/tasks.md
+      - Groups: api/groups.md
+      - Hashtags: api/hashtags.md
 
 markdown_extensions:
   - admonition

@@ -13,6 +13,8 @@ from pynteracta.cli import auth as _auth_cli
 from pynteracta.cli import catalogs as _catalogs_cli
 from pynteracta.cli import communities as _communities_cli
 from pynteracta.cli import config as _config_cli
+from pynteracta.cli import groups as _groups_cli
+from pynteracta.cli import hashtags as _hashtags_cli
 from pynteracta.cli import posts as _posts_cli
 from pynteracta.cli import tasks as _tasks_cli
 from pynteracta.cli import users as _users_cli
@@ -32,6 +34,8 @@ app.add_typer(_config_cli.app, name="config")
 app.add_typer(_users_cli.app, name="users")
 app.add_typer(_posts_cli.app, name="posts")
 app.add_typer(_tasks_cli.app, name="tasks")
+app.add_typer(_groups_cli.app, name="groups")
+app.add_typer(_hashtags_cli.app, name="hashtags")
 
 
 @app.callback()

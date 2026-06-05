@@ -1,0 +1,118 @@
+# serializer version: 1
+# name: TestGroupsGet.test_table_output
+  '''
+                     Group 201                    
+  ┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                ┃ Value                   ┃
+  ┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id                 │ 201                     │
+  │ name               │ Engineering             │
+  │ email              │ engineering@example.com │
+  │ description        │ Engineering team        │
+  │ members_count      │ 2                       │
+  │ visible            │ True                    │
+  │ deleted            │ False                   │
+  │ creation_timestamp │ 1700000000000           │
+  └────────────────────┴─────────────────────────┘
+  
+  '''
+# ---
+# name: TestGroupsList.test_json_output
+  '''
+  [
+    {
+      "id": 201,
+      "name": "Engineering",
+      "email": "engineering@example.com",
+      "members_count": 12,
+      "visible": true,
+      "deleted": false
+    },
+    {
+      "id": 202,
+      "name": "Design",
+      "email": "design@example.com",
+      "members_count": 5,
+      "visible": true,
+      "deleted": false
+    }
+  ]
+  
+  '''
+# ---
+# name: TestGroupsList.test_table_output
+  '''
+                                       Groups                                     
+  ┏━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+  ┃ id  ┃ name        ┃ email                ┃ members_count ┃ visible ┃ deleted ┃
+  ┡━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+  │ 201 │ Engineering │ engineering@example… │ 12            │ True    │ False   │
+  │ 202 │ Design      │ design@example.com   │ 5             │ True    │ False   │
+  └─────┴─────────────┴──────────────────────┴───────────────┴─────────┴─────────┘
+  
+  '''
+# ---
+# name: TestGroupsMembers.test_json_output
+  '''
+  [
+    {
+      "id": 1042,
+      "first_name": "Alice",
+      "last_name": "Rossi",
+      "email": "alice@example.com"
+    },
+    {
+      "id": 1099,
+      "first_name": "Bob",
+      "last_name": "Bianchi",
+      "email": "bob@example.com"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestGroupsMembers.test_table_output
+  '''
+                  Members of group 201                 
+  ┏━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+  ┃ id   ┃ first_name ┃ last_name ┃ email             ┃
+  ┡━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+  │ 1042 │ Alice      │ Rossi     │ alice@example.com │
+  │ 1099 │ Bob        │ Bianchi   │ bob@example.com   │
+  └──────┴────────────┴───────────┴───────────────────┘
+  
+  '''
+# ---
+# name: TestHashtagsList.test_json_output
+  '''
+  [
+    {
+      "id": 301,
+      "name": "engineering",
+      "community_id": 79,
+      "external_id": "ht-301",
+      "deleted": false
+    },
+    {
+      "id": 302,
+      "name": "design",
+      "community_id": 79,
+      "external_id": "ht-302",
+      "deleted": false
+    }
+  ]
+  
+  '''
+# ---
+# name: TestHashtagsList.test_table_output
+  '''
+                    Hashtags (community 79)                   
+  ┏━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━┓
+  ┃ id  ┃ name        ┃ community_id ┃ external_id ┃ deleted ┃
+  ┡━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━┩
+  │ 301 │ engineering │ 79           │ ht-301      │ False   │
+  │ 302 │ design      │ 79           │ ht-302      │ False   │
+  └─────┴─────────────┴──────────────┴─────────────┴─────────┘
+  
+  '''
+# ---
