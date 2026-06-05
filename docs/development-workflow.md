@@ -2,8 +2,8 @@
 
 This page describes how `pynteracta` is planned, versioned and documented as it evolves. It is the
 reader-facing summary of the project's process; the authoritative, detailed version lives in
-[`WORKFLOW.md`](https://gitlab.com/pynteracta/pynteracta/-/blob/main/WORKFLOW.md) at the repository
-root.
+[`WORKFLOW.md`](https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta/-/blob/main/WORKFLOW.md)
+at the repository root.
 
 !!! info "Status & audience"
     `pynteracta` is pre-1.0 and currently targets **internal use / automations**. The near-term
@@ -24,7 +24,7 @@ The project separates *history*, *forward plans*, *build log* and *changelog* in
 
 **Where to look:**
 
-- *What is shipped today?* → `CHANGELOG.md` and the v0.1.0 row of `ROADMAP.md`.
+- *What is shipped today?* → `CHANGELOG.md` and the latest shipped row of `ROADMAP.md`.
 - *What is coming next?* → `ROADMAP.md` + the active `specs/` file.
 - *How was something built / why?* → `PROGRESS.md`.
 
@@ -32,7 +32,8 @@ The project separates *history*, *forward plans*, *build log* and *changelog* in
 
 - **Pre-1.0, lenient semver.** Every feature is a **minor** bump; even breaking changes bump the
   minor until 1.0.
-- **Cadence:** one read-endpoint group per minor release. The next feature release is **0.2.0**.
+- **Cadence:** one read-endpoint group per minor release. See `ROADMAP.md` for the current
+  objective and the backlog.
 - **1.0 + PyPI publication** are deferred until the read surface is complete and the API has been
   stable for a while.
 - Versions are computed from [Conventional Commits](https://www.conventionalcommits.org/) by
