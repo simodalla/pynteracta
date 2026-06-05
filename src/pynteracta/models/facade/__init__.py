@@ -45,6 +45,12 @@ from pynteracta.models.facade.posts import (
     PostList,
     VisibilityResult,
 )
+from pynteracta.models.facade.tasks import (
+    SubTask,
+    Task,
+    TaskCapabilities,
+    TaskReminder,
+)
 from pynteracta.models.facade.users import (
     ListSystemUsersRequestDTO,
     SystemUserList,
@@ -87,7 +93,11 @@ __all__ = [
     "PostHistoryEventList",
     "PostList",
     "ServiceAccountTokenResponse",
+    "SubTask",
     "SystemUserList",
+    "Task",
+    "TaskCapabilities",
+    "TaskReminder",
     "UserForEdit",
     "UserProfile",
     "VisibilityResult",

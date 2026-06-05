@@ -27,6 +27,7 @@ from pynteracta.models.facade.communities import (
     PostDefinitionMap,
 )
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
+from pynteracta.models.facade.tasks import Task
 from pynteracta.models.facade.users import SystemUserList, UserForEdit, UserProfile
 from pynteracta.models.generated import external_v2 as generated
 
@@ -58,6 +59,8 @@ _CATALOG_ENTRY_COUNT = 2
 _POST_DEF_FIELD_COUNT = 2
 _ATTACHMENT_ID_1 = 3001
 _ATTACHMENT_COUNT = 2
+_TASK_ID = 7001
+_TASK_OCC_TOKEN = 3
 _ATTACHMENT_VISIBLE_IDS = [3001, 3002]
 
 # ---------------------------------------------------------------------------
@@ -595,3 +598,55 @@ class TestCheckAttachmentVisibility:
         facade = AttachmentVisibility.from_dict(payload)
         assert facade.raw is not None
         assert facade.ids == _ATTACHMENT_VISIBLE_IDS
+
+
+# ---------------------------------------------------------------------------
+# 17. GetTaskDetailResponseDTO (M17)
+# ---------------------------------------------------------------------------
+
+
+class TestGetTaskDetail:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetTaskDetailResponseDTO",
+            generated.GetTaskDetailResponseDTO,
+        )
+
+    def test_sub_task_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "SubTaskDTO",
+            generated.SubTaskDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_task_capabilities_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "TaskCapabilitiesDTO",
+            generated.TaskCapabilitiesDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_task_reminder_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "TaskReminderDTO",
+            generated.TaskReminderDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_task_detail_response.json")
+        facade = Task.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _TASK_ID
+        assert facade.post_id == _POST_ID
+        assert facade.title == "Review quarterly report"
+
+    def test_facade_raw_accessible(self) -> None:
+        payload = load_payload("get_task_detail_response.json")
+        facade = Task.from_dict(payload)
+        assert facade.raw.occToken == _TASK_OCC_TOKEN
+        assert facade.raw.descriptionDelta is not None

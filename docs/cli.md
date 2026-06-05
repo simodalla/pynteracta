@@ -545,6 +545,35 @@ pynteracta attachments check-visibility 3001 --output json
 
 ---
 
+## `tasks` commands
+
+Fetch task detail. A task belongs to a post (`post_id`); `--web-url` deep-links to the **parent post**, since tasks have no standalone web view (D-v0.4-3).
+
+The default table shows curated fields: `id`, `post_id`, `title`, `state`, `priority`,
+`description` (truncated `descriptionPlainText`), `attachments_count`, `creation_timestamp`.
+`descriptionDelta` (Quill rich-text JSON) and survey payloads (`surveyData`,
+`surveyDataCommentsInfo`) are accessible only via `--full` or `--output json` through `.raw`
+(D-v0.4-4).
+
+### `tasks get TASK_ID`
+
+Fetch a single task by ID.
+
+```bash
+pynteracta tasks get 7001
+pynteracta tasks get 7001 --output json
+pynteracta tasks get 7001 --output json --full
+pynteracta tasks get 7001 --web-url        # includes parent-post URL
+pynteracta tasks get 7001 --fields id,title,state
+pynteracta tasks get 7001 --export tasks.csv
+```
+
+**`state` vs `currentWorkflowState`:** `state` is an integer code representing the task lifecycle
+(open/closed/etc.). `currentWorkflowState` is the post's workflow state DTO and is only reachable
+via `.raw.currentWorkflowState` (D-v0.4-3, Q-v0.4-3).
+
+---
+
 ## Exit codes
 
 | Code | Meaning |
