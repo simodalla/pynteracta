@@ -895,3 +895,44 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 - `uv run pytest --cov --cov-fail-under=85` — 449 passed, 7 skipped; coverage **92.18%**;
   44 snapshots passed.
 - `uv run pytest -m contract` — 45 passed.
+
+## M16 — Attachments read (v0.3.0)
+
+### Done
+
+- `models/facade/attachments.py` — `PostAttachment`, `PostAttachmentList`, `AttachmentDetail`,
+  `AttachmentVisibility` facades; re-exported from `models/facade/__init__.py` and
+  `models/__init__.py`.
+- `api/attachments.py` — `AttachmentsAPI(ResourceClient)` with `list_for_post` /
+  `list_for_post_raw` / `iterate_for_post`, `get`, `check_visibility` / `check_visibility_raw`.
+- `client.py` — `self.attachments = AttachmentsAPI(api_transport)` registered.
+- `cli/attachments.py` — `attachments list`, `attachments get`, `attachments check-visibility`;
+  registered on top-level CLI. No `--web-url` (D-v0.3-3b). Default table metadata-only (D-v0.3-3a).
+- Tests: `tests/unit/test_api_attachments.py`, `test_facade_attachments.py`,
+  `test_cli_attachments.py`; `tests/contract/test_models.py` extended; integration smoke in
+  `tests/integration/test_attachments_integration.py`.
+- Fixtures: `list_post_attachments_response.json`, `get_attachment_detail_response.json`,
+  `check_attachment_visibility_response.json`.
+- Docs: `docs/cli.md` (new `attachments` group), `docs/api/attachments.md`, `mkdocs.yml` nav.
+- `.env.example` — added `PYNTERACTA_TEST_ATTACHMENT_ID`.
+
+### Decisions made beyond the plan
+
+- **Codegen stub → typed mapping (Q5 pattern):**
+  - `ListPostAttachmentsElementDTO` → `RootModel[Any]` stub; bind to
+    `ListPostAttachmentsElementDTOModel`.
+  - `PostAttachmentDataDTO` → `RootModel[Any]` stub; bind to `PostAttachmentDataDTO1`.
+  - `GetPostAttachmentDetailResponseDTO` is a plain `BaseModel` — no stub/typed split, but its
+    `attachmentData` field is `PostAttachmentDataDTO` (stub) and its `post` field is
+    `PostBaseInfoDTO` (stub); both re-validated inside `AttachmentDetail.__init__`.
+  - `PostBaseInfoDTO` → `RootModel[Any]` stub; bind to `PostBaseInfoDTO1`.
+  - `CheckVisibilityResponseDTO` and `CheckVisibilityRequestDTO` are plain `BaseModel` — no stub.
+- **Verified `order_by` value set** (from `ListPostAttachmentsByPostIdRequestDTO.orderBy`
+  swagger description): `'name'`, `'mimeType'`, `'size'`, `'creatorUserId'`,
+  `'creationTimestamp'`, `'entityType'`.
+- `AttachmentVisibility` kept separate from v0.2 `VisibilityResult` as decided (D-v0.3-2).
+
+### Follow-ups
+
+- Write endpoints (`PUT edit-post-attachments`, `POST upload-new-attachment`) — deferred to
+  the future write line (see `ROADMAP.md`).

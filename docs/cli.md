@@ -478,6 +478,73 @@ pynteracta catalogs entries 5 --output json
 
 ---
 
+## `attachments` commands
+
+Retrieve attachment metadata, single attachment detail, and visibility checks.
+
+> **Resource grouping note (D-v0.3-1):** All three attachment endpoints live under the
+> `attachments` CLI group even though `attachments get` calls an API path under
+> `communication/posts/data/attachment-detail-by-id/{id}`.  The URL prefix is a server-side
+> implementation detail; the resource group is `attachments`.
+
+> **`--web-url` is intentionally absent (D-v0.3-3b):** Bare attachments have no canonical
+> deep-link URL in the Interacta web app.  `--output`, `--full`, `--fields`, and `--export`
+> all compose as usual.
+
+> **Default table = metadata only (D-v0.3-3a):** The default table shows `id`, `name`,
+> `contentMimeType`, `size`, and `type`.  Short-lived `temporaryContent*Link` download and
+> preview URLs are exposed only via `--full`, `--fields`, `--export`, or `--output json`.
+
+### `attachments list`
+
+List all attachments for a given post.
+
+```bash
+pynteracta attachments list --post 21269
+pynteracta attachments list --post 21269 --all --page-size 50
+pynteracta attachments list --post 21269 --output json --full
+pynteracta attachments list --post 21269 --type 1 --mime-category multimedia
+pynteracta attachments list --post 21269 --order-by name --order-asc
+```
+
+Filter options:
+
+| Flag | Description |
+|---|---|
+| `--type INT` | Filter by attachment type (1=STORAGE, 2=DRIVE). Repeatable. |
+| `--entity-type INT` | Filter by entity type (1=POST, 2=TASK, 3=COMMENT, 4=POST_FILE_PICKER, 5=SCREEN_FILE_PICKER). Repeatable. |
+| `--mime-type TEXT` | Filter by MIME type string. Repeatable. |
+| `--mime-category TEXT` | Filter by MIME category: `multimedia` or `other`. |
+| `--order-by TEXT` | Sort field: `name`, `mimeType`, `size`, `creatorUserId`, `creationTimestamp`, `entityType`. |
+| `--order-desc / --order-asc` | Sort direction (default: descending). |
+
+Niche filters (`aiSupportedFilter`, `postFilePickerFieldId`, `wfScreenFilePickerFieldId`,
+`language`) are not surfaced as CLI flags; use the Python API `list_for_post_raw(req)` for
+those.
+
+### `attachments get ATTACHMENT_ID`
+
+Fetch a single attachment by ID.
+
+```bash
+pynteracta attachments get 3001
+pynteracta attachments get 3001 --output json --full
+```
+
+The response includes the parent post's basic info (`post_id` in the curated table).
+Temporary content links are accessible via `--full` or `--output json`.
+
+### `attachments check-visibility ATTACHMENT_ID...`
+
+Check which of the supplied attachment IDs are visible to the current principal.
+
+```bash
+pynteracta attachments check-visibility 3001 3002
+pynteracta attachments check-visibility 3001 --output json
+```
+
+---
+
 ## Exit codes
 
 | Code | Meaning |

@@ -13,6 +13,11 @@ from __future__ import annotations
 
 import pytest
 
+from pynteracta.models.facade.attachments import (
+    AttachmentDetail,
+    AttachmentVisibility,
+    PostAttachmentList,
+)
 from pynteracta.models.facade.auth import CurrentUserResponse, ServiceAccountTokenResponse
 from pynteracta.models.facade.catalogs import CatalogEntryList, CatalogList
 from pynteracta.models.facade.communities import (
@@ -51,6 +56,9 @@ _CATALOG_COUNT = 2
 _CATALOG_ENTRY_ID_1 = 100
 _CATALOG_ENTRY_COUNT = 2
 _POST_DEF_FIELD_COUNT = 2
+_ATTACHMENT_ID_1 = 3001
+_ATTACHMENT_COUNT = 2
+_ATTACHMENT_VISIBLE_IDS = [3001, 3002]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -500,3 +508,90 @@ class TestListCatalogEntries:
         assert items[0].id == _CATALOG_ENTRY_ID_1
         assert items[0].label == "Engineering"
         assert items[0].external_id == "ENG"
+
+
+# ---------------------------------------------------------------------------
+# 14. Attachments — M16
+# ---------------------------------------------------------------------------
+
+
+class TestListPostAttachments:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostAttachmentsByPostIdRequestDTO",
+            generated.ListPostAttachmentsByPostIdRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostAttachmentsResponseDTO",
+            generated.ListPostAttachmentsResponseDTO,
+        )
+
+    def test_element_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "ListPostAttachmentsElementDTO",
+            generated.ListPostAttachmentsElementDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("list_post_attachments_response.json")
+        facade = PostAttachmentList.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.total_items_count == _ATTACHMENT_COUNT
+        items = facade.items_typed
+        assert len(items) == _ATTACHMENT_COUNT
+        assert items[0].id == _ATTACHMENT_ID_1
+        assert items[0].name == "report.pdf"
+
+
+class TestGetPostAttachmentDetail:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetPostAttachmentDetailResponseDTO",
+            generated.GetPostAttachmentDetailResponseDTO,
+        )
+
+    def test_attachment_data_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "PostAttachmentDataDTO",
+            generated.PostAttachmentDataDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_attachment_detail_response.json")
+        facade = AttachmentDetail.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _ATTACHMENT_ID_1
+        assert facade.name == "report.pdf"
+        assert facade.post is not None
+        assert facade.post.id == _POST_ID
+
+
+class TestCheckAttachmentVisibility:
+    def test_request_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "CheckVisibilityRequestDTO",
+            generated.CheckVisibilityRequestDTO,
+        )
+
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "CheckVisibilityResponseDTO",
+            generated.CheckVisibilityResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("check_attachment_visibility_response.json")
+        facade = AttachmentVisibility.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.ids == _ATTACHMENT_VISIBLE_IDS

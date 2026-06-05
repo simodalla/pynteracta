@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Facade models for the pynteracta endpoints."""
 
+from pynteracta.models.facade.attachments import (
+    AttachmentDetail,
+    AttachmentVisibility,
+    PostAttachment,
+    PostAttachmentList,
+)
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
     CurrentUserResponse,
@@ -47,6 +53,8 @@ from pynteracta.models.facade.users import (
 )
 
 __all__ = [
+    "AttachmentDetail",
+    "AttachmentVisibility",
     "Catalog",
     "CatalogEntry",
     "CatalogEntryList",
@@ -69,6 +77,8 @@ __all__ = [
     "ListPostHistoryEventsRequestDTO",
     "ListSystemUsersRequestDTO",
     "Post",
+    "PostAttachment",
+    "PostAttachmentList",
     "PostCapabilities",
     "PostCommentList",
     "PostDefinition",

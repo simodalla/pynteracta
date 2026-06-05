@@ -1,0 +1,34 @@
+{
+  "attachmentData": {
+    "id": 3001,
+    "name": "report.pdf",
+    "contentMimeType": "application/pdf",
+    "size": 204800,
+    "type": 1,
+    "downloadable": true,
+    "versionNumber": 1,
+    "contentRef": "gs://bucket/report.pdf",
+    "temporaryContentViewLink": "https://storage.example.com/view/report.pdf?token=xyz",
+    "temporaryContentDownloadLink": "https://storage.example.com/download/report.pdf?token=xyz",
+    "temporaryContentPreviewImageLink": null,
+    "temporaryContentPreviewImageAnimatedLink": null,
+    "temporaryContentPreviewImageHiResLink": null,
+    "temporaryContentPreviewImageHiResAnimatedLink": null,
+    "creatorUser": {"id": 1042, "name": "Alice"},
+    "creationTimestamp": 1700000000000,
+    "lastModifyUser": null,
+    "lastModifyTimestamp": null,
+    "communityId": 79,
+    "etag": "abc123",
+    "md5Hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "hashtags": [],
+    "referencedId": null,
+    "reference": false,
+    "drive": null
+  },
+  "post": {
+    "id": 21269,
+    "communityId": 79,
+    "title": "Test Post"
+  }
+}
