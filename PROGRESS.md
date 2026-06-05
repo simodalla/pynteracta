@@ -936,3 +936,43 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 
 - Write endpoints (`PUT edit-post-attachments`, `POST upload-new-attachment`) — deferred to
   the future write line (see `ROADMAP.md`).
+
+## M17 — Tasks read (v0.4.0)
+
+### Done
+
+- `models/facade/tasks.py` — `Task`, `TaskCapabilities`, `SubTask`, `TaskReminder` facades;
+  composition over `GetTaskDetailResponseDTO`; nested `RootModel[Any]` stubs re-validated
+  against `…1` typed siblings. Re-exported from `models/facade/__init__.py` and `models/__init__.py`.
+- `api/tasks.py` — `TasksAPI(ResourceClient)` with single `get(task_id: int) -> Task` method.
+- `client.py` — `self.tasks = TasksAPI(api_transport)` registered.
+- `cli/tasks.py` — `tasks get`; registered on top-level CLI. `--web-url` deep-links to parent
+  post via `client.web_urls.post(task.post_id)` (D-v0.4-3). Curated table: `id`, `post_id`,
+  `title`, `state`, `priority`, `description` (truncated), `attachments_count`,
+  `creation_timestamp` (D-v0.4-4).
+- Tests: `tests/unit/test_api_tasks.py`, `test_facade_tasks.py`, `test_cli_tasks.py`;
+  `tests/contract/test_models.py` extended; integration smoke in
+  `tests/integration/test_tasks_integration.py`.
+- Fixtures: `tests/fixtures/payloads/get_task_detail_response.json`.
+- Docs: `docs/cli.md` (new `tasks` group), `docs/api/tasks.md`, `mkdocs.yml` nav.
+- `.env.example` — added `PYNTERACTA_TEST_TASK_ID`.
+
+### Decisions made beyond the plan
+
+- **Codegen stub → typed mapping (Q5 pattern confirmed):**
+  - `GetTaskDetailResponseDTO` is a plain `BaseModel` — no stub/typed split.
+  - `TaskCapabilitiesDTO` → `RootModel[Any]` stub; bind to `TaskCapabilitiesDTO1`.
+  - `SubTaskDTO` → `RootModel[Any]` stub; bind to `SubTaskDTO1`.
+  - `TaskReminderDTO` → `RootModel[Any]` stub; bind to `TaskReminderDTO1`.
+  - `UserDTO` is also a `RootModel[Any]` stub; tests access `.root["id"]` directly.
+- **Q-v0.4-2 — `--web-url` inputs:** `WebUrls.post(post_id)` builds the parent-post deep-link
+  from `post_id` alone — no community_id needed. Confirmed from `urls.py` source.
+- **Q-v0.4-3 — `state` vs `currentWorkflowState`:** `state` (int) is the task lifecycle code;
+  `currentWorkflowState` is the post's workflow-state DTO. CLI default table shows `state`.
+  `currentWorkflowState` is exposed via `Task.current_workflow_state` property but not in the
+  curated table. Both documented in CLI help text and `docs/api/tasks.md`.
+
+### Follow-ups
+
+- Write endpoints (`POST create-task`, `PUT edit-task`, `DELETE delete-task`) — deferred to the
+  future write line. `occToken` carried through `.raw` for future write use.

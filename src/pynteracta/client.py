@@ -12,6 +12,7 @@ from pynteracta.api.auth import AuthAPI
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
 from pynteracta.api.posts import PostsAPI
+from pynteracta.api.tasks import TasksAPI
 from pynteracta.api.users import UsersAPI
 from pynteracta.auth import (
     FileTokenCache,
@@ -45,7 +46,8 @@ def _build_token_cache(profile: Profile) -> TokenCache:
 class InteractaClient:
     """Façade aggregating all resource clients.
 
-    Exposes ``auth``, ``users``, ``posts``, ``communities``, ``catalogs``, and ``attachments``.
+    Exposes ``auth``, ``users``, ``posts``, ``communities``, ``catalogs``,
+    ``attachments``, and ``tasks``.
     """
 
     def __init__(  # noqa: PLR0913
@@ -153,6 +155,7 @@ class InteractaClient:
         self.communities = CommunitiesAPI(api_transport)
         self.catalogs = CatalogsAPI(api_transport)
         self.attachments = AttachmentsAPI(api_transport)
+        self.tasks = TasksAPI(api_transport)
 
     def _build_token_manager(  # noqa: PLR0913
         self,

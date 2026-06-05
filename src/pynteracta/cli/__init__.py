@@ -14,6 +14,7 @@ from pynteracta.cli import catalogs as _catalogs_cli
 from pynteracta.cli import communities as _communities_cli
 from pynteracta.cli import config as _config_cli
 from pynteracta.cli import posts as _posts_cli
+from pynteracta.cli import tasks as _tasks_cli
 from pynteracta.cli import users as _users_cli
 from pynteracta.cli._common import CliState
 from pynteracta.logging import setup_default_logging
@@ -30,6 +31,7 @@ app.add_typer(_communities_cli.app, name="communities")
 app.add_typer(_config_cli.app, name="config")
 app.add_typer(_users_cli.app, name="users")
 app.add_typer(_posts_cli.app, name="posts")
+app.add_typer(_tasks_cli.app, name="tasks")
 
 
 @app.callback()
