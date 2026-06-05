@@ -1,7 +1,54 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.5.0] - 2026-06-05
+
+### Chores
+
+- Release v0.5.0 — flip ROADMAP to shipped, freeze spec header
+
+### Features
+
+- Add groups & hashtags read surface (M18, v0.5.0)
+
+## [0.4.0] - 2026-06-05
+
+### Chores
+
+- Release v0.4.0 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Add v0.4 tasks spec (M17)
+
+### Features
+
+- Add tasks read surface (M17, v0.4.0)
+
+## [0.3.0] - 2026-06-05
+
+### Chores
+
+- Release v0.3.0 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Add v0.3 attachments spec (M16)
+
+### Features
+
+- Add attachments read surface (M16, v0.3.0)
+- Release v0.3.0 — attachments read surface (M16)
+
+### Fixes
+
+- Allow null values in workflowScreenData for PostActivityHistoryEventDTO
+
 ## [0.2.0] - 2026-06-04
+
+### Chores
+
+- Release v0.2.0
 
 ### Documentation
 
