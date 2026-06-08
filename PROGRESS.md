@@ -1076,3 +1076,58 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 - Write siblings (`PUT admin/manage/.../edit` for workspace, catalog, catalog-entry,
   user-credentials) — deferred to the v1.0+ write line. `occToken` from each read form is carried
   through `.raw` for future write use.
+
+---
+
+## M20 — Posts filter & sort completeness (v0.7.0)
+
+### Done
+
+- `models/facade/post_filters.py` — `PostFieldFilter`, `PostFieldDefinition`, `PostFieldEnumValue`
+  facades; typed `FieldType` enum (all 15 field types); `filtertype_for_field()` mapping from
+  `FieldType` to allowed filter type ids; `PostFieldFiltersBuilder` (label/externalId → filter
+  construction); `CommunityPostFilters` and `CommunityAttachmentFilters` structured filter
+  containers. Re-exported from `models/facade/__init__.py` and `models/__init__.py`.
+- `api/posts.py` — `list_in_community` expanded with explicit typed kwargs: `order_by`, `order_desc`,
+  `pinned_first`, `title`, `contains_text`, `created_by_user_ids`, `hashtag_ids`, `post_types`,
+  `current_workflow_status_ids`, `creation_timestamp_from/to` (ISO-8601 or epoch-ms via
+  `to_epoch_millis`), `followed_by_me`, `to_manage`, `only_pinned`, `post_field_filters`,
+  `community_post_filters` (generic passthrough). Sends complete `communityPostFilters` and
+  `communityAttachmentFilters` baselines matching the SaaS payload shape. `POST_ORDER_FIELDS`
+  constant exported for CLI validation.
+- `cli/posts.py` — `posts list` command extended with `--order-by`, `--desc/--asc`,
+  `--pinned-first`, `--title`, `--contains-text`, `--created-by`, `--hashtag`, `--post-type`,
+  `--workflow-status`, `--created-from`, `--created-to`, `--followed-by-me`, `--to-manage`,
+  `--only-pinned`, `--field-filter` (COLUMN:TYPE:VAL... syntax), `--filter` (generic key=value
+  passthrough). `--field-filter` coerces integer-looking tokens to int.
+- `cli/_common.py` — `EpochMs(int)` class: inherits from `int` (JSON serializes as number); `__str__`
+  returns `"YYYY-MM-DD HH:MM:SS UTC"` for human-readable table rendering. `_make_yaml()` helper
+  registers `EpochMs` representer so YAML export works correctly.
+- `api/_utils.py` — `to_epoch_millis()` helper converts ISO-8601 date/datetime strings or
+  pass-through epoch-ms integers.
+- `models/facade/communities.py` — `PostDefinition` facade extended with `field_definitions`
+  surfacing `PostFieldDefinition` instances (previously omitted `enumValues`).
+- Tests: unit (`test_api_posts.py`, `test_cli_posts.py`, `test_facade_post_filters.py`),
+  snapshot updates for table datetime rendering.
+- Fixtures: `tests/fixtures/payloads/post_definition_attivita.json`.
+- Docs: `docs/cli.md` (posts filter/sort section), `docs/guides/filtering-posts.md`.
+
+### Decisions made beyond the plan
+
+- **Q-v0.7-1 (resolved): `typeId` semantics confirmed from production payloads.** `columnId`
+  corresponds to a field in the community post-definition. Confirmed: `ENUM/ENUM_LIST/HIERARCHICAL_ENUM/
+  GENERIC_ENTITY_LIST → IN(4)`, `DATE/DATETIME → INTERVAL(2)`, `STRING/TEXT_AREA/DELTA_AREA → LIKE(3)`.
+- **Always-send baselines (Q-v0.7 decision).** `communityPostFilters` and `communityAttachmentFilters`
+  always include the full SaaS-matching field set (with `None`/`[]`/`false` defaults) to prevent
+  backend validation errors on strict tenants. This differs from the original "send only non-None"
+  approach tried in the feature commit.
+- **`EpochMs` table rendering fix (post-spec bugfix).** Epoch-ms integers in curated table output
+  columns (`creation_ts`, `last_modify_ts`, `timestamp`) rendered as raw numbers. Fixed by wrapping
+  in `EpochMs(int)` in the curated functions; JSON output unchanged (still numeric), YAML also
+  gets string via custom representer.
+
+### Follow-ups
+
+- **Q-v0.7-4 (open):** `FLAG`, `INT/BIGINT/DECIMAL`, `FEEDBACK`, `LINK` field type → filter typeId
+  mapping not confirmed from production. Deferred to a future bugfix once a real payload is observed.
+- Users filter & sort (M21, v0.8.0) — spec already scaffolded in `specs/v0.8-users-filter-sort.md`.
