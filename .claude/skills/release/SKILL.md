@@ -1,87 +1,104 @@
 ---
 name: release
-description: Cut a pynteracta minor release — phase 6 RELEASE of WORKFLOW.md, after the version's work is merged to main. Flips the ROADMAP row to ✅ Shipped, freezes the spec header banner, makes the `chore: release vX.Y.0` commit, and tags vX.Y.0 — mirroring the exact 2-file shape of the historical release commits. Use when finishing/shipping a version ("rilascia vX.Y", "chiudi il minor", "release vX.Y.0", "freeze the spec and tag"). Surfaces (does not silently automate) the CHANGELOG and __init__ version steps.
+description: Cut a pynteracta minor release — phase 6 RELEASE of WORKFLOW.md, after the version's work is merged to main. Flips the ROADMAP row to ✅ Shipped, freezes the spec header, then drives the version bump + tag with python-semantic-release (Option A) and regenerates the CHANGELOG with git-cliff. Use when finishing/shipping a version ("rilascia vX.Y", "chiudi il minor", "release vX.Y.0", "freeze the spec and tag"). Never pushes or publishes without an explicit request.
 ---
 
 # release — cut the minor (RELEASE phase)
 
 Automates phase **6. RELEASE** of [`WORKFLOW.md`](../../../WORKFLOW.md) for `pynteracta`. This is the
 **one operation that commits on `main`** — the STOP rule's branch discipline is for feature work;
-the release commit lands on `main` after the merge, exactly like the historical
-`chore: release vX.Y.0` commits.
+the release commits land on `main` after the merge.
 
-## What the historical release commit actually is
+## Release model — Option A (semantic-release is the driver)
 
-Inspect any past release (`git show <tag>`): the `chore: release vX.Y.0 — flip ROADMAP to shipped,
-freeze spec header` commit touches **exactly two files** — `ROADMAP.md` and the version's spec
-header. Nothing else. That 2-file shape is the deterministic core this skill owns. The CHANGELOG and
-the `__init__.py` version are handled separately (see **Surfaced, not automated** below) — do not
-fold them into this commit.
+The package version is **dynamic**: hatchling reads `__version__` from
+`src/pynteracta/__init__.py` (`[tool.hatch.version]`). Ownership of the moving parts:
+
+| Concern | Owner | Notes |
+|---|---|---|
+| Version number + git tag + `__version__` bump | **python-semantic-release** | Computed from Conventional Commits since the last tag. `tag_format = "v{version}"`, `major_on_zero = false`, `allow_zero_version = true`. |
+| `CHANGELOG.md` | **git-cliff** | Per CLAUDE.md. semantic-release runs with `--no-changelog` so the two never fight. |
+| ROADMAP row + spec freeze | **this skill** (a `chore:` doc commit) | The 2-file commit, like the historical `chore: release` commits. |
+
+> **Invariant:** between releases, `__version__` equals the last released tag. semantic-release
+> re-establishes this on every release. If you find it drifted, sync it first with a `chore:` commit —
+> do not let a build go out with a stale version.
 
 ## Pre-flight checks (abort if any fails — report, don't force)
 
 1. **Merged.** The version's work is already merged to `main` (the `feat:` commit + its merge are in
    `git log main`). This skill does **not** merge feature branches.
-2. **On main.** `git branch --show-current` == `main`. The release commit lands here.
+2. **On main.** `git branch --show-current` == `main`. The release commits land here.
 3. **Clean tree.** `git status --porcelain` is empty (no stray WIP from another branch). If dirty,
-   stop and surface it — never sweep unrelated changes into the release commit.
-4. **Gate green.** Re-run the gate or confirm CI passed:
-   `uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest --cov --cov-fail-under=85`.
+   stop — never sweep unrelated changes into the release.
+4. **Gate green.** `uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest --cov --cov-fail-under=85`.
 5. **Logged.** `PROGRESS.md` has the `M<n>` section for this version (phase 5 LOG done). If missing,
-   stop and tell the user to run the LOG step first — releasing without the build log is out of order.
+   stop and run the LOG step first.
 6. **Spec is PLANNING.** The spec header still reads `Status: PLANNING — ⏳ In progress`. If already
    frozen, the version was likely released — stop.
+7. **Version invariant.** `__version__` in `src/pynteracta/__init__.py` equals the last tag
+   (`git describe --tags --abbrev=0`). If not, sync it with a `chore:` commit before releasing.
 
-## Actions (the deterministic 2-file commit)
+## Actions
 
-Determine `vX.Y.0`, `M<n>`, the spec path, and **today's date** (YYYY-MM-DD) up front.
+Compute the **next version** first — never guess it. Preview with semantic-release:
 
-1. **Flip the ROADMAP row.** In the **Versions** table of [`ROADMAP.md`](../../../ROADMAP.md), change
-   only this version's row Status cell:
-   ```
-   | **0.X.0** | <Theme> | M<n> | ⏳ In progress | … |
-   →
-   | **0.X.0** | <Theme> | M<n> | ✅ Shipped <today> | … |
-   ```
-   Touch no other row.
+```bash
+uv run semantic-release version --print        # prints the computed next version, no side effects
+```
 
-2. **Freeze the spec header.** In `specs/vX.Y-<slug>.md`, rewrite only the Status line of the banner:
-   ```
-   > **Status: PLANNING — ⏳ In progress.** Spec for the next minor. …
-   →
-   > **Status: SHIPPED — vX.Y.0 (<today>). Frozen. Do not edit.** Spec for the next minor. …
-   ```
-   Keep the rest of the banner and the body byte-for-byte. Do not edit any other frozen spec.
+Use that `vX.Y.0` and **today's date** (YYYY-MM-DD) below.
 
-3. **Commit on main** (the sanctioned exception). Use exactly this subject and the repo's trailer:
-   ```
-   chore: release vX.Y.0 — flip ROADMAP to shipped, freeze spec header
+### 1. Doc commit — flip ROADMAP + freeze spec (the 2-file commit)
 
-   Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-   ```
-   Stage only `ROADMAP.md` and the spec file (explicit paths) — never `git add -A`.
+- **ROADMAP row.** In the **Versions** table of [`ROADMAP.md`](../../../ROADMAP.md), change only this
+  version's Status cell: `⏳ In progress` → `✅ Shipped <today>`. Touch no other row.
+- **Spec header.** In `specs/vX.Y-<slug>.md`, rewrite only the Status line:
+  `Status: PLANNING — ⏳ In progress.` → `Status: SHIPPED — vX.Y.0 (<today>). Frozen. Do not edit.`
+  Keep the rest byte-for-byte. Do not edit any other frozen spec.
+- **Commit** on `main`, staging only those two files (explicit paths, never `git add -A`):
+  ```
+  chore: release vX.Y.0 — flip ROADMAP to shipped, freeze spec header
 
-4. **Tag.** `git tag vX.Y.0` on that commit (`tag_format = "v{version}"`). Annotated or lightweight to
-   match existing tags (`git tag` shows the convention — they are lightweight).
+  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  ```
 
-5. **Hand back.** Report the commit SHA, the tag, and the two remaining surfaced steps below. **Do not
-   push** unless the user asks (per CLAUDE.md).
+### 2. Version bump + tag (semantic-release)
 
-## Surfaced, not automated (decide with the user — these are genuinely ambiguous in this repo)
+```bash
+uv run semantic-release version --no-changelog --no-push --no-vcs-release --skip-build
+```
 
-- **CHANGELOG.md (git-cliff).** CLAUDE.md/WORKFLOW say it is generated by `git-cliff`, never
-  hand-edited. In practice it has been regenerated in **batches** (e.g. one commit covering several
-  versions), not once per release. Offer to run `git-cliff` and commit the regen as a separate
-  `docs:`/`chore:` commit — but confirm timing with the user; do not hand-edit the file.
-- **`src/pynteracta/__init__.py` `__version__` drift.** `python-semantic-release` is configured with
-  `version_variables = ["src/pynteracta/__init__.py:__version__"]`, but the source variable has
-  drifted (it has lagged the real tags). Before tagging, **check** `__version__` against `vX.Y.0`; if
-  it does not match, surface the gap and ask whether to bump it (and whether to fold the bump into the
-  release commit or run `semantic-release version` instead). Do not silently rewrite it.
+- `--no-changelog` → git-cliff owns `CHANGELOG.md` (next step), not semantic-release.
+- `--no-push --no-vcs-release` → **nothing leaves the machine**; push is a separate, explicit step.
+- `--skip-build` → building the wheel is CI's job; keep the release step side-effect-light.
+
+This bumps `__version__`, creates its own version commit, and tags `vX.Y.0`. Verify with
+`git show --stat HEAD` and `git tag --points-at HEAD`.
+
+### 3. CHANGELOG (git-cliff)
+
+Regenerate and commit separately — never hand-edit `CHANGELOG.md`:
+
+```bash
+uv run git-cliff --tag vX.Y.0 -o CHANGELOG.md
+git commit -m "docs: update CHANGELOG for vX.Y.0" CHANGELOG.md
+```
+
+(The changelog has sometimes been regenerated in **batches** covering several versions — if that is
+the intent, say so and batch instead of committing per release.)
+
+### 4. Hand back
+
+Report the doc commit SHA, the semantic-release version commit + tag, and the changelog commit.
+**Do not push and do not create a remote release** unless the user explicitly asks; then:
+`git push origin main --follow-tags`. PyPI stays off (`upload_to_pypi = false`).
 
 ## Guardrails
 
-- Release commit = **exactly two files** (ROADMAP + spec header). Anything else is a separate commit.
+- The doc commit = **exactly two files** (ROADMAP + spec header). The version bump is semantic-release's
+  own separate commit — never fold them together.
+- Never run `semantic-release version` without `--no-push --no-vcs-release` unless the user asked to
+  publish — its default behaviour pushes and creates a remote release.
 - Never hand-edit `CHANGELOG.md`; never edit a different version's frozen spec.
-- Commit on `main` is allowed **only** for this release commit; all other work is on a branch.
-- Never push or publish to PyPI without an explicit request (`upload_to_pypi = false` by config).
+- Commit on `main` is allowed only for the release commits; all other work is on a branch.
