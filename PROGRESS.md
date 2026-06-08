@@ -1021,3 +1021,58 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 
 - Write endpoints (create/edit/delete group, add/remove members) — deferred to the write line.
   `occToken` from `get_for_edit` is carried through `.raw` for future write use.
+
+---
+
+## M19 — Admin manage edits (read forms) (v0.6.0)
+
+### Done
+
+- `models/facade/admin_manage.py` — `WorkspaceForEdit`, `CatalogForEdit`, `CatalogEntryForEdit`,
+  `UserCredentialsForEdit` facades (composition over the four `Get…ForEditResponseDTO` types).
+  `occToken` kept off the facade surface, reachable only via `.raw`. Re-exported from
+  `models/facade/__init__.py` and `models/__init__.py` (+ `__all__`).
+- `api/admin_manage.py` — `AdminManageAPI` with `workspace_for_edit`, `catalog_for_edit`,
+  `catalog_entry_for_edit`, `user_credentials_for_edit`. No pagination, no `*_raw` variants
+  (single read-form GET endpoints).
+- `client.py` — `self.admin_manage = AdminManageAPI(...)` registered.
+- `cli/admin_manage.py` — `admin-manage workspace`, `catalog`, `catalog-entry`,
+  `user-credentials`; all routed through `render_output` (so `--output`/`--full`/`--fields`/
+  `--export` compose). No `--web-url` (admin forms, D-v0.6-1). Registered as `admin-manage`.
+- Tests: unit (api, facade, CLI with syrupy snapshots), contract (schema-superset + facade smoke),
+  integration smoke (opt-in).
+- Fixtures: `get_workspace_for_edit_response.json`, `get_catalog_for_edit_response.json`,
+  `get_catalog_entry_for_edit_response.json`, `get_user_credentials_for_edit_response.json`.
+- Docs: `docs/cli.md` (admin-manage section), `docs/api/admin_manage.md`, `mkdocs.yml` nav.
+- `.env.example` — added `PYNTERACTA_TEST_WORKSPACE_ID`, `PYNTERACTA_TEST_CATALOG_ENTRY_ID`.
+
+### Decisions made beyond the plan
+
+- **Q-v0.6-1 — facade field curation (resolved): scalars + one-level convenience accessors.**
+  Each facade surfaces the directly-typed scalar fields of its response DTO, plus light
+  convenience accessors that dig **one level** into the nested editable-content blocks for the
+  human-facing values. Complex nested structures and `occToken` stay on `.raw`. Per facade:
+  - `WorkspaceForEdit`: `id`, `name`/`description` (from `contentData`), `admin_users_count`,
+    `admin_groups_count`, `member_users_count`, `member_groups_count`, `creation_timestamp`,
+    `last_modify_timestamp`.
+  - `CatalogForEdit`: `id`, `name` (i18n map from `contentData`), `deleted` (from `contentData`),
+    `community_associations_count` (length of `communityAssociations`).
+  - `CatalogEntryForEdit`: `id`, `label` (i18n map), `external_id`, `deleted`, `parents_count`
+    (length of `parents`). All directly typed on the response DTO.
+  - `UserCredentialsForEdit`: `has_google_credentials`, `has_microsoft_credentials`,
+    `has_custom_credentials`, `custom_username`, `custom_active` (from the custom config). No
+    entity id (the user id is the path parameter).
+- **Codegen stub → typed mapping (Q5 pattern):** the four response DTOs are plain `BaseModel`
+  (no RootModel stub), but their nested editable-content fields are `RootModel[Any]` stubs with
+  typed siblings, re-validated by the facades:
+  - `contentData` on workspace → `WorkspaceEditableContentDataDTO` stub → `…DTO1`.
+  - `contentData` on catalog → `CatalogEditableContentDTO` stub → `CatalogEditableContentDTOModel`.
+  - `userCredentialsConfiguration` → `UserCredentialsConfigurationDTO` stub → `…DTO1`; its
+    `custom` field → `CustomUserCredentialsConfigurationDTO` stub → `…DTOModel`.
+  - `GetCatalogEntryForEditResponseDTO.label`/`parents` are directly typed; no re-validation needed.
+
+### Follow-ups
+
+- Write siblings (`PUT admin/manage/.../edit` for workspace, catalog, catalog-entry,
+  user-credentials) — deferred to the v1.0+ write line. `occToken` from each read form is carried
+  through `.raw` for future write use.

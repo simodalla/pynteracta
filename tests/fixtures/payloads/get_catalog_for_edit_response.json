@@ -1,0 +1,20 @@
+{
+  "id": 5,
+  "occToken": 9,
+  "contentData": {
+    "name": {"en": "Departments", "it": "Reparti"},
+    "deleted": false
+  },
+  "communityAssociations": [
+    {
+      "community": {"id": 79, "name": "Engineering"},
+      "postFields": [],
+      "screenFields": []
+    },
+    {
+      "community": {"id": 80, "name": "Sales"},
+      "postFields": [],
+      "screenFields": []
+    }
+  ]
+}

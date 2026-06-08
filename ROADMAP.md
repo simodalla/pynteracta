@@ -36,7 +36,7 @@ Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes 
 | **0.3.0** | Attachments (read) | M16 | ✅ Shipped 2026-06-05 | [specs/v0.3-attachments.md](specs/v0.3-attachments.md) |
 | **0.4.0** | Tasks (read) | M17 | ✅ Shipped 2026-06-05 | [specs/v0.4-tasks.md](specs/v0.4-tasks.md) |
 | **0.5.0** | Groups & Hashtags (read) | M18 | ✅ Shipped 2026-06-05 | [specs/v0.5-groups-hashtags.md](specs/v0.5-groups-hashtags.md) |
-| **0.6.0** | Admin manage edits (read forms) | M19 | 🔭 Backlog | _tbd_ |
+| **0.6.0** | Admin manage edits (read forms) | M19 | ⏳ In progress | [specs/v0.6-admin-manage-edits.md](specs/v0.6-admin-manage-edits.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M14). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.

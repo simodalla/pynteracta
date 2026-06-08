@@ -1,0 +1,10 @@
+{
+  "id": 100,
+  "occToken": 4,
+  "label": {"en": "Engineering", "it": "Ingegneria"},
+  "externalId": "ENG",
+  "deleted": false,
+  "parents": [
+    {"id": 1, "label": "All departments", "externalId": "ALL"}
+  ]
+}
