@@ -8,6 +8,7 @@ from typing import Annotated, Literal, cast
 
 import typer
 
+from pynteracta.cli import admin_manage as _admin_manage_cli
 from pynteracta.cli import attachments as _attachments_cli
 from pynteracta.cli import auth as _auth_cli
 from pynteracta.cli import catalogs as _catalogs_cli
@@ -36,6 +37,7 @@ app.add_typer(_posts_cli.app, name="posts")
 app.add_typer(_tasks_cli.app, name="tasks")
 app.add_typer(_groups_cli.app, name="groups")
 app.add_typer(_hashtags_cli.app, name="hashtags")
+app.add_typer(_admin_manage_cli.app, name="admin-manage")
 
 
 @app.callback()

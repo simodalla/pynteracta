@@ -13,6 +13,12 @@ from __future__ import annotations
 
 import pytest
 
+from pynteracta.models.facade.admin_manage import (
+    CatalogEntryForEdit,
+    CatalogForEdit,
+    UserCredentialsForEdit,
+    WorkspaceForEdit,
+)
 from pynteracta.models.facade.attachments import (
     AttachmentDetail,
     AttachmentVisibility,
@@ -774,3 +780,117 @@ class TestAdminListHashtags:
         items = facade.items_typed
         assert len(items) == _HASHTAG_COUNT_CONTRACT
         assert items[0].id == _HASHTAG_ID_CONTRACT
+
+
+# ---------------------------------------------------------------------------
+# 19. Admin manage edits (M19)
+# ---------------------------------------------------------------------------
+
+_WORKSPACE_ID_CONTRACT = 88
+_WORKSPACE_OCC_TOKEN_CONTRACT = 17
+_CATALOG_ID_CONTRACT = 5
+_CATALOG_OCC_TOKEN_CONTRACT = 9
+_ENTRY_ID_CONTRACT = 100
+_ENTRY_OCC_TOKEN_CONTRACT = 4
+_USER_CREDS_OCC_TOKEN_CONTRACT = 12
+
+
+class TestGetWorkspaceForEdit:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetWorkspaceForEditResponseDTO",
+            generated.GetWorkspaceForEditResponseDTO,
+        )
+
+    def test_content_data_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "WorkspaceEditableContentDataDTO",
+            generated.WorkspaceEditableContentDataDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_workspace_for_edit_response.json")
+        facade = WorkspaceForEdit.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _WORKSPACE_ID_CONTRACT
+        assert facade.name == "Operations"
+        assert facade.raw.occToken == _WORKSPACE_OCC_TOKEN_CONTRACT
+
+
+class TestGetCatalogForEdit:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetCatalogForEditResponseDTO",
+            generated.GetCatalogForEditResponseDTO,
+        )
+
+    def test_content_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "CatalogEditableContentDTO",
+            generated.CatalogEditableContentDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_catalog_for_edit_response.json")
+        facade = CatalogForEdit.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _CATALOG_ID_CONTRACT
+        assert facade.deleted is False
+        assert facade.raw.occToken == _CATALOG_OCC_TOKEN_CONTRACT
+
+
+class TestGetCatalogEntryForEdit:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetCatalogEntryForEditResponseDTO",
+            generated.GetCatalogEntryForEditResponseDTO,
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_catalog_entry_for_edit_response.json")
+        facade = CatalogEntryForEdit.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.id == _ENTRY_ID_CONTRACT
+        assert facade.external_id == "ENG"
+        assert facade.raw.occToken == _ENTRY_OCC_TOKEN_CONTRACT
+
+
+class TestGetUserCredentialsForEdit:
+    def test_response_dto_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetUserCredentialsForEditResponseDTO",
+            generated.GetUserCredentialsForEditResponseDTO,
+        )
+
+    def test_configuration_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "UserCredentialsConfigurationDTO",
+            generated.UserCredentialsConfigurationDTO1,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_custom_credentials_dto_model_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "CustomUserCredentialsConfigurationDTO",
+            generated.CustomUserCredentialsConfigurationDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("get_user_credentials_for_edit_response.json")
+        facade = UserCredentialsForEdit.from_dict(payload)
+        assert facade.raw is not None
+        assert facade.has_google_credentials is True
+        assert facade.has_custom_credentials is True
+        assert facade.custom_username == "m.rossi"
+        assert facade.raw.occToken == _USER_CREDS_OCC_TOKEN_CONTRACT

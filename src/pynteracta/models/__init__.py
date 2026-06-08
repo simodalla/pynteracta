@@ -12,7 +12,9 @@ from pynteracta.models.facade import (
     AttachmentVisibility,
     Catalog,
     CatalogEntry,
+    CatalogEntryForEdit,
     CatalogEntryList,
+    CatalogForEdit,
     CatalogList,
     CheckVisibilityRequestDTO,
     Community,
@@ -55,9 +57,11 @@ from pynteracta.models.facade import (
     Task,
     TaskCapabilities,
     TaskReminder,
+    UserCredentialsForEdit,
     UserForEdit,
     UserProfile,
     VisibilityResult,
+    WorkspaceForEdit,
 )
 
 __all__ = [
@@ -66,7 +70,9 @@ __all__ = [
     "AttachmentVisibility",
     "Catalog",
     "CatalogEntry",
+    "CatalogEntryForEdit",
     "CatalogEntryList",
+    "CatalogForEdit",
     "CatalogList",
     "CheckVisibilityRequestDTO",
     "Community",
@@ -109,7 +115,9 @@ __all__ = [
     "Task",
     "TaskCapabilities",
     "TaskReminder",
+    "UserCredentialsForEdit",
     "UserForEdit",
     "UserProfile",
     "VisibilityResult",
+    "WorkspaceForEdit",
 ]

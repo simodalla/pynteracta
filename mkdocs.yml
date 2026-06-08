@@ -51,6 +51,7 @@ nav:
       - Tasks: api/tasks.md
       - Groups: api/groups.md
       - Hashtags: api/hashtags.md
+      - Admin Manage: api/admin_manage.md
 
 markdown_extensions:
   - admonition

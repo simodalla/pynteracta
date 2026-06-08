@@ -598,6 +598,57 @@ pynteracta hashtags list 79 --export hashtags.csv
 
 ---
 
+## `admin-manage` commands
+
+Admin-only **read-form** helpers: each fetches the editable state of an entity (the
+`GET admin/manage/.../edit` endpoints) together with an `occToken` for future write operations
+(deferred to v1.0+). These are propaedeutic to the write surface; no write commands exist yet.
+
+`occToken` is **not** shown in the default table — it lives on `.raw.occToken` and is reachable
+via `--full`, `--output json`, or `--export` (combined with `--full`). There is no `--web-url`
+flag on these commands (they are admin forms, not user-facing pages).
+
+### `admin-manage workspace WORKSPACE_ID`
+
+```bash
+pynteracta admin-manage workspace 88
+pynteracta admin-manage workspace 88 --output json --full
+pynteracta admin-manage workspace 88 --fields id,name
+```
+
+Default table: `id`, `name`, `admin_users_count`, `member_users_count`, `admin_groups_count`,
+`member_groups_count`. The editable `contentData` block (name/description/members) is on `.raw`.
+
+### `admin-manage catalog CATALOG_ID`
+
+```bash
+pynteracta admin-manage catalog 5
+pynteracta admin-manage catalog 5 --output json
+```
+
+Default table: `id`, `name` (i18n map), `deleted`, `community_associations_count`.
+
+### `admin-manage catalog-entry CATALOG_ID ENTRY_ID`
+
+```bash
+pynteracta admin-manage catalog-entry 5 100
+pynteracta admin-manage catalog-entry 5 100 --output json --full
+```
+
+Default table: `id`, `label` (i18n map), `external_id`, `deleted`, `parents_count`.
+
+### `admin-manage user-credentials USER_ID`
+
+```bash
+pynteracta admin-manage user-credentials 1042
+pynteracta admin-manage user-credentials 1042 --output json
+```
+
+Default table: `has_google_credentials`, `has_microsoft_credentials`, `has_custom_credentials`,
+`custom_username`, `custom_active`. The full per-provider configuration is on `.raw`.
+
+---
+
 ## `tasks` commands
 
 Fetch task detail. A task belongs to a post (`post_id`); `--web-url` deep-links to the **parent post**, since tasks have no standalone web view (D-v0.4-3).

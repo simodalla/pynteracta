@@ -1,0 +1,17 @@
+{
+  "id": 88,
+  "occToken": 17,
+  "contentData": {
+    "name": "Operations",
+    "translations": {"en": "Operations", "it": "Operazioni"},
+    "description": {"en": "Operations workspace", "it": "Spazio operazioni"}
+  },
+  "creationTimestamp": 1700000000000,
+  "lastModifyTimestamp": 1710000000000,
+  "coverImageTemporaryContentViewLink": "https://cdn.example.com/cover/88.png",
+  "logoTemporaryContentViewLink": "https://cdn.example.com/logo/88.png",
+  "adminUsersCount": 3,
+  "adminGroupsCount": 1,
+  "memberUsersCount": 25,
+  "memberGroupsCount": 4
+}

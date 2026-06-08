@@ -1,0 +1,115 @@
+# serializer version: 1
+# name: TestAdminManageCatalog.test_json_output
+  '''
+  {
+    "id": 5,
+    "name": {
+      "en": "Departments",
+      "it": "Reparti"
+    },
+    "deleted": false,
+    "community_associations_count": 2
+  }
+  
+  '''
+# ---
+# name: TestAdminManageCatalog.test_table_output
+  '''
+                                  Catalog 5                                
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                          ┃ Value                                  ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id                           │ 5                                      │
+  │ name                         │ {'en': 'Departments', 'it': 'Reparti'} │
+  │ deleted                      │ False                                  │
+  │ community_associations_count │ 2                                      │
+  └──────────────────────────────┴────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestAdminManageCatalogEntry.test_json_output
+  '''
+  {
+    "id": 100,
+    "label": {
+      "en": "Engineering",
+      "it": "Ingegneria"
+    },
+    "external_id": "ENG",
+    "deleted": false,
+    "parents_count": 1
+  }
+  
+  '''
+# ---
+# name: TestAdminManageCatalogEntry.test_table_output
+  '''
+                       Catalog 5 entry 100                     
+  ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key           ┃ Value                                     ┃
+  ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id            │ 100                                       │
+  │ label         │ {'en': 'Engineering', 'it': 'Ingegneria'} │
+  │ external_id   │ ENG                                       │
+  │ deleted       │ False                                     │
+  │ parents_count │ 1                                         │
+  └───────────────┴───────────────────────────────────────────┘
+  
+  '''
+# ---
+# name: TestAdminManageUserCredentials.test_json_output
+  '''
+  {
+    "has_google_credentials": true,
+    "has_microsoft_credentials": false,
+    "has_custom_credentials": true,
+    "custom_username": "m.rossi",
+    "custom_active": true
+  }
+  
+  '''
+# ---
+# name: TestAdminManageUserCredentials.test_table_output
+  '''
+           User 1042 credentials         
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+  ┃ Key                       ┃ Value   ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+  │ has_google_credentials    │ True    │
+  │ has_microsoft_credentials │ False   │
+  │ has_custom_credentials    │ True    │
+  │ custom_username           │ m.rossi │
+  │ custom_active             │ True    │
+  └───────────────────────────┴─────────┘
+  
+  '''
+# ---
+# name: TestAdminManageWorkspace.test_json_output
+  '''
+  {
+    "id": 88,
+    "name": "Operations",
+    "admin_users_count": 3,
+    "member_users_count": 25,
+    "admin_groups_count": 1,
+    "member_groups_count": 4
+  }
+  
+  '''
+# ---
+# name: TestAdminManageWorkspace.test_table_output
+  '''
+              Workspace 88            
+  ┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+  ┃ Key                 ┃ Value      ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+  │ id                  │ 88         │
+  │ name                │ Operations │
+  │ admin_users_count   │ 3          │
+  │ member_users_count  │ 25         │
+  │ admin_groups_count  │ 1          │
+  │ member_groups_count │ 4          │
+  └─────────────────────┴────────────┘
+  
+  '''
+# ---

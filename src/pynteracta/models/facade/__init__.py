@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Facade models for the pynteracta endpoints."""
 
+from pynteracta.models.facade.admin_manage import (
+    CatalogEntryForEdit,
+    CatalogForEdit,
+    UserCredentialsForEdit,
+    WorkspaceForEdit,
+)
 from pynteracta.models.facade.attachments import (
     AttachmentDetail,
     AttachmentVisibility,
@@ -77,7 +83,9 @@ __all__ = [
     "AttachmentVisibility",
     "Catalog",
     "CatalogEntry",
+    "CatalogEntryForEdit",
     "CatalogEntryList",
+    "CatalogForEdit",
     "CatalogList",
     "CheckVisibilityRequestDTO",
     "Community",
@@ -120,7 +128,9 @@ __all__ = [
     "Task",
     "TaskCapabilities",
     "TaskReminder",
+    "UserCredentialsForEdit",
     "UserForEdit",
     "UserProfile",
     "VisibilityResult",
+    "WorkspaceForEdit",
 ]
