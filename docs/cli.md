@@ -317,7 +317,96 @@ Lists posts in a community. `--community` is required.
 pynteracta posts list --community 79
 pynteracta posts list --community 79 --all --web-url
 pynteracta posts list --community 79 --page-size 20 --output json
+
+# Ordering
+pynteracta posts list --community 79 --order-by postLastModifyAndCommentTimestamp --desc
+pynteracta posts list --community 79 --order-by postTitle --asc
+pynteracta posts list --community 79 --order-by postCustomField-1954 --desc --pinned-first
+
+# Text and creator filters
+pynteracta posts list --community 79 --title "Incident" --contains-text "CVE-2025"
+pynteracta posts list --community 79 --created-by 101 --created-by 102
+
+# Date range (ISO-8601, epoch-ms, or datetime all accepted by the Python API)
+pynteracta posts list --community 79 --created-from 2025-01-01T00:00:00+00:00
+pynteracta posts list --community 79 --created-from 2025-01-01 --created-to 2025-06-30
+
+# Hashtag, post type, workflow filters
+pynteracta posts list --community 79 --hashtag 5 --hashtag 12
+pynteracta posts list --community 79 --post-type 1
+pynteracta posts list --community 79 --workflow-status 3 --workflow-status 4
+
+# Custom-field filters (COLUMN:TYPEID:VAL[,VAL])
+pynteracta posts list --community 79 --field-filter 1411:4:226
+pynteracta posts list --community 79 --field-filter "1954:2:1780264800000,1780955999999"
+pynteracta posts list --community 79 --field-filter 1957:3:firewall
+
+# Multiple custom-field filters
+pynteracta posts list --community 79 \
+    --field-filter 1411:4:226,512 \
+    --field-filter 1957:3:error
+
+# Personal and pinned filters
+pynteracta posts list --community 79 --followed-by-me --only-pinned
+pynteracta posts list --community 79 --to-manage
+
+# Generic passthrough (for long-tail communityPostFilters fields)
+pynteracta posts list --community 79 --filter draftType=1
 ```
+
+**Ordering flags:**
+
+| Flag | Description |
+|---|---|
+| `--order-by TEXT` | Sort field (see table below). |
+| `--desc / --asc` | Sort direction (default: no ordering sent). |
+| `--pinned-first / --no-pinned-first` | Pinned posts appear before others. |
+
+Valid `--order-by` values: `postCustomId`, `postTitle`, `postCreatorUser`,
+`postCreationTimestamp`, `postLastModifyUser`, `postLastModifyTimestamp`,
+`postLastModifyAndCommentTimestamp`, `postViewedByMeTimestamp`, `postModifiedByMeTimestamp`,
+`postCommentedByMeTimestamp`, `postScheduledPublication`, `postRecency`,
+`postCustomField-{id}`. Invalid values exit with code 6 (`EXIT_VALIDATION`).
+
+**Filter flags:**
+
+| Flag | Description |
+|---|---|
+| `--title TEXT` | Filter by post title (partial match). |
+| `--contains-text TEXT` | Full-text search across title + body. |
+| `--created-by INT` | Filter by creator user ID. Repeatable. |
+| `--hashtag INT` | Filter by hashtag ID. Repeatable. |
+| `--post-type INT` | Filter by post type (1=CUSTOM, 2=EVENTO, 3=QUESTIONARIO). Repeatable. |
+| `--workflow-status INT` | Filter by workflow status ID. Repeatable. |
+| `--created-from TEXT` | Creation date lower bound (ISO-8601 string or epoch-ms integer). |
+| `--created-to TEXT` | Creation date upper bound. |
+| `--followed-by-me / --no-followed-by-me` | Only posts followed by the current user. |
+| `--to-manage / --no-to-manage` | Only posts the current user needs to manage. |
+| `--only-pinned / --no-only-pinned` | Only pinned posts. |
+
+**Custom-field filter (`--field-filter COLUMN:TYPEID:VAL[,VAL]`):**
+
+Format: `COLUMN_ID:TYPE_ID:VALUE[,VALUE]` — all three segments are required.
+
+| `TYPE_ID` | Operator | `VALUE` |
+|---|---|---|
+| `1` | EQUAL | single value |
+| `2` | INTERVAL | two epoch-ms integers (`from,to`) |
+| `3` | LIKE | substring |
+| `4` | IN | one or more enum/entity IDs |
+| `5` | CONTAINS | single value |
+| `6` | IS_NULL_OR_IN | one or more IDs |
+| `7` | IS_EMPTY | (no value segment needed) |
+
+Tokens that look like integers are coerced to `int`; others remain `str`. The flag is repeatable.
+
+**Generic passthrough (`--filter KEY=VALUE`):**
+
+For `communityPostFilters` fields not exposed as explicit flags, pass `KEY=VALUE`. The key is
+converted from `snake_case` to `camelCase`. Values are always `str`. Repeatable.
+
+See [Filtering and sorting posts](guides/filtering-posts.md) for a complete example-driven guide
+including the Python API, custom-field discovery, builder API, and opt-in validation.
 
 ### `posts get-by-client-uid`
 

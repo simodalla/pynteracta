@@ -1,15 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: PLR2004
 """Tests for PostsAPI."""
 
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import httpx
+import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.posts import PostsAPI
+from pynteracta.exceptions import ValidationError
+from pynteracta.models.facade.post_filters import FilterType, PostFieldFilter
 from pynteracta.models.facade.posts import (
     CheckVisibilityRequestDTO,
     ListCommunityPostsFilteredRequestDTO,
@@ -355,3 +360,172 @@ class TestPostsAPI:
         req = CheckVisibilityRequestDTO(ids=[_POST_ID])
         result = api.check_visibility_with_comments_raw(req)
         assert len(result.posts_typed) == self._HISTORY_ITEMS
+
+
+class TestListInCommunityFilters:
+    """Tests for the new filter/sort kwargs on list_in_community."""
+
+    _COMMUNITY_ID = 17
+    _PAYLOAD: ClassVar[dict] = {
+        "items": [{"id": 1, "communityId": 17, "title": "T"}],
+        "nextPageToken": None,
+    }
+    _URL = f"{BASE_URL}/communication/posts/data/list/community/17"
+
+    @respx.mock
+    def test_order_by_sent_in_body(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(
+            self._COMMUNITY_ID, order_by="postLastModifyTimestamp", order_desc=True
+        )
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderBy"] == "postLastModifyTimestamp"
+        assert body["orderDesc"] is True
+
+    @respx.mock
+    def test_pinned_first_sent(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, pinned_first=True)
+        body = json.loads(route.calls[0].request.content)
+        assert body["pinnedFirst"] is True
+
+    @respx.mock
+    def test_custom_field_order_by(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, order_by="postCustomField-1954")
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderBy"] == "postCustomField-1954"
+
+    def test_invalid_order_by_raises(self) -> None:
+        api = PostsAPI(make_transport())
+        with pytest.raises(ValidationError, match="Invalid order_by"):
+            api.list_in_community(self._COMMUNITY_ID, order_by="notAValidField")
+
+    @respx.mock
+    def test_community_post_filters_assembled(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(
+            self._COMMUNITY_ID,
+            title="Report",
+            post_types=[1, 2],
+            followed_by_me=True,
+            only_pinned=False,
+        )
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["title"] == "Report"
+        assert cpf["postTypes"] == [1, 2]
+        assert cpf["followedByMe"] is True
+        assert cpf["onlyPinned"] is False
+        # SaaS defaults always included when any filter is set
+        assert cpf["mentioned"] is False
+        assert cpf["hashtagIds"] == []
+        assert cpf["currentWorkflowStatusIds"] == []
+        assert cpf["postFieldFilters"] == []
+        assert cpf["screenFieldFilters"] == []
+
+    @respx.mock
+    def test_saas_defaults_included_with_to_manage(self) -> None:
+        """Complete communityPostFilters and communityAttachmentFilters always present."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, to_manage=True)
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["toManage"] is True
+        assert cpf["mentioned"] is False
+        assert cpf["postTypes"] == []
+        assert cpf["hashtagIds"] == []
+        assert cpf["currentWorkflowStatusIds"] == []
+        assert cpf["postFieldFilters"] == []
+        assert cpf["screenFieldFilters"] == []
+        caf = body["communityAttachmentFilters"]
+        assert caf["excludeFilePickers"] is False
+        assert caf["hashtagIds"] == []
+        assert caf["name"] is None
+
+    @respx.mock
+    def test_explicit_mentioned_true_not_overridden(self) -> None:
+        """Explicit mentioned=True must not be overridden by the default false."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, mentioned=True)
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["mentioned"] is True
+
+    @respx.mock
+    def test_post_field_filters_serialized(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(
+            self._COMMUNITY_ID,
+            post_field_filters=[
+                PostFieldFilter(column_id=1411, type_id=FilterType.IN, parameters=[226]),
+                PostFieldFilter(column_id=1957, type_id=FilterType.LIKE, parameters=["aaa"]),
+            ],
+        )
+        body = json.loads(route.calls[0].request.content)
+        pff = body["communityPostFilters"]["postFieldFilters"]
+        assert pff[0] == {"columnId": 1411, "typeId": 4, "parameters": [226]}
+        assert pff[1] == {"columnId": 1957, "typeId": 3, "parameters": ["aaa"]}
+
+    @respx.mock
+    def test_date_coercion_iso_string(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(
+            self._COMMUNITY_ID,
+            creation_timestamp_from="2025-01-01T00:00:00+00:00",
+        )
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert isinstance(cpf["creationTimestampFrom"], int)
+        assert cpf["creationTimestampFrom"] == 1735689600000
+
+    @respx.mock
+    def test_date_coercion_int_passthrough(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, creation_timestamp_from=1780264800000)
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["creationTimestampFrom"] == 1780264800000
+
+    @respx.mock
+    def test_community_post_filters_always_present(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, page_size=10)
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["mentioned"] is False
+        assert cpf["postTypes"] == []
+        assert cpf["toManage"] is None
+        assert cpf["hashtagIds"] == []
+        assert body["communityAttachmentFilters"]["excludeFilePickers"] is False
+        assert body["communityAttachmentFilters"]["hashtagIds"] == []
+
+    @respx.mock
+    def test_order_desc_defaults_to_true(self) -> None:
+        """orderDesc and orderBy are always sent with SaaS defaults when not explicitly set."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID)
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderDesc"] is True
+        assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
+        assert body["pinnedFirst"] is True
+
+    @respx.mock
+    def test_post_field_filters_as_dicts(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(
+            self._COMMUNITY_ID,
+            post_field_filters=[{"columnId": 1411, "typeId": 4, "parameters": [226]}],
+        )
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["postFieldFilters"][0]["columnId"] == 1411

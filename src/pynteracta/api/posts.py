@@ -3,10 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+import re
+from typing import TYPE_CHECKING, Any
 
 from pynteracta.api._base import ResourceClient
-from pynteracta.api._utils import build_paginated_body, build_query_params
+from pynteracta.api._utils import (
+    build_paginated_body,
+    build_query_params,
+    snake_to_camel,
+    to_epoch_millis,
+)
+from pynteracta.exceptions import ValidationError
+from pynteracta.models.facade.post_filters import PostFieldFilter, validate_field_filters
 from pynteracta.models.facade.posts import (
     CheckVisibilityRequestDTO,
     GlobalPostStream,
@@ -24,6 +32,79 @@ from pynteracta.models.facade.posts import (
 from pynteracta.models.generated import external_v2 as generated
 from pynteracta.pagination import PageIterator
 from pynteracta.transport import HttpTransport
+
+if TYPE_CHECKING:
+    from pynteracta.models.facade.communities import PostDefinition
+
+
+_DEFAULT_ORDER_BY = "postLastModifyAndCommentTimestamp"
+
+# Complete communityPostFilters baseline matching the SaaS payload structure.
+# All fields are always sent; extra fields (onlyPinned, containsText, hashtagsLogicalAnd)
+# are added only when explicitly requested.
+_DEFAULT_COMMUNITY_POST_FILTERS: dict[str, Any] = {
+    "followedByMe": None,
+    "createdByUserIds": None,
+    "createdByGroupIds": None,
+    "title": None,
+    "description": None,
+    "creationTimestampFrom": None,
+    "creationTimestampTo": None,
+    "modifiedTimestampFrom": None,
+    "modifiedTimestampTo": None,
+    "mentioned": False,
+    "toManage": None,
+    "postTypes": [],
+    "postSurveyTypes": None,
+    "visibility": None,
+    "acknowledgeTaskFilter": None,
+    "hashtagIds": [],
+    "currentWorkflowStatusIds": [],
+    "postFieldFilters": [],
+    "screenFieldFilters": [],
+}
+
+# Complete communityAttachmentFilters baseline matching the SaaS payload structure.
+_DEFAULT_COMMUNITY_ATTACHMENT_FILTERS: dict[str, Any] = {
+    "name": None,
+    "createdByUserId": None,
+    "mimeTypes": None,
+    "mimeTypeCategory": None,
+    "types": None,
+    "excludeFilePickers": False,
+    "modifiedTimestampFrom": None,
+    "modifiedTimestampTo": None,
+    "hashtagIds": [],
+}
+
+# Allowed static values for the orderBy request field.
+POST_ORDER_FIELDS: tuple[str, ...] = (
+    "postCustomId",
+    "postTitle",
+    "postCreatorUser",
+    "postCreationTimestamp",
+    "postLastModifyUser",
+    "postLastModifyTimestamp",
+    "postLastModifyAndCommentTimestamp",
+    "postViewedByMeTimestamp",
+    "postModifiedByMeTimestamp",
+    "postCommentedByMeTimestamp",
+    "postScheduledPublication",
+    "postRecency",
+)
+
+_CUSTOM_FIELD_ORDER_RE = re.compile(r"^postCustomField-\d+$")
+
+
+def _validate_order_by(value: str) -> str:
+    """Validate *value* against POST_ORDER_FIELDS plus the postCustomField-{id} form."""
+    if value in POST_ORDER_FIELDS or _CUSTOM_FIELD_ORDER_RE.match(value):
+        return value
+    raise ValidationError(
+        f"Invalid order_by value {value!r}. Allowed static values: {POST_ORDER_FIELDS}. "
+        "Dynamic form: 'postCustomField-<id>'."
+    )
+
 
 _GET_POST_PATH = "communication/posts/data/post-detail-by-id/{post_id}"
 _GET_POST_BY_CLIENT_UID_PATH = "communication/posts/data/post-detail-by-client-uid/{client_uid}"
@@ -74,7 +155,7 @@ class PostsAPI(ResourceClient):
         )
         return Post.from_dict(self._get(path, params=params or None))
 
-    def list_in_community(  # noqa: PLR0913
+    def list_in_community(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         community_id: int,
         *,
@@ -90,19 +171,164 @@ class PostsAPI(ResourceClient):
         load_main_attachment_preview_image_hi_res_link: bool | None = None,
         load_main_attachment_preview_image_hi_res_animated_link: bool | None = None,
         load_capabilities: bool | None = None,
+        # --- ordering ---
+        order_by: str | None = None,
+        order_desc: bool | None = None,
+        pinned_first: bool | None = None,
+        # --- communityPostFilters (curated subset) ---
+        title: str | None = None,
+        description: str | None = None,
+        contains_text: str | None = None,
+        created_by_user_ids: list[int] | None = None,
+        created_by_group_ids: list[int] | None = None,
+        creation_timestamp_from: int | float | str | None = None,
+        creation_timestamp_to: int | float | str | None = None,
+        modified_timestamp_from: int | float | str | None = None,
+        modified_timestamp_to: int | float | str | None = None,
+        hashtag_ids: list[int] | None = None,
+        hashtags_logical_and: bool | None = None,
+        post_types: list[int] | None = None,
+        current_workflow_status_ids: list[int] | None = None,
+        visibility: int | None = None,
+        followed_by_me: bool | None = None,
+        mentioned: bool | None = None,
+        to_manage: bool | None = None,
+        only_pinned: bool | None = None,
+        post_field_filters: list[PostFieldFilter | dict[str, Any]] | None = None,
+        screen_field_filters: list[PostFieldFilter | dict[str, Any]] | None = None,
+        # --- opt-in validation ---
+        validate_with: PostDefinition | None = None,
+        # --- escape hatch ---
+        community_post_filters: dict[str, Any] | None = None,
         **filters: Any,
     ) -> PostList:
-        """POST ``/communication/posts/data/list/community/{communityId}``."""
-        body = build_paginated_body(
-            page_token=page_token,
-            page_size=page_size,
-            calculate_total_items_count=calculate_total_items_count,
-            **filters,
-        )
-        req = ListCommunityPostsFilteredRequestDTO.model_validate(body)
-        return self.list_in_community_raw(
-            community_id,
-            req,
+        """POST ``/communication/posts/data/list/community/{communityId}``.
+
+        Args:
+            community_id: Target community.
+            order_by: Sort field — one of :data:`POST_ORDER_FIELDS` or ``'postCustomField-{id}'``.
+            order_desc: Descending sort (``True``) or ascending (``False``).
+            pinned_first: Show pinned posts first.
+            title: Filter on post title.
+            description: Filter on post description.
+            contains_text: Full-text filter on post content.
+            created_by_user_ids: Filter by creator user ids.
+            created_by_group_ids: Filter by creator group ids.
+            creation_timestamp_from: Lower bound on creation date (epoch-ms, datetime, or ISO str).
+            creation_timestamp_to: Upper bound on creation date.
+            modified_timestamp_from: Lower bound on modification date.
+            modified_timestamp_to: Upper bound on modification date.
+            hashtag_ids: Filter by hashtag ids.
+            hashtags_logical_and: Combine hashtag filters with AND (default OR).
+            post_types: Filter by post type ids (1=CUSTOM, 2=EVENTO, 3=QUESTIONARIO).
+            current_workflow_status_ids: Filter by workflow status ids.
+            visibility: Filter by visibility (public/private).
+            followed_by_me: Only posts followed by the current user.
+            mentioned: Only posts where the current user was mentioned.
+            to_manage: Only posts the current user has actions to take on.
+            only_pinned: Only pinned posts.
+            post_field_filters: Custom-field filters — list of :class:`PostFieldFilter` or dicts
+                with keys ``column_id``/``columnId``, ``type_id``/``typeId``, ``parameters``.
+            screen_field_filters: Workflow screen-field filters (same structure).
+            validate_with: When supplied, validates ``post_field_filters`` and
+                ``screen_field_filters`` against this community's post-definition before sending
+                (no extra network call; raises :class:`~pynteracta.exceptions.ValidationError`).
+            community_post_filters: Pre-built ``communityPostFilters`` dict — escape hatch for
+                the long-tail fields not promoted to explicit kwargs.
+            **filters: Additional camelCase fields forwarded to the request body (escape hatch).
+        """
+        if order_by is not None:
+            _validate_order_by(order_by)
+
+        # Coerce date kwargs to epoch-millis
+        cf_from = to_epoch_millis(creation_timestamp_from)
+        cf_to = to_epoch_millis(creation_timestamp_to)
+        mf_from = to_epoch_millis(modified_timestamp_from)
+        mf_to = to_epoch_millis(modified_timestamp_to)
+
+        # Opt-in validation of field filters
+        coerced_pff: list[PostFieldFilter] | None = None
+        coerced_sff: list[PostFieldFilter] | None = None
+        if post_field_filters is not None and validate_with is not None:
+            coerced_pff = validate_field_filters(post_field_filters, validate_with)
+        elif post_field_filters is not None:
+            coerced_pff = [
+                f if isinstance(f, PostFieldFilter) else PostFieldFilter.from_dict(f)
+                for f in post_field_filters
+            ]
+        if screen_field_filters is not None and validate_with is not None:
+            coerced_sff = validate_field_filters(screen_field_filters, validate_with, screen=True)
+        elif screen_field_filters is not None:
+            coerced_sff = [
+                f if isinstance(f, PostFieldFilter) else PostFieldFilter.from_dict(f)
+                for f in screen_field_filters
+            ]
+
+        # Build the complete communityPostFilters (SaaS-compatible: all fields present).
+        # Priority: defaults → community_post_filters escape hatch → explicit kwargs.
+        cpf: dict[str, Any] = dict(_DEFAULT_COMMUNITY_POST_FILTERS)
+        if community_post_filters:
+            cpf.update(community_post_filters)
+        if title is not None:
+            cpf["title"] = title
+        if description is not None:
+            cpf["description"] = description
+        if contains_text is not None:
+            cpf["containsText"] = contains_text
+        if created_by_user_ids is not None:
+            cpf["createdByUserIds"] = created_by_user_ids
+        if created_by_group_ids is not None:
+            cpf["createdByGroupIds"] = created_by_group_ids
+        if cf_from is not None:
+            cpf["creationTimestampFrom"] = cf_from
+        if cf_to is not None:
+            cpf["creationTimestampTo"] = cf_to
+        if mf_from is not None:
+            cpf["modifiedTimestampFrom"] = mf_from
+        if mf_to is not None:
+            cpf["modifiedTimestampTo"] = mf_to
+        if hashtag_ids is not None:
+            cpf["hashtagIds"] = hashtag_ids
+        if hashtags_logical_and is not None:
+            cpf["hashtagsLogicalAnd"] = hashtags_logical_and
+        if post_types is not None:
+            cpf["postTypes"] = post_types
+        if current_workflow_status_ids is not None:
+            cpf["currentWorkflowStatusIds"] = current_workflow_status_ids
+        if visibility is not None:
+            cpf["visibility"] = visibility
+        if followed_by_me is not None:
+            cpf["followedByMe"] = followed_by_me
+        if mentioned is not None:
+            cpf["mentioned"] = mentioned
+        if to_manage is not None:
+            cpf["toManage"] = to_manage
+        if only_pinned is not None:
+            cpf["onlyPinned"] = only_pinned
+        if coerced_pff is not None:
+            cpf["postFieldFilters"] = [f.to_dict() for f in coerced_pff]
+        if coerced_sff is not None:
+            cpf["screenFieldFilters"] = [f.to_dict() for f in coerced_sff]
+
+        # Build the complete request body matching the SaaS payload structure.
+        body: dict[str, Any] = {}
+        if page_token is not None:
+            body["pageToken"] = page_token
+        if page_size is not None:
+            body["pageSize"] = page_size
+        if calculate_total_items_count is not None:
+            body["calculateTotalItemsCount"] = calculate_total_items_count
+        body["orderBy"] = order_by if order_by is not None else _DEFAULT_ORDER_BY
+        body["orderDesc"] = order_desc if order_desc is not None else True
+        body["communityPostFilters"] = cpf
+        body["pinnedFirst"] = pinned_first if pinned_first is not None else True
+        body["communityAttachmentFilters"] = dict(_DEFAULT_COMMUNITY_ATTACHMENT_FILTERS)
+        for key, value in filters.items():
+            if value is not None:
+                body[snake_to_camel(key)] = value
+
+        path = _LIST_COMMUNITY_PATH.format(community_id=community_id)
+        params = build_query_params(
             load_post_details=load_post_details,
             load_main_attachment=load_main_attachment,
             load_main_attachment_view_link=load_main_attachment_view_link,
@@ -119,6 +345,7 @@ class PostsAPI(ResourceClient):
             ),
             load_capabilities=load_capabilities,
         )
+        return PostList.from_dict(self._post(path, json=body, params=params))
 
     def list_in_community_raw(  # noqa: PLR0913
         self,
@@ -158,11 +385,36 @@ class PostsAPI(ResourceClient):
             self._post(path, json=req.model_dump(mode="json", exclude_none=True), params=params)
         )
 
-    def iterate_in_community(
+    def iterate_in_community(  # noqa: PLR0913
         self,
         community_id: int,
         *,
         page_size: int | None = None,
+        order_by: str | None = None,
+        order_desc: bool | None = None,
+        pinned_first: bool | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        contains_text: str | None = None,
+        created_by_user_ids: list[int] | None = None,
+        created_by_group_ids: list[int] | None = None,
+        creation_timestamp_from: int | float | str | None = None,
+        creation_timestamp_to: int | float | str | None = None,
+        modified_timestamp_from: int | float | str | None = None,
+        modified_timestamp_to: int | float | str | None = None,
+        hashtag_ids: list[int] | None = None,
+        hashtags_logical_and: bool | None = None,
+        post_types: list[int] | None = None,
+        current_workflow_status_ids: list[int] | None = None,
+        visibility: int | None = None,
+        followed_by_me: bool | None = None,
+        mentioned: bool | None = None,
+        to_manage: bool | None = None,
+        only_pinned: bool | None = None,
+        post_field_filters: list[PostFieldFilter | dict[str, Any]] | None = None,
+        screen_field_filters: list[PostFieldFilter | dict[str, Any]] | None = None,
+        validate_with: PostDefinition | None = None,
+        community_post_filters: dict[str, Any] | None = None,
         **filters: Any,
     ) -> PageIterator[generated.BaseListPostsElementDTOModel]:
         """Lazy iterator over all pages of :meth:`list_in_community`."""
@@ -172,6 +424,31 @@ class PostsAPI(ResourceClient):
                 community_id,
                 page_token=page_token,
                 page_size=page_size,
+                order_by=order_by,
+                order_desc=order_desc,
+                pinned_first=pinned_first,
+                title=title,
+                description=description,
+                contains_text=contains_text,
+                created_by_user_ids=created_by_user_ids,
+                created_by_group_ids=created_by_group_ids,
+                creation_timestamp_from=creation_timestamp_from,
+                creation_timestamp_to=creation_timestamp_to,
+                modified_timestamp_from=modified_timestamp_from,
+                modified_timestamp_to=modified_timestamp_to,
+                hashtag_ids=hashtag_ids,
+                hashtags_logical_and=hashtags_logical_and,
+                post_types=post_types,
+                current_workflow_status_ids=current_workflow_status_ids,
+                visibility=visibility,
+                followed_by_me=followed_by_me,
+                mentioned=mentioned,
+                to_manage=to_manage,
+                only_pinned=only_pinned,
+                post_field_filters=post_field_filters,
+                screen_field_filters=screen_field_filters,
+                validate_with=validate_with,
+                community_post_filters=community_post_filters,
                 **filters,
             )
 

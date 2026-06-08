@@ -96,13 +96,11 @@ def _write_json(records: list[dict[str, Any]], path: Path, *, single: bool) -> N
 
 
 def _write_yaml(records: list[dict[str, Any]], path: Path, *, single: bool) -> None:
-    from pynteracta.cli._common import _check_yaml_available  # noqa: PLC0415
+    from pynteracta.cli._common import _check_yaml_available, _make_yaml  # noqa: PLC0415
 
     _check_yaml_available()
-    from ruamel.yaml import YAML  # noqa: PLC0415
-
     data: Any = records[0] if single and len(records) == 1 else records
-    yml = YAML()
+    yml = _make_yaml()
     with path.open("w", encoding="utf-8") as f:
         yml.dump(data, f)
 

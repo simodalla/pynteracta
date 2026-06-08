@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -31,6 +32,25 @@ def build_paginated_body(
         if value is not None:
             data[snake_to_camel(key)] = value
     return data
+
+
+def to_epoch_millis(value: int | float | str | datetime | None) -> int | None:
+    """Coerce *value* to epoch-milliseconds integer.
+
+    Accepts:
+    - ``int`` / ``float`` — returned as ``int``, assumed already epoch-millis.
+    - :class:`datetime` — converted via UTC if naive.
+    - ISO-8601 ``str`` — parsed then converted.
+    - ``None`` — returned as ``None``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return int(dt.timestamp() * 1000)
 
 
 def build_query_params(**kwargs: Any) -> dict[str, Any]:

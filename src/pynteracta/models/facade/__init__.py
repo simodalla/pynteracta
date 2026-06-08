@@ -31,6 +31,7 @@ from pynteracta.models.facade.communities import (
     Community,
     CommunityDetail,
     CommunityList,
+    FieldEnumValue,
     FieldType,
     ListCommunitiesRequestDTO,
     PostDefinition,
@@ -49,6 +50,12 @@ from pynteracta.models.facade.hashtags import (
     AdminListHashtagsRequestDTO,
     Hashtag,
     HashtagList,
+)
+from pynteracta.models.facade.post_filters import (
+    FilterType,
+    PostFieldFilter,
+    PostFieldFilterBuilder,
+    validate_field_filters,
 )
 from pynteracta.models.facade.posts import (
     CheckVisibilityRequestDTO,
@@ -93,7 +100,9 @@ __all__ = [
     "CommunityList",
     "CreateAccessTokenByServiceAccountRequestDTO",
     "CurrentUserResponse",
+    "FieldEnumValue",
     "FieldType",
+    "FilterType",
     "GetPostDefinitionCatalogsRequestDTO",
     "GlobalPostStream",
     "GoogleOAuth2AccessTokenResponse",
@@ -119,6 +128,8 @@ __all__ = [
     "PostDefinition",
     "PostDefinitionMap",
     "PostFieldDefinition",
+    "PostFieldFilter",
+    "PostFieldFilterBuilder",
     "PostHistoryEventList",
     "PostList",
     "ServiceAccountTokenResponse",
@@ -133,4 +144,5 @@ __all__ = [
     "UserProfile",
     "VisibilityResult",
     "WorkspaceForEdit",
+    "validate_field_filters",
 ]
