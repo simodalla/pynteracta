@@ -124,6 +124,49 @@ class CommunityDetail:
         return cls(generated.GetCommunityDetailsResponseDTO.model_validate(data))
 
 
+class FieldEnumValue:
+    """Facade over :class:`~generated.PostFieldConfigEnumValueDTO`.
+
+    Represents one allowed value for an ENUM / ENUM_LIST / HIERARCHICAL_ENUM field.
+
+    Attributes:
+        raw: The underlying generated DTO.
+    """
+
+    def __init__(self, raw: generated.PostFieldConfigEnumValueDTO) -> None:
+        self.raw = raw
+
+    @property
+    def id(self) -> int | None:
+        """Numeric identifier used in ``postFieldFilters`` ``parameters``."""
+        return self.raw.id
+
+    @property
+    def label(self) -> str | None:
+        """Human-readable label."""
+        return self.raw.label
+
+    @property
+    def external_id(self) -> str | None:
+        """Stable external identifier (preferred over ``label`` for resolution)."""
+        return self.raw.externalId
+
+    @property
+    def parent_ids(self) -> list[int]:
+        """Parent ids for hierarchical enums; empty list for flat enums."""
+        return self.raw.parentIds or []
+
+    @property
+    def deleted(self) -> bool:
+        """``True`` if this value has been deleted (soft-deleted, still returned by API)."""
+        return bool(self.raw.deleted)
+
+    @classmethod
+    def from_raw(cls, raw: generated.PostFieldConfigEnumValueDTO) -> FieldEnumValue:
+        """Wrap a generated DTO."""
+        return cls(raw)
+
+
 class PostFieldDefinition:
     """Facade over :class:`~generated.PostFieldDefinitionDTO1`.
 
@@ -180,9 +223,37 @@ class PostFieldDefinition:
         return self.raw.readonly
 
     @property
+    def external_id(self) -> str | None:
+        """Stable external identifier set by the API consumer (preferred over label)."""
+        return self.raw.externalId
+
+    @property
     def metadata(self) -> dict[str, str] | None:
         """Vendor metadata dict (e.g. ``feedback_max_value``, ``decimal_digits``)."""
         return self.raw.metadata
+
+    @property
+    def searchable(self) -> bool | None:
+        """Whether the field can be used in ``postFieldFilters``."""
+        return self.raw.searchable
+
+    @property
+    def sortable(self) -> bool | None:
+        """Whether the field can be used in ``orderBy`` (``postCustomField-{id}`` form)."""
+        return self.raw.sortable
+
+    @property
+    def enum_values(self) -> list[FieldEnumValue]:
+        """Allowed enum values for ENUM / ENUM_LIST / HIERARCHICAL_ENUM fields.
+
+        Returns an empty list for non-enum field types.
+        Use the ``id`` of each entry as the ``parameters`` value in ``postFieldFilters``.
+        """
+        result = []
+        for raw_val in self.raw.enumValues or []:
+            typed = generated.PostFieldConfigEnumValueDTO.model_validate(raw_val.root)
+            result.append(FieldEnumValue(typed))
+        return result
 
     @property
     def validations(self) -> list[generated.PostFieldValidationDTO] | None:

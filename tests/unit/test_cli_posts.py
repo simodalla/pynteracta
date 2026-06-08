@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import json
+from typing import ClassVar
+
 import httpx
 import pytest
 import respx
@@ -94,6 +97,155 @@ class TestPostsList:
         )
         assert result.exit_code == 0
         assert result.output == snapshot
+
+
+class TestPostsListFilters:
+    """Tests for the new filter/sort flags on `posts list`."""
+
+    _LIST_URL = "communication/posts/data/list/community/79"
+    _PAYLOAD: ClassVar[dict] = {
+        "items": [{"id": 1, "communityId": 79, "title": "T"}],
+        "nextPageToken": None,
+    }
+
+    @respx.mock
+    def test_order_by_flag(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--order-by",
+                "postLastModifyTimestamp",
+                "--desc",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderBy"] == "postLastModifyTimestamp"
+        assert body["orderDesc"] is True
+
+    @respx.mock
+    def test_asc_flag(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--order-by", "postTitle", "--asc"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderDesc"] is False
+
+    @respx.mock
+    def test_pinned_first_flag(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--pinned-first"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["pinnedFirst"] is True
+
+    @respx.mock
+    def test_title_filter(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--title", "Report"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["title"] == "Report"
+
+    @respx.mock
+    def test_post_type_repeatable(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--post-type", "1", "--post-type", "2"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["postTypes"] == [1, 2]
+
+    @respx.mock
+    def test_field_filter_in(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--field-filter", "1411:4:226,512"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        pff = body["communityPostFilters"]["postFieldFilters"]
+        assert pff[0] == {"columnId": 1411, "typeId": 4, "parameters": [226, 512]}
+
+    @respx.mock
+    def test_field_filter_like_string(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--field-filter", "1957:3:aaa"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        pff = body["communityPostFilters"]["postFieldFilters"]
+        assert pff[0] == {"columnId": 1957, "typeId": 3, "parameters": ["aaa"]}
+
+    @respx.mock
+    def test_field_filter_interval(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--field-filter",
+                "1954:2:1780264800000,1780955999999",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        pff = body["communityPostFilters"]["postFieldFilters"]
+        assert pff[0]["parameters"] == [1780264800000, 1780955999999]
+
+    def test_field_filter_bad_format(self, runner: CliRunner) -> None:
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--field-filter", "bad"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code != 0
+
+    @respx.mock
+    def test_generic_filter_passthrough(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--filter", "containsText=hello"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["containsText"] == "hello"
+
+    @respx.mock
+    def test_no_order_desc_without_order_by(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(app, ["posts", "list", "--community", "79"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert "orderDesc" not in body
 
 
 class TestPostsComments:

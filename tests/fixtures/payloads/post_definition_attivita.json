@@ -1,0 +1,1016 @@
+[
+  {
+    "id": 1415,
+    "name": "column_1415",
+    "label": "Assegnatari",
+    "type": 15,
+    "required": true,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "assegnatario",
+    "enumValues": [],
+    "metadata": {
+      "user_picker_from_group": "37",
+      "generic_entity_list_config_id": "core.user",
+      "extends_post_visibility": "true"
+    },
+    "validations": [
+      {
+        "id": 25,
+        "fieldId": 1415,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1411,
+    "name": "column_1411",
+    "label": "Tipologia",
+    "type": 7,
+    "required": true,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [
+      {
+        "id": 527,
+        "label": "Aggiornamento/installazione pc",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 512,
+        "label": "Modifica configurazioni (firewall, console amministrative..) - Registro Operazioni Amministrative",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 226,
+        "label": "Manutenzione sistemistica (aggiornamenti software, ecc..)",
+        "externalId": "",
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 513,
+        "label": "Installazione/configurazione apparati (firewall, switch, router, marcatempi, ap, ecc...)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 520,
+        "label": "Amministrativa (acquisti, rinnovi, ecc)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 531,
+        "label": "Formazione",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 576,
+        "label": "Incident Report - Post mortem",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 28,
+        "label": "Generica",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 26,
+        "label": "Progetto",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": true
+      },
+      {
+        "id": 125,
+        "label": "LABS",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": true
+      },
+      {
+        "id": 65,
+        "label": "Scuola",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": true
+      },
+      {
+        "id": 29,
+        "label": "Telecamera videosorveglianza",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": true
+      },
+      {
+        "id": 27,
+        "label": "Ticket",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": true
+      }
+    ],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 338,
+        "fieldId": 1411,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1890,
+    "name": "column_1890",
+    "label": "Sistema Configurabile",
+    "description": "[{\"insert\":\"E' necessario dal 18/11/2020 che vengano registrate le azioni che vanno a modificare le configurazioni e gli stati di determinati sistemi informatici (GPO, Citrix, Firewall, Sophos..)\\n\"}]",
+    "type": 7,
+    "required": false,
+    "readonly": false,
+    "searchable": false,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "sistema",
+    "enumValues": [
+      {
+        "id": 515,
+        "label": "Citrix (installazione/aggiornamento/disinstallazione/pubblicazione/de-pubblicazione)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 517,
+        "label": "Firewall (modifica, creazioni policy)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 514,
+        "label": "GPO (creazione o modifica di una GPO)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 516,
+        "label": "Sophos Cloud (modifiche policy, aggiunta esclusioni..)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 532,
+        "label": "Vm / vCenter",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 368,
+        "fieldId": 1890,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 369,
+        "fieldId": 1890,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1908,
+    "name": "column_1908",
+    "label": "Tipo attivit\u00e0 sistemstica",
+    "type": 8,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "tipoattivit\u00e0sistemstica",
+    "enumValues": [
+      {
+        "id": 524,
+        "label": "Remediation VA CSIRT 1o semestre 2025",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 525,
+        "label": "Altro",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 526,
+        "label": "Aggiornamenti software",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 348,
+        "fieldId": 1908,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 349,
+        "fieldId": 1908,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1903,
+    "name": "column_1903",
+    "label": "Tipo di acquisto",
+    "type": 8,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "tipodiacquisto",
+    "enumValues": [
+      {
+        "id": 521,
+        "label": "Assistenza",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 522,
+        "label": "Hardware",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 523,
+        "label": "Software",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 339,
+        "fieldId": 1903,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 340,
+        "fieldId": 1903,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1911,
+    "name": "column_1911",
+    "label": "Aggiornamento/installazione pc",
+    "type": 7,
+    "required": false,
+    "readonly": false,
+    "searchable": false,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "tipoaggiornamentowindows11",
+    "enumValues": [
+      {
+        "id": 528,
+        "label": "Aggiornamento 10 -> 11",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 529,
+        "label": "Aggiornamento 11 -> 11 (22/23 h2 --> 24h2)",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 530,
+        "label": "Nuova installazione",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 366,
+        "fieldId": 1911,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 367,
+        "fieldId": 1911,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1912,
+    "name": "column_1912",
+    "label": "Assegnazione dotazione collegata",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "assegnazione",
+    "enumValues": [],
+    "metadata": {
+      "inverse_relation_order_by": "postTitle",
+      "community_id": "56",
+      "inverse_relation_order_desc": "false",
+      "inverse_relation_include_terminal_states": "true",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 362,
+        "fieldId": 1912,
+        "validationTypeId": 5,
+        "parameter": "1",
+        "order": 0
+      },
+      {
+        "id": 363,
+        "fieldId": 1912,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1910,
+    "name": "column_1910",
+    "label": "Info Vulnerabilit\u00e0",
+    "type": 11,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "provacommento",
+    "enumValues": [],
+    "metadata": {
+      "generate_post_comment": "true"
+    },
+    "validations": [
+      {
+        "id": 353,
+        "fieldId": 1910,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 354,
+        "fieldId": 1910,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1954,
+    "name": "column_1954",
+    "label": "Data e ora inizio ",
+    "type": 5,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": true,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "data_",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 428,
+        "fieldId": 1954,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1955,
+    "name": "column_1955",
+    "label": "Data e ora rilevazione",
+    "type": 5,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": true,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "data_e_ora_rilevazione",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 429,
+        "fieldId": 1955,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1956,
+    "name": "column_1956",
+    "label": "Data e ora fine",
+    "type": 5,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": true,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "data_e_ora_rilevazione_1",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 431,
+        "fieldId": 1956,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1957,
+    "name": "column_1957",
+    "label": "Causa",
+    "type": 11,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "causa",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 432,
+        "fieldId": 1957,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1958,
+    "name": "column_1958",
+    "label": "Trattamento",
+    "type": 11,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "causa_1",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 433,
+        "fieldId": 1958,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1959,
+    "name": "column_1959",
+    "label": "Lezioni apprese e azioni migliorative",
+    "type": 11,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "externalId": "trattamento",
+    "enumValues": [],
+    "metadata": {},
+    "validations": [
+      {
+        "id": 434,
+        "fieldId": 1959,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1416,
+    "name": "column_1416",
+    "label": "Deadline",
+    "type": 4,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": true,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {},
+    "validations": []
+  },
+  {
+    "id": 1505,
+    "name": "column_1505",
+    "label": "Priorit\u00e0",
+    "type": 7,
+    "required": false,
+    "readonly": false,
+    "searchable": false,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [
+      {
+        "id": 122,
+        "label": "1 - Massima",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 123,
+        "label": "2 - Normale",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 124,
+        "label": "3 - Minima",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": []
+  },
+  {
+    "id": 1413,
+    "name": "column_1413",
+    "label": "Progetto Collegato",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "16",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 378,
+        "fieldId": 1413,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 176,
+        "fieldId": 1413,
+        "validationTypeId": 5,
+        "parameter": "5",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1494,
+    "name": "column_1494",
+    "label": "Attivit\u00e0 collegata",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "17",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 185,
+        "fieldId": 1494,
+        "validationTypeId": 5,
+        "parameter": "20",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1794,
+    "name": "column_1794",
+    "label": "Ticket collegato",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": false,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "inverse_relation_order_by": "postCustomId",
+      "community_id": "79",
+      "inverse_relation_order_desc": "false",
+      "inverse_relation_include_terminal_states": "true",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 260,
+        "fieldId": 1794,
+        "validationTypeId": 5,
+        "parameter": "10",
+        "order": 0
+      }
+    ]
+  },
+  {
+    "id": 1476,
+    "name": "column_1476",
+    "label": "Oggetti IT collegati",
+    "type": 8,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [
+      {
+        "id": 84,
+        "label": "Access Point",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 80,
+        "label": "Marcatempo",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 81,
+        "label": "Scuola",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 82,
+        "label": "Server",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      },
+      {
+        "id": 83,
+        "label": "Telecamera",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "metadata": {},
+    "validations": []
+  },
+  {
+    "id": 1487,
+    "name": "column_1487",
+    "label": "Access Point",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "27",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 89,
+        "fieldId": 1487,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 184,
+        "fieldId": 1487,
+        "validationTypeId": 5,
+        "parameter": "10",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1503,
+    "name": "column_1503",
+    "label": "Marcatempo",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "29",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 90,
+        "fieldId": 1503,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 187,
+        "fieldId": 1503,
+        "validationTypeId": 5,
+        "parameter": "10",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1429,
+    "name": "column_1429",
+    "label": "Scuola",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": false,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "18",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 39,
+        "fieldId": 1429,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 178,
+        "fieldId": 1429,
+        "validationTypeId": 5,
+        "parameter": "10",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1477,
+    "name": "column_1477",
+    "label": "Server",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "21",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 88,
+        "fieldId": 1477,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 377,
+        "fieldId": 1477,
+        "validationTypeId": 1,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 183,
+        "fieldId": 1477,
+        "validationTypeId": 5,
+        "parameter": "10",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1686,
+    "name": "column_1686",
+    "label": "Apparato videosorveglianza",
+    "type": 15,
+    "required": false,
+    "readonly": false,
+    "searchable": true,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": true,
+    "visibleInEdit": true,
+    "enumValues": [],
+    "metadata": {
+      "community_id": "67",
+      "generic_entity_list_config_id": "communication.post"
+    },
+    "validations": [
+      {
+        "id": 66,
+        "fieldId": 1686,
+        "validationTypeId": 10,
+        "parameter": null,
+        "order": 0
+      },
+      {
+        "id": 236,
+        "fieldId": 1686,
+        "validationTypeId": 5,
+        "parameter": "30",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": 1412,
+    "name": "column_1412",
+    "label": "Ticket",
+    "type": 14,
+    "required": false,
+    "readonly": true,
+    "searchable": false,
+    "sortable": false,
+    "visibleInPreview": true,
+    "visibleInDetail": true,
+    "visibleInCreate": false,
+    "visibleInEdit": false,
+    "enumValues": [],
+    "metadata": {},
+    "validations": []
+  }
+]
