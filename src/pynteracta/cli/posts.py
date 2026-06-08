@@ -12,6 +12,7 @@ from pynteracta.api.posts import POST_ORDER_FIELDS
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    EpochMs,
     ExportFormatOption,
     ExportOption,
     FieldsOption,
@@ -40,7 +41,8 @@ def _post_element_to_row(item: object, *, web_url: str | None = None) -> dict[st
     if hasattr(item, "communityId"):
         row["community_id"] = getattr(item, "communityId", None)
     if hasattr(item, "creationTimestamp"):
-        row["creation_ts"] = getattr(item, "creationTimestamp", None)
+        v = getattr(item, "creationTimestamp", None)
+        row["creation_ts"] = EpochMs(v) if v is not None else None
     if web_url is not None:
         row["web_url"] = web_url
     return row
@@ -71,13 +73,15 @@ def posts_get(  # noqa: PLR0913
             web_url = client.web_urls.post(post_id) if show_web_url else None
 
         def _curated(obj: object) -> dict[str, object]:
+            cts = getattr(obj, "creation_timestamp", None)
+            lmts = getattr(obj, "last_modify_timestamp", None)
             return {
                 "id": getattr(obj, "id", None),
                 "title": getattr(obj, "title", None),
                 "community_id": getattr(obj, "community_id", None),
                 "description": getattr(obj, "description_plain_text", None),
-                "creation_ts": getattr(obj, "creation_timestamp", None),
-                "last_modify_ts": getattr(obj, "last_modify_timestamp", None),
+                "creation_ts": EpochMs(cts) if cts is not None else None,
+                "last_modify_ts": EpochMs(lmts) if lmts is not None else None,
                 "comments_count": getattr(obj, "comments_count", None),
                 "likes_count": getattr(obj, "likes_count", None),
                 **({"web_url": web_url} if web_url is not None else {}),
@@ -371,13 +375,15 @@ def posts_get_by_client_uid(  # noqa: PLR0913
             web_url = client.web_urls.post(post.id) if show_web_url and post.id else None
 
         def _curated(obj: object) -> dict[str, object]:
+            cts = getattr(obj, "creation_timestamp", None)
+            lmts = getattr(obj, "last_modify_timestamp", None)
             return {
                 "id": getattr(obj, "id", None),
                 "title": getattr(obj, "title", None),
                 "community_id": getattr(obj, "community_id", None),
                 "description": getattr(obj, "description_plain_text", None),
-                "creation_ts": getattr(obj, "creation_timestamp", None),
-                "last_modify_ts": getattr(obj, "last_modify_timestamp", None),
+                "creation_ts": EpochMs(cts) if cts is not None else None,
+                "last_modify_ts": EpochMs(lmts) if lmts is not None else None,
                 "comments_count": getattr(obj, "comments_count", None),
                 "likes_count": getattr(obj, "likes_count", None),
                 **({"web_url": web_url} if web_url is not None else {}),
@@ -489,11 +495,12 @@ def posts_history(  # noqa: PLR0913
                 items = list(result.items_typed)
 
         def _curated(obj: object) -> dict[str, object]:
+            ts = getattr(obj, "timestamp", None)
             return {
                 "id": getattr(obj, "id", None),
                 "type_id": getattr(obj, "typeId", None),
                 "type_description": getattr(obj, "typeDescription", None),
-                "timestamp": getattr(obj, "timestamp", None),
+                "timestamp": EpochMs(ts) if ts is not None else None,
             }
 
         fmt = resolve_output(state, output)
@@ -720,10 +727,11 @@ def posts_comments(  # noqa: PLR0913
                 items = list(result.items_typed)
 
         def _curated_comment(obj: object) -> dict[str, object]:
+            cts = getattr(obj, "creationTimestamp", None)
             return {
                 "id": getattr(obj, "id", None),
                 "text": getattr(obj, "commentPlainText", None),
-                "creation_ts": getattr(obj, "creationTimestamp", None),
+                "creation_ts": EpochMs(cts) if cts is not None else None,
             }
 
         fmt = resolve_output(state, output)

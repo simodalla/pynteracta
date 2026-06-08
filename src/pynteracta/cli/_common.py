@@ -219,6 +219,15 @@ def _check_yaml_available() -> None:
         raise typer.Exit(EXIT_CONFIG) from None
 
 
+def _make_yaml() -> Any:
+    """Return a ruamel.yaml YAML instance with representers for custom CLI types."""
+    from ruamel.yaml import YAML  # noqa: PLC0415
+
+    yml = YAML()
+    yml.representer.add_representer(EpochMs, lambda dumper, data: dumper.represent_str(str(data)))
+    return yml
+
+
 def validate_export_options(export: Path | None, export_format: str | None) -> None:
     """Pre-flight check: infer and validate the export format before making the API call."""
     if export is not None:
@@ -287,6 +296,22 @@ def select_fields(data: dict[str, Any], fields: list[str]) -> dict[str, Any]:
         except (KeyError, IndexError, ValueError):
             result[field] = None
     return result
+
+
+class EpochMs(int):
+    """Epoch-millisecond timestamp that formats as a human-readable datetime for table output.
+
+    Inherits from int so json.dumps serializes it as a number; str() returns a UTC datetime
+    string so table rendering (which calls str/repr) shows a readable value.
+    """
+
+    def __str__(self) -> str:
+        from datetime import UTC, datetime  # noqa: PLC0415
+
+        return datetime.fromtimestamp(self / 1000, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 def _compact_json(value: Any) -> str:
@@ -379,9 +404,7 @@ def print_output(
         console.print_json(json.dumps(data, default=str, indent=2))
     elif fmt == "yaml":
         _check_yaml_available()
-        from ruamel.yaml import YAML  # noqa: PLC0415
-
-        yml = YAML()
+        yml = _make_yaml()
         yml.dump(data, sys.stdout)
     elif isinstance(data, list):
         _print_table_rows(data, console=console, title=title)
