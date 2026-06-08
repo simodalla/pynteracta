@@ -1,6 +1,28 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.7.0] - 2026-06-08
+
+### Chores
+
+- Add /new-version and /release Claude Code skills
+- Release v0.7.0 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.6.0
+- Align /release skill to Option A (semantic-release-driven)
+- Log M20 in PROGRESS.md
+
+### Features
+
+- Post filter & sort completeness (M20, v0.7.0)
+
+### Fixes
+
+- Always send complete communityPostFilters/communityAttachmentFilters baselines
+- Render epoch-ms timestamps as datetime strings in table output
+
 ## [0.6.0] - 2026-06-08
 
 ### Documentation
