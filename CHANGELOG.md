@@ -1,6 +1,22 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.6.0] - 2026-06-08
+
+### Documentation
+
+- Regenerate CHANGELOG.md for v0.3.0–v0.5.0
+- Make WORKFLOW.md version-agnostic process guide
+- De-date development-workflow page, fix WORKFLOW.md link host
+- Drop foundation-spec row from CLAUDE.md planning list
+- Resolve Q-v0.6-2 — CLI command tree confirmed
+- Freeze v0.6.0 spec + mark M19 shipped in ROADMAP
+
+### Features
+
+- Plan v0.6.0 — Admin manage edits (read forms)
+- Admin manage edits read forms (M19, v0.6.0)
+
 ## [0.5.0] - 2026-06-05
 
 ### Chores
