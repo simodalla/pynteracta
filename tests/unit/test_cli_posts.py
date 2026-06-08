@@ -240,12 +240,13 @@ class TestPostsListFilters:
         assert body["communityPostFilters"]["containsText"] == "hello"
 
     @respx.mock
-    def test_no_order_desc_without_order_by(self, runner: CliRunner) -> None:
+    def test_order_desc_always_sent(self, runner: CliRunner) -> None:
         route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
         result = runner.invoke(app, ["posts", "list", "--community", "79"], env=BASE_ENV)
         assert result.exit_code == 0, result.output
         body = json.loads(route.calls[0].request.content)
-        assert "orderDesc" not in body
+        assert body["orderDesc"] is True
+        assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
 
 
 class TestPostsComments:

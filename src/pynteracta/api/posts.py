@@ -7,7 +7,12 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from pynteracta.api._base import ResourceClient
-from pynteracta.api._utils import build_paginated_body, build_query_params, to_epoch_millis
+from pynteracta.api._utils import (
+    build_paginated_body,
+    build_query_params,
+    snake_to_camel,
+    to_epoch_millis,
+)
 from pynteracta.exceptions import ValidationError
 from pynteracta.models.facade.post_filters import PostFieldFilter, validate_field_filters
 from pynteracta.models.facade.posts import (
@@ -32,10 +37,45 @@ if TYPE_CHECKING:
     from pynteracta.models.facade.communities import PostDefinition
 
 
-def _set_if(d: dict[str, Any], key: str, value: Any) -> None:
-    if value is not None:
-        d[key] = value
+_DEFAULT_ORDER_BY = "postLastModifyAndCommentTimestamp"
 
+# Complete communityPostFilters baseline matching the SaaS payload structure.
+# All fields are always sent; extra fields (onlyPinned, containsText, hashtagsLogicalAnd)
+# are added only when explicitly requested.
+_DEFAULT_COMMUNITY_POST_FILTERS: dict[str, Any] = {
+    "followedByMe": None,
+    "createdByUserIds": None,
+    "createdByGroupIds": None,
+    "title": None,
+    "description": None,
+    "creationTimestampFrom": None,
+    "creationTimestampTo": None,
+    "modifiedTimestampFrom": None,
+    "modifiedTimestampTo": None,
+    "mentioned": False,
+    "toManage": None,
+    "postTypes": [],
+    "postSurveyTypes": None,
+    "visibility": None,
+    "acknowledgeTaskFilter": None,
+    "hashtagIds": [],
+    "currentWorkflowStatusIds": [],
+    "postFieldFilters": [],
+    "screenFieldFilters": [],
+}
+
+# Complete communityAttachmentFilters baseline matching the SaaS payload structure.
+_DEFAULT_COMMUNITY_ATTACHMENT_FILTERS: dict[str, Any] = {
+    "name": None,
+    "createdByUserId": None,
+    "mimeTypes": None,
+    "mimeTypeCategory": None,
+    "types": None,
+    "excludeFilePickers": False,
+    "modifiedTimestampFrom": None,
+    "modifiedTimestampTo": None,
+    "hashtagIds": [],
+}
 
 # Allowed static values for the orderBy request field.
 POST_ORDER_FIELDS: tuple[str, ...] = (
@@ -115,7 +155,7 @@ class PostsAPI(ResourceClient):
         )
         return Post.from_dict(self._get(path, params=params or None))
 
-    def list_in_community(  # noqa: PLR0913, PLR0915
+    def list_in_community(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         community_id: int,
         *,
@@ -224,52 +264,71 @@ class PostsAPI(ResourceClient):
                 for f in screen_field_filters
             ]
 
-        # Build communityPostFilters dict
-        cpf: dict[str, Any] = {}
+        # Build the complete communityPostFilters (SaaS-compatible: all fields present).
+        # Priority: defaults → community_post_filters escape hatch → explicit kwargs.
+        cpf: dict[str, Any] = dict(_DEFAULT_COMMUNITY_POST_FILTERS)
         if community_post_filters:
             cpf.update(community_post_filters)
-        _set_if(cpf, "title", title)
-        _set_if(cpf, "description", description)
-        _set_if(cpf, "containsText", contains_text)
-        _set_if(cpf, "createdByUserIds", created_by_user_ids)
-        _set_if(cpf, "createdByGroupIds", created_by_group_ids)
-        _set_if(cpf, "creationTimestampFrom", cf_from)
-        _set_if(cpf, "creationTimestampTo", cf_to)
-        _set_if(cpf, "modifiedTimestampFrom", mf_from)
-        _set_if(cpf, "modifiedTimestampTo", mf_to)
-        _set_if(cpf, "hashtagIds", hashtag_ids)
-        _set_if(cpf, "hashtagsLogicalAnd", hashtags_logical_and)
-        _set_if(cpf, "postTypes", post_types)
-        _set_if(cpf, "currentWorkflowStatusIds", current_workflow_status_ids)
-        _set_if(cpf, "visibility", visibility)
-        _set_if(cpf, "followedByMe", followed_by_me)
-        _set_if(cpf, "mentioned", mentioned)
-        _set_if(cpf, "toManage", to_manage)
-        _set_if(cpf, "onlyPinned", only_pinned)
+        if title is not None:
+            cpf["title"] = title
+        if description is not None:
+            cpf["description"] = description
+        if contains_text is not None:
+            cpf["containsText"] = contains_text
+        if created_by_user_ids is not None:
+            cpf["createdByUserIds"] = created_by_user_ids
+        if created_by_group_ids is not None:
+            cpf["createdByGroupIds"] = created_by_group_ids
+        if cf_from is not None:
+            cpf["creationTimestampFrom"] = cf_from
+        if cf_to is not None:
+            cpf["creationTimestampTo"] = cf_to
+        if mf_from is not None:
+            cpf["modifiedTimestampFrom"] = mf_from
+        if mf_to is not None:
+            cpf["modifiedTimestampTo"] = mf_to
+        if hashtag_ids is not None:
+            cpf["hashtagIds"] = hashtag_ids
+        if hashtags_logical_and is not None:
+            cpf["hashtagsLogicalAnd"] = hashtags_logical_and
+        if post_types is not None:
+            cpf["postTypes"] = post_types
+        if current_workflow_status_ids is not None:
+            cpf["currentWorkflowStatusIds"] = current_workflow_status_ids
+        if visibility is not None:
+            cpf["visibility"] = visibility
+        if followed_by_me is not None:
+            cpf["followedByMe"] = followed_by_me
+        if mentioned is not None:
+            cpf["mentioned"] = mentioned
+        if to_manage is not None:
+            cpf["toManage"] = to_manage
+        if only_pinned is not None:
+            cpf["onlyPinned"] = only_pinned
         if coerced_pff is not None:
             cpf["postFieldFilters"] = [f.to_dict() for f in coerced_pff]
         if coerced_sff is not None:
             cpf["screenFieldFilters"] = [f.to_dict() for f in coerced_sff]
 
-        body = build_paginated_body(
-            page_token=page_token,
-            page_size=page_size,
-            calculate_total_items_count=calculate_total_items_count,
-            **filters,
-        )
-        if order_by is not None:
-            body["orderBy"] = order_by
-        if order_desc is not None:
-            body["orderDesc"] = order_desc
-        if pinned_first is not None:
-            body["pinnedFirst"] = pinned_first
-        if cpf:
-            body["communityPostFilters"] = cpf
+        # Build the complete request body matching the SaaS payload structure.
+        body: dict[str, Any] = {}
+        if page_token is not None:
+            body["pageToken"] = page_token
+        if page_size is not None:
+            body["pageSize"] = page_size
+        if calculate_total_items_count is not None:
+            body["calculateTotalItemsCount"] = calculate_total_items_count
+        body["orderBy"] = order_by if order_by is not None else _DEFAULT_ORDER_BY
+        body["orderDesc"] = order_desc if order_desc is not None else True
+        body["communityPostFilters"] = cpf
+        body["pinnedFirst"] = pinned_first if pinned_first is not None else True
+        body["communityAttachmentFilters"] = dict(_DEFAULT_COMMUNITY_ATTACHMENT_FILTERS)
+        for key, value in filters.items():
+            if value is not None:
+                body[snake_to_camel(key)] = value
 
-        req = ListCommunityPostsFilteredRequestDTO.model_validate(body)
-        return self.list_in_community_raw(
-            community_id,
-            req,
+        path = _LIST_COMMUNITY_PATH.format(community_id=community_id)
+        params = build_query_params(
             load_post_details=load_post_details,
             load_main_attachment=load_main_attachment,
             load_main_attachment_view_link=load_main_attachment_view_link,
@@ -286,6 +345,7 @@ class PostsAPI(ResourceClient):
             ),
             load_capabilities=load_capabilities,
         )
+        return PostList.from_dict(self._post(path, json=body, params=params))
 
     def list_in_community_raw(  # noqa: PLR0913
         self,

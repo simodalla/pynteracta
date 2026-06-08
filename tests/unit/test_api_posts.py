@@ -421,6 +421,41 @@ class TestListInCommunityFilters:
         assert cpf["postTypes"] == [1, 2]
         assert cpf["followedByMe"] is True
         assert cpf["onlyPinned"] is False
+        # SaaS defaults always included when any filter is set
+        assert cpf["mentioned"] is False
+        assert cpf["hashtagIds"] == []
+        assert cpf["currentWorkflowStatusIds"] == []
+        assert cpf["postFieldFilters"] == []
+        assert cpf["screenFieldFilters"] == []
+
+    @respx.mock
+    def test_saas_defaults_included_with_to_manage(self) -> None:
+        """Complete communityPostFilters and communityAttachmentFilters always present."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, to_manage=True)
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["toManage"] is True
+        assert cpf["mentioned"] is False
+        assert cpf["postTypes"] == []
+        assert cpf["hashtagIds"] == []
+        assert cpf["currentWorkflowStatusIds"] == []
+        assert cpf["postFieldFilters"] == []
+        assert cpf["screenFieldFilters"] == []
+        caf = body["communityAttachmentFilters"]
+        assert caf["excludeFilePickers"] is False
+        assert caf["hashtagIds"] == []
+        assert caf["name"] is None
+
+    @respx.mock
+    def test_explicit_mentioned_true_not_overridden(self) -> None:
+        """Explicit mentioned=True must not be overridden by the default false."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, mentioned=True)
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["mentioned"] is True
 
     @respx.mock
     def test_post_field_filters_serialized(self) -> None:
@@ -460,22 +495,29 @@ class TestListInCommunityFilters:
         assert body["communityPostFilters"]["creationTimestampFrom"] == 1780264800000
 
     @respx.mock
-    def test_no_community_post_filters_when_none_set(self) -> None:
+    def test_community_post_filters_always_present(self) -> None:
         route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
         api = PostsAPI(make_transport())
         api.list_in_community(self._COMMUNITY_ID, page_size=10)
         body = json.loads(route.calls[0].request.content)
-        assert "communityPostFilters" not in body
+        cpf = body["communityPostFilters"]
+        assert cpf["mentioned"] is False
+        assert cpf["postTypes"] == []
+        assert cpf["toManage"] is None
+        assert cpf["hashtagIds"] == []
+        assert body["communityAttachmentFilters"]["excludeFilePickers"] is False
+        assert body["communityAttachmentFilters"]["hashtagIds"] == []
 
     @respx.mock
-    def test_order_desc_not_sent_without_order_by(self) -> None:
-        """order_desc default True must not be sent to the API when order_by is absent."""
+    def test_order_desc_defaults_to_true(self) -> None:
+        """orderDesc and orderBy are always sent with SaaS defaults when not explicitly set."""
         route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
         api = PostsAPI(make_transport())
         api.list_in_community(self._COMMUNITY_ID)
         body = json.loads(route.calls[0].request.content)
-        # order_desc=True is the CLI default, the API default should not be overridden
-        assert "orderDesc" not in body
+        assert body["orderDesc"] is True
+        assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
+        assert body["pinnedFirst"] is True
 
     @respx.mock
     def test_post_field_filters_as_dicts(self) -> None:
