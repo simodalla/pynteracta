@@ -288,8 +288,8 @@ def posts_list(  # noqa: PLR0913
         k, v = kv.split("=", 1)
         extra_filters[snake_to_camel(k.strip())] = v.strip()
 
-    # order_desc is only meaningful when order_by is set; avoid sending it otherwise
-    effective_order_desc = order_desc if order_by is not None else None
+    # order_desc is always meaningful (API has a default order_by)
+    # pass it through even when order_by is None
 
     try:
         with build_client(state) as client:
@@ -297,7 +297,7 @@ def posts_list(  # noqa: PLR0913
             call_kwargs: dict[str, Any] = dict(
                 page_size=page_size,
                 order_by=order_by,
-                order_desc=effective_order_desc,
+                order_desc=order_desc,
                 pinned_first=pinned_first,
                 title=title,
                 contains_text=contains_text,

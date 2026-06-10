@@ -248,6 +248,19 @@ class TestPostsListFilters:
         assert body["orderDesc"] is True
         assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
 
+    @respx.mock
+    def test_asc_without_order_by(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--asc"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderDesc"] is False
+        assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
+
 
 class TestPostsComments:
     @respx.mock
