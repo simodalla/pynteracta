@@ -1,6 +1,25 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.8.0] - 2026-06-11
+
+### Chores
+
+- Release v0.8.0 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.7.0
+- Refactor AGENTS.md to reference CLAUDE.md, eliminate duplication
+
+### Features
+
+- Add curated filter & sort kwargs to users list (M21, v0.8.0)
+
+### Fixes
+
+- Respect --asc/--desc flag without --order-by in posts list
+
 ## [0.7.0] - 2026-06-08
 
 ### Chores
