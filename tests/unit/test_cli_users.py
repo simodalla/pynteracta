@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: PLR2004
 """CLI tests for the 'users' command group."""
 
 from __future__ import annotations
+
+import json
+from typing import ClassVar
 
 import pytest
 import respx
@@ -129,3 +133,95 @@ class TestUsersList:
         result = runner.invoke(app, ["--output", "json", "users", "list"], env=BASE_ENV)
         assert result.exit_code == 0
         assert result.output == snapshot
+
+
+class TestUsersListFilters:
+    """Tests for the new filter/sort flags on `users list`."""
+
+    _PAYLOAD: ClassVar[dict] = {"items": [], "nextPageToken": None}
+
+    @respx.mock
+    def test_full_text_flag(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(app, ["users", "list", "--full-text", "rossi"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["fullTextFilter"] == "rossi"
+
+    @respx.mock
+    def test_status_repeatable(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app, ["users", "list", "--status", "1", "--status", "2"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["statusFilter"] == [1, 2]
+
+    @respx.mock
+    def test_workspace_and_community_repeatable(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["users", "list", "--workspace", "10", "--community", "20", "--community", "21"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["workspaceIds"] == [10]
+        assert body["communityIds"] == [20, 21]
+
+    @respx.mock
+    def test_role_flag(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(app, ["users", "list", "--role", "ADMIN"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["role"] == "ADMIN"
+
+    @respx.mock
+    def test_order_by_desc(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app, ["users", "list", "--order-by", "lastName", "--desc"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderTypeId"] == "lastName"
+        assert body["orderDesc"] is True
+
+    @respx.mock
+    def test_order_asc(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(app, ["users", "list", "--asc"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderDesc"] is False
+
+    @respx.mock
+    def test_created_from_coercion(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["users", "list", "--created-from", "2025-01-01T00:00:00+00:00"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["creationTimestampFrom"] == 1735689600000
+
+    @respx.mock
+    def test_generic_filter_passthrough_snake_to_camel(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["users", "list", "--filter", "external_id_full_text_filter=EXT-1"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["externalIdFullTextFilter"] == "EXT-1"
+
+    def test_filter_bad_format(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["users", "list", "--filter", "bad"], env=BASE_ENV)
+        assert result.exit_code != 0

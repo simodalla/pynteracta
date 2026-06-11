@@ -1131,3 +1131,56 @@ fields (via `--full`) expose `canEditComment` (int enum), `canDeleteComment` (in
 - **Q-v0.7-4 (open):** `FLAG`, `INT/BIGINT/DECIMAL`, `FEEDBACK`, `LINK` field type → filter typeId
   mapping not confirmed from production. Deferred to a future bugfix once a real payload is observed.
 - Users filter & sort (M21, v0.8.0) — spec already scaffolded in `specs/v0.8-users-filter-sort.md`.
+
+## M21 — Users filter & sort completeness
+
+Milestone M21 (release v0.8.0) — read-only, additive deepening of the existing `admin/data/users`
+list endpoint (shipped v0.1.0). No new endpoint. Sibling of v0.7.0 (posts); mirrors `api/posts.py`
+and `cli/posts.py` patterns. All new kwargs/options optional; the `**filters` passthrough is
+preserved, so existing call sites keep working.
+
+### Done
+
+- `api/users.py` — `UsersAPI.list` gained curated explicit kwargs: `full_text_filter`,
+  `status_filter`, `workspace_ids`, `community_ids`, `creation_timestamp_from/to`,
+  `last_access_timestamp_from/to`, `role`, `order_by` (mapped to `orderTypeId`), `order_desc`
+  (mapped to `orderDesc`). The four `*_timestamp_*` kwargs are coerced via the v0.7.0 helper
+  `to_epoch_millis` (int / datetime / ISO-8601). `None` values are dropped; `**filters` passthrough
+  and `list_raw` retained. `iterate` forwards the new kwargs unchanged (they land on `list` named
+  params via its `**filters`).
+- `cli/users.py` — `users list` extended with `--full-text`, `--status` (repeatable),
+  `--workspace` (repeatable), `--community` (repeatable), `--role`, `--created-from`,
+  `--created-to`, `--order-by`, `--desc/--asc`, and a repeatable `--filter key=value`
+  (string-only, key snake_case -> `snake_to_camel`). Routing through `render_output` unchanged.
+- Tests: `tests/unit/test_api_users.py` (`TestUsersListFilters`) — curated-kwarg -> DTO field
+  mapping, date coercion (int / datetime / ISO), `order_by` -> `orderTypeId`, escape-hatch
+  passthrough, None-drop, iterate forwarding. `tests/unit/test_cli_users.py`
+  (`TestUsersListFilters`) — every new flag, repeatable lists, `--desc/--asc` -> `orderDesc`,
+  `--filter` snake->camel parsing + bad-format exit. `tests/contract/test_models.py` — asserts the
+  11 promoted camelCase fields exist on the pinned `ListSystemUsersRequestDTO`.
+- Docs: `docs/cli.md` (`users list` filter/sort + generic-passthrough section); the Users API
+  reference page is auto-generated from the expanded `list` docstring. `mkdocs build --strict`
+  passes.
+- Gates green: ruff, ruff format --check, mypy (strict), pytest --cov (92%), pytest -m contract.
+
+### Decisions made beyond the plan
+
+- **Q-v0.8-1 (resolved): curated subset confirmed = spec §3 candidate.** The 11 promoted kwargs map
+  to `fullTextFilter`, `statusFilter`, `workspaceIds`, `communityIds`, `creationTimestampFrom/To`,
+  `lastAccessTimestampFrom/To`, `role`, `orderTypeId`, `orderDesc`. The remaining ~20
+  `ListSystemUsersRequestDTO` fields (business-unit/area/manager ids, lang, timezone, login
+  provider, people-section flags, name/email prefixes, place, etc.) stay reachable via `**filters`.
+- **Q-v0.8-2 (resolved): `order_by`/`orderTypeId` is passthrough — no client-side validation.** The
+  DTO documents it only as "Id campo di ordinamento" with no enumerated value set, and no known
+  value list surfaced from a real tenant. Unlike posts (which validates against `POST_ORDER_FIELDS`),
+  users accepts any string. Revisit if a tenant-confirmed value set appears.
+- **`--filter` value collision avoidance.** CLI converts `--filter` keys snake->camel; `list` then
+  re-applies `snake_to_camel` via `build_paginated_body`, which is idempotent for camelCase keys
+  (no underscores). List/int DTO fields (e.g. `loginProviderFilter`) reject string `--filter` values
+  by DTO validation, reinforcing Q-v0.8-3 (use dedicated typed flags for those).
+
+### Follow-ups
+
+- `order_by` validation (Q-v0.8-2) can be tightened to an allow-list if Interacta publishes the
+  `orderTypeId` value set — mirror the posts `POST_ORDER_FIELDS` + `_validate_order_by` approach.
+- Release: flip ROADMAP 0.8.0 row to ✅ Shipped and freeze the spec header via the `release` skill.

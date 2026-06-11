@@ -200,6 +200,30 @@ class TestListSystemUsers:
         assert items[0].firstName == "Maria"
         assert items[1].firstName == "Luca"
 
+    def test_curated_kwargs_serialize_to_pinned_fields(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+    ) -> None:
+        """The camelCase fields the v0.8 curated kwargs map to must exist on the pinned DTO."""
+        promoted_fields = {
+            "fullTextFilter",
+            "statusFilter",
+            "workspaceIds",
+            "communityIds",
+            "creationTimestampFrom",
+            "creationTimestampTo",
+            "lastAccessTimestampFrom",
+            "lastAccessTimestampTo",
+            "role",
+            "orderTypeId",
+            "orderDesc",
+        }
+        swagger_props = set(
+            (swagger_definitions["ListSystemUsersRequestDTO"].get("properties") or {}).keys()
+        )
+        missing = promoted_fields - swagger_props
+        assert not missing, f"Promoted kwargs map to fields absent from the pinned DTO: {missing}"
+
 
 # ---------------------------------------------------------------------------
 # 4. UserProfileInfoDTO  (typed as UserProfileInfoDTO1 in generated code — Q5 surprise)

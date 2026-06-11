@@ -258,7 +258,44 @@ pynteracta users list --all                  # paginate automatically
 pynteracta users list --full-text rossi --page-size 20
 pynteracta users list --all --web-url        # include web URL column
 pynteracta users list --output json
+
+# Filter by status, workspace, community (all repeatable)
+pynteracta users list --status 1 --status 2
+pynteracta users list --workspace 10 --community 20 --community 21
+pynteracta users list --role ADMIN
+
+# Date range (ISO-8601, epoch-ms, or datetime all accepted by the Python API)
+pynteracta users list --created-from 2025-01-01 --created-to 2025-06-30
+
+# Ordering
+pynteracta users list --order-by lastName --desc
+pynteracta users list --order-by lastName --asc
+
+# Generic passthrough for long-tail string filters
+pynteracta users list --filter external_id_full_text_filter=EXT-1
 ```
+
+**Filter and ordering flags:**
+
+| Flag | Description |
+|---|---|
+| `--full-text TEXT` | Full-text filter on name, surname, and email (`fullTextFilter`). |
+| `--status INT` | Filter by user status id (`statusFilter`). Repeatable. |
+| `--workspace INT` | Filter by workspace id (`workspaceIds`). Repeatable. |
+| `--community INT` | Filter by community id (`communityIds`). Repeatable. |
+| `--role TEXT` | Filter by role (`role`). |
+| `--created-from TEXT` | Creation date lower bound (ISO-8601 string or epoch-ms integer). |
+| `--created-to TEXT` | Creation date upper bound. |
+| `--order-by TEXT` | Sort field id (mapped to `orderTypeId`, passthrough — no client-side validation). |
+| `--desc / --asc` | Sort direction (`orderDesc`). Only sent when specified. |
+
+**Generic passthrough (`--filter KEY=VALUE`):**
+
+For `ListSystemUsersRequestDTO` fields not exposed as explicit flags (e.g.
+`business_unit_ids`, `area_ids`, `manager_ids`, `lang`, `login_provider_filter`, name/email
+prefixes), pass `KEY=VALUE`. The key is converted from `snake_case` to `camelCase`. Values are
+always `str`, so list/int fields are reached via the dedicated flags above, not via `--filter`.
+Repeatable.
 
 ### `users me`
 

@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: PLR2004
 """Tests for UsersAPI."""
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from typing import ClassVar
 
 import httpx
 import respx
@@ -87,3 +90,96 @@ class TestUsersAPI:
         result = api.get_for_edit(1042)
         assert route.called
         assert result.first_name == payload["firstname"]
+
+
+class TestUsersListFilters:
+    """Tests for the curated filter/sort kwargs on UsersAPI.list."""
+
+    _PAYLOAD: ClassVar[dict] = {"items": [], "nextPageToken": None}
+    _URL = f"{BASE_URL}/admin/data/users"
+
+    @respx.mock
+    def test_curated_kwargs_mapped_to_dto_fields(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(
+            full_text_filter="rossi",
+            status_filter=[1, 2],
+            workspace_ids=[10, 11],
+            community_ids=[20],
+            role="ADMIN",
+        )
+        body = json.loads(route.calls[0].request.content)
+        assert body["fullTextFilter"] == "rossi"
+        assert body["statusFilter"] == [1, 2]
+        assert body["workspaceIds"] == [10, 11]
+        assert body["communityIds"] == [20]
+        assert body["role"] == "ADMIN"
+
+    @respx.mock
+    def test_order_by_maps_to_order_type_id(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(order_by="lastName", order_desc=True)
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderTypeId"] == "lastName"
+        assert body["orderDesc"] is True
+
+    @respx.mock
+    def test_order_desc_false_sent(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(order_desc=False)
+        body = json.loads(route.calls[0].request.content)
+        assert body["orderDesc"] is False
+
+    @respx.mock
+    def test_date_coercion_iso_string(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(creation_timestamp_from="2025-01-01T00:00:00+00:00")
+        body = json.loads(route.calls[0].request.content)
+        assert isinstance(body["creationTimestampFrom"], int)
+        assert body["creationTimestampFrom"] == 1735689600000
+
+    @respx.mock
+    def test_date_coercion_datetime(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(last_access_timestamp_to=datetime(2025, 1, 1, tzinfo=UTC))
+        body = json.loads(route.calls[0].request.content)
+        assert body["lastAccessTimestampTo"] == 1735689600000
+
+    @respx.mock
+    def test_date_coercion_int_passthrough(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(creation_timestamp_to=1780264800000)
+        body = json.loads(route.calls[0].request.content)
+        assert body["creationTimestampTo"] == 1780264800000
+
+    @respx.mock
+    def test_filters_passthrough_escape_hatch(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(business_unit_ids=[5], login_provider_filter=["GOOGLE"])
+        body = json.loads(route.calls[0].request.content)
+        assert body["businessUnitIds"] == [5]
+        assert body["loginProviderFilter"] == ["GOOGLE"]
+
+    @respx.mock
+    def test_none_kwargs_dropped(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        api.list(page_size=10)
+        body = json.loads(route.calls[0].request.content)
+        assert body == {"pageSize": 10}
+
+    @respx.mock
+    def test_iterate_forwards_curated_kwargs(self) -> None:
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = UsersAPI(make_transport())
+        list(api.iterate(full_text_filter="rossi", order_by="lastName"))
+        body = json.loads(route.calls[0].request.content)
+        assert body["fullTextFilter"] == "rossi"
+        assert body["orderTypeId"] == "lastName"

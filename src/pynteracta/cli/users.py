@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 import typer
 
+from pynteracta.api._utils import snake_to_camel
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
@@ -49,7 +50,7 @@ def users_list(  # noqa: PLR0913
     ctx: typer.Context,
     full_text: Annotated[
         str | None,
-        typer.Option("--full-text", help="Full-text filter."),
+        typer.Option("--full-text", help="Full-text filter on name, surname, and email."),
     ] = None,
     page_size: Annotated[
         int | None,
@@ -63,30 +64,107 @@ def users_list(  # noqa: PLR0913
         bool,
         typer.Option("--web-url", help="Include Web URL in output."),
     ] = False,
+    # --- filters ---
+    status: Annotated[
+        list[int] | None,
+        typer.Option("--status", help="Filter by user status id (repeatable)."),
+    ] = None,
+    workspace: Annotated[
+        list[int] | None,
+        typer.Option("--workspace", help="Filter by workspace id (repeatable)."),
+    ] = None,
+    community: Annotated[
+        list[int] | None,
+        typer.Option("--community", help="Filter by community id (repeatable)."),
+    ] = None,
+    role: Annotated[
+        str | None,
+        typer.Option("--role", help="Filter by role."),
+    ] = None,
+    created_from: Annotated[
+        str | None,
+        typer.Option("--created-from", help="Creation date lower bound (ISO-8601 or epoch-ms)."),
+    ] = None,
+    created_to: Annotated[
+        str | None,
+        typer.Option("--created-to", help="Creation date upper bound (ISO-8601 or epoch-ms)."),
+    ] = None,
+    # --- ordering ---
+    order_by: Annotated[
+        str | None,
+        typer.Option("--order-by", help="Sort field id (mapped to orderTypeId)."),
+    ] = None,
+    order_desc: Annotated[
+        bool | None,
+        typer.Option("--desc/--asc", help="Descending or ascending sort."),
+    ] = None,
+    # --- generic escape hatch ---
+    filter_kv: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--filter",
+            help=(
+                "Generic filter key=value (string-only passthrough, snake_case keys). "
+                "For typed filters use the dedicated flags. Repeatable."
+            ),
+        ),
+    ] = None,
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
     export: ExportOption = None,
     export_format: ExportFormatOption = None,
 ) -> None:
-    """List system users."""
+    """List system users with filtering and ordering.
+
+    Examples::
+
+        # Full-text filter
+        pynteracta users list --full-text rossi
+
+        # Filter by status and workspace (repeatable)
+        pynteracta users list --status 1 --status 2 --workspace 10
+
+        # Order by a sort field id, ascending
+        pynteracta users list --order-by lastName --asc
+
+        # Generic passthrough for long-tail string filters
+        pynteracta users list --filter external_id_full_text_filter=EXT-1
+    """
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
 
-    filters: dict[str, Any] = {}
-    if full_text is not None:
-        filters["full_text_filter"] = full_text
+    # Parse --filter key=value (string-only)
+    extra_filters: dict[str, Any] = {}
+    for kv in filter_kv or []:
+        if "=" not in kv:
+            console.print(f"[red]Error:[/red] --filter must be key=value, got: {kv!r}")
+            raise typer.Exit(1)
+        k, v = kv.split("=", 1)
+        extra_filters[snake_to_camel(k.strip())] = v.strip()
 
     try:
         with build_client(state) as client:
             items = []
+            call_kwargs: dict[str, Any] = dict(
+                full_text_filter=full_text,
+                status_filter=status or None,
+                workspace_ids=workspace or None,
+                community_ids=community or None,
+                role=role,
+                creation_timestamp_from=created_from,
+                creation_timestamp_to=created_to,
+                order_by=order_by,
+                order_desc=order_desc,
+                **extra_filters,
+            )
             if all_pages:
-                for item in client.users.iterate(page_size=page_size, **filters):
+                for item in client.users.iterate(page_size=page_size, **call_kwargs):
                     items.append(item)
             else:
-                result = client.users.list(page_size=page_size, **filters)
+                result = client.users.list(page_size=page_size, **call_kwargs)
                 items = list(result.items_typed)
 
             fmt = resolve_output(state, output)
