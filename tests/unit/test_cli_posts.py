@@ -26,6 +26,9 @@ BASE_ENV = {
     "PYNTERACTA_BASE_URL": "https://api.example.com",
 }
 
+_EPOCH_2025_01_01 = 1735689600000
+_EPOCH_2025_01_02 = 1735776000000
+
 
 class TestPostsGet:
     @respx.mock
@@ -300,6 +303,58 @@ class TestPostsListFilters:
         )
         assert result.exit_code == 1
         assert "--screen-field-filter" in result.output
+
+    @respx.mock
+    def test_remaining_curated_flags_land_on_cpf(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--description",
+                "quarterly",
+                "--created-by-group",
+                "12",
+                "--created-by-group",
+                "13",
+                "--modified-from",
+                "2025-01-01T00:00:00+00:00",
+                "--modified-to",
+                "1735776000000",
+                "--hashtag",
+                "3",
+                "--hashtags-and",
+                "--visibility",
+                "1",
+                "--mentioned",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        cpf = json.loads(route.calls[0].request.content)["communityPostFilters"]
+        assert cpf["description"] == "quarterly"
+        assert cpf["createdByGroupIds"] == [12, 13]
+        assert cpf["modifiedTimestampFrom"] == _EPOCH_2025_01_01
+        assert cpf["modifiedTimestampTo"] == _EPOCH_2025_01_02
+        assert cpf["hashtagsLogicalAnd"] is True
+        assert cpf["visibility"] == 1
+        assert cpf["mentioned"] is True
+
+    @respx.mock
+    def test_negated_bool_flags(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--no-mentioned", "--no-hashtags-and"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        cpf = json.loads(route.calls[0].request.content)["communityPostFilters"]
+        assert cpf["mentioned"] is False
+        assert cpf["hashtagsLogicalAnd"] is False
 
     @respx.mock
     def test_generic_filter_passthrough(self, runner: CliRunner) -> None:

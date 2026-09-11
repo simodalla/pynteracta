@@ -24,6 +24,9 @@ BASE_ENV = {
     "PYNTERACTA_BASE_URL": "https://api.example.com",
 }
 
+_EPOCH_2025_01_01 = 1735689600000
+_EPOCH_2025_01_02 = 1735776000000
+
 
 class TestUsersMe:
     @respx.mock
@@ -209,6 +212,26 @@ class TestUsersListFilters:
         assert result.exit_code == 0, result.output
         body = json.loads(route.calls[0].request.content)
         assert body["creationTimestampFrom"] == 1735689600000
+
+    @respx.mock
+    def test_last_access_range_coercion(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "users",
+                "list",
+                "--last-access-from",
+                "2025-01-01T00:00:00+00:00",
+                "--last-access-to",
+                "1735776000000",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["lastAccessTimestampFrom"] == _EPOCH_2025_01_01
+        assert body["lastAccessTimestampTo"] == _EPOCH_2025_01_02
 
     @respx.mock
     def test_generic_filter_passthrough_snake_to_camel(self, runner: CliRunner) -> None:

@@ -218,6 +218,39 @@ def posts_list(  # noqa: PLR0913
         bool | None,
         typer.Option("--only-pinned/--no-only-pinned", help="Only pinned posts."),
     ] = None,
+    description: Annotated[
+        str | None,
+        typer.Option("--description", help="Filter on post description."),
+    ] = None,
+    created_by_group: Annotated[
+        list[int] | None,
+        typer.Option("--created-by-group", help="Filter by creator group id (repeatable)."),
+    ] = None,
+    modified_from: Annotated[
+        str | None,
+        typer.Option(
+            "--modified-from", help="Last-modification lower bound (ISO-8601 or epoch-ms)."
+        ),
+    ] = None,
+    modified_to: Annotated[
+        str | None,
+        typer.Option("--modified-to", help="Last-modification upper bound (ISO-8601 or epoch-ms)."),
+    ] = None,
+    hashtags_and: Annotated[
+        bool | None,
+        typer.Option(
+            "--hashtags-and/--no-hashtags-and",
+            help="Combine --hashtag filters with AND instead of OR.",
+        ),
+    ] = None,
+    visibility: Annotated[
+        int | None,
+        typer.Option("--visibility", help="Filter by visibility id."),
+    ] = None,
+    mentioned: Annotated[
+        bool | None,
+        typer.Option("--mentioned/--no-mentioned", help="Only posts mentioning me."),
+    ] = None,
     # --- custom-field filters ---
     field_filter: Annotated[
         list[str] | None,
@@ -276,8 +309,13 @@ def posts_list(  # noqa: PLR0913
         # Workflow screen-field filter: screen column 2001 EQUAL 7
         pynteracta posts list --community 56 --screen-field-filter 2001:1:7
 
+        # Posts mentioning me, modified this year, created by a group
+        pynteracta posts list --community 56 --mentioned --modified-from 2026-01-01
+        pynteracta posts list --community 56 --created-by-group 12 --hashtag 3 --hashtag 5 \
+            --hashtags-and
+
         # Generic passthrough for long-tail filters
-        pynteracta posts list --community 56 --filter mentioned=true
+        pynteracta posts list --community 56 --filter draft_type=1
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -335,6 +373,13 @@ def posts_list(  # noqa: PLR0913
                 followed_by_me=followed_by_me,
                 to_manage=to_manage,
                 only_pinned=only_pinned,
+                description=description,
+                created_by_group_ids=created_by_group or None,
+                modified_timestamp_from=modified_from,
+                modified_timestamp_to=modified_to,
+                hashtags_logical_and=hashtags_and,
+                visibility=visibility,
+                mentioned=mentioned,
                 post_field_filters=parsed_field_filters,
                 screen_field_filters=parsed_screen_filters,
                 community_post_filters=extra_filters or None,

@@ -267,6 +267,9 @@ pynteracta users list --role ADMIN
 # Date range (ISO-8601, epoch-ms, or datetime all accepted by the Python API)
 pynteracta users list --created-from 2025-01-01 --created-to 2025-06-30
 
+# Users who have not logged in since 2026-01-01
+pynteracta users list --last-access-to 2026-01-01
+
 # Ordering
 pynteracta users list --order-by lastName --desc
 pynteracta users list --order-by lastName --asc
@@ -286,6 +289,8 @@ pynteracta users list --filter external_id_full_text_filter=EXT-1
 | `--role TEXT` | Filter by role (`role`). |
 | `--created-from TEXT` | Creation date lower bound (ISO-8601 string or epoch-ms integer). |
 | `--created-to TEXT` | Creation date upper bound. |
+| `--last-access-from TEXT` | Last-access date lower bound (ISO-8601 string or epoch-ms integer). |
+| `--last-access-to TEXT` | Last-access date upper bound. |
 | `--order-by TEXT` | Sort field id (mapped to `orderTypeId`, passthrough — no client-side validation). |
 | `--desc / --asc` | Sort direction (`orderDesc`). Only sent when specified. |
 
@@ -391,7 +396,12 @@ pynteracta posts list --community 79 \
 
 # Personal and pinned filters
 pynteracta posts list --community 79 --followed-by-me --only-pinned
-pynteracta posts list --community 79 --to-manage
+pynteracta posts list --community 79 --to-manage --mentioned
+
+# Description, creator group, modification date range, visibility
+pynteracta posts list --community 79 --description "budget" --visibility 1
+pynteracta posts list --community 79 --created-by-group 12 --modified-from 2026-01-01
+pynteracta posts list --community 79 --hashtag 3 --hashtag 5 --hashtags-and   # AND instead of OR
 
 # Generic passthrough (for long-tail communityPostFilters fields)
 pynteracta posts list --community 79 --filter draftType=1
@@ -426,6 +436,13 @@ Valid `--order-by` values: `postCustomId`, `postTitle`, `postCreatorUser`,
 | `--followed-by-me / --no-followed-by-me` | Only posts followed by the current user. |
 | `--to-manage / --no-to-manage` | Only posts the current user needs to manage. |
 | `--only-pinned / --no-only-pinned` | Only pinned posts. |
+| `--description TEXT` | Filter by post description (partial match). |
+| `--created-by-group INT` | Filter by creator group ID. Repeatable. |
+| `--modified-from TEXT` | Last-modification lower bound (ISO-8601 string or epoch-ms integer). |
+| `--modified-to TEXT` | Last-modification upper bound. |
+| `--hashtags-and / --no-hashtags-and` | Combine `--hashtag` values with AND (default: OR). |
+| `--visibility INT` | Filter by visibility id. |
+| `--mentioned / --no-mentioned` | Only posts where the current user is mentioned. |
 
 **Custom-field filter (`--field-filter COLUMN:TYPEID:VAL[,VAL]`):**
 
@@ -697,10 +714,15 @@ List groups, their members, and fetch group detail. `groups get` uses the
 pynteracta groups list
 pynteracta groups list --filter engineering
 pynteracta groups list --order-by name --order-asc --all
+pynteracta groups list --status 1 --status 2 --workspace 10   # repeatable filters
+pynteracta groups list --web-url                              # adds the admin group URL
 pynteracta groups list --output json
 ```
 
 Sort is via `order_type_id` internally; valid `--order-by` values: `name`, `email`.
+`--status INT` (→ `statusFilter`) and `--workspace INT` (→ `workspaceIds`) are repeatable.
+`--filter TEXT` here is the **full-text** filter on name and email, not the generic
+`KEY=VALUE` passthrough available on `posts list` / `users list`.
 
 ### `groups members GROUP_ID`
 

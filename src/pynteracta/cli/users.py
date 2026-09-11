@@ -89,6 +89,18 @@ def users_list(  # noqa: PLR0913
         str | None,
         typer.Option("--created-to", help="Creation date upper bound (ISO-8601 or epoch-ms)."),
     ] = None,
+    last_access_from: Annotated[
+        str | None,
+        typer.Option(
+            "--last-access-from", help="Last-access date lower bound (ISO-8601 or epoch-ms)."
+        ),
+    ] = None,
+    last_access_to: Annotated[
+        str | None,
+        typer.Option(
+            "--last-access-to", help="Last-access date upper bound (ISO-8601 or epoch-ms)."
+        ),
+    ] = None,
     # --- ordering ---
     order_by: Annotated[
         str | None,
@@ -125,6 +137,9 @@ def users_list(  # noqa: PLR0913
         # Filter by status and workspace (repeatable)
         pynteracta users list --status 1 --status 2 --workspace 10
 
+        # Users who have not logged in since 2026-01-01
+        pynteracta users list --last-access-to 2026-01-01
+
         # Order by a sort field id, ascending
         pynteracta users list --order-by lastName --asc
 
@@ -156,6 +171,8 @@ def users_list(  # noqa: PLR0913
                 role=role,
                 creation_timestamp_from=created_from,
                 creation_timestamp_to=created_to,
+                last_access_timestamp_from=last_access_from,
+                last_access_timestamp_to=last_access_to,
                 order_by=order_by,
                 order_desc=order_desc,
                 **extra_filters,

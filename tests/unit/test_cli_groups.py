@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 
 import pytest
@@ -48,6 +49,59 @@ class TestGroupsList:
         assert result.exit_code == 0
         assert out.exists()
         assert "Engineering" in out.read_text()
+
+
+class TestGroupsListFilters:
+    @respx.mock
+    def test_status_and_workspace_repeatable(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/groups", {"items": [], "nextPageToken": None})
+        result = runner.invoke(
+            app,
+            ["groups", "list", "--status", "1", "--status", "2", "--workspace", "10"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["statusFilter"] == [1, 2]
+        assert body["workspaceIds"] == [10]
+
+    @respx.mock
+    def test_filters_forwarded_with_all(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/groups", {"items": [], "nextPageToken": None})
+        result = runner.invoke(
+            app, ["groups", "list", "--all", "--status", "1", "--workspace", "10"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["statusFilter"] == [1]
+        assert body["workspaceIds"] == [10]
+
+    @respx.mock
+    def test_web_url_column(self, runner: CliRunner) -> None:
+        mock_json("POST", "admin/data/groups", load_payload("list_groups_response.json"))
+        result = runner.invoke(
+            app, ["--output", "json", "groups", "list", "--web-url"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data[0]["web_url"] == f"https://api.example.com/portal/admin/group/{_GROUP_ID}"
+
+    @respx.mock
+    def test_web_url_absent_by_default(self, runner: CliRunner) -> None:
+        mock_json("POST", "admin/data/groups", load_payload("list_groups_response.json"))
+        result = runner.invoke(app, ["--output", "json", "groups", "list"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert "web_url" not in result.output
+
+    @respx.mock
+    def test_web_url_with_full(self, runner: CliRunner) -> None:
+        mock_json("POST", "admin/data/groups", load_payload("list_groups_response.json"))
+        result = runner.invoke(
+            app, ["--output", "json", "groups", "list", "--web-url", "--full"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data[0]["web_url"].endswith(f"/admin/group/{_GROUP_ID}")
 
 
 class TestGroupsMembers:
