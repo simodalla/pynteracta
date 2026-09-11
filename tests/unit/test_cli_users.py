@@ -245,6 +245,29 @@ class TestUsersListFilters:
         body = json.loads(route.calls[0].request.content)
         assert body["externalIdFullTextFilter"] == "EXT-1"
 
+    @respx.mock
+    def test_generic_filter_typed_tokens(self, runner: CliRunner) -> None:
+        route = mock_json("POST", "admin/data/users", self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "users",
+                "list",
+                "--filter",
+                "people_section_enabled=false",
+                "--filter",
+                "reduced_profile=TRUE",
+                "--filter",
+                "place=Bologna",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["peopleSectionEnabled"] is False
+        assert body["reducedProfile"] is True
+        assert body["place"] == "Bologna"
+
     def test_filter_bad_format(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["users", "list", "--filter", "bad"], env=BASE_ENV)
         assert result.exit_code != 0

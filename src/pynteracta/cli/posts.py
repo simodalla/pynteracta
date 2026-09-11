@@ -7,7 +7,6 @@ from typing import Annotated, Any
 
 import typer
 
-from pynteracta.api._utils import snake_to_camel
 from pynteracta.api.posts import POST_ORDER_FIELDS
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
@@ -21,6 +20,7 @@ from pynteracta.cli._common import (
     build_client,
     handle_error,
     make_console,
+    parse_kv_filters,
     render_output,
     resolve_output,
     validate_export_options,
@@ -273,14 +273,24 @@ def posts_list(  # noqa: PLR0913
             ),
         ),
     ] = None,
+    validate: Annotated[
+        bool,
+        typer.Option(
+            "--validate",
+            help=(
+                "Validate --field-filter/--screen-field-filter against the community "
+                "post-definition before sending (one extra GET)."
+            ),
+        ),
+    ] = False,
     # --- generic escape hatch ---
     filter_kv: Annotated[
         list[str] | None,
         typer.Option(
             "--filter",
             help=(
-                "Generic filter key=value (string-only passthrough, snake_case keys). "
-                "For typed filters use the dedicated flags. Repeatable."
+                "Generic filter key=value (snake_case keys; true/false and integers are typed, "
+                "everything else is a string). Repeatable."
             ),
         ),
     ] = None,
@@ -314,7 +324,10 @@ def posts_list(  # noqa: PLR0913
         pynteracta posts list --community 56 --created-by-group 12 --hashtag 3 --hashtag 5 \
             --hashtags-and
 
-        # Generic passthrough for long-tail filters
+        # Validate custom-field filters against the community post-definition first
+        pynteracta posts list --community 56 --field-filter 1411:4:226 --validate
+
+        # Generic passthrough for long-tail filters (true/false and integers are typed)
         pynteracta posts list --community 56 --filter draft_type=1
     """
     state: CliState = ctx.obj
@@ -342,14 +355,12 @@ def posts_list(  # noqa: PLR0913
             console.print(f"[red]Error:[/red] {exc}")
             raise typer.Exit(1) from exc
 
-    # Parse --filter key=value (string-only)
-    extra_filters: dict[str, Any] = {}
-    for kv in filter_kv or []:
-        if "=" not in kv:
-            console.print(f"[red]Error:[/red] --filter must be key=value, got: {kv!r}")
-            raise typer.Exit(1)
-        k, v = kv.split("=", 1)
-        extra_filters[snake_to_camel(k.strip())] = v.strip()
+    # Parse --filter key=value (typed tokens)
+    try:
+        extra_filters = parse_kv_filters(filter_kv)
+    except typer.BadParameter as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
     # order_desc is always meaningful (API has a default order_by)
     # pass it through even when order_by is None
@@ -357,6 +368,10 @@ def posts_list(  # noqa: PLR0913
     try:
         with build_client(state) as client:
             items = []
+            # --validate: one post-definition lookup, only when there is something to validate
+            validate_with = None
+            if validate and (parsed_field_filters or parsed_screen_filters):
+                validate_with = client.communities.post_definition(community)
             call_kwargs: dict[str, Any] = dict(
                 page_size=page_size,
                 order_by=order_by,
@@ -382,6 +397,7 @@ def posts_list(  # noqa: PLR0913
                 mentioned=mentioned,
                 post_field_filters=parsed_field_filters,
                 screen_field_filters=parsed_screen_filters,
+                validate_with=validate_with,
                 community_post_filters=extra_filters or None,
             )
             if all_pages:

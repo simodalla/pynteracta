@@ -13,6 +13,7 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
+from pynteracta.cli._common import EXIT_VALIDATION
 
 _STREAM_BASE = "https://api.example.com/portal/api/external/v2/communication/posts/data"
 
@@ -355,6 +356,106 @@ class TestPostsListFilters:
         cpf = json.loads(route.calls[0].request.content)["communityPostFilters"]
         assert cpf["mentioned"] is False
         assert cpf["hashtagsLogicalAnd"] is False
+
+    _POSTDEF_URL = "communication/settings/communities/79/post-definition"
+
+    @respx.mock
+    def test_validate_issues_one_post_definition_lookup(self, runner: CliRunner) -> None:
+        pd_route = mock_json("GET", self._POSTDEF_URL, load_payload("post_definition.json"))
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--field-filter", "1459:1:5", "--validate"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert pd_route.call_count == 1
+        pff = json.loads(route.calls[0].request.content)["communityPostFilters"]["postFieldFilters"]
+        assert pff == [{"columnId": 1459, "typeId": 1, "parameters": [5]}]
+
+    @respx.mock
+    def test_validate_unknown_column_exits_validation(self, runner: CliRunner) -> None:
+        mock_json("GET", self._POSTDEF_URL, load_payload("post_definition.json"))
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--field-filter", "9999:1:5", "--validate"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == EXIT_VALIDATION, result.output
+        assert route.call_count == 0
+
+    @respx.mock
+    def test_validate_covers_screen_filters(self, runner: CliRunner) -> None:
+        pd_route = mock_json("GET", self._POSTDEF_URL, load_payload("post_definition.json"))
+        mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--screen-field-filter",
+                "9999:1:5",
+                "--validate",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == EXIT_VALIDATION, result.output
+        assert pd_route.call_count == 1
+
+    @respx.mock
+    def test_validate_without_filters_is_noop(self, runner: CliRunner) -> None:
+        pd_route = mock_json("GET", self._POSTDEF_URL, load_payload("post_definition.json"))
+        mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--validate"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert pd_route.call_count == 0
+
+    @respx.mock
+    def test_no_validate_skips_lookup(self, runner: CliRunner) -> None:
+        pd_route = mock_json("GET", self._POSTDEF_URL, load_payload("post_definition.json"))
+        mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--field-filter", "9999:1:5"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert pd_route.call_count == 0
+
+    @respx.mock
+    def test_generic_filter_typed_tokens(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--filter",
+                "draft_type=1",
+                "--filter",
+                "mentioned=TRUE",
+                "--filter",
+                "title=Report 2026",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        cpf = json.loads(route.calls[0].request.content)["communityPostFilters"]
+        assert cpf["draftType"] == 1
+        assert cpf["mentioned"] is True
+        assert cpf["title"] == "Report 2026"
+
+    def test_generic_filter_bad_format_names_flag(self, runner: CliRunner) -> None:
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--filter", "nope"], env=BASE_ENV
+        )
+        assert result.exit_code == 1
+        assert "--filter" in result.output
 
     @respx.mock
     def test_generic_filter_passthrough(self, runner: CliRunner) -> None:

@@ -278,6 +278,14 @@ What `validate_with` checks:
 3. The `type_id` is compatible with the field's type for confirmed pairings (e.g., using `LIKE`
    on an ENUM field raises an error). Unconfirmed field types are skipped (permissive).
 
+The CLI equivalent is `posts list --validate`, which performs the post-definition lookup for you
+and applies the same checks to `--field-filter` and `--screen-field-filter` (exit code 6 on
+failure):
+
+```bash
+pynteracta posts list --community 56 --field-filter 1411:4:226 --validate
+```
+
 ---
 
 ## Escape hatches

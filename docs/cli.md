@@ -274,8 +274,8 @@ pynteracta users list --last-access-to 2026-01-01
 pynteracta users list --order-by lastName --desc
 pynteracta users list --order-by lastName --asc
 
-# Generic passthrough for long-tail string filters
-pynteracta users list --filter external_id_full_text_filter=EXT-1
+# Generic passthrough for long-tail filters (true/false and integers are typed)
+pynteracta users list --filter external_id_full_text_filter=EXT-1 --filter reduced_profile=false
 ```
 
 **Filter and ordering flags:**
@@ -299,8 +299,8 @@ pynteracta users list --filter external_id_full_text_filter=EXT-1
 For `ListSystemUsersRequestDTO` fields not exposed as explicit flags (e.g.
 `business_unit_ids`, `area_ids`, `manager_ids`, `lang`, `login_provider_filter`, name/email
 prefixes), pass `KEY=VALUE`. The key is converted from `snake_case` to `camelCase`. Values are
-always `str`, so list/int fields are reached via the dedicated flags above, not via `--filter`.
-Repeatable.
+typed: `true`/`false` become booleans, integer literals become integers, everything else stays a
+string. List fields are still only reachable via the dedicated repeatable flags above. Repeatable.
 
 ### `users me`
 
@@ -468,10 +468,23 @@ The two flags can be combined freely and are both repeatable. Column ids for scr
 the workflow screen-field ids defined in the community's post-definition. Values are passed
 through without client-side validation, like `--field-filter`.
 
+**Opt-in validation (`--validate`):**
+
+With `--validate`, the command fetches the community post-definition once and checks every
+`--field-filter` / `--screen-field-filter` before sending: the column id must exist, the
+`TYPE_ID` must match the field type where the pairing is known, and enum parameters must be
+valid enum value ids. A failing check exits with code 6 (`EXIT_VALIDATION`) and no list call is
+made. Without field filters the flag is a no-op (no extra request).
+
+```bash
+pynteracta posts list --community 79 --field-filter 1411:4:226 --validate
+```
+
 **Generic passthrough (`--filter KEY=VALUE`):**
 
 For `communityPostFilters` fields not exposed as explicit flags, pass `KEY=VALUE`. The key is
-converted from `snake_case` to `camelCase`. Values are always `str`. Repeatable.
+converted from `snake_case` to `camelCase`. Values are typed: `true`/`false` (any case) become
+booleans, integer literals become integers, everything else stays a string. Repeatable.
 
 See [Filtering and sorting posts](guides/filtering-posts.md) for a complete example-driven guide
 including the Python API, custom-field discovery, builder API, and opt-in validation.
@@ -741,6 +754,8 @@ pynteracta groups get 201 --output json --full
 ```
 
 `occToken` is only accessible via `.raw.occToken` (propaedeutic edit token for future write use).
+`creation_timestamp` renders as a UTC datetime string in table output and as epoch-ms in
+JSON/YAML, consistently with `posts get`.
 
 ---
 
@@ -833,6 +848,9 @@ pynteracta tasks get 7001 --web-url        # includes parent-post URL
 pynteracta tasks get 7001 --fields id,title,state
 pynteracta tasks get 7001 --export tasks.csv
 ```
+
+`creation_timestamp` renders as a UTC datetime string in table output and as epoch-ms in
+JSON/YAML, consistently with `posts get`.
 
 **`state` vs `currentWorkflowState`:** `state` is an integer code representing the task lifecycle
 (open/closed/etc.). `currentWorkflowState` is the post's workflow state DTO and is only reachable

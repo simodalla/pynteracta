@@ -10,6 +10,7 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    EpochMs,
     ExportFormatOption,
     ExportOption,
     FieldsOption,
@@ -68,6 +69,7 @@ def tasks_get(  # noqa: PLR0913
             desc = getattr(obj, "description_plain_text", None)
             _max_len = 120
             truncated = (desc[:_max_len] + "…") if desc and len(desc) > _max_len else desc
+            cts = getattr(obj, "creation_timestamp", None)
             row: dict[str, object] = {
                 "id": getattr(obj, "id", None),
                 "post_id": getattr(obj, "post_id", None),
@@ -76,7 +78,7 @@ def tasks_get(  # noqa: PLR0913
                 "priority": getattr(obj, "priority", None),
                 "description": truncated,
                 "attachments_count": getattr(obj, "attachments_count", None),
-                "creation_timestamp": getattr(obj, "creation_timestamp", None),
+                "creation_timestamp": EpochMs(cts) if cts is not None else None,
             }
             if web_url is not None:
                 row["web_url"] = web_url

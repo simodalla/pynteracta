@@ -12,7 +12,7 @@
   │ members_count      │ 2                       │
   │ visible            │ True                    │
   │ deleted            │ False                   │
-  │ creation_timestamp │ 1700000000000           │
+  │ creation_timestamp │ 2023-11-14 22:13:20 UTC │
   └────────────────────┴─────────────────────────┘
   
   '''

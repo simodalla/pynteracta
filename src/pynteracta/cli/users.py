@@ -7,7 +7,6 @@ from typing import Annotated, Any
 
 import typer
 
-from pynteracta.api._utils import snake_to_camel
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
@@ -19,6 +18,7 @@ from pynteracta.cli._common import (
     build_client,
     handle_error,
     make_console,
+    parse_kv_filters,
     render_output,
     resolve_output,
     validate_export_options,
@@ -116,8 +116,8 @@ def users_list(  # noqa: PLR0913
         typer.Option(
             "--filter",
             help=(
-                "Generic filter key=value (string-only passthrough, snake_case keys). "
-                "For typed filters use the dedicated flags. Repeatable."
+                "Generic filter key=value (snake_case keys; true/false and integers are typed, "
+                "everything else is a string). Repeatable."
             ),
         ),
     ] = None,
@@ -151,14 +151,12 @@ def users_list(  # noqa: PLR0913
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
 
-    # Parse --filter key=value (string-only)
-    extra_filters: dict[str, Any] = {}
-    for kv in filter_kv or []:
-        if "=" not in kv:
-            console.print(f"[red]Error:[/red] --filter must be key=value, got: {kv!r}")
-            raise typer.Exit(1)
-        k, v = kv.split("=", 1)
-        extra_filters[snake_to_camel(k.strip())] = v.strip()
+    # Parse --filter key=value (typed tokens)
+    try:
+        extra_filters = parse_kv_filters(filter_kv)
+    except typer.BadParameter as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
     try:
         with build_client(state) as client:

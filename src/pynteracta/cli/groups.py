@@ -10,6 +10,7 @@ import typer
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
+    EpochMs,
     ExportFormatOption,
     ExportOption,
     FieldsOption,
@@ -230,6 +231,7 @@ def groups_get(  # noqa: PLR0913
             web_url = client.web_urls.group(group_id) if show_web_url else None
 
         def _curated(obj: object) -> dict[str, object]:
+            cts = getattr(obj, "creation_timestamp", None)
             row = {
                 "id": getattr(obj, "id", None),
                 "name": getattr(obj, "name", None),
@@ -238,7 +240,7 @@ def groups_get(  # noqa: PLR0913
                 "members_count": getattr(obj, "members_count", None),
                 "visible": getattr(obj, "visible", None),
                 "deleted": getattr(obj, "deleted", None),
-                "creation_timestamp": getattr(obj, "creation_timestamp", None),
+                "creation_timestamp": EpochMs(cts) if cts is not None else None,
             }
             if web_url is not None:
                 row["web_url"] = web_url

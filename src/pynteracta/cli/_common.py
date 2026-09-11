@@ -14,6 +14,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from pynteracta.api._utils import snake_to_camel
 from pynteracta.client import InteractaClient
 from pynteracta.config import _xdg_config_dir, load_config, resolve_profile
 from pynteracta.exceptions import (
@@ -226,6 +227,34 @@ def _make_yaml() -> Any:
     yml = YAML()
     yml.representer.add_representer(EpochMs, lambda dumper, data: dumper.represent_str(str(data)))
     return yml
+
+
+def coerce_filter_value(value: str) -> bool | int | str:
+    """Coerce a ``--filter`` value: ``true``/``false`` → bool, integer literal → int, else str."""
+    v = value.strip()
+    low = v.lower()
+    if low == "true":
+        return True
+    if low == "false":
+        return False
+    if v.lstrip("-").isdigit():
+        return int(v)
+    return v
+
+
+def parse_kv_filters(values: list[str] | None, *, option: str = "--filter") -> dict[str, Any]:
+    """Parse repeatable ``KEY=VALUE`` tokens into a camelCase dict with typed values.
+
+    Keys are converted ``snake_case`` → ``camelCase``; values go through
+    :func:`coerce_filter_value`. Raises :class:`typer.BadParameter` on a token without ``=``.
+    """
+    out: dict[str, Any] = {}
+    for kv in values or []:
+        if "=" not in kv:
+            raise typer.BadParameter(f"{option} must be key=value, got: {kv!r}")
+        k, v = kv.split("=", 1)
+        out[snake_to_camel(k.strip())] = coerce_filter_value(v)
+    return out
 
 
 def validate_export_options(export: Path | None, export_format: str | None) -> None:
