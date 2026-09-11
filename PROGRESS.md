@@ -1253,3 +1253,64 @@ thirteen planned features shipped; Feature 9 was dropped at implementation (see 
 - Cosmetic flag inconsistency: posts/users use `--desc/--asc`, groups/hashtags/catalogs/attachments
   use `--order-desc/--order-asc`.
 - Release: flip ROADMAP 0.9.0 row to ✅ Shipped and freeze the spec header via the `release` skill.
+
+## M23 — Documentation alignment & config fixes (v0.9.1) — completed 2026-09-11
+
+Milestone M23 (release v0.9.1, the project's first **patch**): corrective release driven by a full
+audit of `README.md` and `docs/` against the v0.9.0 code (every snippet and flag verified, suspect
+commands executed). Spec: [`specs/v0.9.1-docs-alignment.md`](specs/v0.9.1-docs-alignment.md).
+No new surface; one code fix plus one new test module.
+
+### Done
+
+- **README** rewritten for 0.9.x: version-agnostic wheel name (D-v0.9.1-6), corrected library and
+  CLI quickstarts, per-area feature list, links to guides/ROADMAP/CHANGELOG/WORKFLOW.
+- **`docs/index.md`** rewritten as the 0.9.x landing page (ten resources, guides, deferred items
+  without target versions).
+- **12 BREAKS fixed** (spec §3.B): `Path` for `load_service_account_key` (fetch-post,
+  authentication ×2); `InteractaClient` has no `token_cache` kwarg → `Profile(token_cache=…)`;
+  `audit_file` as `Path`; `post.creation_timestamp` instead of `post.raw.createdAt`; `--base-url`
+  before `auth login`; `-o` only per-command; `IS_EMPTY` needs the trailing colon; `posts list`
+  always sends `orderBy`/`orderDesc`; `posts community-list` has no filter flags; RS512 and
+  Google OAuth2 in `index.md`; XDG config path on macOS; `PYNTERACTA_PROFILE` removed.
+- **STALE/NIT fixed** (spec §3.C): token cache file keyed by `client_id` (SA) / profile (Google);
+  401 raises `AuthenticationError` (no auto-retry); permission check fails on any mode `!= 0o600`;
+  Windows warning event/logger names; Google CLI examples need a base URL; `WebUrls.group`
+  documented; `GoogleOAuth2Credentials`/`GoogleOAuth2TokenManager`/`TokenCache`/`CachedToken`
+  added to `docs/api/auth.md`; `testing.md` (generated models, `uv run python`, bare `pytest`
+  collects contract tests); attachments column names; `--field-filter` bad grammar exits 1;
+  `--log-level` free-form/`--token-cache` validated wording; `**filters` example uses the real
+  `communityAttachmentFilters` field; version strings (`0.1.0` wheel, `0.4.0` UA).
+- **Code fix** — `cli/__init__.py` + `cli/_common.resolve_log_level()`: `--log-level` defaults to
+  `None`; effective level = flag > `PYNTERACTA_LOG_LEVEL` / profile `log_level` > INFO; flag value
+  validated (exit 2), case-insensitive; resolution never blocks the CLI when no profile exists yet.
+  `build_client` now logs at `profile.log_level` (flag folded in via `_profile_overrides`).
+- **New test module** `tests/unit/test_docs_snippets.py`: compiles every ```` ```python ```` fence
+  in `README.md` and `docs/**/*.md`, verifies `pynteracta` imports and statically resolvable
+  class/module attributes; opt-out marker `<!-- snippet: skip -->` (D-v0.9.1-8). 36 snippets.
+- **Repository URLs** — `pyproject.toml` `[project.urls]`, `mkdocs.yml` `repo_url`,
+  `CONTRIBUTING.md` clone command point at the internal GitLab (D-v0.9.1-7).
+- Tests: +5 (`TestLogLevelResolution`) +37 (snippets). Gates green: ruff, ruff format --check,
+  mypy (strict), pytest --cov (93%), `mkdocs build --strict`.
+
+### Decisions made beyond the plan
+
+- **D-v0.9.1-1 patch release** — `docs:` + one `fix:` → semantic-release computes 0.9.1; first
+  patch of the project, milestone numbering continues (M23).
+- **D-v0.9.1-2** `PYNTERACTA_PROFILE` dropped from docs rather than implemented.
+- **D-v0.9.1-3** `log_level` from profile/env fixed in code (documented behaviour, silently ignored).
+- **D-v0.9.1-4/5** no global `-o`; `posts community-list` docs trimmed, command unchanged.
+- **Snippet checker scope** — instance-level attribute use (`post.raw.createdAt`,
+  `me.raw.account.full_name`) is *not* caught statically; those were fixed by hand. Executing
+  snippets against a mocked transport would close that gap (follow-up).
+
+### Follow-ups
+
+- `mkdocs.yml` `site_url` still points at `pynteracta.gitlab.io`; align once the internal Pages
+  URL is known.
+- Extend the snippet checker to execute blocks against a `respx`-mocked client (catches
+  instance-level attribute drift).
+- `posts community-list` filter wiring (medium) — still open from M22.
+- Coordination note: M24 (`specs/v0.9.2-security-hardening.md`, branch
+  `feature_security_hardening`) was moved to a separate worktree on 2026-09-11; its ROADMAP row
+  will conflict trivially with the 0.9.1 row on merge (keep both, bump "last used" to M24).
