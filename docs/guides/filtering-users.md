@@ -10,9 +10,14 @@ their CLI equivalents on `pynteracta users list`. It mirrors the
 ## Ordering
 
 ```python
-from pynteracta import InteractaClient
+from pathlib import Path
 
-with InteractaClient.from_service_account("sa.json") as client:
+from pynteracta.auth import load_service_account_key
+from pynteracta.client import InteractaClient
+
+key = load_service_account_key(Path("sa.json"))
+
+with InteractaClient(base_url="https://interacta.example.it", credentials=key) as client:
     # Sort by a field id, descending
     page = client.users.list(order_by="lastName", order_desc=True)
 
@@ -41,7 +46,7 @@ All filter kwargs are optional and map 1:1 onto `ListSystemUsersRequestDTO` fiel
 ```python
 from datetime import datetime, timezone
 
-with InteractaClient.from_service_account("sa.json") as client:
+with InteractaClient(base_url="https://interacta.example.it", credentials=key) as client:
     page = client.users.list(
         # Full-text on first name, last name and email
         full_text_filter="rossi",

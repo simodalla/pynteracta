@@ -29,10 +29,12 @@ pynteracta posts get 21269 --output json
 ## Library quickstart
 
 ```python
-from pynteracta.client import InteractaClient
-from pynteracta.auth import load_service_account_key
+from pathlib import Path
 
-key = load_service_account_key("sa.json")
+from pynteracta.auth import load_service_account_key
+from pynteracta.client import InteractaClient
+
+key = load_service_account_key(Path("sa.json"))
 
 with InteractaClient(
     base_url="https://interacta.example.it",
@@ -40,11 +42,13 @@ with InteractaClient(
 ) as client:
     # Who am I?
     me = client.users.me()
-    print(me.raw.account.full_name)
+    ud = me.user_data_typed
+    if ud is not None:
+        print(ud.firstName, ud.lastName)
 
     # Iterate all users lazily
     for user in client.users.iterate(page_size=100):
-        print(user.full_name, user.email)
+        print(user.firstName, user.lastName, user.contactEmail)
 
     # Get a post
     post = client.posts.get(21269)

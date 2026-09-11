@@ -8,9 +8,14 @@ This guide covers all the filtering and ordering capabilities of
 ## Ordering
 
 ```python
-from pynteracta import InteractaClient
+from pathlib import Path
 
-with InteractaClient.from_service_account("sa.json") as client:
+from pynteracta.auth import load_service_account_key
+from pynteracta.client import InteractaClient
+
+key = load_service_account_key(Path("sa.json"))
+
+with InteractaClient(base_url="https://interacta.example.it", credentials=key) as client:
     # Most recently modified first (default API behavior)
     page = client.posts.list_in_community(
         56,
@@ -64,7 +69,7 @@ don't need.
 ```python
 from datetime import datetime, timezone
 
-with InteractaClient.from_service_account("sa.json") as client:
+with InteractaClient(base_url="https://interacta.example.it", credentials=key) as client:
     page = client.posts.list_in_community(
         56,
         # Text filters
@@ -153,7 +158,7 @@ screen fields). Each entry requires three values:
 ```python
 from pynteracta.models.facade.post_filters import FilterType, PostFieldFilter
 
-with InteractaClient.from_service_account("sa.json") as client:
+with InteractaClient(base_url="https://interacta.example.it", credentials=key) as client:
     page = client.posts.list_in_community(
         56,
         post_field_filters=[
