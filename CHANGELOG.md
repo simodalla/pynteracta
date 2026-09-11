@@ -1,6 +1,33 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.0] - 2026-09-11
+
+### Chores
+
+- Neutralise FORCE_COLOR/CLICOLOR_FORCE in unit tests
+- Release v0.9.0 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.8.0
+- Add v0.9.0 minor-enhancements spec and ROADMAP row (M22)
+- **spec**: Promote features 2-13 into v0.9.0 deliverables, resolve Q-v0.9-1/2
+- Add users filtering guide and expose guides/testing in MkDocs nav (M22 group D)
+- Fix Python snippets to match the real API surface
+- Log M22 in PROGRESS.md
+
+### Features
+
+- **cli**: Add --screen-field-filter to posts list (M22, v0.9.0 Feature 1)
+- **cli**: Surface remaining list kwargs as flags (M22 group A)
+- **cli**: Opt-in --validate, typed --filter tokens, EpochMs consistency (M22 group B)
+- **cli**: --version, --count and --page-token on posts/users list (M22 group C)
+
+### Fixes
+
+- Accept epoch-ms given as a digit string in date filter kwargs
+
 ## [0.8.0] - 2026-06-11
 
 ### Chores
