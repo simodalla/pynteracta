@@ -39,8 +39,9 @@ Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes 
 | **0.6.0** | Admin manage edits (read forms) | M19 | ✅ Shipped 2026-06-08 | [specs/v0.6-admin-manage-edits.md](specs/v0.6-admin-manage-edits.md) |
 | **0.7.0** | Posts filter & sort completeness | M20 | ✅ Shipped 2026-06-08 | [specs/v0.7-posts-filter-sort.md](specs/v0.7-posts-filter-sort.md) |
 | **0.8.0** | Users filter & sort completeness | M21 | ✅ Shipped 2026-06-11 | [specs/v0.8-users-filter-sort.md](specs/v0.8-users-filter-sort.md) |
+| **0.9.0** | Minor enhancements grab-bag | M22 | ⏳ In progress | [specs/v0.9-minor-enhancements.md](specs/v0.9-minor-enhancements.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M14). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M21). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line)
