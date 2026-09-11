@@ -36,6 +36,10 @@ nav:
   - CLI Reference: cli.md
   - Audit Logging: logging.md
   - Development Workflow: development-workflow.md
+  - Testing: testing.md
+  - Guides:
+      - Filtering and sorting posts: guides/filtering-posts.md
+      - Filtering and sorting users: guides/filtering-users.md
   - Examples:
       - List Users: examples/list-users.md
       - Fetch a Post: examples/fetch-post.md

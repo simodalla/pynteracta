@@ -287,6 +287,9 @@ pynteracta users list --page-size 50 --page-token eyJwYWdlIjoyfQ
 there): the follow-up token goes to stderr, `--count` prints only the total, and neither can be
 combined with `--all`.
 
+See [Filtering and sorting users](guides/filtering-users.md) for the Python API counterpart of
+every flag, the passthrough fields, and pagination patterns.
+
 **Filter and ordering flags:**
 
 | Flag | Description |
