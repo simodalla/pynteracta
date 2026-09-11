@@ -3,7 +3,7 @@
 ## Development environment
 
 ```bash
-git clone https://gitlab.com/pynteracta/pynteracta.git
+git clone git@gitlab.unionerenolavinosamoggia.bo.it:ucrls/pynteracta.git
 cd pynteracta
 uv sync
 uv run pre-commit install

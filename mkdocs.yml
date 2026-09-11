@@ -1,8 +1,8 @@
 site_name: pynteracta
 site_description: Unofficial third-party Python client for the Interacta platform.
 site_url: https://pynteracta.gitlab.io/pynteracta/
-repo_url: https://gitlab.com/pynteracta/pynteracta
-repo_name: gitlab.com/pynteracta/pynteracta
+repo_url: https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta
+repo_name: ucrls/pynteracta
 
 theme:
   name: material
