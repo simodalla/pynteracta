@@ -228,6 +228,80 @@ class TestPostsListFilters:
         assert result.exit_code != 0
 
     @respx.mock
+    def test_screen_field_filter_forwarded(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--screen-field-filter", "2001:1:7"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["screenFieldFilters"] == [{"columnId": 2001, "typeId": 1, "parameters": [7]}]
+        assert not cpf.get("postFieldFilters")
+
+    @respx.mock
+    def test_screen_field_filter_repeatable_and_string_tokens(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--screen-field-filter",
+                "2001:4:7,9",
+                "--screen-field-filter",
+                "2002:3:draft",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        sff = body["communityPostFilters"]["screenFieldFilters"]
+        assert sff == [
+            {"columnId": 2001, "typeId": 4, "parameters": [7, 9]},
+            {"columnId": 2002, "typeId": 3, "parameters": ["draft"]},
+        ]
+
+    @respx.mock
+    def test_screen_and_post_field_filters_combined(self, runner: CliRunner) -> None:
+        route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "list",
+                "--community",
+                "79",
+                "--field-filter",
+                "1411:4:226,512",
+                "--screen-field-filter",
+                "2001:1:7",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        cpf = body["communityPostFilters"]
+        assert cpf["postFieldFilters"] == [
+            {"columnId": 1411, "typeId": 4, "parameters": [226, 512]}
+        ]
+        assert cpf["screenFieldFilters"] == [{"columnId": 2001, "typeId": 1, "parameters": [7]}]
+
+    @pytest.mark.parametrize("bad", ["bad", "2001:x:7", "2001:1"])
+    def test_screen_field_filter_bad_format(self, runner: CliRunner, bad: str) -> None:
+        result = runner.invoke(
+            app,
+            ["posts", "list", "--community", "79", "--screen-field-filter", bad],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 1
+        assert "--screen-field-filter" in result.output
+
+    @respx.mock
     def test_generic_filter_passthrough(self, runner: CliRunner) -> None:
         route = mock_json("POST", self._LIST_URL, self._PAYLOAD)
         result = runner.invoke(

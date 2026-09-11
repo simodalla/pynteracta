@@ -110,21 +110,22 @@ def posts_get(  # noqa: PLR0913
         raise handle_error(exc, console=console) from exc
 
 
-def _parse_field_filter(value: str) -> PostFieldFilter:
+def _parse_field_filter(value: str, option: str = "--field-filter") -> PostFieldFilter:
     """Parse ``COLUMN:TYPE:VAL[,VAL...]`` into a :class:`PostFieldFilter`.
 
     Token coercion: integer literal (``^-?\\d+$``) → int, otherwise str.
-    COLUMN and TYPE are always int.
+    COLUMN and TYPE are always int. ``option`` is the flag name used in error messages
+    (shared by ``--field-filter`` and ``--screen-field-filter``).
     """
     parts = value.split(":", 2)
     if len(parts) != 3:  # noqa: PLR2004
-        raise typer.BadParameter(f"--field-filter must be COLUMN:TYPE:VAL[,VAL...], got: {value!r}")
+        raise typer.BadParameter(f"{option} must be COLUMN:TYPE:VAL[,VAL...], got: {value!r}")
     try:
         col = int(parts[0])
         tid = int(parts[1])
     except ValueError as err:
         raise typer.BadParameter(
-            f"--field-filter COLUMN and TYPE must be integers, got: {value!r}"
+            f"{option} COLUMN and TYPE must be integers, got: {value!r}"
         ) from err
     raw_params = parts[2].split(",") if parts[2] else []
     params: list[int | str | float] = []
@@ -229,6 +230,16 @@ def posts_list(  # noqa: PLR0913
             ),
         ),
     ] = None,
+    screen_field_filter: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--screen-field-filter",
+            help=(
+                "Workflow screen-field filter: COLUMN_ID:TYPE_ID:VAL[,VAL...]. "
+                "Same grammar and TYPE_ID values as --field-filter. Repeatable."
+            ),
+        ),
+    ] = None,
     # --- generic escape hatch ---
     filter_kv: Annotated[
         list[str] | None,
@@ -262,6 +273,9 @@ def posts_list(  # noqa: PLR0913
         # Date range on custom datetime field (epoch-ms)
         pynteracta posts list --community 56 --field-filter 1954:2:1780264800000,1780955999999
 
+        # Workflow screen-field filter: screen column 2001 EQUAL 7
+        pynteracta posts list --community 56 --screen-field-filter 2001:1:7
+
         # Generic passthrough for long-tail filters
         pynteracta posts list --community 56 --filter mentioned=true
     """
@@ -275,6 +289,17 @@ def posts_list(  # noqa: PLR0913
     if field_filter:
         try:
             parsed_field_filters = [_parse_field_filter(v) for v in field_filter]
+        except typer.BadParameter as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1) from exc
+
+    # Parse --screen-field-filter (same grammar, targets screenFieldFilters)
+    parsed_screen_filters: list[PostFieldFilter] | None = None
+    if screen_field_filter:
+        try:
+            parsed_screen_filters = [
+                _parse_field_filter(v, option="--screen-field-filter") for v in screen_field_filter
+            ]
         except typer.BadParameter as exc:
             console.print(f"[red]Error:[/red] {exc}")
             raise typer.Exit(1) from exc
@@ -311,6 +336,7 @@ def posts_list(  # noqa: PLR0913
                 to_manage=to_manage,
                 only_pinned=only_pinned,
                 post_field_filters=parsed_field_filters,
+                screen_field_filters=parsed_screen_filters,
                 community_post_filters=extra_filters or None,
             )
             if all_pages:

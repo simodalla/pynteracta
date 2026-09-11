@@ -383,6 +383,12 @@ pynteracta posts list --community 79 \
     --field-filter 1411:4:226,512 \
     --field-filter 1957:3:error
 
+# Workflow screen-field filters (same grammar, targets screenFieldFilters)
+pynteracta posts list --community 79 --screen-field-filter 2001:1:7
+pynteracta posts list --community 79 \
+    --field-filter 1411:4:226 \
+    --screen-field-filter 2001:4:7,9
+
 # Personal and pinned filters
 pynteracta posts list --community 79 --followed-by-me --only-pinned
 pynteracta posts list --community 79 --to-manage
@@ -436,6 +442,14 @@ Format: `COLUMN_ID:TYPE_ID:VALUE[,VALUE]` — all three segments are required.
 | `7` | IS_EMPTY | (no value segment needed) |
 
 Tokens that look like integers are coerced to `int`; others remain `str`. The flag is repeatable.
+
+**Workflow screen-field filter (`--screen-field-filter COLUMN:TYPEID:VAL[,VAL]`):**
+
+Identical grammar, parser and `TYPE_ID` table as `--field-filter`, but the entries are sent as
+`screenFieldFilters` (workflow screen fields) instead of `postFieldFilters` (custom post fields).
+The two flags can be combined freely and are both repeatable. Column ids for screen fields are
+the workflow screen-field ids defined in the community's post-definition. Values are passed
+through without client-side validation, like `--field-filter`.
 
 **Generic passthrough (`--filter KEY=VALUE`):**
 
