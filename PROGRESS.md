@@ -1184,3 +1184,72 @@ preserved, so existing call sites keep working.
 - `order_by` validation (Q-v0.8-2) can be tightened to an allow-list if Interacta publishes the
   `orderTypeId` value set — mirror the posts `POST_ORDER_FIELDS` + `_validate_order_by` approach.
 - Release: flip ROADMAP 0.8.0 row to ✅ Shipped and freeze the spec header via the `release` skill.
+
+## M22 — Minor enhancements grab-bag (v0.9.0) — completed 2026-09-11
+
+Milestone M22 (release v0.9.0) — first post-read-completion **grab-bag** minor (D-v0.9-1): thirteen
+small, independent, additive CLI/docs enhancements, no new endpoint group, no API-layer feature
+work. Spec: [`specs/v0.9-minor-enhancements.md`](specs/v0.9-minor-enhancements.md). Twelve of the
+thirteen planned features shipped; Feature 9 was dropped at implementation (see Decisions).
+
+### Done
+
+- **Feature 1** — `posts list --screen-field-filter` (repeatable, same `COLUMN:TYPE:VAL[,VAL]`
+  grammar and parser as `--field-filter`, forwarded to the existing `screen_field_filters` kwarg).
+- **Group A — API→CLI parity.** `posts list` gained `--description`, `--created-by-group`,
+  `--modified-from/-to`, `--hashtags-and`, `--visibility`, `--mentioned`; `users list` gained
+  `--last-access-from/-to`; `groups list` gained `--status`, `--workspace` (repeatable) and
+  `--web-url` (via `WebUrls.group`).
+- **Group B — validation & consistency.** `posts list --validate` performs one
+  `communities.post_definition()` lookup and forwards it as `validate_with` (covers both field and
+  screen filters; `ValidationError` → exit 6; no-op without filters). New shared
+  `cli/_common.parse_kv_filters()` types `--filter KEY=VALUE` tokens (`true`/`false` → bool,
+  integer literal → int, else str) on `posts list` and `users list`. `groups get` and `tasks get`
+  render `creation_timestamp` through `EpochMs` (table snapshots regenerated; JSON unchanged).
+- **Group C — CLI ergonomics.** Root `--version`/`-V` (eager). `--count` on `posts list` /
+  `users list` prints only `totalItemsCount` (page_size=1, `calculateTotalItemsCount=true`).
+  `--page-token` fetches one page and surfaces the follow-up token as `Next page token: …` on
+  **stderr** (silenced by `--quiet`). Both are mutually exclusive with `--all` (exit 2).
+- **Group D — docs.** New `docs/guides/filtering-users.md`; `mkdocs.yml` nav gained a `Guides`
+  section (posts + users guides were orphaned) and the `Testing` page. Python snippets in
+  quickstart, examples and both guides fixed to match the real API surface (`items_typed` is a
+  property; `firstName`/`lastName`/`contactEmail`; no `InteractaClient.from_service_account`;
+  `load_service_account_key()` takes a `Path`; comment elements are `PostCommentDTO1`).
+- **Fix** — `api/_utils.to_epoch_millis` accepts an epoch-ms **digit string**: CLI date flags
+  documented "ISO-8601 or epoch-ms" but an epoch-ms value typed on the command line crashed.
+- **Test hardening** — autouse fixture in `tests/unit/conftest.py` unsets `FORCE_COLOR` /
+  `CLICOLOR_FORCE` and sets `NO_COLOR`: a shell exporting `FORCE_COLOR` made Rich emit ANSI
+  escapes inside `CliRunner` and broke 70 CLI snapshots.
+- Tests: +47 unit tests (`test_cli_posts.py`, `test_cli_users.py`, `test_cli_groups.py`,
+  `test_api_posts.py`, new `test_cli_root.py`). Gates green: ruff, ruff format --check, mypy
+  (strict), pytest --cov (93%), pytest -m contract (87), `mkdocs build --strict`.
+
+### Decisions made beyond the plan
+
+- **Q-v0.9-1 (resolved): roster = features 2–13** from a census of API-vs-CLI gaps, open
+  follow-ups and doc gaps. Left out: users `order_by` allow-list (still blocked on an official
+  `orderTypeId` set, Q-v0.8-2), Q-v0.7-4 field-type mapping (needs an observed payload),
+  `posts community-list` filter surface (medium; needs DTO wiring), `--with-attachment-links`,
+  `--max-items`.
+- **Q-v0.9-2 (resolved): passthrough by default, validation opt-in via `--validate`** (D-v0.9-8:
+  exactly one extra GET, only when field filters are present).
+- **D-v0.9-4 `--count` is print-only**, **D-v0.9-5 next-page token goes to stderr** — keep every
+  stdout payload shape stable for existing consumers.
+- **D-v0.9-6 Feature 9 dropped.** `catalogs entries --filter` was planned, but
+  `ListPostDefinitionCatalogEntriesRequestDTO` has no scalar field beyond the ones already exposed
+  (`label`, `orderBy`, `orderDesc`, paging; the only extra is the nested `context` DTO), so
+  Pydantic would silently drop every key: a flag that looks like it works and does nothing. Rule:
+  add a generic `--filter` only where the DTO has fields the dedicated flags don't cover.
+- **D-v0.9-7 `--filter` coercion is additive.** An int-looking token for a string field is a
+  pre-existing edge case; use the typed flag.
+
+### Follow-ups
+
+- `posts community-list` still advertises filters in `docs/cli.md` that `PostsAPI.community_list`
+  does not accept (only paging). Either wire the request DTO (medium) or trim the doc sentence.
+- `--with-attachment-links` convenience flag for `posts get/list/global-stream` (7 loader kwargs
+  exist in the API, none in the CLI).
+- `--max-items N` cap for `--all` on list commands.
+- Cosmetic flag inconsistency: posts/users use `--desc/--asc`, groups/hashtags/catalogs/attachments
+  use `--order-desc/--order-asc`.
+- Release: flip ROADMAP 0.9.0 row to ✅ Shipped and freeze the spec header via the `release` skill.
