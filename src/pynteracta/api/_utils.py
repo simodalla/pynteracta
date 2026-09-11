@@ -41,12 +41,15 @@ def to_epoch_millis(value: int | float | str | datetime | None) -> int | None:
     - ``int`` / ``float`` — returned as ``int``, assumed already epoch-millis.
     - :class:`datetime` — converted via UTC if naive.
     - ISO-8601 ``str`` — parsed then converted.
+    - Integer-literal ``str`` (e.g. ``"1735689600000"`` from a CLI flag) — treated as epoch-millis.
     - ``None`` — returned as ``None``.
     """
     if value is None:
         return None
     if isinstance(value, (int, float)):
         return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
     dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)

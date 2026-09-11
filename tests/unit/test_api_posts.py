@@ -487,6 +487,15 @@ class TestListInCommunityFilters:
         assert cpf["creationTimestampFrom"] == 1735689600000
 
     @respx.mock
+    def test_date_coercion_digit_string(self) -> None:
+        """Epoch-ms given as a string (as a CLI flag delivers it) is accepted as-is."""
+        route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
+        api = PostsAPI(make_transport())
+        api.list_in_community(self._COMMUNITY_ID, creation_timestamp_from="1780264800000")
+        body = json.loads(route.calls[0].request.content)
+        assert body["communityPostFilters"]["creationTimestampFrom"] == 1780264800000
+
+    @respx.mock
     def test_date_coercion_int_passthrough(self) -> None:
         route = respx.post(self._URL).mock(return_value=httpx.Response(200, json=self._PAYLOAD))
         api = PostsAPI(make_transport())
