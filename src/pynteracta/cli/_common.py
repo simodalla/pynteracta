@@ -120,7 +120,7 @@ class CliState:
     token_cache_dir: Path | None = None
     timeout: float | None = None
     output: OutputFormat = "table"
-    log_level: str = "INFO"
+    log_level: str | None = None  # None → profile/env value, else INFO
     no_color: bool = False
     quiet: bool = False
     audit_log: bool = False
@@ -145,6 +145,7 @@ def _profile_overrides(state: CliState) -> dict[str, Any]:
     _set_if_not_none(overrides, "token_cache_dir", state.token_cache_dir)
     if state.timeout is not None:
         overrides["timeout_seconds"] = state.timeout
+    _set_if_not_none(overrides, "log_level", state.log_level)
     if state.audit_log:
         overrides["audit_log"] = state.audit_log
     _set_if_not_none(overrides, "audit_log_file", state.audit_log_file)
@@ -164,6 +165,23 @@ def _set_if_not_none(d: dict[str, Any], key: str, value: Any) -> None:
         d[key] = value
 
 
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+
+
+def resolve_log_level(state: CliState) -> str:
+    """Effective log level: ``--log-level`` > env ``PYNTERACTA_LOG_LEVEL`` / profile > ``INFO``.
+
+    Never raises: if no profile can be resolved yet (e.g. first ``config set`` on a fresh machine)
+    the default applies and the real error, if any, surfaces later in :func:`build_client`.
+    """
+    if state.log_level is not None:
+        return state.log_level
+    try:
+        return resolve_profile(profile_name=state.profile, config_file=state.config_file).log_level
+    except Exception:  # log-level lookup must never block the CLI
+        return "INFO"
+
+
 def build_client(state: CliState) -> InteractaClient:
     """Construct InteractaClient from resolved CliState (applying precedence overrides)."""
     overrides = _profile_overrides(state)
@@ -178,7 +196,7 @@ def build_client(state: CliState) -> InteractaClient:
 
     # Wire audit settings from the resolved profile (merged CLI flags are already in overrides).
     setup_default_logging(
-        level=state.log_level,
+        level=profile.log_level,
         audit=profile.audit_log,
         audit_file=profile.audit_log_file,
         audit_max_bytes=profile.audit_log_max_bytes,

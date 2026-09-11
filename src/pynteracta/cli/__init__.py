@@ -20,7 +20,7 @@ from pynteracta.cli import hashtags as _hashtags_cli
 from pynteracta.cli import posts as _posts_cli
 from pynteracta.cli import tasks as _tasks_cli
 from pynteracta.cli import users as _users_cli
-from pynteracta.cli._common import CliState
+from pynteracta.cli._common import LOG_LEVELS, CliState, resolve_log_level
 from pynteracta.logging import setup_default_logging
 
 app = typer.Typer(
@@ -101,9 +101,12 @@ def _main(  # noqa: PLR0913
         typer.Option("--output", help="Output format: table, json, or yaml."),
     ] = "table",
     log_level: Annotated[
-        str,
-        typer.Option("--log-level", help="Log level: DEBUG, INFO, WARNING, ERROR."),
-    ] = "INFO",
+        str | None,
+        typer.Option(
+            "--log-level",
+            help="Log level: DEBUG, INFO, WARNING, ERROR (default: profile/env value, else INFO).",
+        ),
+    ] = None,
     no_color: Annotated[
         bool,
         typer.Option("--no-color", help="Disable color output."),
@@ -152,6 +155,15 @@ def _main(  # noqa: PLR0913
             raise typer.Exit(2)
         tc = cast(Literal["file", "memory"], token_cache)
 
+    if log_level is not None:
+        log_level = log_level.upper()
+        if log_level not in LOG_LEVELS:
+            typer.echo(
+                f"Invalid --log-level value '{log_level}'. Must be one of {', '.join(LOG_LEVELS)}.",
+                err=True,
+            )
+            raise typer.Exit(2)
+
     if output not in ("table", "json", "yaml"):
         typer.echo(
             f"Invalid --output value '{output}'. Must be 'table', 'json', or 'yaml'.",
@@ -184,4 +196,4 @@ def _main(  # noqa: PLR0913
         audit_log_backups=audit_log_backups,
     )
 
-    setup_default_logging(level=log_level)
+    setup_default_logging(level=resolve_log_level(ctx.obj))
