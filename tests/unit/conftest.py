@@ -21,6 +21,18 @@ def _isolate_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("PYNTERACTA_CONFIG_FILE", str(tmp_path / "isolated_config.toml"))
 
 
+@pytest.fixture(autouse=True)
+def _no_forced_color(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neutralise terminal colour forcing so CLI snapshots are environment-independent.
+
+    Some shells and agent harnesses export ``FORCE_COLOR`` (or ``CLICOLOR_FORCE``), which makes
+    Rich emit ANSI escapes inside ``CliRunner`` output and breaks every snapshot test.
+    """
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.delenv("CLICOLOR_FORCE", raising=False)
+    monkeypatch.setenv("NO_COLOR", "1")
+
+
 @pytest.fixture
 def cli_runner() -> CliRunner:
     """Typer CliRunner with mix_stderr=False for separate capture."""
