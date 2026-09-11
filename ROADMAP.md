@@ -40,7 +40,7 @@ Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes 
 | **0.7.0** | Posts filter & sort completeness | M20 | ✅ Shipped 2026-06-08 | [specs/v0.7-posts-filter-sort.md](specs/v0.7-posts-filter-sort.md) |
 | **0.8.0** | Users filter & sort completeness | M21 | ✅ Shipped 2026-06-11 | [specs/v0.8-users-filter-sort.md](specs/v0.8-users-filter-sort.md) |
 | **0.9.0** | Minor enhancements grab-bag | M22 | ✅ Shipped 2026-09-11 | [specs/v0.9-minor-enhancements.md](specs/v0.9-minor-enhancements.md) |
-| **0.9.1** | Documentation alignment & config fixes (patch) | M23 | ⏳ In progress | [specs/v0.9.1-docs-alignment.md](specs/v0.9.1-docs-alignment.md) |
+| **0.9.1** | Documentation alignment & config fixes (patch) | M23 | ✅ Shipped 2026-09-11 | [specs/v0.9.1-docs-alignment.md](specs/v0.9.1-docs-alignment.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M22). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
