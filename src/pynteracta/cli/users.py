@@ -15,6 +15,9 @@ from pynteracta.cli._common import (
     FieldsOption,
     FullOption,
     OutputOption,
+    _check_paging_flags,
+    _echo_next_page_token,
+    _print_count,
     build_client,
     handle_error,
     make_console,
@@ -59,6 +62,17 @@ def users_list(  # noqa: PLR0913
     all_pages: Annotated[
         bool,
         typer.Option("--all", help="Iterate through all pages."),
+    ] = False,
+    page_token: Annotated[
+        str | None,
+        typer.Option(
+            "--page-token",
+            help="Fetch the page identified by this token (see 'Next page token' on stderr).",
+        ),
+    ] = None,
+    count: Annotated[
+        bool,
+        typer.Option("--count", help="Print only the total number of matching users and exit."),
     ] = False,
     show_web_url: Annotated[
         bool,
@@ -140,6 +154,10 @@ def users_list(  # noqa: PLR0913
         # Users who have not logged in since 2026-01-01
         pynteracta users list --last-access-to 2026-01-01
 
+        # How many blocked-profile users match / resume from a page token
+        pynteracta users list --status 2 --count
+        pynteracta users list --page-token eyJwYWdlIjoyfQ
+
         # Order by a sort field id, ascending
         pynteracta users list --order-by lastName --asc
 
@@ -150,6 +168,7 @@ def users_list(  # noqa: PLR0913
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
+    _check_paging_flags(console, all_pages=all_pages, page_token=page_token, count=count)
 
     # Parse --filter key=value (typed tokens)
     try:
@@ -175,12 +194,20 @@ def users_list(  # noqa: PLR0913
                 order_desc=order_desc,
                 **extra_filters,
             )
+            if count:
+                total = client.users.list(
+                    page_size=1, calculate_total_items_count=True, **call_kwargs
+                ).total_items_count
+                raise typer.Exit(_print_count(console, total))
             if all_pages:
                 for item in client.users.iterate(page_size=page_size, **call_kwargs):
                     items.append(item)
             else:
-                result = client.users.list(page_size=page_size, **call_kwargs)
+                result = client.users.list(
+                    page_size=page_size, page_token=page_token, **call_kwargs
+                )
                 items = list(result.items_typed)
+                _echo_next_page_token(result.next_page_token, quiet=state.quiet)
 
             fmt = resolve_output(state, output)
 

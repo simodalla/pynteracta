@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 import typer
+from rich.console import Console
 
 from pynteracta.api.posts import POST_ORDER_FIELDS
 from pynteracta.cli._common import (
@@ -17,6 +18,9 @@ from pynteracta.cli._common import (
     FieldsOption,
     FullOption,
     OutputOption,
+    _check_paging_flags,
+    _echo_next_page_token,
+    _print_count,
     build_client,
     handle_error,
     make_console,
@@ -137,6 +141,19 @@ def _parse_field_filter(value: str, option: str = "--field-filter") -> PostField
     return PostFieldFilter(column_id=col, type_id=tid, parameters=params)
 
 
+def _parse_field_filter_flag(
+    console: Console, values: list[str] | None, option: str
+) -> list[PostFieldFilter] | None:
+    """Parse a repeatable ``COLUMN:TYPE:VAL`` flag; print the error and exit 1 on bad grammar."""
+    if not values:
+        return None
+    try:
+        return [_parse_field_filter(v, option=option) for v in values]
+    except typer.BadParameter as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+
 @app.command("list")
 def posts_list(  # noqa: PLR0913
     ctx: typer.Context,
@@ -148,6 +165,17 @@ def posts_list(  # noqa: PLR0913
     all_pages: Annotated[
         bool,
         typer.Option("--all", help="Iterate through all pages."),
+    ] = False,
+    page_token: Annotated[
+        str | None,
+        typer.Option(
+            "--page-token",
+            help="Fetch the page identified by this token (see 'Next page token' on stderr).",
+        ),
+    ] = None,
+    count: Annotated[
+        bool,
+        typer.Option("--count", help="Print only the total number of matching posts and exit."),
     ] = False,
     show_web_url: Annotated[
         bool,
@@ -327,6 +355,10 @@ def posts_list(  # noqa: PLR0913
         # Validate custom-field filters against the community post-definition first
         pynteracta posts list --community 56 --field-filter 1411:4:226 --validate
 
+        # Count matching posts / resume from a page token
+        pynteracta posts list --community 56 --mentioned --count
+        pynteracta posts list --community 56 --page-token eyJwYWdlIjoyfQ
+
         # Generic passthrough for long-tail filters (true/false and integers are typed)
         pynteracta posts list --community 56 --filter draft_type=1
     """
@@ -334,28 +366,12 @@ def posts_list(  # noqa: PLR0913
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
+    _check_paging_flags(console, all_pages=all_pages, page_token=page_token, count=count)
 
-    # Parse --field-filter
-    parsed_field_filters: list[PostFieldFilter] | None = None
-    if field_filter:
-        try:
-            parsed_field_filters = [_parse_field_filter(v) for v in field_filter]
-        except typer.BadParameter as exc:
-            console.print(f"[red]Error:[/red] {exc}")
-            raise typer.Exit(1) from exc
-
-    # Parse --screen-field-filter (same grammar, targets screenFieldFilters)
-    parsed_screen_filters: list[PostFieldFilter] | None = None
-    if screen_field_filter:
-        try:
-            parsed_screen_filters = [
-                _parse_field_filter(v, option="--screen-field-filter") for v in screen_field_filter
-            ]
-        except typer.BadParameter as exc:
-            console.print(f"[red]Error:[/red] {exc}")
-            raise typer.Exit(1) from exc
-
-    # Parse --filter key=value (typed tokens)
+    parsed_field_filters = _parse_field_filter_flag(console, field_filter, "--field-filter")
+    parsed_screen_filters = _parse_field_filter_flag(
+        console, screen_field_filter, "--screen-field-filter"
+    )
     try:
         extra_filters = parse_kv_filters(filter_kv)
     except typer.BadParameter as exc:
@@ -400,12 +416,19 @@ def posts_list(  # noqa: PLR0913
                 validate_with=validate_with,
                 community_post_filters=extra_filters or None,
             )
+            if count:
+                call_kwargs.update(page_size=1, calculate_total_items_count=True)
+                total = client.posts.list_in_community(community, **call_kwargs).total_items_count
+                raise typer.Exit(_print_count(console, total))
             if all_pages:
                 for item in client.posts.iterate_in_community(community, **call_kwargs):
                     items.append(item)
             else:
-                result = client.posts.list_in_community(community, **call_kwargs)
+                result = client.posts.list_in_community(
+                    community, page_token=page_token, **call_kwargs
+                )
                 items = list(result.items_typed)
+                _echo_next_page_token(result.next_page_token, quiet=state.quiet)
 
             fmt = resolve_output(state, output)
             title_str = f"Posts (community {community})"

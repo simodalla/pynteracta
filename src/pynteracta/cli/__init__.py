@@ -8,6 +8,7 @@ from typing import Annotated, Literal, cast
 
 import typer
 
+from pynteracta import __version__
 from pynteracta.cli import admin_manage as _admin_manage_cli
 from pynteracta.cli import attachments as _attachments_cli
 from pynteracta.cli import auth as _auth_cli
@@ -40,9 +41,25 @@ app.add_typer(_hashtags_cli.app, name="hashtags")
 app.add_typer(_admin_manage_cli.app, name="admin-manage")
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"pynteracta {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
 def _main(  # noqa: PLR0913
     ctx: typer.Context,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show the pynteracta version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
     profile: Annotated[
         str | None,
         typer.Option("--profile", help="Profile name from config.toml."),

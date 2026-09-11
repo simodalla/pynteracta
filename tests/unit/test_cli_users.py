@@ -13,6 +13,7 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
+from pynteracta.cli._common import EXIT_CONFIG
 
 
 @pytest.fixture
@@ -271,3 +272,42 @@ class TestUsersListFilters:
     def test_filter_bad_format(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["users", "list", "--filter", "bad"], env=BASE_ENV)
         assert result.exit_code != 0
+
+
+class TestUsersListPaging:
+    @respx.mock
+    def test_count_prints_only_total(self, runner: CliRunner) -> None:
+        route = mock_json(
+            "POST", "admin/data/users", {"items": [], "nextPageToken": None, "totalItemsCount": 42}
+        )
+        result = runner.invoke(app, ["users", "list", "--status", "2", "--count"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert result.output == "42\n"
+        body = json.loads(route.calls[0].request.content)
+        assert body["calculateTotalItemsCount"] is True
+        assert body["pageSize"] == 1
+        assert body["statusFilter"] == [2]
+
+    def test_count_with_all_is_config_error(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["users", "list", "--count", "--all"], env=BASE_ENV)
+        assert result.exit_code == EXIT_CONFIG
+
+    @respx.mock
+    def test_page_token_forwarded_and_next_on_stderr(self, runner: CliRunner) -> None:
+        route = mock_json(
+            "POST",
+            "admin/data/users",
+            {"items": [{"id": 7, "firstName": "A", "lastName": "B"}], "nextPageToken": "tok-2"},
+        )
+        result = runner.invoke(
+            app, ["--output", "json", "users", "list", "--page-token", "tok-1"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["pageToken"] == "tok-1"
+        assert "Next page token: tok-2" in result.stderr
+        assert json.loads(result.stdout)[0]["id"] == 7
+
+    def test_page_token_with_all_is_config_error(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["users", "list", "--page-token", "x", "--all"], env=BASE_ENV)
+        assert result.exit_code == EXIT_CONFIG

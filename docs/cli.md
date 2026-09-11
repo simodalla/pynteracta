@@ -6,6 +6,7 @@
 pynteracta [OPTIONS] COMMAND [ARGS]...
 
 Options:
+  --version, -V                Print the pynteracta version and exit
   --profile TEXT               Profile name from config file
   --config-file PATH           Override config file path
   --base-url TEXT              Interacta tenant URL
@@ -276,7 +277,15 @@ pynteracta users list --order-by lastName --asc
 
 # Generic passthrough for long-tail filters (true/false and integers are typed)
 pynteracta users list --filter external_id_full_text_filter=EXT-1 --filter reduced_profile=false
+
+# Count matching users (prints just the number), resume from a page token
+pynteracta users list --status 2 --count
+pynteracta users list --page-size 50 --page-token eyJwYWdlIjoyfQ
 ```
+
+`--page-token` and `--count` behave exactly as on `posts list` (see the paging flags table
+there): the follow-up token goes to stderr, `--count` prints only the total, and neither can be
+combined with `--all`.
 
 **Filter and ordering flags:**
 
@@ -404,8 +413,21 @@ pynteracta posts list --community 79 --created-by-group 12 --modified-from 2026-
 pynteracta posts list --community 79 --hashtag 3 --hashtag 5 --hashtags-and   # AND instead of OR
 
 # Generic passthrough (for long-tail communityPostFilters fields)
-pynteracta posts list --community 79 --filter draftType=1
+pynteracta posts list --community 79 --filter draft_type=1
+
+# Count matching posts (prints just the number), resume from a page token
+pynteracta posts list --community 79 --mentioned --count
+pynteracta posts list --community 79 --page-size 50 --page-token eyJwYWdlIjoyfQ
 ```
+
+**Paging flags:**
+
+| Flag | Description |
+|---|---|
+| `--page-size INT` | Items per page. |
+| `--all` | Walk every page. Mutually exclusive with `--page-token` and `--count` (exit 2). |
+| `--page-token TEXT` | Fetch one specific page. When the response has a follow-up page, `Next page token: <token>` is printed on **stderr** (suppressed by `--quiet`); stdout stays the plain payload. |
+| `--count` | Print **only** the total number of matching items (`totalItemsCount`) and exit 0. All filter flags apply; rendering flags are ignored. Exit 1 if the server returns no total. |
 
 **Ordering flags:**
 

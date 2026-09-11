@@ -13,7 +13,7 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli._common import EXIT_VALIDATION
+from pynteracta.cli._common import EXIT_CONFIG, EXIT_VALIDATION
 
 _STREAM_BASE = "https://api.example.com/portal/api/external/v2/communication/posts/data"
 
@@ -490,6 +490,70 @@ class TestPostsListFilters:
         body = json.loads(route.calls[0].request.content)
         assert body["orderDesc"] is False
         assert body["orderBy"] == "postLastModifyAndCommentTimestamp"
+
+
+class TestPostsListPaging:
+    _LIST_URL = "communication/posts/data/list/community/79"
+
+    @respx.mock
+    def test_count_prints_only_total(self, runner: CliRunner) -> None:
+        route = mock_json(
+            "POST", self._LIST_URL, {"items": [], "nextPageToken": None, "totalItemsCount": 134}
+        )
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--mentioned", "--count"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == "134\n"
+        body = json.loads(route.calls[0].request.content)
+        assert body["calculateTotalItemsCount"] is True
+        assert body["pageSize"] == 1
+        assert body["communityPostFilters"]["mentioned"] is True
+
+    @respx.mock
+    def test_count_without_total_exits_1(self, runner: CliRunner) -> None:
+        mock_json("POST", self._LIST_URL, {"items": [], "nextPageToken": None})
+        result = runner.invoke(app, ["posts", "list", "--community", "79", "--count"], env=BASE_ENV)
+        assert result.exit_code == 1
+
+    def test_count_with_all_is_config_error(self, runner: CliRunner) -> None:
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--count", "--all"], env=BASE_ENV
+        )
+        assert result.exit_code == EXIT_CONFIG
+
+    @respx.mock
+    def test_page_token_forwarded_and_next_on_stderr(self, runner: CliRunner) -> None:
+        route = mock_json(
+            "POST",
+            self._LIST_URL,
+            {"items": [{"id": 1, "communityId": 79, "title": "T"}], "nextPageToken": "tok-2"},
+        )
+        result = runner.invoke(
+            app,
+            ["--output", "json", "posts", "list", "--community", "79", "--page-token", "tok-1"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        body = json.loads(route.calls[0].request.content)
+        assert body["pageToken"] == "tok-1"
+        assert "Next page token: tok-2" in result.stderr
+        assert json.loads(result.stdout)[0]["id"] == 1
+
+    @respx.mock
+    def test_next_token_silenced_by_quiet(self, runner: CliRunner) -> None:
+        mock_json("POST", self._LIST_URL, {"items": [], "nextPageToken": "tok-2"})
+        result = runner.invoke(
+            app, ["--quiet", "--output", "json", "posts", "list", "--community", "79"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert "Next page token" not in result.stderr
+
+    def test_page_token_with_all_is_config_error(self, runner: CliRunner) -> None:
+        result = runner.invoke(
+            app, ["posts", "list", "--community", "79", "--page-token", "x", "--all"], env=BASE_ENV
+        )
+        assert result.exit_code == EXIT_CONFIG
 
 
 class TestPostsComments:

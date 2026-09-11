@@ -257,6 +257,33 @@ def parse_kv_filters(values: list[str] | None, *, option: str = "--filter") -> d
     return out
 
 
+def _check_paging_flags(
+    console: Console, *, all_pages: bool, page_token: str | None, count: bool
+) -> None:
+    """``--all`` is mutually exclusive with ``--page-token`` and ``--count`` (exit 2)."""
+    if all_pages and page_token is not None:
+        console.print("[red]Error:[/red] --page-token cannot be combined with --all.")
+        raise typer.Exit(EXIT_CONFIG)
+    if all_pages and count:
+        console.print("[red]Error:[/red] --count cannot be combined with --all.")
+        raise typer.Exit(EXIT_CONFIG)
+
+
+def _print_count(console: Console, total: int | None) -> int:
+    """Print the bare total on stdout; return the exit code (1 if the server sent no total)."""
+    if total is None:
+        console.print("[red]Error:[/red] the server did not return a total item count.")
+        return EXIT_GENERIC
+    typer.echo(str(total))
+    return EXIT_SUCCESS
+
+
+def _echo_next_page_token(token: str | None, *, quiet: bool) -> None:
+    """Surface the follow-up page token on stderr (never in the stdout payload)."""
+    if token and not quiet:
+        typer.echo(f"Next page token: {token}", err=True)
+
+
 def validate_export_options(export: Path | None, export_format: str | None) -> None:
     """Pre-flight check: infer and validate the export format before making the API call."""
     if export is not None:
