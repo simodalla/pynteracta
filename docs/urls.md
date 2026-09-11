@@ -43,6 +43,9 @@ client.web_urls.user(5225)
 
 client.web_urls.community(79)
 # "https://interacta.example.it/portal/community/79"
+
+client.web_urls.group(201)
+# "https://interacta.example.it/portal/admin/group/201"
 ```
 
 These URLs are also available via the CLI `--web-url` flag:

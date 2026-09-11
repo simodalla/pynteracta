@@ -2,8 +2,8 @@
 
 ## Unit tests
 
-Unit tests use `respx` to mock HTTP calls and require no network access.
-They run by default on every `pytest` invocation.
+Unit tests use `respx` to mock HTTP calls and require no network access. A bare `pytest` run
+collects unit **and** contract tests (integration tests skip themselves unless opted in).
 
 ```bash
 uv run pytest                                    # all unit tests
@@ -13,8 +13,9 @@ uv run pytest --cov --cov-fail-under=85          # with coverage gate
 
 ## Contract tests
 
-Contract tests validate that the hand-written facade models are still consistent
-with the pinned `tests/fixtures/swagger.json` schema.
+Contract tests validate that the **generated** Pydantic models still cover every property of the
+pinned `tests/fixtures/swagger.json` schema, and smoke-parse the hand-written facades from the JSON
+payload fixtures.
 
 ```bash
 uv run pytest -m contract
@@ -23,7 +24,7 @@ uv run pytest -m contract
 To regenerate the auto-generated models from a new schema:
 
 ```bash
-python scripts/generate_models.py
+uv run python scripts/generate_models.py
 uv run pytest -m contract
 ```
 

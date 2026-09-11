@@ -5,6 +5,10 @@
       members:
         - ServiceAccountKey
         - TokenManager
+        - GoogleOAuth2Credentials
+        - GoogleOAuth2TokenManager
+        - TokenCache
+        - CachedToken
         - FileTokenCache
         - MemoryTokenCache
         - load_service_account_key

@@ -61,7 +61,7 @@ Setting `--audit-log-file` implies `--audit-log` automatically.
 Each entry is a single JSON object on its own line (JSON-lines / NDJSON), written via Python's `RotatingFileHandler`.  Example:
 
 ```json
-{"event": "audit.request", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "method": "GET", "url": "https://tenant.interacta.cloud/.../core/auth/current-user-data", "headers": {"User-Agent": "pynteracta/0.4.0 ...", "Authorization": "***REDACTED***"}, "body": null}
+{"event": "audit.request", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "method": "GET", "url": "https://tenant.interacta.cloud/.../core/auth/current-user-data", "headers": {"User-Agent": "pynteracta/0.9.1 ...", "Authorization": "***REDACTED***"}, "body": null}
 {"event": "audit.response", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "status": 200, "url": "...", "headers": {...}, "duration_ms": 134.2, "request_id": "abc-123", "body": {"userId": 42, ...}}
 ```
 
@@ -95,12 +95,14 @@ audit.redaction_disabled: --audit-raw is active — raw tokens and sensitive dat
 When you call `setup_default_logging(audit=True, ...)`, the dedicated `pynteracta.audit` logger is wired up independently of the main `pynteracta` logger.  Audit events (`audit.request`, `audit.response`) are emitted at `DEBUG` level and do not propagate to the root `pynteracta` logger (no double-printing).
 
 ```python
+from pathlib import Path
+
 from pynteracta.logging import setup_default_logging
 
 setup_default_logging(
     level="INFO",
     audit=True,
-    audit_file="/tmp/audit.log",
+    audit_file=Path("/tmp/audit.log"),
     audit_bodies=True,
 )
 ```

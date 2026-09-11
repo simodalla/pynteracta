@@ -33,9 +33,11 @@ is documented in the [official vendor authentication guide](https://injenia.atla
 Load the key in code:
 
 ```python
+from pathlib import Path
+
 from pynteracta.auth import load_service_account_key
 
-key = load_service_account_key("sa.json")
+key = load_service_account_key(Path("sa.json"))
 ```
 
 For integration tests, store the key at `tests/integration/.secrets/sa.json` (git-ignored). See
@@ -74,9 +76,10 @@ The assertion is signed with the private key using **RS512**.
 3. Cache the access token (file or memory backend).
 4. On subsequent requests, return the cached token. Refresh it automatically when
    `now + 60 s ≥ exp` (60-second skew).
-5. On HTTP 401, invalidate the cached token and re-fetch. When the server signals an expired
-   token via `WWW-Authenticate: INVALID_AUTH_TOKEN`, the invalidation is logged as
-   `auth.token_invalidated_by_server`.
+5. On HTTP 401, invalidate the cached token and raise `AuthenticationError`; the **next** call
+   fetches a fresh token (there is no automatic retry of the failed request). When the server
+   signals an expired token via `WWW-Authenticate: INVALID_AUTH_TOKEN`, the invalidation is logged
+   as `auth.token_invalidated_by_server`.
 
 ## Google OAuth2
 
@@ -125,12 +128,13 @@ client = InteractaClient(
 ### CLI usage
 
 ```bash
+# A base URL must be resolvable first (profile, PYNTERACTA_BASE_URL, or the global --base-url flag).
 # Token from the environment (recommended — never written to disk):
 export PYNTERACTA_GOOGLE_OAUTH2_TOKEN="ya29.<your-google-access-token>"
-pynteracta auth login --google --profile myprofile
+pynteracta --base-url https://interacta.example.it auth login --google --profile myprofile
 
 # Or pass it explicitly:
-pynteracta auth login --google-token "ya29.<...>"
+pynteracta --base-url https://interacta.example.it auth login --google-token "ya29.<...>"
 ```
 
 `auth login --google` persists only `auth_method = "google_oauth2"` to the profile; the
@@ -163,38 +167,46 @@ itself expired you must provide a fresh one (e.g. via `google_token_provider`).
 
 ### File cache (default)
 
-- Location: `{token_cache_dir}/{profile}.token.json`.
+- Location: `{token_cache_dir}/{key}.token.json`, where `{key}` is the service-account
+  `client_id` for the service-account flow and the profile name for the Google OAuth2 flow.
 - Default dir: `~/.config/pynteracta/tokens/` (Linux/macOS, XDG; respects `XDG_CONFIG_HOME`).
   Windows: `%LOCALAPPDATA%\pynteracta\tokens\`.
 - File permissions: `0o600`; directory: `0o700`.
 
 #### POSIX (Linux/macOS)
 
-The library enforces `0o600` on the cache file and `0o700` on the directory. If permissions are
-wider on read (e.g. world-readable), the library raises an error and refuses to load the cached
-token.
+The library enforces `0o600` on the cache file and `0o700` on the directory. If the file mode is
+anything other than `0o600` on read (e.g. world-readable), the library raises an error and refuses
+to load the cached token.
 
 #### Windows
 
-POSIX modes (`os.chmod`) do not apply on Windows. The library emits a one-time warning
-(`pynteracta.token_cache.windows_permissions`) recommending the in-memory cache for users
-who require strong at-rest protection.
+POSIX modes (`os.chmod`) do not apply on Windows. The library emits a one-time warning (event
+`token_cache.windows_permissions` on the `pynteracta.auth` logger) recommending the in-memory
+cache for users who require strong at-rest protection.
 
 ### Memory cache
 
-Tokens are kept only inside the running process — no disk write.
+Tokens are kept only inside the running process — no disk write. The backend is selected on the
+`Profile` (`token_cache = "memory"` in `config.toml`, `PYNTERACTA_TOKEN_CACHE=memory`, or the CLI
+flag `--token-cache memory`); `InteractaClient` has no `token_cache` constructor argument.
 
 ```python
-from pynteracta.client import InteractaClient
-from pynteracta.auth import load_service_account_key
+from pathlib import Path
 
-key = load_service_account_key("sa.json")
-client = InteractaClient(
+from pynteracta.client import InteractaClient
+from pynteracta.config import Profile
+
+profile = Profile(
     base_url="https://interacta.example.it",
-    credentials=key,
+    service_account_key=Path("sa.json"),
     token_cache="memory",
 )
+client = InteractaClient(profile=profile)
 ```
+
+Without a profile, a client built from `base_url=` + `credentials=` always uses the in-memory
+cache.
 
 ## Authorization header
 

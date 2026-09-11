@@ -316,11 +316,21 @@ overlapping keys.
 ### `**filters` passthrough (Python API)
 
 Any additional keyword argument is camelCased and added to the **top-level** request body
-(not to `communityPostFilters`):
+(not to `communityPostFilters`). The only top-level field of
+`ListCommunityPostsFilteredRequestDTO` without an explicit kwarg is `communityAttachmentFilters`,
+a dict shaped like the swagger `CommunityAttachmentFiltersDTO` (`name`, `mimeTypes`,
+`mimeTypeCategory`, `types`, `createdByUserIds`, `creationTimestampFrom/To`, …; the generated
+model is an opaque stub, so the dict is forwarded as-is):
 
 ```python
-client.posts.list_in_community(56, calculate_total_items_count=True)
+client.posts.list_in_community(
+    56,
+    community_attachment_filters={"mimeTypes": ["application/pdf"]},
+)
 ```
+
+Every other top-level field (`pageToken`, `pageSize`, `calculateTotalItemsCount`, `orderBy`,
+`orderDesc`, `pinnedFirst`) already has an explicit kwarg.
 
 > **CLI note:** `--filter KEY=VALUE` maps to `community_post_filters`, not to the top-level body.
 

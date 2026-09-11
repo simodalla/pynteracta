@@ -2,19 +2,20 @@
 
 ## Installation
 
-pynteracta v0.x wheels are distributed via GitLab CI artifacts.
+pynteracta v0.x wheels are distributed as GitLab CI artifacts (PyPI publication is planned for
+v1.0). Download `dist/pynteracta-<version>-py3-none-any.whl` from the latest pipeline, then:
 
 ```bash
-uv pip install pynteracta-0.1.0-py3-none-any.whl
+uv pip install pynteracta-<version>-py3-none-any.whl
+uv pip install "pynteracta-<version>-py3-none-any.whl[export]"   # + yaml/parquet export support
 ```
 
 ## CLI quickstart
 
 ```bash
-# Authenticate with a service-account key
-pynteracta auth login \
-  --service-account-key sa.json \
-  --base-url https://interacta.example.it
+# Authenticate with a service-account key (--base-url is a global option: it goes BEFORE the command)
+pynteracta --base-url https://interacta.example.it \
+  auth login --service-account-key sa.json
 
 # Verify authentication
 pynteracta auth whoami

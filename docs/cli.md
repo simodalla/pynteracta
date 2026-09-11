@@ -13,11 +13,11 @@ Options:
   --base-path TEXT             URL base path (default: /portal)
   --api-version INTEGER        API version (default: 2)
   --service-account-key PATH   Path to service-account key JSON
-  --token-cache [file|memory]  Token cache backend
+  --token-cache TEXT           Token cache backend: file or memory (validated, exit 2 otherwise)
   --token-cache-dir PATH       Override token cache directory
   --timeout FLOAT              HTTP timeout in seconds
   --output [table|json|yaml]   Output format (default: table)
-  --log-level [DEBUG|INFO|WARNING|ERROR]
+  --log-level TEXT             DEBUG, INFO, WARNING or ERROR (default: profile/env value, else INFO)
   --no-color                   Disable rich color output
   --quiet                      Suppress non-essential output
   --audit-log                  Enable API call audit logging
@@ -32,9 +32,10 @@ See [Audit Logging](logging.md) for full details on redaction guarantees, file f
 
 ### Output format
 
-`--output` (short: `-o`) controls the rendering format. It can be placed either **before** the
-command path (global position) or **after** a data-emitting command (per-command position).
-When both are supplied the command-level value wins.
+`--output` controls the rendering format. It can be placed either **before** the command path
+(global position) or **after** a data-emitting command (per-command position). The short form
+`-o` exists **only** in the per-command position. When both are supplied the command-level value
+wins.
 
 ```bash
 # Global position (before the command path)
@@ -47,9 +48,11 @@ pynteracta communities details 79 --output json
 pynteracta communities details 79 -o yaml
 ```
 
-Data-emitting commands (`auth whoami`, all `users`, `posts`, `communities`, and `catalogs`
-sub-commands) accept `--output` / `-o` directly. Configuration meta-commands (`config set`,
-`config get`, etc.) do not; use the global form if you need to control their output format.
+Every data-emitting command (`auth whoami` and all sub-commands of `users`, `posts`,
+`communities`, `catalogs`, `attachments`, `tasks`, `groups`, `hashtags`, `admin-manage`) accepts
+`--output` / `-o` directly, together with `--full`, `--fields`, `--export` and `--export-format`.
+Configuration meta-commands (`config set`, `config get`, etc.) do not; use the global form if you
+need to control their output format.
 
 ### `--full` — emit all DTO fields
 
@@ -437,7 +440,7 @@ pynteracta posts list --community 79 --page-size 50 --page-token eyJwYWdlIjoyfQ
 | Flag | Description |
 |---|---|
 | `--order-by TEXT` | Sort field (see table below). |
-| `--desc / --asc` | Sort direction (default: no ordering sent). |
+| `--desc / --asc` | Sort direction. Descending is the default; `orderBy` (default `postLastModifyAndCommentTimestamp`) and `orderDesc` are always sent. |
 | `--pinned-first / --no-pinned-first` | Pinned posts appear before others. |
 
 Valid `--order-by` values: `postCustomId`, `postTitle`, `postCreatorUser`,
@@ -481,9 +484,11 @@ Format: `COLUMN_ID:TYPE_ID:VALUE[,VALUE]` — all three segments are required.
 | `4` | IN | one or more enum/entity IDs |
 | `5` | CONTAINS | single value |
 | `6` | IS_NULL_OR_IN | one or more IDs |
-| `7` | IS_EMPTY | (no value segment needed) |
+| `7` | IS_EMPTY | empty, but the third segment is mandatory: `COLUMN:7:` (trailing colon) |
 
 Tokens that look like integers are coerced to `int`; others remain `str`. The flag is repeatable.
+A malformed value (fewer than three segments, or a non-integer `COLUMN`/`TYPE_ID`) exits with
+code 1 and names the offending flag; the same applies to `--screen-field-filter`.
 
 **Workflow screen-field filter (`--screen-field-filter COLUMN:TYPEID:VAL[,VAL]`):**
 
@@ -560,14 +565,17 @@ pynteracta posts global-stream --sync-token <token>
 
 ### `posts community-list`
 
-Lists posts in a community using the lighter `data/community-list/{communityId}` endpoint
-(`ListCommunityPostsRequestDTO` — basic filters: title, description, date ranges, workflow
-status, etc.).
+Lists posts in a community using the `data/community-list/{communityId}` endpoint
+(`ListCommunityPostsRequestDTO`). The CLI command exposes **paging only** (`--page-size`,
+`--all`) plus `--web-url` and the rendering flags: it has no filter or ordering flags. The
+endpoint's own filters (title, description, date ranges, workflow status, …) are reachable from
+Python via `client.posts.community_list(community_id, **filters)` or `community_list_raw()`.
 
-**Distinction from `posts list`:** `posts list` calls the older `data/list/community/{communityId}`
-endpoint with `ListCommunityPostsFilteredRequestDTO`, which supports additional server-side
-filtering options (full-text search via `containsText`, `loadPostDetails` query flag, etc.).
-Use `posts list` when you need richer filtering; use `posts community-list` for simpler requests.
+**Distinction from `posts list`:** `posts list` calls `data/list/community/{communityId}` with
+`ListCommunityPostsFilteredRequestDTO` and is the command with the full filter/sort surface
+(curated flags, custom-field filters, `--validate`, `--count`, `--page-token`). Use `posts list`
+whenever you need to filter; use `posts community-list` only to page through a community's posts
+as the other endpoint returns them.
 
 ```bash
 pynteracta posts community-list --community 79
@@ -687,7 +695,7 @@ Retrieve attachment metadata, single attachment detail, and visibility checks.
 > all compose as usual.
 
 > **Default table = metadata only (D-v0.3-3a):** The default table shows `id`, `name`,
-> `contentMimeType`, `size`, and `type`.  Short-lived `temporaryContent*Link` download and
+> `content_mime_type`, `size`, and `type` (use the camelCase `contentMimeType` with `--fields`).  Short-lived `temporaryContent*Link` download and
 > preview URLs are exposed only via `--full`, `--fields`, `--export`, or `--output json`.
 
 ### `attachments list`

@@ -4,15 +4,16 @@
 
 1. **CLI flags** — e.g. `--base-url`, `--profile`.
 2. **Environment variables** — `PYNTERACTA_*` prefixed.
-3. **Config file profile** — selected by `--profile` / `PYNTERACTA_PROFILE` / `current_profile`.
+3. **Config file profile** — selected by `--profile`, else by `current_profile` in the file.
 4. **Built-in defaults** — e.g. `base_path = "/portal"`, `timeout_seconds = 30.0`.
 
 ## Config file
 
-Location: `platformdirs.user_config_dir("pynteracta") / "config.toml"`.
+Location:
 
-- Linux/macOS: `~/.config/pynteracta/config.toml` (XDG; override with `XDG_CONFIG_HOME`).
-- Windows: `%LOCALAPPDATA%\pynteracta\config.toml`.
+- Linux/macOS: `$XDG_CONFIG_HOME/pynteracta/config.toml`, i.e. `~/.config/pynteracta/config.toml`
+  by default (XDG convention on both platforms — **not** `~/Library/Application Support` on macOS).
+- Windows: `platformdirs.user_config_dir("pynteracta")`, i.e. `%LOCALAPPDATA%\pynteracta\config.toml`.
 - Override the path with `PYNTERACTA_CONFIG_FILE` or `--config-file`.
 
 ```toml
@@ -45,7 +46,6 @@ pynteracta config list
 
 | Variable | Profile field |
 |---|---|
-| `PYNTERACTA_PROFILE` | active profile name |
 | `PYNTERACTA_BASE_URL` | `base_url` |
 | `PYNTERACTA_BASE_PATH` | `base_path` |
 | `PYNTERACTA_API_VERSION` | `api_version` |
@@ -55,7 +55,7 @@ pynteracta config list
 | `PYNTERACTA_TOKEN_CACHE` | `token_cache` (`file` or `memory`) |
 | `PYNTERACTA_TOKEN_CACHE_DIR` | `token_cache_dir` |
 | `PYNTERACTA_TIMEOUT` | `timeout_seconds` |
-| `PYNTERACTA_LOG_LEVEL` | `log_level` |
+| `PYNTERACTA_LOG_LEVEL` | `log_level` — used by the CLI when `--log-level` is not given |
 | `PYNTERACTA_AUDIT_LOG` | `audit_log` — enable audit logging |
 | `PYNTERACTA_AUDIT_LOG_FILE` | `audit_log_file` — rotating file path (implies audit on) |
 | `PYNTERACTA_AUDIT_LOG_BODIES` | `audit_log_bodies` — capture request/response bodies |
@@ -77,7 +77,7 @@ pynteracta config list
 | `token_cache` | `"file"` or `"memory"` | `file` | Cache backend |
 | `token_cache_dir` | `Path` | `~/.config/pynteracta/tokens/` (XDG) | Override cache directory |
 | `timeout_seconds` | `float` | `30.0` | HTTP timeout |
-| `log_level` | `DEBUG`/`INFO`/`WARNING`/`ERROR` | `INFO` | Log verbosity |
+| `log_level` | `DEBUG`/`INFO`/`WARNING`/`ERROR` | `INFO` | Log verbosity for the CLI; `--log-level` overrides it |
 | `audit_log` | `bool` | `false` | Enable API call audit logging |
 | `audit_log_file` | `path` | _(none)_ | Rotating JSON-lines audit file path |
 | `audit_log_bodies` | `bool` | `false` | Capture request/response bodies (opt-in) |
