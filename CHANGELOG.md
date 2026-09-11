@@ -1,6 +1,25 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.1] - 2026-09-11
+
+### Chores
+
+- Add static consistency check for docs Python snippets
+- Point repository URLs at the internal GitLab
+- Release v0.9.1 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.9.0
+- **spec**: Add v0.9.1 docs-alignment spec and ROADMAP row (M23)
+- Align README and docs with the v0.9 API and CLI surface
+- Log M23 in PROGRESS.md
+
+### Fixes
+
+- **cli**: Honour log_level from profile and environment
+
 ## [0.9.0] - 2026-09-11
 
 ### Chores
