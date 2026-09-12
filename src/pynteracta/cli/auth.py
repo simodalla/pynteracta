@@ -11,7 +11,12 @@ import tomlkit
 import typer
 from rich.console import Console
 
-from pynteracta.auth import FileTokenCache, MemoryTokenCache, load_service_account_key
+from pynteracta.auth import (
+    FileTokenCache,
+    MemoryTokenCache,
+    build_cache_key,
+    load_service_account_key,
+)
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
@@ -33,6 +38,7 @@ from pynteracta.cli._common import (
 from pynteracta.client import InteractaClient, _default_token_cache_dir
 from pynteracta.config import Profile, load_config, resolve_profile
 from pynteracta.exceptions import InteractaError
+from pynteracta.urls import build_api_base
 
 app = typer.Typer(help="Authentication commands.", no_args_is_help=True)
 
@@ -280,11 +286,15 @@ def logout(ctx: typer.Context) -> None:
     config = load_config(state.config_file)
     profile_name = state.profile or config.current_profile
 
+    api_base = build_api_base(
+        str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
+    )
+
     if profile_obj.token_cache == "memory":
         cache: MemoryTokenCache | FileTokenCache = MemoryTokenCache()
     else:
         cache_dir = profile_obj.token_cache_dir or _default_token_cache_dir()
-        cache = FileTokenCache(cache_dir)
+        cache = FileTokenCache(cache_dir, api_base=api_base)
 
     key_id = profile_name
     if profile_obj.service_account_key is not None:
@@ -294,6 +304,7 @@ def logout(ctx: typer.Context) -> None:
         except Exception:
             pass
 
-    cache.clear(key_id)
+    # Must match how the token managers derive the key, or logout silently clears nothing.
+    cache.clear(build_cache_key(api_base, key_id))
     console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
     raise typer.Exit(EXIT_SUCCESS)

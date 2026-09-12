@@ -39,11 +39,11 @@ def _default_token_cache_dir() -> Path:
     return _xdg_config_dir() / "tokens"
 
 
-def _build_token_cache(profile: Profile) -> TokenCache:
+def _build_token_cache(profile: Profile, api_base: str | None = None) -> TokenCache:
     if profile.token_cache == "memory":
         return MemoryTokenCache()
     cache_dir = profile.token_cache_dir or _default_token_cache_dir()
-    return FileTokenCache(cache_dir)
+    return FileTokenCache(cache_dir, api_base=api_base)
 
 
 class InteractaClient:
@@ -181,7 +181,13 @@ class InteractaClient:
         provider (explicit kwargs or ``profile.google_oauth2_token``) selects the Google flow.
         Returns ``None`` when no credentials are available (unauthenticated client).
         """
-        cache = _build_token_cache(profile) if profile is not None else MemoryTokenCache()
+        # Both transports are built from the same profile, so either base identifies the tenant.
+        api_base = sa_transport.base_url
+        cache = (
+            _build_token_cache(profile, api_base=api_base)
+            if profile is not None
+            else MemoryTokenCache()
+        )
 
         if credentials is not None:
             return TokenManager(key=credentials, cache=cache, transport=sa_transport)

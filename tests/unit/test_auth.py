@@ -27,6 +27,7 @@ from pynteracta.auth import (
     TokenManager,
     TokenProvider,
     _decode_token_expiry,
+    build_cache_key,
     load_service_account_key,
 )
 from pynteracta.exceptions import AuthenticationError
@@ -41,9 +42,29 @@ _AUTH_PATH = "/core/auth/create-access-token-by-service-account"
 _AUTH_URL = f"{_BASE}{_AUTH_PATH}"
 # Google exchange endpoint is under /portal/api/core/... (no /external/v2/ prefix).
 _GOOGLE_BASE = "https://api.example.com/portal/api"
+
+
+def _mock_transport(base_url: str) -> MagicMock:
+    """A mocked transport that still exposes the ``base_url`` the cache key is derived from."""
+    transport = MagicMock(spec=HttpTransport)
+    transport.base_url = base_url
+    return transport
+
+
+def _google_cache_key(base_url: str = _GOOGLE_BASE) -> str:
+    """The tenant-scoped key a GoogleOAuth2TokenManager derives from ``_GOOGLE_CACHE_KEY``."""
+    return build_cache_key(base_url, _GOOGLE_CACHE_KEY)
+
+
+def _sa_cache_key(key: ServiceAccountKey, base_url: str = _BASE) -> str:
+    """The tenant-scoped cache key a TokenManager derives for this key (see build_cache_key)."""
+    return build_cache_key(base_url, str(key.client_id))
+
+
 _GOOGLE_AUTH_PATH = "/core/auth/create-access-token-by-google-oauth2-access-token-credentials"
 _GOOGLE_AUTH_URL = f"{_GOOGLE_BASE}{_GOOGLE_AUTH_PATH}"
 _GOOGLE_CACHE_KEY = "default"
+"""The raw cache_key callers pass; the manager namespaces it by tenant."""
 _EXPIRY_SHORT = 30
 _EXPIRY_LONG = 3600
 _FIXTURE_CLIENT_ID = 1001
@@ -93,7 +114,7 @@ def _make_token_manager(
     return TokenManager(
         key=key or _load_fixture_key(),
         cache=cache or MemoryTokenCache(),
-        transport=transport or MagicMock(spec=HttpTransport),
+        transport=transport or _mock_transport(_BASE),
         clock=clock or (lambda: datetime.now(tz=UTC)),
     )
 
@@ -225,10 +246,10 @@ class TestTokenManager:
     def test_invalidate_clears_cache(self) -> None:
         cache = MemoryTokenCache()
         key = _load_fixture_key()
-        cache.save(str(key.client_id), _token())
+        cache.save(_sa_cache_key(key), _token())
         tm = _make_token_manager(cache=cache, key=key)
         tm.invalidate()
-        assert cache.load(str(key.client_id)) is None
+        assert cache.load(_sa_cache_key(key)) is None
 
     def test_needs_refresh_when_near_expiry(self) -> None:
         tm = _make_token_manager()
@@ -244,8 +265,8 @@ class TestTokenManager:
         cache = MemoryTokenCache()
         key = _load_fixture_key()
         cached = _token(seconds_until_expiry=_EXPIRY_LONG)
-        cache.save(str(key.client_id), cached)
-        transport = MagicMock(spec=HttpTransport)
+        cache.save(_sa_cache_key(key), cached)
+        transport = _mock_transport(_BASE)
         tm = _make_token_manager(cache=cache, transport=transport, key=key)
         assert tm.get_token() == cached.access_token
         transport.request.assert_not_called()
@@ -255,7 +276,7 @@ class TestTokenManager:
         cache = MemoryTokenCache()
         key = _load_fixture_key()
         stale = _token(seconds_until_expiry=_EXPIRY_SHORT)
-        cache.save(str(key.client_id), stale)
+        cache.save(_sa_cache_key(key), stale)
         access = _make_access_jwt()
         respx.post(_AUTH_URL).mock(
             return_value=Response(200, json={"accessToken": access}),
@@ -263,7 +284,7 @@ class TestTokenManager:
         transport = HttpTransport(base_url=_BASE)
         tm = _make_token_manager(cache=cache, transport=transport, key=key)
         assert tm.get_token() == access
-        saved = cache.load(str(key.client_id))
+        saved = cache.load(_sa_cache_key(key))
         assert saved is not None
         assert saved.access_token == access
 
@@ -323,7 +344,7 @@ class TestTokenInvalidationOn401:
     def test_transport_calls_invalidator_on_401(self) -> None:
         cache = MemoryTokenCache()
         key = _load_fixture_key()
-        cache.save(str(key.client_id), _token())
+        cache.save(_sa_cache_key(key), _token())
         invalidated: list[str] = []
 
         transport = HttpTransport(
@@ -339,7 +360,7 @@ class TestTokenInvalidationOn401:
     def test_token_manager_invalidate_wired_to_transport(self) -> None:
         cache = MemoryTokenCache()
         key = _load_fixture_key()
-        cache.save(str(key.client_id), _token())
+        cache.save(_sa_cache_key(key), _token())
         tm = _make_token_manager(cache=cache, key=key, transport=HttpTransport(base_url=_BASE))
         transport = HttpTransport(
             base_url=_BASE,
@@ -348,7 +369,7 @@ class TestTokenInvalidationOn401:
         respx.get(_BASE + "/core/auth/current-user-data").mock(return_value=Response(401))
         with pytest.raises(AuthenticationError):
             transport.request("GET", "/core/auth/current-user-data")
-        assert cache.load(str(key.client_id)) is None
+        assert cache.load(_sa_cache_key(key)) is None
 
 
 def _make_google_manager(
@@ -361,7 +382,7 @@ def _make_google_manager(
     return GoogleOAuth2TokenManager(
         credentials or GoogleOAuth2Credentials(token="google-access-token"),
         cache or MemoryTokenCache(),
-        transport or MagicMock(spec=HttpTransport),
+        transport or _mock_transport(_GOOGLE_BASE),
         cache_key=_GOOGLE_CACHE_KEY,
         clock=clock or (lambda: datetime.now(tz=UTC)),
     )
@@ -443,7 +464,7 @@ class TestGoogleOAuth2TokenManager:
     def test_uses_cache_when_valid(self) -> None:
         cache = MemoryTokenCache()
         cached = _token()
-        cache.save(_GOOGLE_CACHE_KEY, cached)
+        cache.save(_google_cache_key(), cached)
         route = respx.post(_GOOGLE_AUTH_URL).mock(return_value=Response(200, json={}))
         tm = _make_google_manager(cache=cache, transport=HttpTransport(base_url=_GOOGLE_BASE))
         assert tm.get_token() == cached.access_token
@@ -452,14 +473,14 @@ class TestGoogleOAuth2TokenManager:
     @respx.mock
     def test_refreshes_when_near_expiry(self) -> None:
         cache = MemoryTokenCache()
-        cache.save(_GOOGLE_CACHE_KEY, _token(seconds_until_expiry=_EXPIRY_SHORT))
+        cache.save(_google_cache_key(), _token(seconds_until_expiry=_EXPIRY_SHORT))
         access = _make_access_jwt()
         respx.post(_GOOGLE_AUTH_URL).mock(
             return_value=Response(200, json={"accessToken": access}),
         )
         tm = _make_google_manager(cache=cache, transport=HttpTransport(base_url=_GOOGLE_BASE))
         assert tm.get_token() == access
-        saved = cache.load(_GOOGLE_CACHE_KEY)
+        saved = cache.load(_google_cache_key())
         assert saved is not None
         assert saved.access_token == access
 
@@ -477,7 +498,78 @@ class TestGoogleOAuth2TokenManager:
 
     def test_invalidate_clears_cache(self) -> None:
         cache = MemoryTokenCache()
-        cache.save(_GOOGLE_CACHE_KEY, _token())
+        cache.save(_google_cache_key(), _token())
         tm = _make_google_manager(cache=cache)
         tm.invalidate()
-        assert cache.load(_GOOGLE_CACHE_KEY) is None
+        assert cache.load(_google_cache_key()) is None
+
+
+class TestTenantScopedCacheKey:
+    """Finding B (v0.9.3): the cache key must identify the tenant, not just the credential."""
+
+    _OTHER_BASE = "https://other-tenant.example.com/portal/api/external/v2"
+
+    def test_same_client_id_different_tenants_do_not_share_a_key(self) -> None:
+        key = _load_fixture_key()
+        assert build_cache_key(_BASE, str(key.client_id)) != build_cache_key(
+            self._OTHER_BASE, str(key.client_id)
+        )
+
+    def test_key_is_stable_for_the_same_tenant(self) -> None:
+        assert build_cache_key(_BASE, "1001") == build_cache_key(_BASE, "1001")
+
+    def test_production_token_is_not_served_to_another_tenant(self) -> None:
+        """The concrete attack: two profiles, one client_id, one shared cache file."""
+        cache = MemoryTokenCache()
+        key = _load_fixture_key()
+        prod = _make_token_manager(cache=cache, key=key, transport=_mock_transport(_BASE))
+        staging = _make_token_manager(
+            cache=cache, key=key, transport=_mock_transport(self._OTHER_BASE)
+        )
+        cache.save(prod._profile, _token(seconds_until_expiry=_EXPIRY_LONG))
+
+        assert cache.load(prod._profile) is not None
+        assert cache.load(staging._profile) is None
+
+    def test_google_manager_scopes_its_key_too(self) -> None:
+        one = _make_google_manager(transport=_mock_transport(_GOOGLE_BASE))
+        other = _make_google_manager(transport=_mock_transport(self._OTHER_BASE))
+        assert one._profile != other._profile
+
+
+class TestFileTokenCacheTenantAssertion:
+    """Defence in depth: the stored file records its tenant and is rejected elsewhere."""
+
+    _OTHER_BASE = "https://other-tenant.example.com/portal/api/external/v2"
+
+    def test_save_records_the_api_base(self, tmp_path: Path) -> None:
+        cache = FileTokenCache(tmp_path, api_base=_BASE)
+        cache.save("k", _token())
+        stored = json.loads((tmp_path / "k.token.json").read_text(encoding="utf-8"))
+        assert stored["api_base"] == _BASE
+
+    def test_entry_written_for_another_tenant_is_rejected(self, tmp_path: Path) -> None:
+        FileTokenCache(tmp_path, api_base=_BASE).save("k", _token())
+        assert FileTokenCache(tmp_path, api_base=self._OTHER_BASE).load("k") is None
+
+    def test_legacy_entry_without_api_base_is_accepted(self, tmp_path: Path) -> None:
+        """A file written by <= 0.9.2 has no api_base; upgrading must not be a hard break."""
+        legacy = _token()
+        (tmp_path / "k.token.json").write_text(
+            json.dumps(
+                {
+                    "access_token": legacy.access_token,
+                    "expires_at": legacy.expires_at.isoformat(),
+                    "obtained_at": legacy.obtained_at.isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        (tmp_path / "k.token.json").chmod(0o600)
+        loaded = FileTokenCache(tmp_path, api_base=_BASE).load("k")
+        assert loaded is not None
+        assert loaded.access_token == legacy.access_token
+
+    def test_no_api_base_configured_means_no_checking(self, tmp_path: Path) -> None:
+        FileTokenCache(tmp_path, api_base=_BASE).save("k", _token())
+        assert FileTokenCache(tmp_path).load("k") is not None

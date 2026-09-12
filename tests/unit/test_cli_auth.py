@@ -13,7 +13,7 @@ import respx
 from api_helpers import BASE_URL, load_payload, mock_json
 from typer.testing import CliRunner
 
-from pynteracta.auth import CachedToken, MemoryTokenCache
+from pynteracta.auth import CachedToken, FileTokenCache, MemoryTokenCache, build_cache_key
 from pynteracta.cli import app
 from pynteracta.cli._common import (
     EXIT_AUTH,
@@ -23,6 +23,7 @@ from pynteracta.cli._common import (
     EXIT_SERVER,
     EXIT_VALIDATION,
 )
+from pynteracta.urls import build_api_base
 
 
 @pytest.fixture
@@ -246,6 +247,44 @@ class TestAuthLogout:
             env=BASE_ENV,
         )
         assert result.exit_code == 0
+
+    def test_logout_clears_the_file_the_managers_write(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Regression for v0.9.3: logout must derive the same tenant-scoped key.
+
+        If the two derivations drift apart, ``auth logout`` reports success while the token file
+        stays on disk — the worst possible failure mode for a command whose whole purpose is
+        removing a credential.
+        """
+        cache_dir = tmp_path / "tokens"
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            "[profiles.default]\n"
+            'base_url = "https://api.example.com"\n'
+            'base_path = "/portal"\n'
+            f'token_cache_dir = "{cache_dir}"\n',
+            encoding="utf-8",
+        )
+        api_base = build_api_base("https://api.example.com", "/portal", 2)
+        key_id = "default"
+        cache = FileTokenCache(cache_dir, api_base=api_base)
+        cache.save(
+            build_cache_key(api_base, key_id),
+            CachedToken(
+                access_token="tok",
+                expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+                obtained_at=datetime.now(tz=UTC),
+            ),
+        )
+        written = list(cache_dir.glob("*.token.json"))
+        assert len(written) == 1, "precondition: exactly one cache file exists"
+
+        result = runner.invoke(
+            app, ["--config-file", str(config_file), "auth", "logout"], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        assert not written[0].exists(), "logout reported success but left the token file on disk"
 
 
 class TestExitCodes:

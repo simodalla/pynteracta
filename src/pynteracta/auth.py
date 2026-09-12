@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import stat
 import sys
@@ -209,12 +210,26 @@ class MemoryTokenCache:
         self._store.pop(profile, None)
 
 
+def build_cache_key(api_base: str, identity: str) -> str:
+    """Namespace a token-cache key by tenant so two tenants never share a file.
+
+    The credential alone does not identify a tenant: Interacta ``client_id`` values are
+    vendor-assigned small integers, and a certification tenant is often a clone of production,
+    so two profiles pointing at different hosts can carry the same id. Hashing the API base into
+    the key keeps their cache files distinct, and a production bearer token can no longer be
+    replayed against a staging host.
+    """
+    digest = hashlib.sha256(api_base.encode("utf-8")).hexdigest()[:16]
+    return f"{digest}-{identity}"
+
+
 class FileTokenCache:
     """File-backed token cache with POSIX ``0o600`` / ``0o700`` enforcement."""
 
-    def __init__(self, cache_dir: Path) -> None:
+    def __init__(self, cache_dir: Path, api_base: str | None = None) -> None:
         _maybe_warn_windows()
         self._dir = cache_dir
+        self._api_base = api_base
         self._ensure_dir()
 
     def _ensure_dir(self) -> None:
@@ -237,6 +252,17 @@ class FileTokenCache:
         except (OSError, json.JSONDecodeError) as exc:
             _log.warning("auth.token_cache_corrupt", path=str(path), error=str(exc))
             return None
+        stored_base = data.get("api_base")
+        if self._api_base is not None and stored_base is not None and stored_base != self._api_base:
+            # A file written for another tenant. Discard rather than hand its token to this host.
+            # A file written by <= 0.9.2 carries no "api_base" and is accepted (see D-v0.9.3-5).
+            _log.warning(
+                "auth.token_cache_tenant_mismatch",
+                path=str(path),
+                expected=self._api_base,
+                stored=stored_base,
+            )
+            return None
         try:
             return CachedToken(
                 access_token=str(data["access_token"]),
@@ -250,11 +276,13 @@ class FileTokenCache:
     def save(self, profile: str, token: CachedToken) -> None:
         self._ensure_dir()
         path = self._path_for(profile)
-        payload = {
+        payload: dict[str, Any] = {
             "access_token": token.access_token,
             "expires_at": _iso(token.expires_at),
             "obtained_at": _iso(token.obtained_at),
         }
+        if self._api_base is not None:
+            payload["api_base"] = self._api_base
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         if sys.platform != "win32":
             path.chmod(_FILE_MODE)
@@ -296,7 +324,7 @@ class TokenManager:
         self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
-        self._profile: str = str(key.client_id)
+        self._profile: str = build_cache_key(transport.base_url, str(key.client_id))
 
     def get_token(self) -> str:
         """Return a valid access token, refreshing if near expiry."""
@@ -402,7 +430,7 @@ class GoogleOAuth2TokenManager:
         self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
-        self._profile = cache_key
+        self._profile = build_cache_key(transport.base_url, cache_key)
 
     def get_token(self) -> str:
         """Return a valid Interacta access token, refreshing if near expiry."""
