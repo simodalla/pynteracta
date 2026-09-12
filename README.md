@@ -1,7 +1,7 @@
 # pynteracta
 
 [![CI](https://github.com/simodalla/pynteracta/actions/workflows/ci.yml/badge.svg)](https://github.com/simodalla/pynteracta/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/simodalla/pynteracta/blob/main/LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![Docs](https://img.shields.io/badge/docs-github.io-blue.svg)](https://simodalla.github.io/pynteracta/)
 
@@ -11,26 +11,30 @@
 An unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`).
 Synchronous, read-only, typed: service-account and Google OAuth2 authentication, ten read
 resources, a Typer CLI with table/JSON/YAML output and file export. Current version: see
-[`CHANGELOG.md`](CHANGELOG.md).
+[`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 ## Installation
 
-pynteracta v0.x is distributed as a wheel attached to each
-[GitHub release](https://github.com/simodalla/pynteracta/releases) (PyPI publication planned for
-v1.0). Install straight from a tag:
-
 ```bash
-uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.1"
+uv pip install pynteracta
 # with YAML output support:
-uv pip install "pynteracta[yaml] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
+uv pip install "pynteracta[yaml]"
 # with Parquet export support:
-uv pip install "pynteracta[parquet] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
+uv pip install "pynteracta[parquet]"
 # with all export formats (yaml + parquet):
-uv pip install "pynteracta[export] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
+uv pip install "pynteracta[export]"
 ```
 
-Alternatively, download `pynteracta-<version>-py3-none-any.whl` from the release page and
-`uv pip install` the local file.
+> **Upgrading from 0.4.x?** The API changed completely — see
+> [the compatibility note](#note-for-users-of-pynteracta-04x-and-earlier) at the end of this page.
+
+Each release is also attached as a wheel and sdist to its
+[GitHub release](https://github.com/simodalla/pynteracta/releases). To pin an exact tag from the
+repository instead:
+
+```bash
+uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.3"
+```
 
 ## Quickstart — library
 
@@ -120,23 +124,50 @@ service_account_key = "~/.config/pynteracta/sa.json"
 ```
 
 Environment variables: `PYNTERACTA_BASE_URL`, `PYNTERACTA_SERVICE_ACCOUNT_KEY`,
-`PYNTERACTA_LOG_LEVEL`, etc. See [docs/configuration.md](docs/configuration.md) for the full
+`PYNTERACTA_LOG_LEVEL`, etc. See [docs/configuration.md](https://github.com/simodalla/pynteracta/blob/main/docs/configuration.md) for the full
 reference.
 
 ## Documentation
 
 Full documentation: **<https://simodalla.github.io/pynteracta/>**
 
-- [CLI reference](docs/cli.md) — every command, flag and exit code.
-- Guides: [filtering and sorting posts](docs/guides/filtering-posts.md),
-  [filtering and sorting users](docs/guides/filtering-users.md).
-- [Authentication](docs/authentication.md), [configuration](docs/configuration.md),
-  [audit logging](docs/logging.md), [testing](docs/testing.md).
-- Planning: [`ROADMAP.md`](ROADMAP.md) (what ships when), [`specs/`](specs/) (one spec per
-  version), [`WORKFLOW.md`](WORKFLOW.md) (how we work), [`CHANGELOG.md`](CHANGELOG.md).
+- [CLI reference](https://github.com/simodalla/pynteracta/blob/main/docs/cli.md) — every command, flag and exit code.
+- Guides: [filtering and sorting posts](https://github.com/simodalla/pynteracta/blob/main/docs/guides/filtering-posts.md),
+  [filtering and sorting users](https://github.com/simodalla/pynteracta/blob/main/docs/guides/filtering-users.md).
+- [Authentication](https://github.com/simodalla/pynteracta/blob/main/docs/authentication.md), [configuration](https://github.com/simodalla/pynteracta/blob/main/docs/configuration.md),
+  [audit logging](https://github.com/simodalla/pynteracta/blob/main/docs/logging.md), [testing](https://github.com/simodalla/pynteracta/blob/main/docs/testing.md).
+- Planning: [`ROADMAP.md`](https://github.com/simodalla/pynteracta/blob/main/ROADMAP.md) (what ships when), [`specs/`](https://github.com/simodalla/pynteracta/blob/main/specs/) (one spec per
+  version), [`WORKFLOW.md`](https://github.com/simodalla/pynteracta/blob/main/WORKFLOW.md) (how we work), [`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 To preview the site locally: `uv run mkdocs serve`.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](https://github.com/simodalla/pynteracta/blob/main/LICENSE).
+
+## Note for users of pynteracta 0.4.x and earlier
+
+**Version 0.9.4 and every later version are a complete rewrite of this project.** The package name
+on PyPI is the same, but the code is not: the library was rebuilt from scratch, and its public API
+is **not compatible** with the `0.4.x` line. (PyPI jumps straight from `0.4.30` to `0.9.4`: the
+rewrite's earlier versions were released on GitHub only.) Upgrading from `0.4.x` will break your code, and there
+is no migration path — the two versions share no common API surface.
+
+What changed:
+
+| | `0.4.30` and earlier | `0.9.4` and later |
+|---|---|---|
+| Library API | `pynteracta.api` / `pynteracta.core` / `pynteracta.schemas` | `InteractaClient` + `pynteracta.api.*` resource clients |
+| CLI command | `pynta` | **`pynteracta`** |
+| HTTP backend | `requests` | `httpx` |
+| License | BSD-3-Clause | **Apache-2.0** |
+| Scope | read + write | read-only surface (writes deferred) |
+
+**If you depend on the old line**, it is still published and installable — nothing has been removed
+or yanked. Pin it explicitly:
+
+```bash
+uv pip install "pynteracta==0.4.30"
+```
+
+The `0.4.x` releases receive no further updates. New work happens on the rewrite.

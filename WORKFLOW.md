@@ -38,8 +38,11 @@ lifecycle. Knowing which file to touch is half the process.
   `major_on_zero = false`).
 - **Cadence: one read-endpoint group per minor.** Each new minor adds one coherent slice of the
   read surface.
-- **1.0 + PyPI** are deferred until the read surface is complete and the API has been stable for a
-  while. Target audience today: **internal use / automations**.
+- **1.0** is deferred until the read surface is complete and the API has been stable for a while.
+  Target audience today: **internal use / automations**.
+- **PyPI publication is not gated on 1.0** (decided 2026-09-12). Every `v*` tag publishes to
+  [PyPI](https://pypi.org/project/pynteracta/) from v0.9.4 onward, via trusted publishing (OIDC)
+  in `.github/workflows/release.yml` — no API token is stored in the repository.
 - semantic-release computes the version from Conventional Commits; `tag_format = "v{version}"`.
 
 ---
@@ -73,6 +76,8 @@ lifecycle. Knowing which file to touch is half the process.
    └────────────────────────────────────────────────────────────────────────┘
    ┌─ 6. RELEASE ───────────────────────────────────────────────────────────┐
    │  • Merge to main; semantic-release cuts the tag; git-cliff the CHANGELOG│
+   │  • Pushing the tag runs release.yml: GitHub Release + PyPI (trusted     │
+   │    publishing). Verify both landed before announcing the version.       │
    │  • Mark the version ✅ in ROADMAP.md and FREEZE its spec header.         │
    └────────────────────────────────────────────────────────────────────────┘
 ```

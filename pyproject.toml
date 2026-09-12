@@ -44,6 +44,9 @@ export = ["ruamel.yaml>=0.18", "pyarrow>=18"]
 [project.urls]
 Homepage = "https://github.com/simodalla/pynteracta"
 Repository = "https://github.com/simodalla/pynteracta"
+Documentation = "https://simodalla.github.io/pynteracta/"
+Changelog = "https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md"
+Issues = "https://github.com/simodalla/pynteracta/issues"
 
 [dependency-groups]
 dev = [
