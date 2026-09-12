@@ -1,6 +1,29 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.2] - 2026-09-12
+
+### CI
+
+- Replace GitLab CI with GitHub Actions
+
+### Chores
+
+- Point repository URLs at GitHub
+- Neutralise GITHUB_ACTIONS colour forcing in CLI tests
+- **deps**: Upgrade all packages to latest compatible versions
+- Release v0.9.2 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.9.1
+- Align documentation with the move to GitHub
+- Log M24 in PROGRESS.md
+
+### Fixes
+
+- **deps**: Upgrade cryptography and pydantic-settings for security advisories
+
 ## [0.9.1] - 2026-09-11
 
 ### Chores
