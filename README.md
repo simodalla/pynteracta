@@ -1,5 +1,10 @@
 # pynteracta
 
+[![CI](https://github.com/simodalla/pynteracta/actions/workflows/ci.yml/badge.svg)](https://github.com/simodalla/pynteracta/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Docs](https://img.shields.io/badge/docs-github.io-blue.svg)](https://simodalla.github.io/pynteracta/)
+
 > *pynteracta is an unofficial third-party Python client for the Interacta™ platform by
 > Dinova S.r.l. / Maggioli S.p.A. It is neither sponsored nor endorsed by the vendor.*
 
@@ -10,18 +15,22 @@ resources, a Typer CLI with table/JSON/YAML output and file export. Current vers
 
 ## Installation
 
-pynteracta v0.x is distributed as a wheel via GitLab CI artifacts (PyPI publication planned for
-v1.0). Download `dist/pynteracta-<version>-py3-none-any.whl` from the latest pipeline, then:
+pynteracta v0.x is distributed as a wheel attached to each
+[GitHub release](https://github.com/simodalla/pynteracta/releases) (PyPI publication planned for
+v1.0). Install straight from a tag:
 
 ```bash
-uv pip install pynteracta-<version>-py3-none-any.whl
+uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.1"
 # with YAML output support:
-uv pip install "pynteracta-<version>-py3-none-any.whl[yaml]"
+uv pip install "pynteracta[yaml] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
 # with Parquet export support:
-uv pip install "pynteracta-<version>-py3-none-any.whl[parquet]"
+uv pip install "pynteracta[parquet] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
 # with all export formats (yaml + parquet):
-uv pip install "pynteracta-<version>-py3-none-any.whl[export]"
+uv pip install "pynteracta[export] @ git+https://github.com/simodalla/pynteracta@v0.9.1"
 ```
+
+Alternatively, download `pynteracta-<version>-py3-none-any.whl` from the release page and
+`uv pip install` the local file.
 
 ## Quickstart — library
 
@@ -116,6 +125,8 @@ reference.
 
 ## Documentation
 
+Full documentation: **<https://simodalla.github.io/pynteracta/>**
+
 - [CLI reference](docs/cli.md) — every command, flag and exit code.
 - Guides: [filtering and sorting posts](docs/guides/filtering-posts.md),
   [filtering and sorting users](docs/guides/filtering-users.md).
@@ -124,7 +135,7 @@ reference.
 - Planning: [`ROADMAP.md`](ROADMAP.md) (what ships when), [`specs/`](specs/) (one spec per
   version), [`WORKFLOW.md`](WORKFLOW.md) (how we work), [`CHANGELOG.md`](CHANGELOG.md).
 
-Full site: `uv run mkdocs serve`.
+To preview the site locally: `uv run mkdocs serve`.
 
 ## License
 

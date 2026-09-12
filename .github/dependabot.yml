@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# Dependency updates. Commit messages carry a Conventional Commits prefix so they
+# pass the conventional-pre-commit gate and are classified correctly by
+# python-semantic-release and git-cliff: "build" for dependencies (no version
+# bump), "ci" for workflow actions.
+version: 2
+
+updates:
+  # Python dependencies: pyproject.toml constraints + uv.lock
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      prefix-development: chore
+      include: scope
+    groups:
+      python-runtime:
+        applies-to: version-updates
+        dependency-type: production
+        update-types: [minor, patch]
+      python-dev:
+        applies-to: version-updates
+        dependency-type: development
+        update-types: [minor, patch]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    labels: [dependencies, python]
+
+  # GitHub Actions used by the workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        applies-to: version-updates
+        patterns: ["*"]
+    labels: [dependencies, github-actions]
+
+  # pre-commit hook revisions
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      pre-commit:
+        applies-to: version-updates
+        patterns: ["*"]
+    labels: [dependencies, pre-commit]

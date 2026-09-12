@@ -3,7 +3,7 @@
 ## Development environment
 
 ```bash
-git clone git@gitlab.unionerenolavinosamoggia.bo.it:ucrls/pynteracta.git
+git clone git@github.com:simodalla/pynteracta.git
 cd pynteracta
 uv sync
 uv run pre-commit install
@@ -62,6 +62,22 @@ Integration tests require a service-account key and env vars — see
 
 6. **Update docs** — add or update `docs/api/` and `docs/cli.md`. Run
    `uv run mkdocs build --strict` to confirm the site builds.
+
+## Dependency updates
+
+Dependabot opens grouped pull requests every Monday for Python dependencies (`pyproject.toml` +
+`uv.lock`), GitHub Actions and pre-commit hook revisions. Its commits already carry a Conventional
+Commits prefix (`build:` for runtime dependencies, `chore:` for dev and hooks, `ci:` for actions),
+so they pass the commit-message hook as-is. Review them like any other PR: the full CI gate runs
+on them. Major-version bumps arrive as individual PRs rather than grouped.
+
+To update the lockfile by hand:
+
+```bash
+uv lock --upgrade          # all dependencies
+uv lock --upgrade-package httpx   # a single one
+uv run pre-commit autoupdate      # pre-commit hook revisions
+```
 
 ## License
 

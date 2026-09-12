@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Mirrors main + tags to the internal GitLab, which is kept in sync as a
+# secondary remote. Requires the GITLAB_MIRROR_SSH_KEY secret (a deploy key
+# with write access) and GITLAB_MIRROR_URL (git@<host>:ucrls/pynteracta.git).
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    name: Push to internal GitLab
+    runs-on: ubuntu-latest
+    # The internal GitLab is not reachable from hosted runners; this job is
+    # skipped unless the mirror secret is configured (e.g. on a self-hosted runner).
+    if: vars.GITLAB_MIRROR_ENABLED == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.GITLAB_MIRROR_SSH_KEY }}
+          GITLAB_HOST: ${{ vars.GITLAB_MIRROR_HOST }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$GITLAB_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Push main and tags
+        env:
+          GITLAB_URL: ${{ vars.GITLAB_MIRROR_URL }}
+        run: |
+          git remote add gitlab "$GITLAB_URL"
+          git push gitlab HEAD:main
+          git push gitlab --tags

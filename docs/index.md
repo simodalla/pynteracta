@@ -5,7 +5,7 @@
 
 `pynteracta` is a Python 3.12+ library and CLI providing a Pythonic, type-safe interface to the
 Interacta REST API (`external_v2`). It is synchronous and read-only; the current version is listed
-in the [changelog](https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta/-/blob/main/CHANGELOG.md).
+in the [changelog](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 ## What's included (v0.9.x)
 

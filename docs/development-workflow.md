@@ -2,7 +2,7 @@
 
 This page describes how `pynteracta` is planned, versioned and documented as it evolves. It is the
 reader-facing summary of the project's process; the authoritative, detailed version lives in
-[`WORKFLOW.md`](https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta/-/blob/main/WORKFLOW.md)
+[`WORKFLOW.md`](https://github.com/simodalla/pynteracta/blob/main/WORKFLOW.md)
 at the repository root.
 
 !!! info "Status & audience"
@@ -28,6 +28,14 @@ The project separates *history*, *forward plans*, *build log* and *changelog* in
 - *What is coming next?* → `ROADMAP.md` + the active `specs/` file.
 - *How was something built / why?* → `PROGRESS.md`.
 
+## Continuous integration
+
+The project is hosted on [GitHub](https://github.com/simodalla/pynteracta). Every push and pull
+request runs lint, strict type-checking, the unit-test matrix (Python 3.12 and 3.13) with the 85%
+coverage gate, the contract tests, a distribution build and a strict docs build. Merges to `main`
+publish this site to GitHub Pages; pushing a `v*` tag publishes a GitHub release with the wheel
+and sdist attached.
+
 ## Versioning policy
 
 - **Pre-1.0, lenient semver.** Every feature is a **minor** bump; even breaking changes bump the
@@ -49,11 +57,13 @@ The project separates *history*, *forward plans*, *build log* and *changelog* in
 3. **Implement** — façade model → resource method (explicit kwargs + a `*_raw` escape hatch) →
    CLI command → tests (unit + contract + a JSON fixture) → docs. Commit with Conventional Commits.
 4. **Gate** — `ruff check .`, `ruff format --check .`, `mypy src`, and
-   `pytest --cov --cov-fail-under=85` must all pass.
+   `pytest --cov --cov-fail-under=85` must all pass. The same checks run on every pull request
+   through [GitHub Actions](https://github.com/simodalla/pynteracta/actions).
 5. **Log** — append a milestone section to `PROGRESS.md` (Done / Decisions / Follow-ups) and record
    the answers to the spec's open questions.
 6. **Release** — merge to `main`; `semantic-release` cuts the tag and `git-cliff` updates the
-   changelog. Mark the version ✅ in the roadmap and freeze its spec.
+   changelog. Pushing the tag triggers the release workflow, which builds the wheel and sdist and
+   attaches them to the GitHub release. Mark the version ✅ in the roadmap and freeze its spec.
 
 ## Adding a new endpoint
 
