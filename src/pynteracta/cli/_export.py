@@ -134,7 +134,7 @@ def _write_parquet(records: list[dict[str, Any]], path: Path) -> None:
         fields.append(pa.field(col, arr.type))
 
     table = pa.table({col: arr for col, arr in zip(columns, arrays, strict=True)})
-    pq.write_table(table, path)  # type: ignore[no-untyped-call]
+    pq.write_table(table, path)
 
 
 def export_records(

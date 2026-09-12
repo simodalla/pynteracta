@@ -73,8 +73,22 @@ target-version = "py312"
 line-length = 100
 extend-exclude = ["src/pynteracta/models/generated"]
 
+[tool.ruff.format]
+# Ruff 0.16 began formatting code blocks embedded in Markdown. Our docs snippets
+# are illustrative fragments (keyword arguments shown out of call context, blank
+# lines grouping related options), which that pass rewrites misleadingly, and
+# specs/ holds frozen documents. Keep Markdown untouched.
+docstring-code-format = false
+exclude = ["*.md"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "PT", "PL"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer commands declare one parameter per CLI option; the count is dictated by
+# the command surface, not by function design (PLR0913 is already suppressed
+# inline at these call sites).
+"src/pynteracta/cli/*.py" = ["PLR0917"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -85,6 +99,12 @@ warn_return_any = true
 [[tool.mypy.overrides]]
 module = "pynteracta.models.generated.*"
 ignore_errors = true
+
+# pyarrow stopped shipping a py.typed marker in v25; it is an optional extra
+# imported lazily inside the parquet export path.
+[[tool.mypy.overrides]]
+module = ["pyarrow.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["src/pynteracta"]
