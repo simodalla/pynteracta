@@ -18,7 +18,7 @@ jobs:
     # skipped unless the mirror secret is configured (e.g. on a self-hosted runner).
     if: vars.GITLAB_MIRROR_ENABLED == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Configure SSH
