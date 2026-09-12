@@ -42,7 +42,7 @@ Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes 
 | **0.9.0** | Minor enhancements grab-bag | M22 | ✅ Shipped 2026-09-11 | [specs/v0.9-minor-enhancements.md](specs/v0.9-minor-enhancements.md) |
 | **0.9.1** | Documentation alignment & config fixes (patch) | M23 | ✅ Shipped 2026-09-11 | [specs/v0.9.1-docs-alignment.md](specs/v0.9.1-docs-alignment.md) |
 | **0.9.2** | Migration to GitHub: Actions CI, Pages, Releases (patch) | M24 | ✅ Shipped 2026-09-12 | [specs/v0.9.2-github-migration.md](specs/v0.9.2-github-migration.md) |
-| **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ⏳ In progress | [specs/v0.9.3-security-hardening.md](specs/v0.9.3-security-hardening.md) |
+| **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ✅ Shipped 2026-09-12 | [specs/v0.9.3-security-hardening.md](specs/v0.9.3-security-hardening.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M24). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
