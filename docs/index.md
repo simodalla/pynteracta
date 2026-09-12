@@ -31,7 +31,7 @@ in the [changelog](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.m
   been stable for a while.
 - Async client, alternate auth methods (Microsoft OAuth2, username/password), automatic
   retry/backoff — tracked under *Deferred / future* in the roadmap, no target version.
-- PyPI publication and strict-semver 1.0.
+- Strict-semver 1.0.
 
 ## Quick links
 

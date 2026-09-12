@@ -1454,3 +1454,71 @@ surface, no new endpoint, no public signature change.
 - The old worktree `../pynteracta-security-hardening` still holds the superseded branch
   `feature_security_hardening` (at v0.9.0) and an uncommitted ROADMAP edit with the old numbering.
   It can be removed once this release ships.
+
+---
+
+## M26 — PyPI publication (v0.9.4) — in progress
+
+Spec: [`specs/v0.9.4-pypi-publication.md`](specs/v0.9.4-pypi-publication.md). Infrastructure and
+documentation only — `src/` is untouched, so installed behaviour is identical to v0.9.3.
+
+### Done
+
+- **`release.yml` split into three jobs** — `build` (once) → `github-release` + `pypi`, both
+  consuming the same uploaded artifact, so the wheel on PyPI is byte-identical to the one attached
+  to the GitHub Release. A failure on one destination no longer half-completes the other.
+- **Trusted publishing (OIDC)** — the `pypi` job uses `pypa/gh-action-pypi-publish@release/v1` with
+  `permissions: id-token: write` and `environment: pypi`. No `PYPI_API_TOKEN` secret exists in the
+  repository; nothing to rotate or leak.
+- **README compatibility note** — new final section documenting that 0.9.3+ is a from-scratch
+  rewrite whose API is incompatible with the 0.4.x line, with a verified difference table and the
+  `pynteracta==0.4.30` pin for anyone staying on the old line.
+- **README install path** — leads with `uv pip install pynteracta`; the `git+…` form is kept as the
+  way to pin a tag. Stale `v0.9.1` examples updated to `v0.9.3`.
+- **README links absolutised** — the file doubles as the PyPI project description, where
+  repository-relative links resolve to nothing. All 12 now point at `blob/main` or the docs site.
+- **Policy docs** — `ROADMAP.md`, `WORKFLOW.md`, `docs/index.md`, `docs/quickstart.md` and
+  `docs/development-workflow.md` no longer say PyPI is deferred; 1.0 alone stays gated on
+  read-surface completeness.
+- **`pyproject.toml`** — added the `Documentation`, `Changelog` and `Issues` project URLs PyPI
+  renders in its sidebar.
+
+### Decisions beyond spec
+
+- **The PyPI name was already taken — by this author.** The spec was written assuming a fresh
+  registration; `pynteracta` in fact already exists with 30 releases up to **0.4.30**, published
+  under BSD-3-Clause from the pre-rewrite codebase. This reframed the release: it is not a name
+  registration but a discontinuity on an existing project. Decided to publish onto the same
+  project, leaving 0.1.3–0.4.30 in place unyanked (**D-v0.9.4-2**), and to carry the break in prose.
+- **Compatibility claims verified against the published artifact, not assumed.** A first draft of
+  the README table asserted "CLI: none" and "Python 3.10+ → 3.12+" for the old line. Downloading
+  the `0.4.30` wheel disproved both: it *has* a console script (`pynta`, hence the rename is the
+  most visible CLI breakage) and already required Python `>=3.12` — its `3.10`/`3.11` classifiers
+  are stale and contradict its own `requires_python`. The table now lists only verified
+  differences: module layout, `pynta` → `pynteracta`, `requests` → `httpx`, licence, read-only
+  scope.
+- **First upload is 0.9.4** (**D-v0.9.4-3**, revised) — the spec first planned to publish the
+  already-tagged `0.9.3`. But `v0.9.3` was pushed before the `pypi` job existed, so publishing it
+  would need an artificial workflow re-trigger. Publishing `0.9.4` means the first upload is
+  produced by the workflow being introduced, on a tag pushed after it exists. `src/` is identical
+  between the two, so no library code is lost; PyPI's history for the rewrite simply starts at
+  `0.9.4`, leaving a gap after `0.4.30`. The README/docs rewrite boundary was restated as `0.9.4`
+  accordingly, since a PyPI reader will not find a `0.9.3` there.
+- **`pypi` GitHub environment created** via `gh api -X PUT` (id `21799053783`, no protection
+  rules). The trusted-publisher registration on PyPI remains manual — it requires a browser login
+  and cannot be done from the repository.
+- **`upload_to_pypi` left `false`** — distribution stays the workflow's responsibility, triggered
+  by the tag semantic-release pushes; one publisher, no duplicate upload attempt.
+
+### Follow-ups
+
+- **Manual prerequisites, not automatable from the repository:** register the trusted publisher on
+  PyPI (project `pynteracta`, owner `simodalla`, repo `pynteracta`, workflow `release.yml`,
+  environment `pypi`) and create the `pypi` environment in the GitHub repository settings. The
+  `pypi` job fails until both exist.
+- The two PyPI lines now share one version sequence and one project page forever
+  (**Q-v0.9.4-1**). Mitigated by the README note; revisit only if upgrade confusion is reported.
+- No TestPyPI dry-run target is wired in (**Q-v0.9.4-3**); it would need its own trusted-publisher
+  registration.
+- A `0.4.31` "sunset" release warning old users in-band was considered and not planned
+  (**Q-v0.9.4-2**) — it would require resurrecting the old codebase to build.

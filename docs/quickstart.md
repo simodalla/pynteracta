@@ -2,16 +2,21 @@
 
 ## Installation
 
-pynteracta v0.x wheels are attached to each
-[GitHub release](https://github.com/simodalla/pynteracta/releases) (PyPI publication is planned
-for v1.0). Install straight from a tag:
-
 ```bash
-uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.1"
-uv pip install "pynteracta[export] @ git+https://github.com/simodalla/pynteracta@v0.9.1"   # + yaml/parquet export support
+uv pip install pynteracta
+uv pip install "pynteracta[export]"   # + yaml/parquet export support
 ```
 
-Alternatively, download the wheel from the release page and `uv pip install` the local file.
+!!! warning "Upgrading from 0.4.x"
+    `pynteracta` 0.9.4 is a from-scratch rewrite published under the same PyPI name. Its API is
+    **not compatible** with the 0.4.x line, and the console script was renamed `pynta` →
+    `pynteracta`. The old releases are still installable via an explicit pin
+    (`pynteracta==0.4.30`).
+
+Wheels and sdists are also attached to each
+[GitHub release](https://github.com/simodalla/pynteracta/releases); to pin an exact tag from the
+repository, use
+`uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.3"`.
 
 ## CLI quickstart
 

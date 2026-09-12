@@ -22,8 +22,11 @@
 
 Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes bump the minor
 (lenient pre-1.0 convention). `python-semantic-release` is configured with
-`allow_zero_version = true` and `major_on_zero = false`. PyPI publication and a strict-semver
-1.0 are deferred until the read surface is complete and the API has been stable for a while.
+`allow_zero_version = true` and `major_on_zero = false`. A strict-semver 1.0 is deferred until
+the read surface is complete and the API has been stable for a while. **PyPI publication is not
+gated on 1.0** (decided 2026-09-12, see [specs/v0.9.4-pypi-publication.md](specs/v0.9.4-pypi-publication.md)):
+releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9.4 onward, and
+`Development Status :: 3 - Alpha` carries the stability signal.
 
 **Scope cadence:** one read-endpoint group per minor release (decided 2026-06-04).
 
@@ -43,8 +46,9 @@ Pre-1.0 (current): every feature is a **minor** bump, and even breaking changes 
 | **0.9.1** | Documentation alignment & config fixes (patch) | M23 | ✅ Shipped 2026-09-11 | [specs/v0.9.1-docs-alignment.md](specs/v0.9.1-docs-alignment.md) |
 | **0.9.2** | Migration to GitHub: Actions CI, Pages, Releases (patch) | M24 | ✅ Shipped 2026-09-12 | [specs/v0.9.2-github-migration.md](specs/v0.9.2-github-migration.md) |
 | **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ✅ Shipped 2026-09-12 | [specs/v0.9.3-security-hardening.md](specs/v0.9.3-security-hardening.md) |
+| **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ⏳ In progress | [specs/v0.9.4-pypi-publication.md](specs/v0.9.4-pypi-publication.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M24). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M26). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line)
@@ -89,4 +93,4 @@ add them. (`✅` = already shipped in 0.1.0, listed for context.)
 - **Async client** (`AsyncInteractaClient`).
 - **Alternate auth**: Microsoft OAuth2, username/password (same exchange pattern as Google OAuth2).
 - **Automatic retry/backoff** with jitter.
-- **PyPI publication + strict-semver 1.0** once the surface is stable.
+- **Strict-semver 1.0** once the surface is stable. (PyPI publication shipped in 0.9.4.)
