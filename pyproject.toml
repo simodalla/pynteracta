@@ -54,10 +54,10 @@ dev = [
     "pytest-cov",
     "respx",
     "syrupy",
-    "datamodel-code-generator>=0.59.0",
-    "mkdocs-material>=9",
+    "datamodel-code-generator>=0.78.0",
+    "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=0.29",
-    "python-semantic-release>=9",
+    "python-semantic-release>=10.6.2",
     "ruamel.yaml>=0.18",
     "pyarrow>=18",
 ]
