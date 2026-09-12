@@ -1391,3 +1391,66 @@ Spec: [`specs/v0.9.2-github-migration.md`](specs/v0.9.2-github-migration.md).
   the cost, and trusted publishing (OIDC) would need no stored token. Still a 1.0 target.
 - The pinned install tag in `README.md`/`docs/quickstart.md` is `v0.9.1`; refresh when it drifts
   more than one minor behind (D-v0.9.2-8).
+
+## M25 — Security hardening (v0.9.3) — completed 2026-09-12
+
+Milestone M25 (release v0.9.3, a **patch**): closes the two defects confirmed by the full-source
+security review of 2026-09-11 ([`SECURITY-REVIEW-2026-09-11.md`](SECURITY-REVIEW-2026-09-11.md)).
+Spec: [`specs/v0.9.3-security-hardening.md`](specs/v0.9.3-security-hardening.md). No new read
+surface, no new endpoint, no public signature change.
+
+### Done
+
+- **Finding A (Medium) — response-side redaction.** `HttpTransport.request` redacted the request
+  side but passed the raw response to both observers: `ResponseInfo.headers`/`.body` and the
+  `audit.response` event. With `audit=True, audit_bodies=True`, the SA and Google token-exchange
+  responses (`{"accessToken": "<JWT>"}`) were readable in plain text. `redact_headers` /
+  `redact_body` are now applied in `transport.py` before either consumer sees the values.
+  Reproduced before fixing, and confirmed closed after.
+- **Fix 1b** — `_SENSITIVE_KEY_RE` widened with `assertion` and `jwt`: Google `ya29.` tokens are
+  not JWT-shaped, so only a key match catches them.
+- **`hooks.py`** — `ResponseInfo` docstring now says "(after redaction)", matching `RequestInfo`.
+- **Finding B (Low) — tenant-scoped cache key.** `build_cache_key(api_base, identity)` namespaces
+  the key with `sha256(api_base)[:16]`; both `TokenManager` and `GoogleOAuth2TokenManager` use it.
+  `HttpTransport.base_url` became a public property so the managers derive it without reaching into
+  `_base_url`. `FileTokenCache` additionally persists `api_base` and discards an entry belonging to
+  another tenant (`auth.token_cache_tenant_mismatch` at WARNING).
+- **`cli/auth.py logout`** derives the identical key via `build_api_base` + `build_cache_key`.
+- **Docs** — `docs/logging.md` (redaction happens in the transport; `--audit-raw` does not bypass
+  it), `docs/authentication.md` (new file-name shape, why the tenant scoping exists, upgrade note).
+- Tests: **+29** (804 total, was 775), coverage 93.20%. Gates green: ruff, ruff format --check,
+  mypy (strict), pytest --cov, contract (87), `mkdocs build --strict`.
+
+### Decisions made beyond the plan
+
+- **Regression tests were verified genuine.** Each leak test was re-run against the pre-fix code
+  and confirmed to fail: 3 of 5 transport cases, and the logout round-trip. A security test that
+  passes both before and after the fix proves nothing, so this check is worth the extra step. The
+  other 2 transport cases are deliberate non-regression guards (an ordinary business payload must
+  **not** be over-redacted; an oversized truncated body must not raise) and pass either way.
+- **`str(profile.base_url)` in `logout`** — `Profile.base_url` is a pydantic `HttpUrl`, not a
+  `str`, and `build_api_base` calls `.strip()`. Caught by the existing CLI test; `client.py` had
+  already established the `str(...)` convention.
+- **`_build_token_cache(profile, api_base=...)`** — the api_base is threaded from
+  `sa_transport.base_url` at the call site rather than recomputed, so the cache and the managers
+  cannot disagree about the tenant.
+- **Test-helper `_mock_transport`** — `MagicMock(spec=HttpTransport)` no longer suffices now that
+  the managers read `transport.base_url`; the helper sets a real base so the derived key is
+  meaningful rather than a Mock repr.
+- **Version/milestone renumbering** — this work was specced as v0.9.2/M24 before the GitHub
+  migration took those numbers (D-v0.9.2-11). Renumbered to **v0.9.3/M25**; the branch was not
+  rebased but re-created from `main` (`m25_security_hardening`), since it carried no commits of its
+  own — only the uncommitted spec.
+
+### Follow-ups
+
+- The truncated-body path (`_capture_response_body` returns a `str` above `_AUDIT_BODY_MAX_BYTES`)
+  is scrubbed only by `redact_string`, i.e. JWT-shaped substrings. An opaque `ya29.` token inside
+  an oversized body would survive. Accepted as **D-v0.9.3-4**; revisit if an endpoint is found that
+  returns a token in a payload that large.
+- The informational items from the review are still open (**D-v0.9.3-6**):
+  `ServiceAccountKey.__repr__`, audit-file permissions, duplicate `setup_default_logging()`,
+  `client_uid` quoting.
+- The old worktree `../pynteracta-security-hardening` still holds the superseded branch
+  `feature_security_hardening` (at v0.9.0) and an uncommitted ROADMAP edit with the old numbering.
+  It can be removed once this release ships.
