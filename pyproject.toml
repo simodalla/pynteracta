@@ -56,7 +56,7 @@ dev = [
     "syrupy",
     "datamodel-code-generator>=0.59.0",
     "mkdocs-material>=9",
-    "mkdocstrings[python]>=0.29",
+    "mkdocstrings[python]>=1.0.6",
     "python-semantic-release>=9",
     "ruamel.yaml>=0.18",
     "pyarrow>=18",
