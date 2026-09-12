@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.4] - 2026-09-12
+
+### CI
+
+- Publish releases to PyPI via trusted publishing
+
+### Documentation
+
+- Update CHANGELOG for v0.9.3
+- Document the PyPI rewrite discontinuity and install path
+
 ## [0.9.3] - 2026-09-12
 
 ### Chores
@@ -266,3 +277,5 @@ All notable changes to this project will be documented in this file.
 ### Style
 
 - Ruff format config.py decorator line
+
+
