@@ -55,7 +55,7 @@ dev = [
     "respx",
     "syrupy",
     "datamodel-code-generator>=0.59.0",
-    "mkdocs-material>=9",
+    "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=0.29",
     "python-semantic-release>=9",
     "ruamel.yaml>=0.18",
