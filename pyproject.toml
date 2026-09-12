@@ -42,8 +42,8 @@ parquet = ["pyarrow>=18"]
 export = ["ruamel.yaml>=0.18", "pyarrow>=18"]
 
 [project.urls]
-Homepage = "https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta"
-Repository = "https://gitlab.unionerenolavinosamoggia.bo.it/ucrls/pynteracta"
+Homepage = "https://github.com/simodalla/pynteracta"
+Repository = "https://github.com/simodalla/pynteracta"
 
 [dependency-groups]
 dev = [
