@@ -24,7 +24,7 @@ class RequestInfo:
 
 @dataclass(frozen=True)
 class ResponseInfo:
-    """Snapshot of a received HTTP response."""
+    """Snapshot of a received HTTP response (after redaction)."""
 
     status_code: int
     url: str

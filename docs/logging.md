@@ -71,8 +71,9 @@ Each entry is a single JSON object on its own line (JSON-lines / NDJSON), writte
 
 - The `Authorization` header is **always** replaced with `***REDACTED***`.
 - Any value matching a JWT pattern (`eyJ…`) is replaced — in headers, bodies, and string fields.
-- Body keys matching `token`, `password`, `secret`, or `privatekey` (case-insensitive) at **any nesting depth** are replaced.
+- Body keys matching `token`, `password`, `secret`, `privatekey`, `assertion`, or `jwt` (case-insensitive) at **any nesting depth** are replaced.
 - Redaction runs on **both** the console and the file handler independently; neither channel ever receives a raw token.
+- **Response payloads are redacted inside the transport**, before either observer sees them. This matters for the hooks channel: a `ClientHooks.on_response` implementation receives `ResponseInfo` directly, and since the library never configures logging on your behalf, no logging setup could have scrubbed it. Since v0.9.3 the guarantee holds for both channels without any configuration on your part.
 
 ## `--audit-raw`: unsafe redaction bypass
 
@@ -87,6 +88,8 @@ audit.redaction_disabled: --audit-raw is active — raw tokens and sensitive dat
 ```
 
 > **Never use `--audit-raw` in production.**  It will expose bearer tokens and service-account keys in plain text.
+
+`--audit-raw` affects only the audit **logging** channel. It does **not** bypass the transport-level redaction described above, so `ResponseInfo` handed to `ClientHooks.on_response` stays redacted either way.
 
 ---
 

@@ -167,8 +167,21 @@ itself expired you must provide a fresh one (e.g. via `google_token_provider`).
 
 ### File cache (default)
 
-- Location: `{token_cache_dir}/{key}.token.json`, where `{key}` is the service-account
-  `client_id` for the service-account flow and the profile name for the Google OAuth2 flow.
+- Location: `{token_cache_dir}/{key}.token.json`, where `{key}` is
+  `<sha256(api_base)[:16]>-<identity>` — the identity being the service-account `client_id` for
+  the service-account flow, and the profile name for the Google OAuth2 flow.
+- **The key is scoped to the tenant.** `client_id` values are vendor-assigned small integers and a
+  certification tenant is often a clone of production, so two profiles pointing at different hosts
+  can legitimately carry the same id. Hashing the API base into the key keeps their cache files
+  distinct, so a production bearer token is never replayed against a staging host. Each cache file
+  also records the `api_base` it was written for and is ignored if loaded against a different one.
+
+!!! note "Upgrading to v0.9.3"
+    The cache key changed in v0.9.3, so cache files written by earlier versions no longer match
+    and each profile re-authenticates **once** on first use. Nothing needs to be cleaned up:
+    the stale files are simply never read again (delete them if you want the space back). Files
+    written by v0.9.2 and earlier carry no `api_base` and are still accepted by that check, so
+    downgrading is not broken either.
 - Default dir: `~/.config/pynteracta/tokens/` (Linux/macOS, XDG; respects `XDG_CONFIG_HOME`).
   Windows: `%LOCALAPPDATA%\pynteracta\tokens\`.
 - File permissions: `0o600`; directory: `0o700`.

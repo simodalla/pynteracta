@@ -13,6 +13,7 @@ import pytest
 from pynteracta.logging import (
     _AUDIT_LOGGER_NAME,
     build_audit_file_handler,
+    redact_body,
     setup_default_logging,
 )
 
@@ -139,3 +140,36 @@ class TestSetupDefaultLoggingAudit:
         setup_default_logging(audit=True)
         assert not audit_logger.propagate
         audit_logger.handlers.clear()
+
+
+class TestSensitiveKeyCoverage:
+    """Fix 1b (v0.9.3): the key regex must cover the auth payloads, not just ``token``."""
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "accessToken",
+            "access_token",
+            "assertion",
+            "jwt",
+            "googleOAuth2Token",
+            "password",
+            "clientSecret",
+            "privateKey",
+        ],
+    )
+    def test_sensitive_keys_are_redacted(self, key: str) -> None:
+        assert redact_body({key: _FAKE_JWT}) == {key: _REDACTED}
+
+    @pytest.mark.parametrize("key", ["id", "title", "description", "email", "communityId"])
+    def test_ordinary_keys_are_untouched(self, key: str) -> None:
+        assert redact_body({key: "plain value"}) == {key: "plain value"}
+
+    def test_google_opaque_token_is_redacted_by_key(self) -> None:
+        """``ya29.`` values are not JWT-shaped, so only the key match can catch them."""
+        body = {"googleOAuth2Token": "ya29.a0ARrdaM-opaque-value"}
+        assert redact_body(body) == {"googleOAuth2Token": _REDACTED}
+
+    def test_nested_payload_is_redacted(self) -> None:
+        body = {"data": {"accessToken": _FAKE_JWT, "userId": 7}}
+        assert redact_body(body) == {"data": {"accessToken": _REDACTED, "userId": 7}}

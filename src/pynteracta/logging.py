@@ -24,7 +24,7 @@ _REDACTED = "***REDACTED***"
 _JWT_RE = re.compile(r"eyJ[A-Za-z0-9+/._\-]{10,}")
 
 # Body fields whose *key* (case-insensitive) should always be redacted.
-_SENSITIVE_KEY_RE = re.compile(r"(?i)token|password|secret|privatekey")
+_SENSITIVE_KEY_RE = re.compile(r"(?i)token|password|secret|privatekey|assertion|jwt")
 
 _AUDIT_LOGGER_NAME = "pynteracta.audit"
 _AUDIT_RAW_WARNED = False
