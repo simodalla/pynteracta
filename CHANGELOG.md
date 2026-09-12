@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.3] - 2026-09-12
+
+### Chores
+
+- Release v0.9.3 — flip ROADMAP to shipped, freeze spec header
+
+### Documentation
+
+- Update CHANGELOG for v0.9.2
+- Add the v0.9.3 security-hardening spec and ROADMAP row
+- Log M25 in PROGRESS.md
+
+### Fixes
+
+- **security**: Redact response bodies and headers inside the transport
+- **security**: Scope the token-cache key to the tenant
+
 ## [0.9.2] - 2026-09-12
 
 ### CI
