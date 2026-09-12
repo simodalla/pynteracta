@@ -27,10 +27,17 @@ def _no_forced_color(monkeypatch: pytest.MonkeyPatch) -> None:
 
     Some shells and agent harnesses export ``FORCE_COLOR`` (or ``CLICOLOR_FORCE``), which makes
     Rich emit ANSI escapes inside ``CliRunner`` output and breaks every snapshot test.
+
+    ``GITHUB_ACTIONS`` needs the same treatment: Rich treats it as a CI environment that supports
+    colour and emits escapes regardless of ``NO_COLOR``, which splits an option name into
+    per-segment styles (``--web-url`` becomes ``ESC[1;36m-ESC[0mESC[1;36m-webESC[0m…``) and breaks
+    substring assertions on ``--help`` output.
     """
     monkeypatch.delenv("FORCE_COLOR", raising=False)
     monkeypatch.delenv("CLICOLOR_FORCE", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("TERM", "dumb")
 
 
 @pytest.fixture
