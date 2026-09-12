@@ -95,6 +95,11 @@ class HttpTransport:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def base_url(self) -> str:
+        """The already-built API base URL this transport targets, without a trailing slash."""
+        return self._base_url
+
     def request(
         self,
         method: str,
@@ -153,13 +158,18 @@ class HttpTransport:
         request_id = response.headers.get("x-request-id")
         capture_body = self._audit and self._audit_bodies
         resp_body = self._capture_response_body(response) if capture_body else None
+        # Redact before either consumer sees the values: the hooks channel cannot be scrubbed by
+        # any logging configuration, and the library never configures logging on the caller's
+        # behalf, so the transport is the only place that can hold the guarantee.
+        redacted_resp_headers = redact_headers(response.headers)
+        redacted_resp_body = redact_body(resp_body) if resp_body is not None else None
         resp_info = ResponseInfo(
             status_code=response.status_code,
             url=redacted_url,
-            headers=dict(response.headers),
+            headers=redacted_resp_headers,
             elapsed_ms=elapsed_ms,
             request_id=request_id,
-            body=resp_body,
+            body=redacted_resp_body,
         )
         _log.debug(
             "http.response",
@@ -171,10 +181,10 @@ class HttpTransport:
                 "audit.response",
                 status=response.status_code,
                 url=redacted_url,
-                headers=dict(response.headers),
+                headers=redacted_resp_headers,
                 duration_ms=round(elapsed_ms, 2),
                 request_id=request_id,
-                body=resp_body,
+                body=redacted_resp_body,
             )
         if self._hooks is not None:
             self._hooks.on_response(resp_info)

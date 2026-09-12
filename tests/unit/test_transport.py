@@ -417,3 +417,111 @@ def test_audit_sensitive_body_key_redacted() -> None:
     body = req_entry.get("body", {})
     assert body.get("token") == _REDACTED
     assert body.get("name") == "test"
+
+
+class TestResponseRedaction:
+    """Finding A (v0.9.3): the response side must be redacted inside the transport.
+
+    The hooks channel is the reason this cannot live in a structlog processor: a consumer's
+    ``ClientHooks.on_response`` receives ``ResponseInfo`` directly, and the library deliberately
+    never calls ``setup_default_logging()`` on their behalf, so no logging configuration can
+    scrub it. None of these tests installs the redaction processor.
+    """
+
+    _JWT = "eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiIxMDAxIn0.c2lnbmF0dXJlLXNlY3JldA"
+
+    def _auth_transport(self, hooks: Any = None) -> HttpTransport:
+        return HttpTransport(base_url=_BASE, audit=True, audit_bodies=True, hooks=hooks)
+
+    @respx.mock
+    def test_hooks_channel_never_sees_raw_token(self) -> None:
+        captured: list[ResponseInfo] = []
+
+        class _Capture:
+            def on_request(self, info: RequestInfo) -> None: ...
+            def on_response(self, info: ResponseInfo) -> None:
+                captured.append(info)
+
+            def on_error(self, err: Exception) -> None: ...
+
+        respx.post(f"{_BASE}/core/auth/create-access-token-by-service-account").mock(
+            return_value=httpx.Response(200, json={"accessToken": self._JWT})
+        )
+        transport = self._auth_transport(hooks=_Capture())
+        transport.request("POST", "core/auth/create-access-token-by-service-account", json={})
+
+        assert captured, "on_response was not called"
+        body = captured[0].body
+        assert isinstance(body, dict)
+        assert body["accessToken"] == "***REDACTED***"
+        assert self._JWT not in str(body)
+
+    @respx.mock
+    def test_audit_event_never_carries_raw_token(self) -> None:
+        respx.post(f"{_BASE}/core/auth/create-access-token-by-service-account").mock(
+            return_value=httpx.Response(200, json={"accessToken": self._JWT})
+        )
+        transport = self._auth_transport()
+        with capture_logs() as logs:
+            transport.request("POST", "core/auth/create-access-token-by-service-account", json={})
+
+        events = [e for e in logs if e.get("event") == "audit.response"]
+        assert events, "audit.response was not emitted"
+        assert self._JWT not in str(events[0])
+        assert events[0]["body"]["accessToken"] == "***REDACTED***"
+
+    @respx.mock
+    def test_response_headers_are_redacted_in_both_channels(self) -> None:
+        captured: list[ResponseInfo] = []
+
+        class _Capture:
+            def on_request(self, info: RequestInfo) -> None: ...
+            def on_response(self, info: ResponseInfo) -> None:
+                captured.append(info)
+
+            def on_error(self, err: Exception) -> None: ...
+
+        respx.get(f"{_BASE}/ping").mock(
+            return_value=httpx.Response(
+                200,
+                json={"ok": True},
+                headers={"authorization": f"Bearer {self._JWT}", "set-cookie": "sid=abc123"},
+            )
+        )
+        transport = self._auth_transport(hooks=_Capture())
+        with capture_logs() as logs:
+            transport.request("GET", "ping")
+
+        headers = captured[0].headers
+        assert self._JWT not in str(headers)
+        events = [e for e in logs if e.get("event") == "audit.response"]
+        assert self._JWT not in str(events[0]["headers"])
+
+    @respx.mock
+    def test_ordinary_payload_is_not_over_redacted(self) -> None:
+        """Guards the fix against scrubbing legitimate business fields."""
+        payload = {"id": 42, "title": "Quarterly report", "description": "no secrets here"}
+        captured: list[ResponseInfo] = []
+
+        class _Capture:
+            def on_request(self, info: RequestInfo) -> None: ...
+            def on_response(self, info: ResponseInfo) -> None:
+                captured.append(info)
+
+            def on_error(self, err: Exception) -> None: ...
+
+        respx.get(f"{_BASE}/posts/42").mock(return_value=httpx.Response(200, json=payload))
+        transport = self._auth_transport(hooks=_Capture())
+        transport.request("GET", "posts/42")
+
+        assert captured[0].body == payload
+
+    @respx.mock
+    def test_oversized_body_still_round_trips(self) -> None:
+        """A truncated body is a str, not a dict; redaction must not raise on it."""
+        respx.get(f"{_BASE}/big").mock(
+            return_value=httpx.Response(200, json={"blob": "x" * 200_000})
+        )
+        transport = self._auth_transport()
+        response = transport.request("GET", "big")
+        assert response.status_code == _HTTP_200
