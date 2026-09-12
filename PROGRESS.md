@@ -1314,3 +1314,80 @@ No new surface; one code fix plus one new test module.
 - Coordination note: M24 (`specs/v0.9.2-security-hardening.md`, branch
   `feature_security_hardening`) was moved to a separate worktree on 2026-09-11; its ROADMAP row
   will conflict trivially with the 0.9.1 row on merge (keep both, bump "last used" to M24).
+
+## M24 — Migration to GitHub (v0.9.2) — completed 2026-09-12
+
+Milestone M24 (release v0.9.2, a **patch**): infrastructure release, no API surface and no CLI
+change. Moves the canonical repository from the internal GitLab to a public GitHub repository and
+replaces GitLab CI with GitHub Actions.
+Spec: [`specs/v0.9.2-github-migration.md`](specs/v0.9.2-github-migration.md).
+
+### Done
+
+- **Git migration** — `github.com/simodalla/pynteracta`, public. `main` (123 commits) and all ten
+  tags `v0.1.0`…`v0.9.1` pushed unchanged; same SHA on both remotes. Remotes: `origin` → GitHub,
+  `gitlab` → internal GitLab. **No history rewrite**: a full-history audit found no credential —
+  `tests/fixtures/sa_key.json` is a synthetic RSA-2048 fixture (`private_key_id: 42`,
+  `client_id: 1001`, no `client_email`), payload fixtures use `example.com`/`example.it` only, and
+  `.secrets/`/`*.env` were never committed. The 34 stale local branches are all merged into `main`
+  and were not pushed.
+- **CI** — `.github/workflows/ci.yml` replaces `.gitlab-ci.yml`: lint, strict mypy, unit matrix
+  (3.12/3.13) with the 85% gate, contract, build, strict docs. Hosted `ubuntu-latest` +
+  `astral-sh/setup-uv`, which **closes Q11** of the foundation spec (self-hosted runner tag and
+  registry image were never filled in).
+- **Pages** — `docs.yml` publishes MkDocs to `https://simodalla.github.io/pynteracta/`, closing the
+  M23 follow-up about `site_url` pointing at a non-existent internal Pages.
+- **Releases** — `release.yml` attaches wheel + sdist on a `v*` tag, replacing wheel distribution
+  via pipeline artifacts (resolves the D-v0.9.1-6 placeholder into a stable release page).
+- **Mirror** — the internal GitLab stays synchronised (D-v0.9.2-2). `mirror-gitlab.yml` exists but
+  is opt-in via `vars.GITLAB_MIRROR_ENABLED` because hosted runners cannot resolve the internal
+  hostname; `scripts/mirror_to_gitlab.sh` is the working path and was used for every push.
+- **Dependabot** — `uv`, `github-actions` and `pre-commit`, weekly and grouped, with Conventional
+  Commits prefixes (`build:`/`chore:`/`ci:`) so bot commits pass `conventional-pre-commit` and are
+  classified by git-cliff. Repository alerts + security updates enabled; four labels created.
+- **Docs** — README (badges, install from an explicit tag + release page, link to the published
+  site), `docs/quickstart.md`, `docs/index.md`, `docs/development-workflow.md` (new *Continuous
+  integration* section; Gate and Release steps updated), `CONTRIBUTING.md` (GitHub clone + new
+  *Dependency updates* section), `pyproject.toml` `[project.urls]`, `mkdocs.yml`.
+- Gates green: ruff, ruff format --check, mypy (strict), pytest --cov (93.02%), contract (87),
+  `mkdocs build --strict`. **CI verified green on GitHub** — all 7 jobs.
+
+### Decisions made beyond the plan
+
+- **D-v0.9.2-2 supersedes D-v0.9.1-7** — GitHub is canonical; the internal GitLab becomes a
+  synchronised mirror rather than being archived, so internal tooling pointing at it keeps working.
+- **D-v0.9.2-3 no history rewrite** — `git filter-repo` would rewrite all 123 SHAs and invalidate
+  the ten tags for no security benefit (see the audit above).
+- **Runtime security advisories fixed during the release** — Dependabot flagged 43 alerts on first
+  push. Only `cryptography` (48.0.0, vulnerable through `< 50.0.0`) and `pydantic-settings` are
+  runtime and ship in the wheel; upgraded to 50.0.1 / 2.15.0 with the full gate re-run, since
+  `cryptography` signs the RS512 assertion. The rest (GitPython via `python-semantic-release`,
+  datamodel-code-generator, mkdocs-material, pymdown-extensions) are dev-only and left to the first
+  weekly Dependabot run.
+- **CI-only test failure fixed** — two `--help` assertions passed locally and failed on the first
+  CI run: Rich treats `GITHUB_ACTIONS` as a colour-capable environment and emits ANSI escapes even
+  with `NO_COLOR`, styling an option name per segment so `--web-url` is no longer a literal
+  substring. The pre-existing `_no_forced_color` fixture (written for `FORCE_COLOR`/
+  `CLICOLOR_FORCE`) was extended to drop `GITHUB_ACTIONS` and pin `TERM=dumb`. Test-only; no `src/`
+  behaviour changed.
+- **Version/milestone collision with the security-hardening work** — `specs/v0.9.2-security-hardening.md`
+  (worktree `pynteracta-security-hardening`, branch `feature_security_hardening`) had already
+  claimed v0.9.2/M24 per the M23 closing note. Resolved 2026-09-12 in favour of this release, which
+  was already merged to `main` with CI green: the security work is renumbered **v0.9.3 / M25**.
+- **Branch protection deliberately not configured** (Q-v0.9.2-3) — required status checks and
+  force-push blocking are cheap, but "require pull request" would reject the version-bump commit
+  semantic-release writes directly to `main`. Revisit with a ruleset + owner bypass, or when a
+  second maintainer joins.
+
+### Follow-ups
+
+- Enable required status checks + force-push/deletion blocking on `main` (Q-v0.9.2-3); needs a
+  GitHub ruleset with an owner bypass to keep semantic-release working.
+- Dev-only Dependabot alerts (GitPython critical via `python-semantic-release`, and others) land in
+  the first weekly grouped PR — review rather than merge blind.
+- `mirror-gitlab.yml` stays inert until a self-hosted runner exists; until then the mirror is a
+  manual `scripts/mirror_to_gitlab.sh` step after each push to `main`.
+- Re-evaluate PyPI publication (Q-v0.9.2-4): a public repo plus a working release workflow lowers
+  the cost, and trusted publishing (OIDC) would need no stored token. Still a 1.0 target.
+- The pinned install tag in `README.md`/`docs/quickstart.md` is `v0.9.1`; refresh when it drifts
+  more than one minor behind (D-v0.9.2-8).
