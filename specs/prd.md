@@ -16,8 +16,9 @@ davvero alla versione 0.9.4. Le spec per versione precedenti all'adozione del me
 REST `external_v2` della piattaforma Interacta™ (Dinova S.r.l. / Maggioli S.p.A.). Serve a chi
 scrive automazioni e integrazioni interne: legge utenti, post, community, cataloghi, allegati,
 task, gruppi e hashtag di un tenant con tipi espliciti, paginazione pigra ed esportazione su file.
-La superficie è sincrona e **di sola lettura**; le operazioni di scrittura sono rimandate
-(`ROADMAP.md`, "Deferred / future").
+La superficie è sincrona. Alla versione 0.9.4 è di sola lettura; con
+[ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post e commenti,
+task, anagrafiche admin, upload di allegati) entrano nell'ambito e arrivano con le prossime spec.
 
 ## 2. Attori e ruoli
 
@@ -80,6 +81,25 @@ La superficie è sincrona e **di sola lettura**; le operazioni di scrittura sono
 - RF-020. Deep link web (`WebUrls`) a post, utenti e community a partire da `base_url` e
   `base_path`.
 
+Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): non ancora
+implementate alla 0.9.4; ogni spec che le realizza ne precisa i dettagli. Stessa forma delle
+letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test unit e contract).
+
+- RF-021. Post e commenti: creazione e modifica di post e post-evento (dati, campi custom,
+  allegati, watcher, dati di screen del workflow), transizione di workflow, copia, eliminazione e
+  marcatura per cancellazione, risposta di partecipazione a un evento, creazione di commenti; con
+  gli helper di lettura propedeutici (`post-data-for-create|edit|copy`, `event-post-data-for-*`,
+  `post-workflow-screen-data-for-edit`).
+- RF-022. Task: creazione, modifica, eliminazione.
+- RF-023. Anagrafiche admin: creazione, modifica, eliminazione e credenziali degli utenti;
+  creazione, modifica, eliminazione e membri dei gruppi; creazione, modifica e flag `deleted` di
+  cataloghi e voci; modifica del workspace.
+- RF-024. Upload di allegati: richiesta di un URL temporaneo di storage e caricamento del file,
+  propedeutico agli allegati dei post.
+- RF-025. Concorrenza ottimistica: dove l'API richiede un `occToken`, la libreria lo espone al
+  chiamante e mappa il `409` su `ConcurrencyError`; non rilegge e non riprova da sola. Le
+  operazioni distruttive nella CLI chiedono conferma esplicita.
+
 ## 4. Requisiti non funzionali
 
 *Da confermare.* Solo ciò che il codice o la configurazione mostrano.
@@ -101,6 +121,10 @@ La superficie è sincrona e **di sola lettura**; le operazioni di scrittura sono
 - RNF-007. Licenza Apache-2.0 con intestazione SPDX su ogni sorgente; distribuzione su PyPI via
   trusted publishing (OIDC), senza token nel repository.
 - RNF-008. Timeout configurabile (`timeout_seconds`, default 30 s); nessun retry automatico.
+- RNF-009. Nessuna operazione ripetuta in automatico verso Interacta (ADR 0001, regola non
+  negoziabile): una scrittura che fallisce in modo incerto (timeout, errore di rete) non si ritenta
+  da sola, l'errore risale al chiamante con esito sconosciuto; un futuro retry/backoff vale solo
+  per le letture.
 
 ## 5. Integrazioni esterne
 
@@ -126,6 +150,10 @@ La superficie è sincrona e **di sola lettura**; le operazioni di scrittura sono
   l'audit log, solo se abilitato, che contiene URL, header redatti e, con `audit_log_bodies`, i
   body delle risposte e quindi i dati personali sopra elencati (eccezione documentata nelle
   Regole non negoziabili del `CLAUDE.md`).
+- **Dati scritti sul tenant** (dalle spec di scrittura, ADR 0001): anagrafiche di utenti
+  (compresi i dati di credenziale), appartenenze ai gruppi, contenuti di post, commenti, task e
+  allegati forniti dal chiamante. La libreria li inoltra al tenant così come li riceve; non li
+  conserva e non li logga (eccezione: audit log con `audit_log_bodies`, come sopra).
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -135,14 +163,15 @@ La superficie è sincrona e **di sola lettura**; le operazioni di scrittura sono
 
 *Da confermare.*
 
-- Scritture verso Interacta (creazione o modifica di post, utenti, gruppi…), compresi gli
-  endpoint "form-prep" propedeutici alle scritture.
 - Client asincrono.
 - Autenticazione Microsoft OAuth2 e username/password.
-- Retry automatico con backoff.
+- Retry automatico con backoff sulle scritture (vedi RNF-009); sulle letture è solo rimandato.
+- Risoluzione automatica dei conflitti di concorrenza (`occToken`): spetta al chiamante.
 - Ottenere un token Google per conto dell'utente.
 - Versione 1.0 con semver stretto, finché la superficie di lettura non è completa e stabile.
 
 ## Storia del documento
 
 - 2026-10-08: prima versione, ricostruita dal codice (v0.9.4, commit `f0398bc`).
+- 2026-10-08: apertura della superficie di scrittura (§1, RF-021…RF-025, RNF-009, §6, §7), vedi
+  [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md).
