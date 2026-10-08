@@ -51,7 +51,7 @@ leggono prima del commit.
   4. Controlli bloccanti (anche `uv run pytest -m contract`); commit `feat(tasks): occ_token nella
      lettura e façade TaskWriteResult per le risposte di scrittura`.
 
-### [ ] T03 – `TasksAPI.create` e `create_raw`
+### [x] T03 – `TasksAPI.create` e `create_raw`
 
 - Criteri: 02-C01, 02-C02, 02-C03 (richiesta), 02-C13
 - Dipende da: T01, T02
