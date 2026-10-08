@@ -128,7 +128,7 @@ leggono prima del commit.
   3. Generare e leggere gli snapshot; controlli bloccanti; commit `feat(cli): comando tasks create
      con flag e --json`.
 
-### [ ] T07 – Comando `tasks edit`
+### [x] T07 – Comando `tasks edit`
 
 - Criteri: 02-C09, 02-C10
 - Dipende da: T04, T06

@@ -13,6 +13,7 @@ import typer
 from pynteracta.api._utils import snake_to_camel, zoned_datetime_input
 from pynteracta.cli._common import (
     EXIT_CONFIG,
+    EXIT_GENERIC,
     EXIT_SUCCESS,
     CliState,
     EpochMs,
@@ -32,7 +33,7 @@ from pynteracta.cli._common import (
 )
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.tasks import TaskWriteResult
-from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO
+from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO, EditTaskRequestDTO
 
 app = typer.Typer(help="Task commands.", no_args_is_help=True)
 
@@ -90,6 +91,24 @@ JsonBodyOption = Annotated[
             "and attachments. Flags override the keys they correspond to."
         ),
     ),
+]
+OccTokenOption = Annotated[
+    int | None,
+    typer.Option(
+        "--occ-token",
+        help=(
+            "Concurrency token of the task as last read. If omitted the task is fetched first "
+            "and its token used. A 409 (token mismatch) exits with code 9; nothing is retried."
+        ),
+    ),
+]
+RemoveWatcherUserOption = Annotated[
+    list[int] | None,
+    typer.Option("--remove-watcher-user", help="Watcher user ID to remove (repeatable)."),
+]
+RemoveWatcherGroupOption = Annotated[
+    list[int] | None,
+    typer.Option("--remove-watcher-group", help="Watcher group ID to remove (repeatable)."),
 ]
 
 
@@ -204,6 +223,85 @@ def tasks_create(  # noqa: PLR0913
             fields=fields,
             console=console,
             title=f"Task {result.task_id} created on post {post_id}",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("edit")
+def tasks_edit(  # noqa: PLR0913
+    ctx: typer.Context,
+    task_id: Annotated[int, typer.Argument(help="Task ID.")],
+    occ_token: OccTokenOption = None,
+    title: TitleOption = None,
+    description: DescriptionOption = None,
+    expiration: ExpirationOption = None,
+    timezone: TimezoneOption = _DEFAULT_TIMEZONE,
+    priority: PriorityOption = None,
+    assignee_user: AssigneeUserOption = None,
+    assignee_group: AssigneeGroupOption = None,
+    watcher_user: WatcherUserOption = None,
+    watcher_group: WatcherGroupOption = None,
+    remove_watcher_user: RemoveWatcherUserOption = None,
+    remove_watcher_group: RemoveWatcherGroupOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit a task.
+
+    Only the fields given are sent; --watcher-user/--watcher-group add watchers,
+    --remove-watcher-* remove them. Without --occ-token the task is read first to get its
+    concurrency token. If the task changed since it was read the server answers 409: the command
+    exits with code 9 and never retries.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    merged = _merge_body(
+        load_json_body(json_body, EditTaskRequestDTO),
+        title=title,
+        description_plain_text=description,
+        expiration=_parse_expiration(expiration, timezone),
+        priority=priority,
+        assignee_user_id=assignee_user,
+        assignee_group_id=assignee_group,
+        add_watcher_user_ids=watcher_user,
+        add_watcher_group_ids=watcher_group,
+        remove_watcher_user_ids=remove_watcher_user,
+        remove_watcher_group_ids=remove_watcher_group,
+    )
+    req = _validate_body(merged, EditTaskRequestDTO)
+    try:
+        with build_client(state) as client:
+            token = occ_token
+            if token is None:
+                token = client.tasks.get(task_id).occ_token
+                if token is None:
+                    typer.echo(
+                        f"Task {task_id} has no occToken in the server response: "
+                        "pass --occ-token explicitly.",
+                        err=True,
+                    )
+                    raise typer.Exit(EXIT_GENERIC)
+            result = client.tasks.edit_raw(task_id, token, req)
+        render_output(
+            resolve_output(state, output),
+            [result],
+            _write_result_row,
+            full=full,
+            fields=fields,
+            console=console,
+            title=f"Task {task_id} updated",
             export_path=export,
             export_format=export_format,
             quiet=state.quiet,

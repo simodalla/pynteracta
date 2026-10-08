@@ -30,6 +30,20 @@
   
   '''
 # ---
+# name: TestTasksEdit.test_edit_json_output
+  '''
+  {
+    "id": 7001,
+    "post_id": 21269,
+    "title": "Review quarterly report (updated)",
+    "state": 1,
+    "priority": 2,
+    "expiration": "2026-06-30T23:59:59+02:00",
+    "assignee": "Alice Rossi"
+  }
+  
+  '''
+# ---
 # name: TestTasksGet.test_json_output
   '''
   {
