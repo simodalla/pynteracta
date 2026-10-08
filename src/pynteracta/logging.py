@@ -26,6 +26,34 @@ _JWT_RE = re.compile(r"eyJ[A-Za-z0-9+/._\-]{10,}")
 # Body fields whose *key* (case-insensitive) should always be redacted.
 _SENSITIVE_KEY_RE = re.compile(r"(?i)token|password|secret|privatekey|assertion|jwt")
 
+# Header il cui intero valore è sempre redatto, per nome (confronto in minuscolo): la lista fissa
+# degli header di autenticazione standard più un pattern sul nome, simmetrico a quello delle chiavi
+# dei body. ``api[-_]?key`` copre ``X-Api-Key`` e ``x_api_key``.
+_SENSITIVE_HEADER_NAMES = frozenset({"authorization", "proxy-authorization"})
+_SENSITIVE_HEADER_RE = re.compile(r"(?i)token|secret|password|api[-_]?key")
+
+# Header cookie: il valore di ogni cookie è redatto, nome e attributi restano.
+_COOKIE_HEADER_NAMES = frozenset({"cookie", "set-cookie"})
+# Attributi di ``Set-Cookie`` (RFC 6265 più Partitioned e Priority), in minuscolo: una coppia
+# ``nome=valore`` con uno di questi nomi, preceduta da ``;``, è un attributo e non si tocca.
+_COOKIE_ATTRIBUTES = frozenset(
+    {
+        "expires",
+        "max-age",
+        "domain",
+        "path",
+        "samesite",
+        "secure",
+        "httponly",
+        "partitioned",
+        "priority",
+    }
+)
+# Una coppia ``nome=valore`` con il separatore che la precede: l'inizio del valore, ``,`` (così
+# httpx unisce più ``Set-Cookie``: ogni coppia dopo una virgola è un nuovo cookie) o ``;``.
+# Un frammento senza ``=`` (la parte dopo la virgola di ``Expires=Thu, 02 Jul …``) non è una coppia.
+_COOKIE_PAIR_RE = re.compile(r"(^|[;,])(\s*)([^;,=\s]+)=([^;,]*)")
+
 _AUDIT_LOGGER_NAME = "pynteracta.audit"
 _AUDIT_RAW_WARNED = False
 
@@ -41,18 +69,41 @@ def redact_string(value: str) -> str:
 
 
 def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
-    """Return a copy of *headers* with the Authorization value blanked out.
+    """Return a copy of *headers* with sensitive values blanked out.
 
-    Any remaining header value that contains a JWT-shaped token is also
-    redacted via :func:`redact_string`.
+    Gli header ``Authorization`` e ``Proxy-Authorization``, e quelli il cui nome contiene
+    ``token``, ``secret``, ``password`` o ``api-key``, perdono l'intero valore qualunque sia la
+    sua forma. Ogni altro valore passa da :func:`redact_string`, che sostituisce i JWT.
     """
     result: dict[str, str] = {}
     for k, v in headers.items():
-        if k.lower() == "authorization":
+        name = k.lower()
+        if name in _SENSITIVE_HEADER_NAMES or _SENSITIVE_HEADER_RE.search(name):
             result[k] = _REDACTED
+        elif name in _COOKIE_HEADER_NAMES:
+            result[k] = _redact_cookie_header(name, v)
         else:
             result[k] = redact_string(v)
     return result
+
+
+def _redact_cookie_header(name: str, value: str) -> str:
+    """Redige il valore di ogni cookie di un header ``Cookie`` o ``Set-Cookie``.
+
+    ``name`` è il nome dell'header in minuscolo. In ``Cookie`` ogni coppia è un cookie; in
+    ``Set-Cookie`` lo è la coppia all'inizio o dopo una virgola, e quella dopo ``;`` il cui nome
+    non è un attributo noto. Un valore senza ``=`` o con virgolette non si lascia analizzare con
+    certezza: in dubbio si redige per intero.
+    """
+    if "=" not in value or '"' in value:
+        return _REDACTED
+
+    def _sub(match: re.Match[str]) -> str:
+        sep, ws, key = match.group(1), match.group(2), match.group(3)
+        is_cookie = name == "cookie" or sep != ";" or key.lower() not in _COOKIE_ATTRIBUTES
+        return f"{sep}{ws}{key}={_REDACTED}" if is_cookie else match.group(0)
+
+    return _COOKIE_PAIR_RE.sub(_sub, value)
 
 
 def redact_body(body: Any) -> Any:

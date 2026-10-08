@@ -3,11 +3,16 @@
 
 from __future__ import annotations
 
+import io
+import logging
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 import respx
+import structlog
 from structlog.testing import capture_logs
 
 from pynteracta import __version__
@@ -23,6 +28,7 @@ from pynteracta.exceptions import (
 )
 from pynteracta.exceptions import PermissionError as InteractaPermissionError
 from pynteracta.hooks import RequestInfo, ResponseInfo
+from pynteracta.logging import _AUDIT_LOGGER_NAME, setup_default_logging
 from pynteracta.transport import _DEFAULT_USER_AGENT, HttpTransport
 
 _BASE = "https://api.example.com/portal/api/external/v2"
@@ -336,6 +342,120 @@ def test_context_manager() -> None:
 # ---------------------------------------------------------------------------
 # Audit logging
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# P-01: il cookie di refresh del login non deve mai comparire in nessun canale
+# ---------------------------------------------------------------------------
+
+_FAKE_REFRESH = "2ec02ee10ef0ad90df56fbb07f2424ff" * 2  # 64 esadecimali finti
+_LOGIN_SET_COOKIE = (
+    f"interacta_auth_refresh_token={_FAKE_REFRESH}; Secure; HttpOnly; SameSite=Strict; "
+    "Path=/portal/api/core/auth/refresh-token/; Expires=Thu, 02-Jul-2026 16:06:04 GMT"
+)
+_LOGIN_EXPIRES = "Expires=Thu, 02-Jul-2026 16:06:04 GMT"
+
+
+def _mock_login_shaped_response() -> None:
+    respx.get(_FULL_URL).mock(
+        return_value=httpx.Response(
+            _HTTP_200,
+            json={"userId": 42},
+            headers={"set-cookie": _LOGIN_SET_COOKIE, "content-type": "application/json"},
+        )
+    )
+
+
+def _set_cookie_of(headers: Any) -> str:
+    return str(headers.get("set-cookie", headers.get("Set-Cookie", "")))
+
+
+@pytest.fixture
+def _stdlib_audit_logging() -> Iterator[None]:
+    """Isola i test che instradano l'audit sugli handler stdlib con ``setup_default_logging``.
+
+    ``setup_default_logging`` configura structlog con ``cache_logger_on_first_use=True``: i proxy
+    di modulo del transport resterebbero legati alla catena di processori di questo test e
+    ``capture_logs`` dei test successivi non li vedrebbe più. Il fixture salva la configurazione,
+    e i test la usano con :func:`_setup_audit_logging`, che spegne la cache.
+    """
+    audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
+    audit_logger.handlers.clear()
+    saved = structlog.get_config()
+    yield
+    for h in audit_logger.handlers:
+        h.close()
+    audit_logger.handlers.clear()
+    structlog.configure(**saved)
+
+
+def _setup_audit_logging(**kwargs: Any) -> None:
+    setup_default_logging(audit=True, **kwargs)
+    structlog.configure(cache_logger_on_first_use=False)
+
+
+# criterio: 01-C10
+@respx.mock
+def test_login_shaped_set_cookie_never_leaks_to_hooks_and_audit_event() -> None:
+    _mock_login_shaped_response()
+    hooks = _RecordingHooks()
+    with capture_logs() as logs:
+        _make_transport(audit=True, hooks=hooks).request("GET", _PATH)
+
+    hook_cookie = _set_cookie_of(hooks.responses[0].headers)
+    event = next(e for e in logs if e.get("event") == "audit.response")
+    event_cookie = _set_cookie_of(event["headers"])
+    for cookie in (hook_cookie, event_cookie):
+        assert _FAKE_REFRESH not in cookie
+        assert cookie.startswith(f"interacta_auth_refresh_token={_REDACTED}; Secure; HttpOnly")
+        assert _LOGIN_EXPIRES in cookie
+
+
+# criterio: 01-C10
+@respx.mock
+@pytest.mark.usefixtures("_stdlib_audit_logging")
+def test_login_shaped_set_cookie_never_leaks_to_audit_file(tmp_path: Path) -> None:
+    _mock_login_shaped_response()
+    log_file = tmp_path / "audit.log"
+    _setup_audit_logging(audit_file=log_file)
+
+    _make_transport(audit=True).request("GET", _PATH)
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        h.flush()
+
+    content = log_file.read_text()
+    assert "audit.response" in content  # il canale file ha davvero ricevuto l'evento
+    assert "interacta_auth_refresh_token" in content
+    assert _LOGIN_EXPIRES in content
+    assert _FAKE_REFRESH not in content
+
+
+# criterio: 01-C10
+@respx.mock
+@pytest.mark.usefixtures("_stdlib_audit_logging")
+def test_login_shaped_set_cookie_never_leaks_with_audit_raw(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pynteracta.logging as plog  # noqa: PLC0415
+
+    _mock_login_shaped_response()
+    monkeypatch.setattr(plog, "_AUDIT_RAW_WARNED", False)
+    _setup_audit_logging(audit_raw=True)
+    stream = io.StringIO()
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        if isinstance(h, logging.StreamHandler):
+            h.setStream(stream)
+
+    hooks = _RecordingHooks()
+    _make_transport(audit=True, hooks=hooks).request("GET", _PATH)
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        h.flush()
+
+    raw_output = stream.getvalue()
+    assert "audit.response" in raw_output  # il canale raw ha davvero scritto l'evento
+    assert "interacta_auth_refresh_token" in raw_output
+    assert _FAKE_REFRESH not in raw_output
+    assert _FAKE_REFRESH not in _set_cookie_of(hooks.responses[0].headers)
 
 
 @respx.mock

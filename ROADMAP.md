@@ -48,8 +48,9 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 | **0.9.2** | Migration to GitHub: Actions CI, Pages, Releases (patch) | M24 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.2-github-migration.md](specs/legacy/v0.9.2-github-migration.md) |
 | **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.3-security-hardening.md](specs/legacy/v0.9.3-security-hardening.md) |
 | **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ⏳ In progress | [specs/legacy/v0.9.4-pypi-publication.md](specs/legacy/v0.9.4-pypi-publication.md) |
+| **0.9.5** | Audit log: redaction of cookies and sensitive headers, closes P-01 (patch) | M27 | ⏳ In progress | [specs/01-redazione-cookie-header/spec.md](specs/01-redazione-cookie-header/spec.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M26). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M27). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line)

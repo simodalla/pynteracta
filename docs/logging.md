@@ -13,7 +13,7 @@ Audit logging is **off by default**.  All audit output is redacted; raw output r
 | HTTP method | Request body (JSON payload) |
 | Redacted URL | Response body (parsed JSON / truncated text) |
 | Redacted request headers | — |
-| Response headers | — |
+| Redacted response headers | — |
 | Status code, duration, `X-Request-Id` | — |
 
 Response bodies larger than 64 KB are truncated with a `...[truncated]` marker.
@@ -62,7 +62,7 @@ Each entry is a single JSON object on its own line (JSON-lines / NDJSON), writte
 
 ```json
 {"event": "audit.request", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "method": "GET", "url": "https://tenant.interacta.cloud/.../core/auth/current-user-data", "headers": {"User-Agent": "pynteracta/0.9.1 ...", "Authorization": "***REDACTED***"}, "body": null}
-{"event": "audit.response", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "status": 200, "url": "...", "headers": {...}, "duration_ms": 134.2, "request_id": "abc-123", "body": {"userId": 42, ...}}
+{"event": "audit.response", "log_level": "debug", "logger": "pynteracta.audit", "timestamp": "2026-06-02T10:00:00Z", "status": 200, "url": "...", "headers": {"content-type": "application/json;charset=utf-8", "set-cookie": "interacta_auth_refresh_token=***REDACTED***; Secure; HttpOnly; SameSite=Strict; Path=/portal/api/core/auth/refresh-token/; Expires=Thu, 02-Jul-2026 16:06:04 GMT"}, "duration_ms": 134.2, "request_id": "abc-123", "body": {"userId": 42, ...}}
 ```
 
 ---
@@ -70,6 +70,8 @@ Each entry is a single JSON object on its own line (JSON-lines / NDJSON), writte
 ## Redaction guarantees
 
 - The `Authorization` header is **always** replaced with `***REDACTED***`.
+- **Headers redacted by name** (since 0.9.5): `Authorization`, `Proxy-Authorization`, and any header whose name contains `token`, `secret`, `password` or `api-key` (case-insensitive, e.g. `X-Api-Key`, `X-Auth-Token`) lose their **whole value**, whatever its shape.
+- **Cookies** (since 0.9.5): in `Cookie` and `Set-Cookie` every cookie keeps its **name and attributes** (`Secure`, `HttpOnly`, `SameSite`, `Path`, `Expires`, …) and loses its **value**, which becomes `***REDACTED***` — see the `set-cookie` example above. A cookie header that cannot be parsed with certainty (no `=`, quoted values) is redacted as a whole: when in doubt, redact.
 - Any value matching a JWT pattern (`eyJ…`) is replaced — in headers, bodies, and string fields.
 - Body keys matching `token`, `password`, `secret`, `privatekey`, `assertion`, or `jwt` (case-insensitive) at **any nesting depth** are replaced.
 - Redaction runs on **both** the console and the file handler independently; neither channel ever receives a raw token.
