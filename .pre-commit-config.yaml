@@ -7,7 +7,13 @@ repos:
       - id: check-toml
       - id: check-yaml
       - id: end-of-file-fixer
+        # CHANGELOG.md è generato da git-cliff (cliff.toml) e finisce con righe vuote: non si
+        # modifica a mano.
+        exclude: ^CHANGELOG\.md$
       - id: trailing-whitespace
+        # Gli snapshot syrupy contengono l'output delle tabelle Rich, spazi di padding compresi:
+        # toglierli rompe i confronti.
+        exclude: \.ambr$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.15
@@ -33,6 +39,7 @@ repos:
           - cryptography
           - typer
           - rich
+          - ruamel.yaml
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0
