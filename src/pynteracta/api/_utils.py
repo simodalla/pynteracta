@@ -6,6 +6,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from pydantic import BaseModel
+
 
 def snake_to_camel(name: str) -> str:
     """Convert ``snake_case`` to ``camelCase``."""
@@ -63,3 +65,41 @@ def build_query_params(**kwargs: Any) -> dict[str, Any]:
         if value is not None:
             params[snake_to_camel(key)] = value
     return params
+
+
+def zoned_datetime_input(value: datetime) -> dict[str, str]:
+    """Traduce un ``datetime`` con fuso nella coppia ``{datetime, timezone}`` delle scritture.
+
+    Con un fuso IANA (``ZoneInfo``) invia l'ora locale e il nome del fuso; con un offset fisso,
+    che non ha un nome IANA, converte in UTC e invia ``"UTC"``. Un ``datetime`` senza fuso è
+    rifiutato prima di qualunque chiamata al server.
+    """
+    if value.tzinfo is None or value.utcoffset() is None:
+        msg = "expiration must be a timezone-aware datetime"
+        raise ValueError(msg)
+    key = getattr(value.tzinfo, "key", None)
+    if key is None:
+        value = value.astimezone(UTC)
+        key = "UTC"
+    return {"datetime": value.replace(tzinfo=None).isoformat(timespec="seconds"), "timezone": key}
+
+
+def _dump_value(value: Any) -> Any:
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json", exclude_none=True)
+    if isinstance(value, list):
+        return [_dump_value(item) for item in value]
+    return value
+
+
+def build_write_body(**kwargs: Any) -> dict[str, Any]:
+    """Costruisce il corpo di una scrittura dai kwargs: camelCase, solo i campi non ``None``.
+
+    I modelli pydantic (anche dentro le liste) sono dumpati senza i campi ``None``; dict e valori
+    semplici passano così come sono.
+    """
+    body: dict[str, Any] = {}
+    for key, value in kwargs.items():
+        if value is not None:
+            body[snake_to_camel(key)] = _dump_value(value)
+    return body

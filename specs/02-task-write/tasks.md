@@ -12,7 +12,7 @@ leggono prima del commit.
 
 ## Elenco
 
-### [ ] T01 – Utilità di scrittura: scadenza, corpo, `_put` e `_delete`
+### [x] T01 – Utilità di scrittura: scadenza, corpo, `_put` e `_delete`
 
 - Criteri: 02-C03 (helper)
 - Dipende da: nessuno
