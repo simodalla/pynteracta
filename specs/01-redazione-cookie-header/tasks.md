@@ -33,7 +33,7 @@ in Conventional Commits con descrizione in italiano.
      `_REDACTED`; altrimenti `redact_string(v)` come oggi. Aggiornare la docstring.
   4. Controlli bloccanti; commit `fix(security): redazione per nome degli header sensibili`.
 
-### [ ] T02 – Redazione del valore dei cookie in `Cookie` e `Set-Cookie`
+### [x] T02 – Redazione del valore dei cookie in `Cookie` e `Set-Cookie`
 
 - Criteri: 01-C01, 01-C02, 01-C03, 01-C04, 01-C10
 - Dipende da: T01 (stesso ramo di `redact_headers`)

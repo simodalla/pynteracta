@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from pynteracta.logging import redact_body, redact_headers, redact_string
@@ -98,6 +99,48 @@ class TestRedactHeaders:
     def test_jwt_embedded_in_other_header_only_jwt_redacted(self) -> None:
         result = redact_headers({"X-Custom": f"before {_FAKE_JWT} after"})
         assert result["X-Custom"] == f"before {_REDACTED} after"
+
+    # criterio: 01-C01
+    def test_set_cookie_value_redacted_attributes_kept(self) -> None:
+        result = redact_headers({"Set-Cookie": "a=1; Secure; HttpOnly"})
+        assert result["Set-Cookie"] == f"a={_REDACTED}; Secure; HttpOnly"
+
+    # criterio: 01-C01
+    def test_set_cookie_empty_value_redacted_attributes_kept(self) -> None:
+        result = redact_headers({"Set-Cookie": "a=; Path=/"})
+        assert result["Set-Cookie"] == f"a={_REDACTED}; Path=/"
+
+    # criterio: 01-C02
+    def test_set_cookie_joined_pair_with_expires_comma(self) -> None:
+        """Due Set-Cookie come li unisce httpx (``, ``), con la virgola dentro ``Expires``."""
+        expires = "Expires=Thu, 02-Jul-2026 16:06:04 GMT"
+        first = f"first=val-1; Secure; HttpOnly; SameSite=Strict; Path=/p; {expires}"
+        joined = httpx.Headers([("set-cookie", first), ("set-cookie", "second=val-2; Path=/")])[
+            "set-cookie"
+        ]
+        assert ", second=" in joined  # il formato unito è davvero quello di httpx
+
+        result = redact_headers({"set-cookie": joined})["set-cookie"]
+        assert "val-1" not in result
+        assert "val-2" not in result
+        assert result == (
+            f"first={_REDACTED}; Secure; HttpOnly; SameSite=Strict; Path=/p; {expires}, "
+            f"second={_REDACTED}; Path=/"
+        )
+
+    # criterio: 01-C03
+    def test_cookie_request_header_all_values_redacted(self) -> None:
+        result = redact_headers({"Cookie": "a=1; b=2"})
+        assert result["Cookie"] == f"a={_REDACTED}; b={_REDACTED}"
+
+    # criterio: 01-C04
+    @pytest.mark.parametrize("name", ["Cookie", "Set-Cookie"])
+    @pytest.mark.parametrize("value", ["garbage", 'a="x,y"; Path=/'])
+    def test_cookie_header_without_equals_or_quoted_fully_redacted(
+        self, name: str, value: str
+    ) -> None:
+        result = redact_headers({name: value})
+        assert result[name] == _REDACTED
 
 
 class TestRedactBody:
