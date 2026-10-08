@@ -10,19 +10,23 @@ davvero alla versione 0.9.4. Le spec per versione precedenti all'adozione del me
 
 ## 1. Scopo
 
-*Da confermare.*
+Confermato dal maintainer il 2026-10-08.
 
 `pynteracta` è una libreria Python 3.12+ e un client a riga di comando, non ufficiali, per l'API
 REST `external_v2` della piattaforma Interacta™ (Dinova S.r.l. / Maggioli S.p.A.). Serve a chi
 scrive automazioni e integrazioni interne: legge utenti, post, community, cataloghi, allegati,
 task, gruppi e hashtag di un tenant con tipi espliciti, paginazione pigra ed esportazione su file.
+Ha inoltre due usi voluti: essere la libreria che gli strumenti di *vibe coding* (agenti di
+programmazione assistita) usano per lavorare con Interacta, quindi con un'API tipizzata, uniforme e
+documentata che un agente possa scoprire e comporre; ed essere la base di un **server MCP non
+ufficiale per Interacta**, che ne esporrà le operazioni come strumenti.
 La superficie è sincrona. Alla versione 0.9.4 è di sola lettura; con
 [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post e commenti,
 task, anagrafiche admin, upload di allegati) entrano nell'ambito e arrivano con le prossime spec.
 
 ## 2. Attori e ruoli
 
-*Da confermare.*
+Confermato dal maintainer il 2026-10-08.
 
 | Attore | Ruolo o gruppo | Cosa può fare |
 |---|---|---|
@@ -175,3 +179,5 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
 - 2026-10-08: prima versione, ricostruita dal codice (v0.9.4, commit `f0398bc`).
 - 2026-10-08: apertura della superficie di scrittura (§1, RF-021…RF-025, RNF-009, §6, §7), vedi
   [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md).
+- 2026-10-08: §1 e §2 confermati dal maintainer; §1 aggiunge gli usi da strumenti di vibe coding e
+  come base di un server MCP non ufficiale.
