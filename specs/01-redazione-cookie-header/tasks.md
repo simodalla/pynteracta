@@ -69,7 +69,7 @@ in Conventional Commits con descrizione in italiano.
   5. Controlli bloccanti; commit `fix(security): redazione del valore dei cookie in Cookie e
      Set-Cookie (chiude P-01)`.
 
-### [ ] T03 – Processore structlog e handler di file dell'audit con header sensibili
+### [x] T03 – Processore structlog e handler di file dell'audit con header sensibili
 
 - Criteri: 01-C09
 - Dipende da: T02

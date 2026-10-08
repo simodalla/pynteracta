@@ -7,13 +7,16 @@ import json
 import logging
 import logging.handlers
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
+import structlog
 
 from pynteracta.logging import (
     _AUDIT_LOGGER_NAME,
     build_audit_file_handler,
     redact_body,
+    redaction_processor,
     setup_default_logging,
 )
 
@@ -75,6 +78,42 @@ class TestBuildAuditFileHandler:
         content = log_file.read_text()
         assert _FAKE_JWT not in content
         assert _REDACTED in content
+
+
+class TestRedactionProcessorHeaders:
+    """Il processore structlog e l'handler di file ereditano le regole di ``redact_headers``."""
+
+    _HEADERS: ClassVar[dict[str, str]] = {"Set-Cookie": "a=1; Secure", "X-Api-Key": "k"}
+
+    # criterio: 01-C09
+    def test_processor_redacts_cookie_and_api_key(self) -> None:
+        event = redaction_processor(None, "info", {"event": "x", "headers": dict(self._HEADERS)})
+        assert event["headers"] == {"Set-Cookie": f"a={_REDACTED}; Secure", "X-Api-Key": _REDACTED}
+
+    # criterio: 01-C09
+    def test_file_handler_redacts_cookie_and_api_key(self, tmp_path: Path) -> None:
+        log_file = tmp_path / "audit.log"
+        handler = build_audit_file_handler(log_file)
+
+        stdlib_logger = logging.getLogger("pynteracta.audit.test_headers_file")
+        stdlib_logger.setLevel(logging.DEBUG)
+        stdlib_logger.propagate = False
+        stdlib_logger.addHandler(handler)
+        # Emette come il transport: evento structlog con la catena di setup_default_logging
+        # (redazione, poi impacchettamento per ProcessorFormatter), senza configure() globale.
+        wrap_for_formatter = structlog.stdlib.ProcessorFormatter.wrap_for_formatter
+        audit_logger = structlog.wrap_logger(
+            stdlib_logger,
+            processors=[redaction_processor, wrap_for_formatter],
+            wrapper_class=structlog.stdlib.BoundLogger,
+        )
+        audit_logger.info("audit.response", headers=dict(self._HEADERS))
+        handler.flush()
+        handler.close()
+
+        parsed = json.loads(log_file.read_text().splitlines()[0])
+        assert parsed["event"] == "audit.response"
+        assert parsed["headers"] == {"Set-Cookie": f"a={_REDACTED}; Secure", "X-Api-Key": _REDACTED}
 
 
 class TestSetupDefaultLoggingAudit:
