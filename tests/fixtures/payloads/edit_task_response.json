@@ -1,0 +1,62 @@
+{
+  "nextOccToken": 4,
+  "taskData": {
+    "id": 7001,
+    "postId": 21269,
+    "title": "Review quarterly report (updated)",
+    "description": "Please review the attached quarterly report.",
+    "expiration": {
+      "zonedDatetime": "2026-06-30T23:59:59+02:00",
+      "localDatetime": "2026-06-30T23:59:59",
+      "timezone": "Europe/Rome"
+    },
+    "priority": 2,
+    "subTasks": [
+      {
+        "id": 801,
+        "description": "Read introduction",
+        "state": 1
+      }
+    ],
+    "reminders": [],
+    "state": 1,
+    "assigneeUser": {
+      "id": 1042,
+      "name": "Alice Rossi"
+    },
+    "assigneeGroup": null,
+    "creatorUser": {
+      "id": 1099,
+      "name": "Bob Bianchi"
+    },
+    "creationTimestamp": 1748000000000,
+    "lastModifyUser": {
+      "id": 1099,
+      "name": "Bob Bianchi"
+    },
+    "lastModifyTimestamp": 1767200000000,
+    "lastReviewTimestamp": null,
+    "lastReviewUser": null,
+    "closingTimestamp": null,
+    "closingUser": null,
+    "attachments": [],
+    "mentions": [],
+    "watcherUsers": [],
+    "watcherGroups": [],
+    "hashtags": [],
+    "occToken": 4,
+    "type": 1,
+    "attachmentsCount": 2,
+    "deleted": false
+  },
+  "capabilities": {
+    "canViewDetail": true,
+    "canModify": true,
+    "canUpdateState": true,
+    "canCopy": false,
+    "canDelete": false,
+    "canAddComment": true,
+    "canEditAttachments": true,
+    "canEditReminders": true
+  }
+}

@@ -1,4 +1,49 @@
 # serializer version: 1
+# name: TestTasksCreate.test_json_output
+  '''
+  {
+    "id": 7002,
+    "post_id": 21269,
+    "title": "Prepare the quarterly report",
+    "state": 0,
+    "priority": 2,
+    "expiration": "2026-12-31T18:00:00+01:00",
+    "assignee": "Alice Rossi"
+  }
+  
+  '''
+# ---
+# name: TestTasksCreate.test_table_output
+  '''
+         Task 7002 created on post 21269       
+  ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key        ┃ Value                        ┃
+  ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id         │ 7002                         │
+  │ post_id    │ 21269                        │
+  │ title      │ Prepare the quarterly report │
+  │ state      │ 0                            │
+  │ priority   │ 2                            │
+  │ expiration │ 2026-12-31T18:00:00+01:00    │
+  │ assignee   │ Alice Rossi                  │
+  └────────────┴──────────────────────────────┘
+  
+  '''
+# ---
+# name: TestTasksEdit.test_edit_json_output
+  '''
+  {
+    "id": 7001,
+    "post_id": 21269,
+    "title": "Review quarterly report (updated)",
+    "state": 1,
+    "priority": 2,
+    "expiration": "2026-06-30T23:59:59+02:00",
+    "assignee": "Alice Rossi"
+  }
+  
+  '''
+# ---
 # name: TestTasksGet.test_json_output
   '''
   {

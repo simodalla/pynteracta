@@ -1562,3 +1562,59 @@ Prima spec del metodo spec-driven (`sddpa` 0.3.0): [`specs/01-redazione-cookie-h
 - Cookie jar di `httpx.Client` (conserva il cookie di refresh in memoria): fuori ambito della spec,
   spec a parte se si vuole svuotarlo.
 - Release 0.9.5 con la prossima spec; la riga in ROADMAP resta ⏳ fino ad allora.
+
+## M28 — Scrittura dei task: creazione, modifica, eliminazione — completata 2026-10-08
+
+Seconda spec del metodo: [`specs/02-task-write/`](specs/02-task-write/) (`spec.md`, `plan.md`,
+`tasks.md`, `verifica.md`). Primo gruppo della superficie di scrittura aperta da
+[ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md). Minor **0.10.0**, insieme alla
+correzione M27 (P-01).
+
+### Fatto
+
+- Libreria: `client.tasks.create(post_id, **kw)` / `create_raw`, `edit(task_id, occ_token, **kw)` /
+  `edit_raw`, `delete(task_id) -> post_id`; corpo in camelCase con i soli campi passati
+  (`build_write_body`), scadenza come `datetime` con fuso tradotta in `{datetime, timezone}`
+  (`zoned_datetime_input`, offset fisso → UTC); `_put` e `_delete` nel client base; façade
+  `TaskWriteResult` (`task_id`, `next_occ_token`, `task`, `capabilities`, `.raw`) e `Task.occ_token`
+  (02-T01…T04).
+- CLI: `tasks create` (flag per i campi semplici, `--json FILE|-` per il DTO completo, flag che
+  prevalgono, `--timezone` default `Europe/Rome`), `tasks edit` (legge il task e rimanda i campi non
+  indicati, perché il server sostituisce il task intero; `--occ-token` impone solo il token; `409` →
+  exit code **9** senza secondo tentativo), `tasks delete` (prompt con id e titolo, `--yes/-y`,
+  rifiuto senza terminale); `EXIT_CONFLICT = 9`, `confirm_destructive`, `load_json_body` in
+  `cli/_common.py` (02-T05…T08, T13).
+- Documentazione: `docs/api/tasks.md`, `docs/cli.md` (exit code 9), `docs/testing.md`,
+  `tests/integration/.env.example` (02-T09); integration test opt-in del ciclo
+  `create → get → edit → get → delete → 404` su `PYNTERACTA_TEST_WRITE_POST_ID` (02-T10), eseguito
+  sul tenant di prova (02-T11); PRD con RF-022 precisato e RF-022a, RF-015a, RF-025a, RF-025b,
+  RNF-010 (02-T12).
+- 75 unit test e 10 contract test nuovi (751 → 826, 87 → 97); copertura totale 93,18 % → 93,66 %,
+  `api/_base.py` e `api/tasks.py` al 100 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant (T11)**, che lo swagger non documenta: `expiration` accettata nel formato
+  della spec e restituita come `{zonedDatetime, localDatetime, timezone}`; l'edit è una
+  sostituzione (titolo, descrizione, priorità, scadenza, assegnatario e sub-task omessi vengono
+  azzerati; watcher e allegati, con coppie add/remove, restano); assegnatario e scadenza
+  obbligatori in creazione e modifica (`400` sul campo `assignee`, `500` senza scadenza); `state`
+  dei sub-task obbligatorio e `0` rifiutato; i sub-task rimandati vengono ricreati con id nuovi.
+- Di conseguenza la spec è stata rivista dopo T11 (02-C09 sostituito da 02-C17 e 02-C18, task T13):
+  la CLI `tasks edit` è una patch, la libreria resta "una richiesta, campi espliciti" e lo documenta
+  come avviso.
+- Errori d'uso della CLI con exit code `2`, come il resto della CLI (spec corretta dal piano).
+- Testi della CLI in inglese (riga nella sezione Lingua del `CLAUDE.md`).
+- La fixture `get_task_detail_response.json` ha ora la forma reale di `expiration`.
+- La prima verifica (`e43fdd0`) ha trovato `api/_base.py` al 77,78 %: T01 riaperto con quattro test
+  di caratterizzazione dei rami `TypeError` (`7c4d261`).
+
+### Follow-up
+
+- Release **0.10.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- `cli/communities.py` al 53 % di copertura (dalla linea di partenza).
+- Cookie jar di `httpx.Client` (dalla M27): spec a parte se si vuole svuotarlo.
+- Se un futuro swagger marcasse `assignee`, `expiration` o `state` dei sub-task come obbligatori,
+  rigenerare i modelli; oggi la libreria non li impone.
+- Prossimi gruppi di scrittura (ADR 0001): post e commenti (RF-021), anagrafiche admin (RF-023),
+  upload (RF-024), ciascuno con la propria spec.

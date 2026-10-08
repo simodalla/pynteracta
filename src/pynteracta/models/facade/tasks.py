@@ -167,6 +167,11 @@ class Task:
         return self.raw.attachmentsCount
 
     @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza ottimistica, da passare a ``TasksAPI.edit``."""
+        return self.raw.occToken
+
+    @property
     def creation_timestamp(self) -> int | None:
         return self.raw.creationTimestamp
 
@@ -231,3 +236,64 @@ class Task:
         """
         raw = generated.GetTaskDetailResponseDTO.model_validate(data)
         return cls(raw)
+
+
+class TaskWriteResult:
+    """Façade sulla risposta di ``create`` ed ``edit`` di un task.
+
+    ``taskData`` e ``capabilities`` sono stub ``RootModel`` nei modelli generati: la façade li
+    rivalida nelle varianti tipizzate ``TaskDetailDTO1`` e ``TaskCapabilitiesDTO1``.
+
+    Attributes:
+        raw: Il DTO generato sottostante (``CreateTaskResponseDTO`` o ``EditTaskResponseDTO``).
+    """
+
+    def __init__(
+        self, raw: generated.CreateTaskResponseDTO | generated.EditTaskResponseDTO
+    ) -> None:
+        self.raw = raw
+        self._task: generated.TaskDetailDTO1 | None = None
+        self._capabilities: TaskCapabilities | None = None
+        if raw.taskData is not None:
+            root = _resolve_root(raw.taskData)
+            if isinstance(root, dict):
+                self._task = generated.TaskDetailDTO1.model_validate(root)
+        if raw.capabilities is not None:
+            root = _resolve_root(raw.capabilities)
+            if isinstance(root, dict):
+                self._capabilities = TaskCapabilities(
+                    generated.TaskCapabilitiesDTO1.model_validate(root)
+                )
+
+    @property
+    def task_id(self) -> int | None:
+        """Id del task: dalla risposta di creazione, altrimenti dai dati del task."""
+        task_id = getattr(self.raw, "taskId", None)
+        if task_id is not None:
+            return int(task_id)
+        return self._task.id if self._task is not None else None
+
+    @property
+    def next_occ_token(self) -> int | None:
+        """Token di concorrenza da usare per la modifica successiva."""
+        return self.raw.nextOccToken
+
+    @property
+    def task(self) -> generated.TaskDetailDTO1 | None:
+        """Dati del task dopo la scrittura, tipizzati."""
+        return self._task
+
+    @property
+    def capabilities(self) -> TaskCapabilities | None:
+        """Capabilities sul task dopo la scrittura."""
+        return self._capabilities
+
+    @classmethod
+    def from_create(cls, data: dict) -> TaskWriteResult:  # type: ignore[type-arg]
+        """Parse the response of ``create-task``."""
+        return cls(generated.CreateTaskResponseDTO.model_validate(data))
+
+    @classmethod
+    def from_edit(cls, data: dict) -> TaskWriteResult:  # type: ignore[type-arg]
+        """Parse the response of ``edit-task``."""
+        return cls(generated.EditTaskResponseDTO.model_validate(data))

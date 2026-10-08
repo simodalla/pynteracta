@@ -12,10 +12,10 @@ numeri; `/sddpa:verifica` li aggiorna quando migliorano. Non si modifica a mano.
 | Comando | Esito |
 |---|---|
 | `uv run ruff check .` | verde ("All checks passed!") |
-| `uv run ruff format --check .` | verde (104 file già formattati) |
+| `uv run ruff format --check .` | verde (107 file già formattati; 104 all'adozione) |
 | `uv run mypy src` | verde (52 file, nessun errore) |
-| `uv run pytest -m "not integration and not contract"` | verde (751 test, 67 snapshot; 717 all'adozione) |
-| `uv run pytest -m contract` | verde (87 test) |
+| `uv run pytest -m "not integration and not contract"` | verde (826 test, 70 snapshot; 717 all'adozione) |
+| `uv run pytest -m contract` | verde (97 test; 87 all'adozione) |
 
 Esclusi dai controlli del metodo: `uv run pytest -m integration` (20 test opt-in contro un tenant
 reale, si auto-skippano senza `tests/integration/.env` e `.secrets/sa.json`) e `uv build` (solo in
@@ -33,10 +33,10 @@ sotto `src/pynteracta/`.
 
 | Ambito | Copertura |
 |---|---|
-| Totale | 93,18 % (3865/4148 righe; 93,15 % all'adozione) |
-| `api` | 96,02 % |
-| `cli` | 89,31 % |
-| `models/facade` | 94,74 % |
+| Totale | 93,66 % (4120/4399 righe; 93,15 % all'adozione) |
+| `api` | 97,22 % (96,02 % all'adozione) |
+| `cli` | 90,11 % (89,31 % all'adozione) |
+| `models/facade` | 95,09 % (94,74 % all'adozione) |
 | `auth.py` | 94,01 % |
 | `client.py` | 96,70 % |
 | `config.py` | 98,86 % |
@@ -89,3 +89,4 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 |---|---|---|
 | 2026-10-08 | – | Linea di partenza iniziale |
 | 2026-10-08 | 01 | P-01 chiusa; copertura totale 93,15 % → 93,18 %, `logging.py` 93,41 % → 94,39 %; unit test 717 → 751 |
+| 2026-10-08 | 02 | Copertura totale 93,18 % → 93,66 %, `api` 96,02 % → 97,22 %, `cli` 89,31 % → 90,11 %, `models/facade` 94,74 % → 95,09 %; unit test 751 → 826, contract 87 → 97 |

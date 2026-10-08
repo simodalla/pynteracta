@@ -5,8 +5,9 @@
   "descriptionDelta": "{\"ops\":[{\"insert\":\"Please review the attached quarterly report.\\n\"}]}",
   "descriptionPlainText": "Please review the attached quarterly report.",
   "expiration": {
-    "dateTime": "2026-06-30T23:59:59",
-    "zoneId": "Europe/Rome"
+    "zonedDatetime": "2026-06-30T23:59:59+02:00",
+    "localDatetime": "2026-06-30T23:59:59",
+    "timezone": "Europe/Rome"
   },
   "priority": 2,
   "state": 1,
@@ -25,7 +26,10 @@
       "id": 501,
       "value": 1,
       "range": 2,
-      "types": [1, 2]
+      "types": [
+        1,
+        2
+      ]
     }
   ],
   "subTasks": [

@@ -35,3 +35,28 @@ class ResourceClient:
             msg = f"Expected JSON object response from {path}"
             raise TypeError(msg)
         return body
+
+    def _put(
+        self,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        response = self._transport.request("PUT", path, json=json, params=params)
+        body: Any = response.json()
+        if not isinstance(body, dict):
+            msg = f"Expected JSON object response from {path}"
+            raise TypeError(msg)
+        return body
+
+    def _delete(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Una ``DELETE``; una risposta senza corpo vale come oggetto vuoto."""
+        response = self._transport.request("DELETE", path, params=params)
+        if not response.content:
+            return {}
+        body: Any = response.json()
+        if not isinstance(body, dict):
+            msg = f"Expected JSON object response from {path}"
+            raise TypeError(msg)
+        return body
