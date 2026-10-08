@@ -89,13 +89,18 @@ in Conventional Commits con descrizione in italiano.
   2. Controlli bloccanti; commit `test: processore structlog e handler di file con cookie e header
      sensibili (01-C09)`.
 
-### [x] T04 – Pagina "Audit Logging" del sito
+### [ ] T04 – Pagina "Audit Logging" del sito
 
 - Criteri: 01-C11
 - Dipende da: T02
-- Test: nessun test automatico sul contenuto; verifica con `uv run mkdocs build --strict`,
-  `uv run pytest tests/unit/test_docs_snippets.py` e `grep -n "Set-Cookie\|Proxy-Authorization"
-  docs/logging.md` (entrambe le stringhe presenti).
+- Test: `tests/unit/test_docs_snippets.py::test_logging_page_states_redaction_guarantees`, con
+  marker `# criterio: 01-C11`: legge `docs/logging.md` e verifica che la sezione "Redaction
+  guarantees" nomini `Proxy-Authorization`, `Set-Cookie` e `api-key`, e che l'esempio di
+  `audit.response` contenga `interacta_auth_refresh_token=***REDACTED***`. Rosso prima del
+  codice se eseguito sulla pagina di `03dfe63` (`git checkout 03dfe63 -- docs/logging.md`, poi
+  `git checkout HEAD -- docs/logging.md`). In più `uv run mkdocs build --strict` verde.
+- Riaperto dalla verifica del 2026-10-08 (problema 1 di `verifica.md`): i passi 1–4 sono fatti
+  (`4c3dd5f`); resta il passo 5.
 - Passi:
   1. In `docs/logging.md`, "What is captured": `Response headers` → `Redacted response headers`.
   2. "Log format": nell'esempio di `audit.response` mostrare `"headers": {"content-type": "…",
@@ -105,6 +110,9 @@ in Conventional Commits con descrizione in italiano.
      (`Cookie`/`Set-Cookie`: valore di ogni cookie sostituito, nome e attributi conservati; valore
      non analizzabile → tutto redatto); nota "since 0.9.5" per coerenza con la nota v0.9.3.
   4. Verifiche del punto "Test"; commit `docs: garanzie di redazione per cookie e header sensibili`.
+  5. Scrivere il test con marker 01-C11, vederlo rosso sulla pagina di `03dfe63` e verde su HEAD;
+     controlli bloccanti; commit `test: la pagina Audit Logging dichiara le garanzie di redazione
+     (01-C11)`.
 
 ### [x] T05 – Chiusura: PRD
 
