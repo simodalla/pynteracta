@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 
 import pytest
@@ -105,3 +106,218 @@ class TestTasksGet:
         assert result.exit_code == 0
         assert "descriptionDelta" not in result.output
         assert "surveyData" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# Scritture (spec 02)
+# ---------------------------------------------------------------------------
+
+_TASKS_CREATE_PATH = f"communication/tasks/manage/create-task/{_POST_ID}"
+_EXIT_USAGE = 2
+_WATCHER_A = 7
+_WATCHER_B = 8
+_ASSIGNEE = 9
+_PRIORITY = 2
+
+
+def _sent_body(route: respx.Route) -> dict:  # type: ignore[type-arg]
+    return json.loads(route.calls[0].request.content)  # type: ignore[no-any-return]
+
+
+class TestTasksCreate:
+    # criterio: 02-C08
+    @respx.mock
+    def test_flags_and_json_merge_flags_win(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        body = tmp_path / "body.json"
+        body.write_text(json.dumps({"title": "X", "assigneeUserId": _ASSIGNEE}), encoding="utf-8")
+        result = runner.invoke(
+            app,
+            [
+                "tasks",
+                "create",
+                str(_POST_ID),
+                "--title",
+                "T",
+                "--priority",
+                str(_PRIORITY),
+                "--watcher-user",
+                str(_WATCHER_A),
+                "--watcher-user",
+                str(_WATCHER_B),
+                "--json",
+                str(body),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert route.call_count == 1
+        assert _sent_body(route) == {
+            "title": "T",
+            "priority": _PRIORITY,
+            "watcherUserIds": [_WATCHER_A, _WATCHER_B],
+            "assigneeUserId": _ASSIGNEE,
+        }
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_description_and_client_uid_flags(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            ["tasks", "create", str(_POST_ID), "--description", "Plain", "--client-uid", "u-1"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route) == {"descriptionPlainText": "Plain", "clientUid": "u-1"}
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_expiration_flag_default_timezone(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            ["tasks", "create", str(_POST_ID), "--expiration", "2026-12-31T18:00"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["expiration"] == {
+            "datetime": "2026-12-31T18:00:00",
+            "timezone": "Europe/Rome",
+        }
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_expiration_flag_explicit_timezone(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            [
+                "tasks",
+                "create",
+                str(_POST_ID),
+                "--expiration",
+                "2026-12-31T18:00",
+                "--timezone",
+                "UTC",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["expiration"] == {
+            "datetime": "2026-12-31T18:00:00",
+            "timezone": "UTC",
+        }
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_expiration_with_offset_ignores_timezone(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            [
+                "tasks",
+                "create",
+                str(_POST_ID),
+                "--expiration",
+                "2026-12-31T18:00+01:00",
+                "--timezone",
+                "Europe/Rome",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        # offset fisso: la libreria converte in UTC
+        assert _sent_body(route)["expiration"] == {
+            "datetime": "2026-12-31T17:00:00",
+            "timezone": "UTC",
+        }
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_invalid_timezone_exits_2(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            [
+                "tasks",
+                "create",
+                str(_POST_ID),
+                "--expiration",
+                "2026-12-31T18:00",
+                "--timezone",
+                "Mars/Olympus",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_USAGE
+        assert "Mars/Olympus" in result.output
+        assert route.call_count == 0
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_invalid_expiration_exits_2(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app, ["tasks", "create", str(_POST_ID), "--expiration", "tomorrow"], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_USAGE
+        assert "--expiration" in result.output
+        assert route.call_count == 0
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_json_unknown_key_exits_2(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        body = tmp_path / "body.json"
+        body.write_text(json.dumps({"bogus": 1}), encoding="utf-8")
+        result = runner.invoke(
+            app, ["tasks", "create", str(_POST_ID), "--json", str(body)], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_USAGE
+        assert "bogus" in result.output
+        assert route.call_count == 0
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_json_from_stdin(self, runner: CliRunner) -> None:
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            ["tasks", "create", str(_POST_ID), "--json", "-"],
+            env=BASE_ENV,
+            input=json.dumps({"title": "from stdin", "subTasks": [{"description": "s"}]}),
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route) == {"title": "from stdin", "subTasks": [{"description": "s"}]}
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_table_output(self, runner: CliRunner, snapshot: object) -> None:
+        mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app, ["tasks", "create", str(_POST_ID), "--title", "T"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == snapshot
+
+    # criterio: 02-C08
+    @respx.mock
+    def test_json_output(self, runner: CliRunner, snapshot: object) -> None:
+        mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            ["--output", "json", "tasks", "create", str(_POST_ID), "--title", "T"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == snapshot
+
+    # criterio: 02-C08
+    def test_help_lists_options(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["tasks", "create", "--help"], env=BASE_ENV)
+        assert result.exit_code == 0
+        for option in ("--title", "--expiration", "--timezone", "--watcher-user", "--json"):
+            assert option in result.output

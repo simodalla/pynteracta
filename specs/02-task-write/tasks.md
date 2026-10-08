@@ -109,7 +109,7 @@ leggono prima del commit.
   3. Controlli bloccanti; commit `feat(cli): exit code 9 per i conflitti, conferma delle operazioni
      distruttive e corpo da --json`.
 
-### [ ] T06 – Comando `tasks create`
+### [x] T06 – Comando `tasks create`
 
 - Criteri: 02-C08
 - Dipende da: T03, T05
