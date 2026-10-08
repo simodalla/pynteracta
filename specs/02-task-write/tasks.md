@@ -70,7 +70,7 @@ leggono prima del commit.
      exclude_none=True)`; ritorno `TaskWriteResult.from_create`.
   3. Controlli bloccanti; commit `feat(tasks): creazione di un task su un post (create, create_raw)`.
 
-### [ ] T04 – `TasksAPI.edit`, `edit_raw` e `delete`
+### [x] T04 – `TasksAPI.edit`, `edit_raw` e `delete`
 
 - Criteri: 02-C03 (edit), 02-C04, 02-C05, 02-C06
 - Dipende da: T03

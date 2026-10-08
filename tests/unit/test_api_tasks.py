@@ -13,7 +13,7 @@ import respx
 from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.tasks import TasksAPI
-from pynteracta.exceptions import TransportError
+from pynteracta.exceptions import ConcurrencyError, TransportError
 from pynteracta.models.generated import external_v2 as generated
 
 _TASK_ID = 7001
@@ -198,4 +198,89 @@ class TestTasksCreate:
         route = respx.post(_CREATE_PATH).mock(side_effect=httpx.ReadTimeout("timed out"))
         with pytest.raises(TransportError):
             TasksAPI(make_transport()).create(_POST_ID, title="T")
+        assert route.call_count == 1
+
+
+_EDIT_NEXT_OCC_TOKEN = 4
+_OCC_TOKEN = 3
+
+
+class TestTasksEdit:
+    # criterio: 02-C04
+    @respx.mock
+    def test_edit_sends_only_given_fields(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_task_response.json"))
+        )
+        result = TasksAPI(make_transport()).edit(
+            _TASK_ID, _OCC_TOKEN, title="T2", remove_watcher_user_ids=[_WATCHER_ID]
+        )
+        assert route.call_count == 1
+        assert _sent_body(route) == {"title": "T2", "removeWatcherUserIds": [_WATCHER_ID]}
+        assert result.next_occ_token == _EDIT_NEXT_OCC_TOKEN
+        assert result.task_id == _TASK_ID
+        assert result.task is not None
+        assert result.task.title == "Review quarterly report (updated)"
+
+    # criterio: 02-C04
+    @respx.mock
+    def test_edit_raw_equivalent(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_task_response.json"))
+        )
+        result = TasksAPI(make_transport()).edit_raw(
+            _TASK_ID,
+            _OCC_TOKEN,
+            generated.EditTaskRequestDTO(title="T2", removeWatcherUserIds=[_WATCHER_ID]),
+        )
+        assert _sent_body(route) == {"title": "T2", "removeWatcherUserIds": [_WATCHER_ID]}
+        assert result.next_occ_token == _EDIT_NEXT_OCC_TOKEN
+
+    # criterio: 02-C04
+    @respx.mock
+    def test_edit_without_fields_sends_empty_body(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_task_response.json"))
+        )
+        TasksAPI(make_transport()).edit(_TASK_ID, _OCC_TOKEN)
+        assert _sent_body(route) == {}
+
+    # criterio: 02-C03
+    @respx.mock
+    def test_edit_naive_expiration_raises_before_request(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(return_value=httpx.Response(200, json={}))
+        with pytest.raises(ValueError, match="timezone"):
+            TasksAPI(make_transport()).edit(
+                _TASK_ID, _OCC_TOKEN, expiration=datetime(2026, 12, 31, 18, 0)
+            )
+        assert route.call_count == 0
+
+    # criterio: 02-C05
+    @respx.mock
+    def test_edit_409_raises_concurrency_error_once(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(_HTTP_409, json={"message": "occToken mismatch"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            TasksAPI(make_transport()).edit(_TASK_ID, _OCC_TOKEN, title="T2")
+        assert exc_info.value.status_code == _HTTP_409
+        assert route.call_count == 1
+
+
+class TestTasksDelete:
+    # criterio: 02-C06
+    @respx.mock
+    def test_delete_returns_post_id(self) -> None:
+        route = respx.delete(_DELETE_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("delete_task_response.json"))
+        )
+        post_id = TasksAPI(make_transport()).delete(_TASK_ID)
+        assert route.call_count == 1
+        assert post_id == _POST_ID
+
+    # criterio: 02-C06
+    @respx.mock
+    def test_delete_without_body_returns_none(self) -> None:
+        route = respx.delete(_DELETE_PATH).mock(return_value=httpx.Response(200))
+        assert TasksAPI(make_transport()).delete(_TASK_ID) is None
         assert route.call_count == 1

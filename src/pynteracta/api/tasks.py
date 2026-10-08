@@ -9,11 +9,17 @@ from typing import Any
 from pynteracta.api._base import ResourceClient
 from pynteracta.api._utils import build_write_body, zoned_datetime_input
 from pynteracta.models.facade.tasks import Task, TaskWriteResult
-from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO
+from pynteracta.models.generated.external_v2 import (
+    CreateTaskRequestDTO,
+    DeleteTaskResponseDTO,
+    EditTaskRequestDTO,
+)
 from pynteracta.transport import HttpTransport
 
 _GET_TASK_PATH = "communication/tasks/data/task-detail-by-id/{task_id}"
 _CREATE_TASK_PATH = "communication/tasks/manage/create-task/{post_id}"
+_EDIT_TASK_PATH = "communication/tasks/manage/edit-task/{task_id}/{occ_token}"
+_DELETE_TASK_PATH = "communication/tasks/manage/delete-task/{task_id}"
 
 # Elementi di sub-task e allegati: dict nella forma del DTO oppure il modello generato.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -90,6 +96,91 @@ class TasksAPI(ResourceClient):
         return TaskWriteResult.from_create(
             self._post(path, json=req.model_dump(mode="json", exclude_none=True))
         )
+
+    def edit(  # noqa: PLR0913
+        self,
+        task_id: int,
+        occ_token: int,
+        *,
+        title: str | None = None,
+        description_delta: str | None = None,
+        description_plain_text: str | None = None,
+        expiration: datetime | None = None,
+        priority: int | None = None,
+        sub_tasks: WriteItems = None,
+        assignee_user_id: int | None = None,
+        assignee_group_id: int | None = None,
+        add_attachments: WriteItems = None,
+        remove_attachment_ids: list[int] | None = None,
+        add_watcher_user_ids: list[int] | None = None,
+        remove_watcher_user_ids: list[int] | None = None,
+        add_watcher_group_ids: list[int] | None = None,
+        remove_watcher_group_ids: list[int] | None = None,
+    ) -> TaskWriteResult:
+        """PUT ``/communication/tasks/manage/edit-task/{taskId}/{occToken}``.
+
+        ``occ_token`` è il token di concorrenza letto con :meth:`get` (``Task.occ_token``): se il
+        task è cambiato nel frattempo il server risponde ``409`` e viene sollevata
+        :class:`~pynteracta.exceptions.ConcurrencyError`; la libreria non rilegge e non riprova.
+        Il corpo contiene solo i campi passati; l'effetto sui campi omessi è deciso dal server.
+
+        Args:
+            task_id: Il task da modificare.
+            occ_token: Token di concorrenza ottimistica del task letto.
+            title: Titolo.
+            description_delta: Descrizione in formato Quill delta (JSON).
+            description_plain_text: Descrizione in testo semplice.
+            expiration: Scadenza, ``datetime`` con fuso.
+            priority: Priorità.
+            sub_tasks: Sub-task, nella forma di ``SubTaskDTO``.
+            assignee_user_id: Utente assegnatario.
+            assignee_group_id: Gruppo assegnatario.
+            add_attachments: Allegati da aggiungere (``InputTaskAttachmentDTO``).
+            remove_attachment_ids: Allegati da togliere.
+            add_watcher_user_ids: Utenti osservatori da aggiungere.
+            remove_watcher_user_ids: Utenti osservatori da togliere.
+            add_watcher_group_ids: Gruppi osservatori da aggiungere.
+            remove_watcher_group_ids: Gruppi osservatori da togliere.
+
+        Returns:
+            Un :class:`~pynteracta.models.facade.tasks.TaskWriteResult`; ``next_occ_token`` è il
+            token per la modifica successiva.
+        """
+        body = build_write_body(
+            title=title,
+            description_delta=description_delta,
+            description_plain_text=description_plain_text,
+            expiration=zoned_datetime_input(expiration) if expiration is not None else None,
+            priority=priority,
+            sub_tasks=sub_tasks,
+            assignee_user_id=assignee_user_id,
+            assignee_group_id=assignee_group_id,
+            add_attachments=add_attachments,
+            remove_attachment_ids=remove_attachment_ids,
+            add_watcher_user_ids=add_watcher_user_ids,
+            remove_watcher_user_ids=remove_watcher_user_ids,
+            add_watcher_group_ids=add_watcher_group_ids,
+            remove_watcher_group_ids=remove_watcher_group_ids,
+        )
+        path = _EDIT_TASK_PATH.format(task_id=task_id, occ_token=occ_token)
+        return TaskWriteResult.from_edit(self._put(path, json=body))
+
+    def edit_raw(self, task_id: int, occ_token: int, req: EditTaskRequestDTO) -> TaskWriteResult:
+        """Come :meth:`edit`, da un ``EditTaskRequestDTO`` già costruito."""
+        path = _EDIT_TASK_PATH.format(task_id=task_id, occ_token=occ_token)
+        return TaskWriteResult.from_edit(
+            self._put(path, json=req.model_dump(mode="json", exclude_none=True))
+        )
+
+    def delete(self, task_id: int) -> int | None:
+        """DELETE ``/communication/tasks/manage/delete-task/{taskId}``.
+
+        Returns:
+            L'id del post che conteneva il task (``postId`` della risposta), se il server lo
+            restituisce.
+        """
+        path = _DELETE_TASK_PATH.format(task_id=task_id)
+        return DeleteTaskResponseDTO.model_validate(self._delete(path)).postId
 
     def get(self, task_id: int) -> Task:
         """GET ``/communication/tasks/data/task-detail-by-id/{taskId}``.
