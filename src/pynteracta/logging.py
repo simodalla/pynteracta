@@ -26,6 +26,12 @@ _JWT_RE = re.compile(r"eyJ[A-Za-z0-9+/._\-]{10,}")
 # Body fields whose *key* (case-insensitive) should always be redacted.
 _SENSITIVE_KEY_RE = re.compile(r"(?i)token|password|secret|privatekey|assertion|jwt")
 
+# Header il cui intero valore è sempre redatto, per nome (confronto in minuscolo): la lista fissa
+# degli header di autenticazione standard più un pattern sul nome, simmetrico a quello delle chiavi
+# dei body. ``api[-_]?key`` copre ``X-Api-Key`` e ``x_api_key``.
+_SENSITIVE_HEADER_NAMES = frozenset({"authorization", "proxy-authorization"})
+_SENSITIVE_HEADER_RE = re.compile(r"(?i)token|secret|password|api[-_]?key")
+
 _AUDIT_LOGGER_NAME = "pynteracta.audit"
 _AUDIT_RAW_WARNED = False
 
@@ -41,14 +47,16 @@ def redact_string(value: str) -> str:
 
 
 def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
-    """Return a copy of *headers* with the Authorization value blanked out.
+    """Return a copy of *headers* with sensitive values blanked out.
 
-    Any remaining header value that contains a JWT-shaped token is also
-    redacted via :func:`redact_string`.
+    Gli header ``Authorization`` e ``Proxy-Authorization``, e quelli il cui nome contiene
+    ``token``, ``secret``, ``password`` o ``api-key``, perdono l'intero valore qualunque sia la
+    sua forma. Ogni altro valore passa da :func:`redact_string`, che sostituisce i JWT.
     """
     result: dict[str, str] = {}
     for k, v in headers.items():
-        if k.lower() == "authorization":
+        name = k.lower()
+        if name in _SENSITIVE_HEADER_NAMES or _SENSITIVE_HEADER_RE.search(name):
             result[k] = _REDACTED
         else:
             result[k] = redact_string(v)

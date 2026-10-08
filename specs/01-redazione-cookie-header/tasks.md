@@ -10,7 +10,7 @@ in Conventional Commits con descrizione in italiano.
 
 ## Elenco
 
-### [ ] T01 – Header redatti per nome in `redact_headers`
+### [x] T01 – Header redatti per nome in `redact_headers`
 
 - Criteri: 01-C05, 01-C06, 01-C07, 01-C08
 - Dipende da: nessuno

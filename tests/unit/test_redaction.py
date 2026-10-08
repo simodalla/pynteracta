@@ -55,6 +55,50 @@ class TestRedactHeaders:
         result = redact_headers(original)
         assert result is not original
 
+    # criterio: 01-C05
+    @pytest.mark.parametrize(
+        "name",
+        ["Authorization", "authorization", "Proxy-Authorization", "PROXY-AUTHORIZATION"],
+    )
+    def test_auth_headers_redacted_by_name(self, name: str) -> None:
+        """Il valore è redatto per nome, anche se non ha la forma di un JWT (Basic user:pass)."""
+        result = redact_headers({name: "Basic dXNlcjpwYXNz"})
+        assert result[name] == _REDACTED
+
+    # criterio: 01-C06
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "X-Api-Key",
+            "x-api-key",
+            "X_API_KEY",
+            "X-Auth-Token",
+            "X-Refresh-Token",
+            "X-Secret",
+            "X-Password",
+        ],
+    )
+    @pytest.mark.parametrize("value", ["opaque-value-1234", ""])
+    def test_sensitive_header_names_redacted(self, name: str, value: str) -> None:
+        result = redact_headers({name: value})
+        assert result[name] == _REDACTED
+
+    # criterio: 01-C07
+    def test_non_sensitive_headers_untouched(self) -> None:
+        headers = {
+            "Content-Type": "application/json",
+            "X-Request-Id": "abc-123",
+            "WWW-Authenticate": 'Bearer error="invalid_token"',
+            "Date": "Thu, 02 Jul 2026 16:06:04 GMT",
+            "User-Agent": "pynteracta/0.9.4",
+        }
+        assert redact_headers(headers) == headers
+
+    # criterio: 01-C08
+    def test_jwt_embedded_in_other_header_only_jwt_redacted(self) -> None:
+        result = redact_headers({"X-Custom": f"before {_FAKE_JWT} after"})
+        assert result["X-Custom"] == f"before {_REDACTED} after"
+
 
 class TestRedactBody:
     @pytest.mark.parametrize(
