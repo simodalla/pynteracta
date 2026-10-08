@@ -14,7 +14,7 @@ numeri; `/sddpa:verifica` li aggiorna quando migliorano. Non si modifica a mano.
 | `uv run ruff check .` | verde ("All checks passed!") |
 | `uv run ruff format --check .` | verde (104 file già formattati) |
 | `uv run mypy src` | verde (52 file, nessun errore) |
-| `uv run pytest -m "not integration and not contract"` | verde (717 test, 67 snapshot) |
+| `uv run pytest -m "not integration and not contract"` | verde (751 test, 67 snapshot; 717 all'adozione) |
 | `uv run pytest -m contract` | verde (87 test) |
 
 Esclusi dai controlli del metodo: `uv run pytest -m integration` (20 test opt-in contro un tenant
@@ -33,14 +33,14 @@ sotto `src/pynteracta/`.
 
 | Ambito | Copertura |
 |---|---|
-| Totale | 93,15 % (3849/4132 righe) |
+| Totale | 93,18 % (3865/4148 righe; 93,15 % all'adozione) |
 | `api` | 96,02 % |
 | `cli` | 89,31 % |
 | `models/facade` | 94,74 % |
 | `auth.py` | 94,01 % |
 | `client.py` | 96,70 % |
 | `config.py` | 98,86 % |
-| `logging.py` | 93,41 % |
+| `logging.py` | 94,39 % (101/107; 93,41 % all'adozione) |
 | `pagination.py` | 93,02 % |
 | `transport.py` | 97,84 % |
 | `exceptions.py`, `hooks.py`, `urls.py`, `__init__.py` | 100 % |
@@ -52,9 +52,11 @@ Il file meno coperto è `cli/communities.py` (53 %).
 Trovate con una ricerca ragionevole nel codice e confermate dal maintainer, non con un audit
 completo.
 
-| Id | Regola | Dove | Descrizione |
-|---|---|---|---|
-| P-01 | Token e segreti mai nei log | `src/pynteracta/logging.py` (`redact_headers`) | Redige solo `Authorization` e i valori a forma di JWT. L'header `Set-Cookie` della risposta di login porta `interacta_auth_refresh_token=<hex>`, che non è un JWT: con l'audit log attivo finisce in chiaro negli header di `audit.response` (`transport.py`, evento `audit.response`). v0.9.3 ha redatto body e header ma non copre questo caso. |
+| Id | Regola | Dove | Descrizione | Stato |
+|---|---|---|---|---|
+| P-01 | Token e segreti mai nei log | `src/pynteracta/logging.py` (`redact_headers`) | Redigeva solo `Authorization` e i valori a forma di JWT. L'header `Set-Cookie` della risposta di login porta `interacta_auth_refresh_token=<hex>`, che non è un JWT: con l'audit log attivo finiva in chiaro negli header di `audit.response`. v0.9.3 aveva redatto body e header ma non copriva questo caso. | **chiusa** dalla [spec 01](../01-redazione-cookie-header/spec.md) il 2026-10-08 (commit `1129894`) |
+
+Nessuna violazione aperta.
 
 ## Cosa fa già l'applicazione
 
@@ -86,3 +88,4 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 | Data | Spec | Cosa è cambiato |
 |---|---|---|
 | 2026-10-08 | – | Linea di partenza iniziale |
+| 2026-10-08 | 01 | P-01 chiusa; copertura totale 93,15 % → 93,18 %, `logging.py` 93,41 % → 94,39 %; unit test 717 → 751 |

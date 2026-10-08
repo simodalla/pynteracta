@@ -1522,3 +1522,43 @@ documentation only — `src/` is untouched, so installed behaviour is identical 
   registration.
 - A `0.4.31` "sunset" release warning old users in-band was considered and not planned
   (**Q-v0.9.4-2**) — it would require resurrecting the old codebase to build.
+
+---
+
+## M27 — Redazione di cookie e header sensibili nei log e nei hook — completata 2026-10-08
+
+Prima spec del metodo spec-driven (`sddpa` 0.3.0): [`specs/01-redazione-cookie-header/`](specs/01-redazione-cookie-header/)
+(`spec.md`, `plan.md`, `tasks.md`, `verifica.md`). Chiude **P-01** della
+[linea di partenza](specs/00-partenza/partenza.md). Patch `0.9.5`, release rimandata alla prossima spec.
+
+### Fatto
+
+- `redact_headers()` redige per nome l'intero valore di `Authorization`, `Proxy-Authorization` e di
+  ogni header il cui nome contiene `token`, `secret`, `password` o `api-key` (01-T01, `859b61e`).
+- In `Cookie` e `Set-Cookie` ogni cookie perde il valore e conserva nome e attributi, anche quando
+  httpx unisce più `Set-Cookie` con una virgola; un valore senza `=` o con virgolette è redatto per
+  intero. Il cookie di refresh del login non compare più in `ResponseInfo`, negli eventi `audit.*`
+  su console e file, né con `audit_raw` (01-T02, `1129894`).
+- Test del processore structlog e dell'handler di file (01-T03, `6c45645`); pagina "Audit Logging"
+  con le garanzie nuove e un test che le verifica (01-T04, `4c3dd5f`, `3a305e5`); PRD con RNF-001
+  precisato e RF-017, RF-018, RNF-001 confermati (01-T05, `df4e936`).
+- 34 test nuovi (717 → 751); copertura 93,15 % → 93,18 %, `logging.py` 93,41 % → 94,39 %.
+
+### Decisioni oltre la spec
+
+- Nessuna sul comportamento. Tre scostamenti dal piano sui soli test, dichiarati nei commit: il
+  canale file si prova con `setup_default_logging` più un fixture che ripristina la configurazione
+  di structlog e ne spegne la cache (altrimenti `capture_logs` dei test successivi non vede più i
+  proxy del transport); l'handler di file riceve l'evento da un logger `wrap_logger` sulla stessa
+  catena; 01-C11 ha un test con marker invece del solo controllo in verifica (emerso alla prima
+  verifica, `29b9fa4`).
+
+### Follow-up
+
+- `pre-commit run --all-files` è rosso su file non toccati: `end-of-file-fixer` e
+  `trailing-whitespace` (`.gitignore`, `CHANGELOG.md`, snapshot `.ambr`) e `mypy` (`ruamel.yaml`
+  mancante tra le `additional_dependencies` del hook). Branch `bugfix_precommit_hooks`.
+- `cli/communities.py` al 53 % di copertura (dalla linea di partenza).
+- Cookie jar di `httpx.Client` (conserva il cookie di refresh in memoria): fuori ambito della spec,
+  spec a parte se si vuole svuotarlo.
+- Release 0.9.5 con la prossima spec; la riga in ROADMAP resta ⏳ fino ad allora.

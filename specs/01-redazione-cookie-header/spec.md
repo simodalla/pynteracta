@@ -1,6 +1,6 @@
 # 01 – Redazione di cookie e header sensibili nei log e nei hook
 
-Stato: approvata
+Stato: chiusa
 Branch: `m27_redazione_cookie_header`
 Requisiti del PRD: RNF-001, RF-017, RF-018
 Dipende da: nessuna
