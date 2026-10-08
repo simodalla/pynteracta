@@ -217,3 +217,5 @@ Plugin: `sddpa` 0.3.0. Regole del metodo in `riferimenti/metodo.md` del plugin.
 Italiano per comunicazione, documenti, messaggi di commit e interfaccia, e per commenti e docstring
 del codice nuovo o modificato. Nomi tecnici di classi, funzioni e variabili in inglese. Il codice e
 la documentazione esistenti sono in inglese: restano come sono finché una modifica non li tocca.
+Eccezione: l'interfaccia utente della CLI (help, prompt, messaggi) resta in inglese, per coerenza
+con la CLI e il sito esistenti (decisione della spec 02).

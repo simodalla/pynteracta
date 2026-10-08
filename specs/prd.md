@@ -61,6 +61,8 @@ Confermato dal maintainer il 2026-10-08.
 - RF-008. Cataloghi: elenco dei cataloghi e delle voci, con iterazione.
 - RF-009. Allegati: elenco per post, dettaglio per id, controllo di visibilità.
 - RF-010. Task: dettaglio per id.
+  - RF-022a. La lettura di un task espone `occ_token`, il token di concorrenza da passare alla
+    modifica. *(Spec 02, 2026-10-08.)*
 - RF-011. Gruppi: elenco, membri di un gruppo, form di modifica.
 - RF-012. Hashtag di una community.
 - RF-013. Form di modifica dell'area admin (sola lettura): workspace, catalogo, voce di catalogo,
@@ -70,6 +72,8 @@ Confermato dal maintainer il 2026-10-08.
 - RF-015. Output CLI componibile: `table` (default), `json`, `yaml`; `--full` e `--fields` per la
   selezione dei campi; `--web-url` per i deep link; `--export` su csv/json/yaml/parquet, formato
   dedotto dall'estensione (`yaml` e `parquet` sono extra opzionali).
+  - RF-015a. La CLI termina con exit code `9` quando una scrittura fallisce per conflitto di
+    concorrenza (`409`), distinto dagli altri errori. *(Spec 02, 2026-10-08.)*
 - RF-016. Configurazione: profili in `config.toml` (`platformdirs`, override con
   `PYNTERACTA_CONFIG_FILE`), variabili `PYNTERACTA_*`, flag globali della CLI; precedenza flag >
   env > file > default; comandi `config profile|add-profile|set|use-profile|remove-profile` che
@@ -86,16 +90,21 @@ Confermato dal maintainer il 2026-10-08.
 - RF-020. Deep link web (`WebUrls`) a post, utenti e community a partire da `base_url` e
   `base_path`.
 
-Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): non ancora
-implementate alla 0.9.4; ogni spec che le realizza ne precisa i dettagli. Stessa forma delle
-letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test unit e contract).
+Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): ogni spec
+che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0; le
+altre non ancora implementate). Stessa forma delle letture (façade con `.raw`, kwargs espliciti
+più `*_raw`, comando CLI, test unit e contract).
 
 - RF-021. Post e commenti: creazione e modifica di post e post-evento (dati, campi custom,
   allegati, watcher, dati di screen del workflow), transizione di workflow, copia, eliminazione e
   marcatura per cancellazione, risposta di partecipazione a un evento, creazione di commenti; con
   gli helper di lettura propedeutici (`post-data-for-create|edit|copy`, `event-post-data-for-*`,
   `post-workflow-screen-data-for-edit`).
-- RF-022. Task: creazione, modifica, eliminazione.
+- RF-022. Task: creazione, modifica, eliminazione. La libreria invia solo i campi passati, in una
+  sola richiesta; `edit` riceve l'`occToken` dal chiamante. Il server tratta la modifica come una
+  sostituzione (i campi omessi sono azzerati, tranne watcher e allegati, che hanno coppie
+  add/remove) ed esige assegnatario e scadenza: lo dice la documentazione, la libreria non aggiunge
+  nulla da sola. *(Confermato dal maintainer il 2026-10-08, spec 02.)*
 - RF-023. Anagrafiche admin: creazione, modifica, eliminazione e credenziali degli utenti;
   creazione, modifica, eliminazione e membri dei gruppi; creazione, modifica e flag `deleted` di
   cataloghi e voci; modifica del workspace.
@@ -103,7 +112,14 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
   propedeutico agli allegati dei post.
 - RF-025. Concorrenza ottimistica: dove l'API richiede un `occToken`, la libreria lo espone al
   chiamante e mappa il `409` su `ConcurrencyError`; non rilegge e non riprova da sola. Le
-  operazioni distruttive nella CLI chiedono conferma esplicita.
+  operazioni distruttive nella CLI chiedono conferma esplicita. *(Confermato dal maintainer il
+  2026-10-08, spec 02.)*
+  - RF-025a. `tasks delete` (e i comandi distruttivi futuri) chiede conferma mostrando id e titolo;
+    `--yes` la salta; senza terminale interattivo e senza `--yes` il comando rifiuta con exit code
+    `2` e non invia nulla. *(Spec 02, 2026-10-08.)*
+  - RF-025b. `tasks edit` modifica solo i campi indicati: rilegge il task e rimanda gli altri,
+    perché il server sostituisce il task intero; `--occ-token` impone solo il token. *(Spec 02,
+    2026-10-08, dopo la prova sul tenant.)*
 
 ## 4. Requisiti non funzionali
 
@@ -133,7 +149,11 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
 - RNF-009. Nessuna operazione ripetuta in automatico verso Interacta (ADR 0001, regola non
   negoziabile): una scrittura che fallisce in modo incerto (timeout, errore di rete) non si ritenta
   da sola, l'errore risale al chiamante con esito sconosciuto; un futuro retry/backoff vale solo
-  per le letture.
+  per le letture. *(Confermato dal maintainer il 2026-10-08, spec 02.)*
+- RNF-010. Le date-ora di scrittura (`expiration`) accettano solo `datetime` con fuso orario e
+  arrivano al server come data-ora locale più nome IANA del fuso (offset fisso → UTC); la CLI
+  interpreta i valori senza offset nel fuso `--timezone` (predefinito `Europe/Rome`). *(Spec 02,
+  2026-10-08.)*
 
 ## 5. Integrazioni esterne
 
@@ -162,7 +182,9 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
 - **Dati scritti sul tenant** (dalle spec di scrittura, ADR 0001): anagrafiche di utenti
   (compresi i dati di credenziale), appartenenze ai gruppi, contenuti di post, commenti, task e
   allegati forniti dal chiamante. La libreria li inoltra al tenant così come li riceve; non li
-  conserva e non li logga (eccezione: audit log con `audit_log_bodies`, come sopra).
+  conserva e non li logga (eccezione: audit log con `audit_log_bodies`, come sopra). *(Confermato
+  dal maintainer il 2026-10-08, spec 02: titolo e descrizione dei task, id di assegnatari e
+  watcher.)*
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -188,3 +210,6 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
   come base di un server MCP non ufficiale.
 - 2026-10-08: RNF-001 precisato dalla [spec 01](01-redazione-cookie-header/spec.md) (cookie e
   header redatti per nome); RF-017, RF-018 e RNF-001 confermati dal maintainer.
+- 2026-10-08: [spec 02](02-task-write/spec.md) (scrittura dei task, 0.10.0): RF-022 precisato con
+  la semantica del server; nuovi RF-022a, RF-015a, RF-025a, RF-025b, RNF-010; RF-022, RF-025,
+  RNF-009 e la voce "Dati scritti sul tenant" di §6 confermati dal maintainer.

@@ -262,7 +262,7 @@ leggono prima del commit.
   5. Controlli bloccanti, `uv run mkdocs build --strict`; commit `feat(cli): tasks edit conserva i
      campi non indicati rileggendo il task`.
 
-### [ ] T12 – Chiusura: PRD, `CLAUDE.md`, nota sui campi omessi
+### [x] T12 – Chiusura: PRD, `CLAUDE.md`, nota sui campi omessi
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T11)
 - Dipende da: T09, T11, T13
