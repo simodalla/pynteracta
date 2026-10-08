@@ -59,12 +59,15 @@ class TestTasksWriteIntegration:
     """Ciclo completo di scrittura su un post di una community di prova (spec 02).
 
     Le stampe ``[T11]`` servono al maintainer per annotare il formato reale di ``expiration`` e
-    l'effetto dei campi omessi in ``edit`` (task manuale T11 della spec 02).
+    l'effetto dei campi omessi in ``edit`` (task manuale T11 della spec 02). Il tenant esige
+    ``assignee`` (400 INVALID_VALUE senza) ed ``expiration`` (500 senza) sia in create sia in edit,
+    anche se il swagger non li marca obbligatori: si usano l'utente di test e una scadenza fissa.
     """
 
     # criterio: 02-C16
     def test_create_edit_delete_cycle(self, client: InteractaClient) -> None:
         post_id = int(_require_env("PYNTERACTA_TEST_WRITE_POST_ID"))
+        assignee_user_id = int(_require_env("PYNTERACTA_TEST_USER_ID"))
         client_uid = f"pynteracta-it-{int(time.time())}"
         expiration = datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome"))
         with client:
@@ -74,6 +77,7 @@ class TestTasksWriteIntegration:
                 description_plain_text="Created by the write integration test; safe to delete.",
                 priority=1,
                 expiration=expiration,
+                assignee_user_id=assignee_user_id,
                 client_uid=client_uid,
             )
             task_id = created.task_id
@@ -88,13 +92,20 @@ class TestTasksWriteIntegration:
                     f"[T11] get: priority={task.priority} expiration={task.expiration!r} "
                     f"occ_token={task.occ_token}"
                 )
-                edited = client.tasks.edit(task_id, task.occ_token, title=_WRITE_TITLE_EDITED)
+                edited = client.tasks.edit(
+                    task_id,
+                    task.occ_token,
+                    title=_WRITE_TITLE_EDITED,
+                    expiration=expiration,
+                    assignee_user_id=assignee_user_id,
+                )
                 assert edited.next_occ_token is not None
                 after = client.tasks.get(task_id)
                 assert after.title == _WRITE_TITLE_EDITED
                 print(
-                    f"[T11] after edit with title only: priority={after.priority} "
-                    f"expiration={after.expiration!r} (before: priority=1, expiration set)"
+                    f"[T11] after edit without priority/description: priority={after.priority} "
+                    f"description={after.description_plain_text!r} "
+                    "(before: priority=1, description set)"
                 )
             finally:
                 deleted_post = client.tasks.delete(task_id)

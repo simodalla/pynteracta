@@ -27,13 +27,13 @@ Fixture JSON e contract test per i cinque DTO; integration test opt-in a ciclo c
 | `src/pynteracta/api/tasks.py` | modificato | `create`, `create_raw`, `edit`, `edit_raw`, `delete`; costanti dei tre percorsi; docstring Google con i campi |
 | `src/pynteracta/models/facade/tasks.py` | modificato | `Task.occ_token`; `TaskWriteResult(raw: CreateTaskResponseDTO \| EditTaskResponseDTO)` con `task_id`, `next_occ_token`, `task: generated.TaskDetailDTO1 \| None`, `capabilities: TaskCapabilities \| None`, `from_create(data)`, `from_edit(data)` |
 | `src/pynteracta/cli/_common.py` | modificato | `EXIT_CONFLICT = 9`; `ConcurrencyError: EXIT_CONFLICT` in `_EXIT_MAP`; `_stdin_is_interactive()` (wrapper di `sys.stdin.isatty()`, sostituibile nei test); `confirm_destructive(prompt, *, yes) -> bool` (True con `--yes`; prompt `typer.confirm` se interattivo; altrimenti messaggio `--yes is required when not running interactively` ed `Exit(EXIT_CONFIG)`); `load_json_body(source: str \| None, dto_cls) -> dict` (file o `-` = stdin; JSON non valido o chiavi fuori da `dto_cls.model_fields` → messaggio ed `Exit(EXIT_CONFIG)`) |
-| `src/pynteracta/cli/tasks.py` | modificato | comandi `create`, `edit`, `delete`; opzioni condivise (`--title`, `--description`, `--expiration`, `--timezone`, `--priority`, `--assignee-user`, `--assignee-group`, `--watcher-user`, `--watcher-group`, `--client-uid`, `--json`); `_parse_expiration(value, timezone)` (ISO 8601 via `datetime.fromisoformat`; senza offset → `ZoneInfo(timezone)`, `ZoneInfoNotFoundError` → `Exit(EXIT_CONFIG)`); `_merge_body(flags, json_body)` (flag prevalgono campo per campo); tabella curata di `create`/`edit` (id, post_id, title, state, priority, expiration, assignee) |
+| `src/pynteracta/cli/tasks.py` | modificato | comandi `create`, `edit`, `delete`; opzioni condivise (`--title`, `--description`, `--expiration`, `--timezone`, `--priority`, `--assignee-user`, `--assignee-group`, `--watcher-user`, `--watcher-group`, `--client-uid`, `--json`); `_parse_expiration(value, timezone)` (ISO 8601 via `datetime.fromisoformat`; senza offset → `ZoneInfo(timezone)`, `ZoneInfoNotFoundError` → `Exit(EXIT_CONFIG)`); `_merge_body(flags, json_body)` (flag prevalgono campo per campo); tabella curata di `create`/`edit` (id, post_id, title, state, priority, expiration, assignee). **Dopo T11**: `_edit_base(task: Task) -> dict` (corpo camelCase dal task letto: `title`, `descriptionDelta`, `expiration` → `{"datetime": localDatetime, "timezone": timezone}`, `priority`, `assigneeUserId`/`assigneeGroupId` dagli `id` di `assigneeUser`/`assigneeGroup`, `subTasks` → `[{id, description, state}]`; le chiavi `None` non si mettono) e `_drop_delta_if_plain(merged)` (se `descriptionPlainText` è presente, `descriptionDelta` si toglie) |
 | `tests/unit/test_api_tasks.py` | modificato | 02-C01…C07, 02-C13 |
 | `tests/unit/test_cli_tasks.py` | modificato | 02-C08…C12 (snapshot syrupy per la tabella di `create`) |
 | `tests/unit/test_cli_common.py` | nuovo | caratterizzazione di `error_exit_code` (mappa attuale) prima di aggiungere il 409; test di `confirm_destructive` e `load_json_body` |
 | `tests/unit/test_api_utils.py` | nuovo | `zoned_datetime_input`: ZoneInfo, UTC, offset fisso, naive (02-C03); `build_write_body` |
 | `tests/fixtures/payloads/create_task_response.json`, `edit_task_response.json`, `delete_task_response.json` | nuovi | risposte sagomate sul swagger, con `taskData` completo e `nextOccToken`; dati finti |
-| `tests/fixtures/payloads/get_task_detail_response.json` | invariato | ha già `occToken`: lo usano 02-C07 e 02-C09 (il valore atteso nei test è quello della fixture) |
+| `tests/fixtures/payloads/get_task_detail_response.json` | modificato (dopo T11) | ha già `occToken`: lo usano 02-C07 e 02-C17. La `expiration` passa dalla forma inventata `{dateTime, zoneId}` a quella reale del server `{zonedDatetime, localDatetime, timezone}` (osservata in T11), così la base di `tasks edit` si testa su dati veri; gli snapshot di `tasks get` che la mostrano si rigenerano e si leggono |
 | `tests/contract/test_models.py` | modificato | 02-C14: `assert_superset` per `CreateTaskRequestDTO`, `CreateTaskResponseDTO`, `EditTaskRequestDTO`, `EditTaskResponseDTO`, `DeleteTaskResponseDTO`, `ZonedDatetimeInputDTO1`, `TaskDetailDTO1`; smoke `TaskWriteResult.from_create/from_edit` sulle fixture |
 | `tests/integration/test_tasks_integration.py` | modificato | 02-C16: classe `TestTasksWriteIntegration`, ciclo `create → get → edit → delete` con `finally` |
 | `tests/integration/.env.example`, `docs/testing.md` | modificati | `PYNTERACTA_TEST_WRITE_POST_ID` |
@@ -70,9 +70,11 @@ tasks create POST_ID    → flags → dict camelCase (expiration via _parse_expi
                         → merged = {**json_body, **flags_non_none}
                         → client.tasks.create_raw(POST_ID, CreateTaskRequestDTO.model_validate(merged))
                         → render_output([result], curated, …)
-tasks edit TASK_ID      → occ = --occ-token oppure client.tasks.get(TASK_ID).occ_token
-                            (occ_token None dal server → messaggio ed Exit(EXIT_GENERIC))
-                        → merged come sopra con EditTaskRequestDTO
+tasks edit TASK_ID      → task = client.tasks.get(TASK_ID)                      (sempre, dopo T11)
+                        → occ = --occ-token oppure task.occ_token
+                            (occ_token None dal server e nessun --occ-token → messaggio ed Exit(EXIT_GENERIC))
+                        → merged = {**_edit_base(task), **json_body, **flags_non_none}
+                        → _drop_delta_if_plain(merged)
                         → client.tasks.edit_raw(TASK_ID, occ, EditTaskRequestDTO.model_validate(merged))
                         → render_output; ConcurrencyError → handle_error → EXIT_CONFLICT (9) con il
                           messaggio della spec (handle_error aggiunge il testo per ConcurrencyError)
@@ -135,19 +137,23 @@ il test che le usa.
 | 02-C06 | `::TestTasksDelete::test_delete_returns_post_id`: DELETE, `delete_task_response.json`, `route.call_count == 1` | unitario |
 | 02-C07 | `::TestTasksGet::test_occ_token_exposed` sulla fixture con `occToken: 5` | unitario |
 | 02-C08 | `test_cli_tasks.py::TestTasksCreate::test_flags_and_json_merge_flags_win` (file `body.json` in `tmp_path`, corpo della POST uguale al dict atteso), `::test_table_output` (snapshot), `::test_json_output` (snapshot) | unitario |
-| 02-C09 | `::TestTasksEdit::test_edit_reads_occ_token_then_puts` (route GET + PUT; `put_route.calls[0].request.url.path` termina con `/7001/5`); `::test_edit_with_occ_token_skips_get` (`get_route.call_count == 0`, path termina con `/7001/3`) | unitario |
+| 02-C09 | *sostituito da 02-C17*: i test di T07 che lo citano passano al marker 02-C17 e cambiano le attese sul corpo e sulla `GET` | — |
+| 02-C17 | `::TestTasksEdit::test_edit_reads_task_then_puts_patched_body` (route GET + PUT; PUT su `/7001/<occToken della fixture>`; corpo == base dalla fixture + `title`); `::test_edit_with_occ_token_still_reads_base` (`get_route.call_count == 1`, PUT su `/7001/3`, corpo con la base) | unitario |
+| 02-C18 | `::test_edit_description_flag_drops_delta` (`--description X` → `descriptionPlainText`, nessun `descriptionDelta`); `::test_edit_flags_win_over_json_over_read` (`--priority 3 --json` con `priority: 2, assigneeGroupId: 9` → `priority: 3`, `assigneeGroupId: 9`, `assigneeUserId` letto); `::test_edit_base_skips_missing_fields` (fixture senza `expiration`, `assigneeUser`, `subTasks` → chiavi assenti) | unitario |
 | 02-C10 | `::test_edit_conflict_exits_9_without_retry`: PUT → 409, `exit_code == 9`, messaggio della spec in `result.output`, `put_route.call_count == 1` | unitario |
 | 02-C11 | `::TestTasksDelete::test_prompt_shows_id_and_title_and_y_deletes` (monkeypatch `_stdin_is_interactive` → True, `input="y\n"`, DELETE chiamata, output `Task 7001 deleted (post 21269)`), `::test_prompt_n_does_nothing` (`input="n\n"`, `delete_route.call_count == 0`, `exit_code == 0`) | unitario |
 | 02-C12 | `::test_yes_skips_prompt` (nessun monkeypatch, `--yes`, DELETE chiamata, nessun `?` nell'output); `::test_non_interactive_without_yes_refuses` (`exit_code == 2`, messaggio `--yes is required…`, `delete_route.call_count == 0`); più `test_cli_common.py::test_confirm_destructive_*` per i tre rami dell'helper | unitario |
 | 02-C13 | `test_api_tasks.py::test_create_timeout_raises_transport_error_once`: `respx.post(...).mock(side_effect=httpx.ReadTimeout(...))`, `pytest.raises(TransportError)`, `route.call_count == 1` | unitario |
 | 02-C14 | `tests/contract/test_models.py::TestTaskWriteDTOs`: `assert_superset` per i 7 modelli; `test_facade_smoke_create`/`_edit` sulle fixture | contract |
 | 02-C15 | `test_docs_snippets.py::test_tasks_pages_document_write_commands` (marker 02-C15: `docs/cli.md` contiene `tasks create`, `tasks edit`, `tasks delete`, `--json`, `| 9 |`; `docs/api/tasks.md` contiene `create(`, `edit(`, `delete(`, `TaskWriteResult`, `occ_token`); `uv run mkdocs build --strict` nei controlli di verifica | unitario + verifica |
-| 02-C16 | `test_tasks_integration.py::TestTasksWriteIntegration::test_create_edit_delete_cycle`: skip senza `PYNTERACTA_TEST_WRITE_POST_ID`; `create` con titolo, `client_uid`, `expiration` → `get` → `edit` (titolo nuovo) → asserzioni sul round trip → `delete` in `finally`; dopo il delete `get` → `NotFoundError` | integrazione (opt-in) + verifica manuale |
+| 02-C16 | `test_tasks_integration.py::TestTasksWriteIntegration::test_create_edit_delete_cycle`: skip senza `PYNTERACTA_TEST_WRITE_POST_ID` o `PYNTERACTA_TEST_USER_ID`; `create` con titolo, `client_uid`, `expiration`, assegnatario → `get` → `edit` (titolo nuovo, scadenza e assegnatario ripassati) → asserzioni sul round trip → `delete` in `finally`; dopo il delete `get` → `NotFoundError` | integrazione (opt-in) + verifica manuale |
 
 Verifica manuale (dalla spec): l'esito di 02-C16 sul tenant di prova stabilisce il formato reale di
 `expiration` e la semantica dei campi omessi; si registra in `docs/api/tasks.md` e in `verifica.md`.
 Se il server rifiuta il formato della scadenza previsto da 02-C03, la correzione passa da una
-modifica della spec (criterio 02-C03), non da un aggiustamento silenzioso.
+modifica della spec (criterio 02-C03), non da un aggiustamento silenzioso. **Esito (T11,
+2026-10-08)**: formato accettato; campi omessi azzerati; da qui la revisione di `tasks edit`
+(02-C17, 02-C18) e il task T13.
 
 ## Scelte tecniche
 
@@ -165,13 +171,18 @@ modifica della spec (criterio 02-C03), non da un aggiustamento silenzioso.
 | `tasks delete` stampa testo o JSON senza `render_output` | `render_output` con una façade ad hoc | Non c'è un elenco di record da mostrare; `--output json` resta onorato |
 | Integration test nello stesso file dei task, con `finally` | file separato; nessuna pulizia | Convenzione del progetto (un file per risorsa, fixture `client` locale) |
 | Commit `feat(tasks):` per libreria e `feat(cli):` per i comandi | `feat:` unico | Scope come nella storia del progetto; semantic-release calcola 0.10.0 |
+| `tasks edit`: base dal task letto in `_edit_base`, unione piatta base < `--json` < flag, delta tolto se arriva un testo semplice (dopo T11) | unione nel comando; base costruita dal `Task` façade dentro `_merge_body`; `--replace` per saltare la base | Una funzione pura testabile da sola; `_merge_body` resta quella di `create`; nessuna opzione in più da spiegare |
+| `_edit_base` rimanda i `subTasks` letti con il loro `id` anche se il server li ricrea | ometterli (azzerati) | Perdere i sub-task per cambiare un titolo è peggio di vederli con un id nuovo; documentato in `docs/cli.md` |
 
 ## Rischi
 
 - **Formato della scadenza rifiutato dal server** → l'integration test lo scopre; se il server
   vuole un altro formato si corregge 02-C03 nella spec e `zoned_datetime_input`, non il test.
 - **Campi omessi azzerati dal server** → l'integration test lo scopre; la documentazione lo dice
-  come avviso; nessuna modifica alla libreria (decisione della spec).
+  come avviso; nessuna modifica alla libreria (decisione della spec). *Avverato in T11*: la CLI
+  diventa una patch (T13); la libreria resta com'è.
+- **Base di `tasks edit` costruita su una fixture inventata** → la fixture di `get` prende la forma
+  reale di `expiration` vista in T11, prima dei test di 02-C17.
 - **`taskData` come stub `RootModel`** → rivalidazione in `TaskDetailDTO1` come per le capabilities;
   se `TaskDetailDTO1` non copre tutte le proprietà, il contract test lo mostra (02-C14).
 - **`CliRunner` e stdin** → il prompt si testa sostituendo `_stdin_is_interactive`, mai leggendo

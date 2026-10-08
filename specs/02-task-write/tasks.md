@@ -197,7 +197,7 @@ leggono prima del commit.
   2. Controlli bloccanti (il test non entra nella suite unit); commit `test: integration test
      opt-in del ciclo di scrittura dei task`.
 
-### [ ] T11 – Esecuzione dell'integration test sul tenant di prova (manuale)
+### [x] T11 – Esecuzione dell'integration test sul tenant di prova (manuale)
 
 - Criteri: 02-C16 (esecuzione), verifica manuale della spec
 - Chi: maintainer
@@ -209,23 +209,73 @@ leggono prima del commit.
   (b) se dopo l'`edit` con il solo titolo gli altri campi (priority, expiration, watcher) sono
   rimasti invariati o azzerati; (c) eventuali errori. Se il formato della scadenza è rifiutato,
   fermarsi: si corregge la spec (02-C03) prima di T12.
-- Esito: <compilato a mano>
+- Esito (2026-10-08, tenant di prova, post 23310, eseguito da Claude con le variabili caricate
+  nella shell senza leggerle; task creati 2805–2815, tutti eliminati):
+  - (a) **Scadenza accettata** nel formato della spec. Il server la restituisce come
+    `{"zonedDatetime": "2026-12-31T18:00:00+01:00", "localDatetime": "2026-12-31T18:00:00",
+    "timezone": "Europe/Rome"}` sia nella risposta della create sia nella `get`. 02-C03 resta
+    com'è.
+  - (b) **`edit` è una sostituzione, non una patch**: con `title`, `expiration` e
+    `assignee_user_id` inviati e `priority` e `description_plain_text` omessi, dopo l'edit
+    `priority=None` e `description_plain_text=None` (prima: `1` e valorizzata). I campi omessi
+    vengono **azzerati**.
+  - (c) **Campi obbligatori sul tenant, non nel swagger** (`CreateTaskRequestDTO` ed
+    `EditTaskRequestDTO` non hanno `required`): senza `assigneeUserId`/`assigneeGroupId` il
+    server risponde `400` con `{"validationErrors": {"list": [{"code": "INVALID_VALUE", "field":
+    "assignee"}]}}` (→ `ValidationError`); senza `expiration` risponde `500` senza body
+    (→ `ServerError`), sia in create sia in edit. Il primo giro del test (`create` senza
+    assegnatario) è fallito per questo: il test ora passa `assignee_user_id` da
+    `PYNTERACTA_TEST_USER_ID` e manda `expiration` e assegnatario anche all'edit. Con queste
+    modifiche il ciclo create → get → edit → get → delete → 404 **passa**.
+  - Conseguenza da decidere prima di T12: `tasks edit 7001 --title T2` (02-C09, "solo i campi
+    passati") su questo tenant fallisce con `500` se non si passa anche `--expiration`, e azzera
+    priorità e descrizione se non si ripassano. Vedi la proposta in chat.
+
+### [ ] T13 – `tasks edit` come patch: base dal task letto (aggiunto il 2026-10-08 dopo T11)
+
+- Criteri: 02-C17, 02-C18 (sostituiscono 02-C09)
+- Dipende da: T07, T11
+- Test: `tests/unit/test_cli_tasks.py::TestTasksEdit` — i test di T07 con marker 02-C09 passano a
+  02-C17 e cambiano attese: `test_edit_reads_task_then_puts_patched_body` (ex
+  `test_edit_reads_occ_token_then_puts`; corpo == base dalla fixture + `{"title": "T2"}`),
+  `test_edit_with_occ_token_still_reads_base` (ex `test_edit_with_occ_token_skips_get`;
+  `get_route.call_count == 1`, PUT su `/7001/3`, corpo con la base e `priority` del flag),
+  `test_edit_watcher_flags_map_to_add_and_remove` (corpo = base + add/remove). Nuovi, marker 02-C18:
+  `test_edit_description_flag_drops_delta`, `test_edit_flags_win_over_json_over_read`,
+  `test_edit_base_skips_missing_fields` (fixture copiata e privata di `expiration`, `assigneeUser`,
+  `subTasks`). Test puro di `_edit_base` sulla fixture: `test_edit_base_from_fixture` (02-C17).
+  Snapshot `test_edit_json_output` e quelli di `tasks get` che mostrano la scadenza si rigenerano
+  dopo la modifica della fixture e si leggono.
+- Passi:
+  1. `tests/fixtures/payloads/get_task_detail_response.json`: `expiration` nella forma reale
+     `{"zonedDatetime": "2026-06-30T23:59:59+02:00", "localDatetime": "2026-06-30T23:59:59",
+     "timezone": "Europe/Rome"}`; eseguire la suite: ciò che rompe (snapshot) si rigenera e si legge.
+  2. Scrivere i test; eseguirli: rossi (corpo senza la base, `_edit_base` inesistente).
+  3. In `cli/tasks.py`: `_edit_base(task)`, `_drop_delta_if_plain(merged)`; in `tasks_edit` la
+     `GET` sempre, token da `--occ-token` o dal task letto, unione base < `--json` < flag;
+     docstring e help di `--occ-token` aggiornati ("the task is always read; this token replaces
+     the one read").
+  4. `docs/cli.md`: `tasks edit` descritto come patch (campi conservati, sub-task ricreati con id
+     nuovi, `--description` sostituisce il delta); `docs/api/tasks.md`: sezione "Omitted fields"
+     riscritta con l'esito di T11 (sostituzione; assegnatario, scadenza e `state` dei sub-task
+     obbligatori sul tenant) — anticipa il punto 3 di T12, che poi non lo ripete.
+  5. Controlli bloccanti, `uv run mkdocs build --strict`; commit `feat(cli): tasks edit conserva i
+     campi non indicati rileggendo il task`.
 
 ### [ ] T12 – Chiusura: PRD, `CLAUDE.md`, nota sui campi omessi
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T11)
-- Dipende da: T09, T11
+- Dipende da: T09, T11, T13
 - Test: nessuno; verifica con la rilettura dei diff, il controllo che ogni link risolva e
   `uv run mkdocs build --strict`.
 - Passi:
-  1. `specs/prd.md`: RF-022a, RF-015a, RF-025a, RNF-010 dalla sezione "Requisiti nuovi" della
-     spec; conferma del maintainer (2026-10-08, spec 02) accanto a RF-022, RF-025, RNF-009 e alla
-     voce "Dati scritti sul tenant" di §6; riga nella storia.
+  1. `specs/prd.md`: RF-022a, RF-015a, RF-025a, RF-025b, RNF-010 dalla sezione "Requisiti nuovi"
+     della spec; conferma del maintainer (2026-10-08, spec 02) accanto a RF-022, RF-025, RNF-009 e
+     alla voce "Dati scritti sul tenant" di §6; riga nella storia.
   2. `CLAUDE.md`, sezione "Lingua": una riga — l'interfaccia utente della CLI (help, prompt,
      messaggi) resta in inglese per coerenza con la CLI e il sito esistenti (spec 02).
-  3. `docs/api/tasks.md`: sostituire "to be confirmed" con l'esito di T11 (formato della scadenza
-     accettato; campi omessi invariati o azzerati, come avviso se azzerati).
-  4. Commit `docs: PRD e CLAUDE.md per la spec 02, esito dell'integration test nella pagina API`.
+  3. `docs/api/tasks.md`: controllo che non resti alcun "to be confirmed" (riscritto in T13).
+  4. Commit `docs: PRD e CLAUDE.md per la spec 02`.
 
 La riga `0.10.0 ⏳ M27–M28` in `ROADMAP.md` è già stata scritta con la spec; la sezione M28 in
 `PROGRESS.md` la scrive `/sddpa:verifica`.
@@ -242,7 +292,7 @@ La riga `0.10.0 ⏳ M27–M28` in `ROADMAP.md` è già stata scritta con la spec
 | 02-C06 | T04 |
 | 02-C07 | T02 |
 | 02-C08 | T06 |
-| 02-C09 | T07 |
+| 02-C09 | T07 (sostituito da 02-C17 il 2026-10-08) |
 | 02-C10 | T05, T07 |
 | 02-C11 | T08 |
 | 02-C12 | T05, T08 |
@@ -250,3 +300,5 @@ La riga `0.10.0 ⏳ M27–M28` in `ROADMAP.md` è già stata scritta con la spec
 | 02-C14 | T02 |
 | 02-C15 | T09 |
 | 02-C16 | T10, T11 (manuale) |
+| 02-C17 | T13 |
+| 02-C18 | T13 |
