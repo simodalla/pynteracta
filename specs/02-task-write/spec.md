@@ -1,6 +1,6 @@
 # 02 – Scrittura dei task: creazione, modifica, eliminazione
 
-Stato: approvata
+Stato: chiusa
 Branch: `m28_task_write`
 Requisiti del PRD: RF-022, RF-025, RNF-009; toccati RF-010, RF-015, RF-019
 Dipende da: nessuna (spec 01 chiusa)

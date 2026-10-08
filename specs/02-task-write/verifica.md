@@ -1,10 +1,16 @@
 # Verifica 02 – Scrittura dei task: creazione, modifica, eliminazione
 
 Data: 2026-10-08
-Commit verificato: `d38f386` sul branch `m28_task_write` (spec `77069ef`, piano `4270fb3`, task
+Commit verificato: `7c4d261` sul branch `m28_task_write` (spec `77069ef`, piano `4270fb3`, task
 `61f4f62`; T01–T10: `33916e0`, `ce6b104`, `a546ff8`, `48d3ffb`, `9a80a74`, `dbdeb76`, `3fc3e28`,
-`b746cda`, `2a511c4`, `0b19378`; revisione dopo T11: `7ebc649`; T13: `69b1f5b`; T12: `d38f386`)
-Esito: **un problema** (copertura di `src/pynteracta/api/_base.py` sotto soglia). Spec non chiusa.
+`b746cda`, `2a511c4`, `0b19378`; revisione dopo T11: `7ebc649`; T13: `69b1f5b`; T12: `d38f386`;
+riapertura di T01: `7c4d261`)
+Esito: **nessun problema**. Spec chiusa.
+
+Una prima verifica (`e43fdd0`) aveva trovato `src/pynteracta/api/_base.py` al 77,78 %, sotto la
+soglia dei file toccati: i rami `TypeError` di `_get`, `_post`, `_put`, `_delete` erano senza
+test. T01 è stato riaperto e chiuso con quattro test di caratterizzazione (`7c4d261`). Questo
+rapporto sostituisce il primo.
 
 ## Task
 
@@ -17,12 +23,12 @@ sul tenant; `state` dei sub-task obbligatorio e `0` rifiutato. Da T11 è nata la
 
 | Criterio | Test | Esito |
 |---|---|---|
-| 02-C01 | `tests/unit/test_api_tasks.py::TestTasksCreate::test_create_sends_only_given_fields_and_wraps_response`; `tests/unit/test_api_utils.py::TestBuildWriteBody` (3 test) | verde |
+| 02-C01 | `tests/unit/test_api_tasks.py::TestTasksCreate::test_create_sends_only_given_fields_and_wraps_response`; `tests/unit/test_api_utils.py::TestBuildWriteBody` (3 test); `tests/unit/test_api_base.py::TestResourceClientRejectsNonObjectBodies::test_post_array_raises_type_error` | verde |
 | 02-C02 | `test_api_tasks.py::TestTasksCreate::test_create_raw_equivalent` | verde |
 | 02-C03 | `test_api_utils.py::TestZonedDatetimeInput` (5 test); `test_api_tasks.py::TestTasksCreate::test_create_expiration_zoneinfo_in_body`, `::test_create_naive_expiration_raises_before_request`; `::TestTasksEdit::test_edit_naive_expiration_raises_before_request` | verde |
-| 02-C04 | `test_api_tasks.py::TestTasksEdit::test_edit_sends_only_given_fields`, `::test_edit_raw_equivalent`, `::test_edit_without_fields_sends_empty_body` | verde |
+| 02-C04 | `test_api_tasks.py::TestTasksEdit::test_edit_sends_only_given_fields`, `::test_edit_raw_equivalent`, `::test_edit_without_fields_sends_empty_body`; `test_api_base.py::…::test_put_array_raises_type_error` | verde |
 | 02-C05 | `test_api_tasks.py::TestTasksEdit::test_edit_409_raises_concurrency_error_once` | verde |
-| 02-C06 | `test_api_tasks.py::TestTasksDelete::test_delete_returns_post_id`, `::test_delete_without_body_returns_none` | verde |
+| 02-C06 | `test_api_tasks.py::TestTasksDelete::test_delete_returns_post_id`, `::test_delete_without_body_returns_none`; `test_api_base.py::…::test_delete_array_raises_type_error` | verde |
 | 02-C07 | `test_api_tasks.py::TestTasksGet::test_occ_token_exposed` | verde |
 | 02-C08 | `tests/unit/test_cli_tasks.py::TestTasksCreate` (12 test: unione flag/`--json`, scadenza e fuso, errori d'uso, stdin, snapshot tabella e JSON, help); `tests/unit/test_cli_common.py::TestLoadJsonBody` (6 test) | verde |
 | 02-C09 | sostituito da 02-C17 il 2026-10-08: nessun marker, come atteso | — |
@@ -37,17 +43,18 @@ sul tenant; `state` dei sub-task obbligatorio e `0` rifiutato. Da T11 è nata la
 | 02-C18 | `test_cli_tasks.py::TestTasksEdit::test_edit_description_flag_drops_delta`, `::test_edit_flags_win_over_json_over_read`, `::test_edit_base_skips_missing_fields` | verde |
 
 Ogni test è stato visto rosso prima del codice (per `ImportError`, `AttributeError`, comando o
-opzione inesistente, corpo diverso). Nessun marker cita criteri inesistenti; i test preesistenti
-senza marker e il test di caratterizzazione della mappa degli exit code non sono un problema.
+opzione inesistente, corpo diverso), tranne i test di caratterizzazione (mappa degli exit code,
+`ResourceClient`), verdi subito per definizione. Nessun marker cita criteri inesistenti; i test
+preesistenti senza marker non sono un problema.
 
 ## Controlli automatici
 
 | Controllo | Esito |
 |---|---|
 | `uv run ruff check .` | verde |
-| `uv run ruff format --check .` | verde (105 file) |
+| `uv run ruff format --check .` | verde (107 file) |
 | `uv run mypy src` | verde (52 file) |
-| `uv run pytest -m "not integration and not contract"` | verde: 822 test (+71 rispetto alla partenza), 70 snapshot |
+| `uv run pytest -m "not integration and not contract"` | verde: 826 test (+75 rispetto alla partenza), 70 snapshot |
 | `uv run pytest -m contract` | verde (97, +10) |
 | `uv run mkdocs build --strict` (aggiuntivo) | verde |
 | `uv run pre-commit run --all-files` (aggiuntivo) | verde: tutti e 7 gli hook passano (il debito della verifica 01 è stato chiuso dal branch `bugfix_precommit_hooks`) |
@@ -60,20 +67,18 @@ Comando: `uv run pytest -m "not integration and not contract" --cov --cov-report
 
 | Ambito | Copertura | Soglia | Esito |
 |---|---|---|---|
-| Totale | **93,48 %** (4112/4399 righe) | ≥ 85 % e ≥ 93,18 % (partenza) | ok |
-| `src/pynteracta/api/_base.py` (toccato) | **77,78 %** (28/36) | ≥ 85 % | **sotto soglia** |
+| Totale | **93,66 %** (4120/4399 righe) | ≥ 85 % e ≥ 93,18 % (partenza) | ok |
+| `src/pynteracta/api/_base.py` (toccato) | 100 % (36/36; 77,78 % alla prima verifica) | ≥ 85 % | ok |
 | `src/pynteracta/api/_utils.py` (toccato) | 98,25 % (56/57) | ≥ 85 % | ok |
 | `src/pynteracta/api/tasks.py` (toccato) | 100 % (36/36) | ≥ 85 % | ok |
 | `src/pynteracta/models/facade/tasks.py` (toccato) | 98,30 % (173/176) | ≥ 85 % | ok |
 | `src/pynteracta/cli/_common.py` (toccato) | 92,62 % (301/325) | ≥ 85 % | ok |
 | `src/pynteracta/cli/tasks.py` (toccato) | 96,10 % (148/154) | ≥ 85 % | ok |
 
-Righe scoperte di `api/_base.py`: 21–22, 35–36, 49–50, 60–61, cioè i quattro rami `TypeError`
-"risposta non oggetto JSON" di `_get`, `_post`, `_put`, `_delete`. I primi due sono preesistenti e
-senza test; la spec ha aggiunto `_put` e `_delete` sullo stesso modello, con lo stesso ramo non
-testato: il file resta al 78 % e il piano lo dava per "già fissato indirettamente", a torto.
-Scoperte altrove (non bloccanti): `cli/tasks.py` 148–150 (ramo `pydantic.ValidationError` di
-`_validate_body`), 272, 443, 462; `facade/tasks.py` 163, 196, 219 (rami `None` degli stub).
+Righe scoperte nei file toccati (non bloccanti): `api/_utils.py` 57 (ramo dei modelli dentro i
+dict); `cli/tasks.py` 148–150 (ramo `pydantic.ValidationError` di `_validate_body`), 272, 443,
+462; `facade/tasks.py` 163, 196, 219 (rami `None` degli stub); `cli/_common.py` 24 righe
+preesistenti (export, profili).
 
 ## Regole non negoziabili
 
@@ -82,7 +87,7 @@ Scoperte altrove (non bloccanti): `cli/tasks.py` 148–150 (ramo `pydantic.Valid
 | Token e segreti mai nei log | Il diff di `src/` non aggiunge chiamate ai logger né `print`; l'unica stampa nuova è `console.print("Task … deleted (post …)")` con soli id. I corpi delle scritture passano dal transport, che li redige prima di log, audit e hook (non modificato). | rispettata |
 | Cache del token con permessi stretti | Codice non toccato. | n/a |
 | Segreti fuori dal repository | Fixture con dati finti (`Alice Rossi`, id piccoli, `occToken: 3`); `tests/integration/.env.example` ha solo nomi di variabili; nessun `.env`, `.secrets`, `audit.log` aggiunto. Le prove T11 sono state eseguite con le variabili caricate nella shell, senza leggerle né copiarle. | rispettata |
-| Soglie che non scendono | Controlli e regole di ruff/mypy invariati; copertura totale salita. La soglia per file toccati **non è rispettata** da `api/_base.py` (sopra): la spec non si chiude finché non lo è. | **da sistemare** |
+| Soglie che non scendono | Controlli e regole di ruff/mypy invariati; copertura totale salita; ogni file toccato ≥ 85 % dopo la riapertura di T01. | rispettata |
 | Dati personali fuori dai log, con eccezione audit | Titolo, descrizione e id di persone viaggiano nei corpi delle richieste e non vengono loggati; l'integration test usa un post di prova e un `client_uid` riconoscibile. L'output di `tasks create|edit` mostra il nome dell'assegnatario, come già `tasks get`: è output per l'operatore, non log. | rispettata |
 | Nessuna operazione ripetuta in automatico verso Interacta | `create`, `edit`, `delete` fanno una richiesta ciascuno, senza `try/except`; `409` → `ConcurrencyError` senza rilettura (02-C05, 02-C10); timeout → `TransportError` con una sola richiesta (02-C13). `tasks edit` fa una `GET` di lettura più una `PUT`: la lettura non è una ripetizione. | rispettata |
 
@@ -94,30 +99,30 @@ Scoperte altrove (non bloccanti): `cli/tasks.py` 148–150 (ramo `pydantic.Valid
   `--yes` e rifiuto senza TTY; exit code 9.
 - Scostamenti dal piano, dichiarati: `_validate_body` di `tasks edit` gira dopo la `GET` (il corpo
   dipende dal task letto); le chiavi sconosciute di `--json` restano rifiutate prima di ogni
-  richiesta da `load_json_body`.
+  richiesta da `load_json_body`; `api/_base.py` ha un file di test proprio, che il piano non
+  prevedeva.
 - La revisione della spec dopo T11 (`7ebc649`) è dentro l'ambito della spec e non tocca il PRD né gli
   ADR oltre ai "Requisiti nuovi": nessun ADR necessario. RF-022a, RF-015a, RF-025a, RF-025b, RNF-010
   sono entrati nel PRD (`d38f386`); RF-022, RF-025, RNF-009 e §6 portano la conferma del maintainer.
 - Voci aggiuntive della checklist: nessuna rigenerazione dei modelli (swagger pinnato invariato);
   `tasks create|edit` passano da `render_output` con snapshot; `docs/cli.md`, `docs/api/tasks.md`,
-  `docs/testing.md` aggiornati; riga `0.10.0 ⏳` in `ROADMAP.md` dall'apertura; la sezione M28 di
-  `PROGRESS.md` si scrive alla chiusura.
+  `docs/testing.md` aggiornati; riga `0.10.0 ⏳` in `ROADMAP.md` dall'apertura (diventa ✅ alla
+  release); sezione M28 in `PROGRESS.md` scritta con questa verifica.
 
 ## Linea di partenza
 
-Non aggiornata: si aggiorna alla verifica che chiude la spec.
+Aggiornata (`specs/00-partenza/partenza.md`): copertura totale 93,18 % → 93,66 %, `api` 96,02 % →
+97,22 %, `cli` 89,31 % → 90,11 %, `models/facade` 94,74 % → 95,09 %; unit test 751 → 826, contract
+87 → 97. Nessuna violazione `P-<mm>` toccata.
 
 ## Debiti aperti
 
 - Nessuna violazione `P-<mm>` aperta nella linea di partenza.
 - `cli/communities.py` al 53 % di copertura (dalla partenza).
+- Il tenant esige campi che il swagger pinnato non marca come obbligatori (`assignee`,
+  `expiration`, `state` dei sub-task): la libreria non li impone (documentati); se un futuro swagger
+  li marcasse, i modelli andrebbero rigenerati.
 
 ## Problemi trovati
 
-1. **`src/pynteracta/api/_base.py` al 77,78 %, sotto la soglia dell'85 % per i file toccati.**
-   Proposta: riaprire **T01** (che ha aggiunto `_put` e `_delete`) con un test di caratterizzazione
-   `tests/unit/test_api_base.py::TestResourceClient` che, con `respx`, fa rispondere un array JSON a
-   `GET`, `POST`, `PUT` e `DELETE` e attende `TypeError` con il messaggio `Expected JSON object
-   response from <path>` (quattro test, marker 02-C01 per `_post` e 02-C04/02-C06 per `_put` e
-   `_delete`; `_get` è caratterizzazione pura). Il file sale al 100 %. Poi `/sddpa:verifica 02` di
-   nuovo.
+Nessuno.
