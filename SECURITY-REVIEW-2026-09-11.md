@@ -16,7 +16,7 @@
 for "raise this in a PR review".**
 
 Two concrete defects were confirmed in the token-handling path and are actionable. Both are fixed
-by [`specs/v0.9.2-security-hardening.md`](specs/v0.9.2-security-hardening.md).
+by [`specs/legacy/v0.9.2-security-hardening.md`](specs/legacy/v0.9.2-security-hardening.md).
 
 | # | Title | Severity | Confidence | Category |
 |---|---|---|---|---|
@@ -188,7 +188,7 @@ configured host.
 
 Consequently two profiles pointing at different tenants whose service-account keys carry the same
 `client_id` read and write the same `{client_id}.token.json`. Vendor-assigned `client_id` values are
-small integers (`1001` in `docs/authentication.md:29`, `-4` in `specs/v0.1-foundation.md:299`), and
+small integers (`1001` in `docs/authentication.md:29`, `-4` in `specs/legacy/v0.1-foundation.md:299`), and
 certification tenants are commonly database clones of production, so the collision is realistic
 rather than contrived.
 

@@ -11,5 +11,17 @@
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "ucrls": {
+      "source": {
+        "source": "git",
+        "url": "git@gitlab.unionerenolavinosamoggia.bo.it:ucrls/claude-plugins.git",
+        "ref": "v0.3.0"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "sddpa@ucrls": true
   }
 }
