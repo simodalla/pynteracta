@@ -16,6 +16,11 @@ leggono prima del commit.
 
 - Criteri: 02-C03 (helper)
 - Dipende da: nessuno
+- Riaperto il 2026-10-08 dalla verifica (`e43fdd0`): `api/_base.py` al 77,78 %, i rami `TypeError`
+  di `_get`, `_post`, `_put`, `_delete` erano senza test. Chiuso con
+  `tests/unit/test_api_base.py::TestResourceClientRejectsNonObjectBodies` (quattro test di
+  caratterizzazione, verdi subito; marker 02-C01, 02-C04, 02-C06 per i tre metodi delle
+  scritture).
 - Test: `tests/unit/test_api_utils.py` (nuovo) — `test_zoned_datetime_input_zoneinfo`
   (`Europe/Rome` → `{"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}`),
   `test_zoned_datetime_input_utc_zoneinfo`, `test_zoned_datetime_input_fixed_offset_converts_to_utc`
