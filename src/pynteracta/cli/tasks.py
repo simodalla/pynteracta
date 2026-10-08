@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -23,6 +24,7 @@ from pynteracta.cli._common import (
     FullOption,
     OutputOption,
     build_client,
+    confirm_destructive,
     handle_error,
     load_json_body,
     make_console,
@@ -307,6 +309,35 @@ def tasks_edit(  # noqa: PLR0913
             quiet=state.quiet,
             single_command=True,
         )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("delete")
+def tasks_delete(
+    ctx: typer.Context,
+    task_id: Annotated[int, typer.Argument(help="Task ID.")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")] = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a task.
+
+    The task is read first and its id and title shown in a confirmation prompt. Without an
+    interactive terminal --yes is required: nothing is deleted silently from a script.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            task = client.tasks.get(task_id)
+            if not confirm_destructive(f'Delete task {task_id} "{task.title}"?', yes=yes):
+                raise typer.Exit(EXIT_SUCCESS)
+            post_id = client.tasks.delete(task_id)
+        if resolve_output(state, output) == "json":
+            typer.echo(json.dumps({"task_id": task_id, "post_id": post_id}))
+        elif not state.quiet:
+            console.print(f"Task {task_id} deleted (post {post_id})")
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

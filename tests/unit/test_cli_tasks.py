@@ -441,3 +441,93 @@ class TestTasksEdit:
         )
         assert result.exit_code == 0, result.output
         assert result.output == snapshot
+
+
+_TASKS_DELETE_PATH = f"communication/tasks/manage/delete-task/{_TASK_ID}"
+_DELETE_DONE = f"Task {_TASK_ID} deleted (post {_POST_ID})"
+
+
+def _mock_delete_flow() -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
+    delete_route = mock_json(
+        "DELETE", _TASKS_DELETE_PATH, load_payload("delete_task_response.json")
+    )
+    return get_route, delete_route
+
+
+class TestTasksDelete:
+    # criterio: 02-C11
+    @respx.mock
+    def test_prompt_shows_id_and_title_and_y_deletes(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        get_route, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID)], env=BASE_ENV, input="y\n")
+        assert result.exit_code == 0, result.output
+        assert f'Delete task {_TASK_ID} "Review quarterly report"?' in result.output
+        assert get_route.call_count == 1
+        assert delete_route.call_count == 1
+        assert _DELETE_DONE in result.output
+
+    # criterio: 02-C11
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID)], env=BASE_ENV, input="n\n")
+        assert result.exit_code == 0, result.output
+        assert delete_route.call_count == 0
+        assert _DELETE_DONE not in result.output
+
+    # criterio: 02-C12
+    @respx.mock
+    def test_yes_skips_prompt(self, runner: CliRunner) -> None:
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert "?" not in result.output
+        assert delete_route.call_count == 1
+        assert _DELETE_DONE in result.output
+
+    # criterio: 02-C12
+    @respx.mock
+    def test_short_yes_flag(self, runner: CliRunner) -> None:
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID), "-y"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert delete_route.call_count == 1
+
+    # criterio: 02-C12
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(self, runner: CliRunner) -> None:
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_USAGE
+        assert "--yes is required when not running interactively" in result.output
+        assert delete_route.call_count == 0
+
+    # criterio: 02-C11
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_delete_flow()
+        result = runner.invoke(
+            app, ["--output", "json", "tasks", "delete", str(_TASK_ID), "--yes"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {"task_id": _TASK_ID, "post_id": _POST_ID}
+
+    # criterio: 02-C11
+    @respx.mock
+    def test_not_found_exits_5_without_delete(self, runner: CliRunner) -> None:
+        mock_json("GET", _TASKS_GET_PATH, {"message": "not found"}, status=404)
+        delete_route = mock_json("DELETE", _TASKS_DELETE_PATH, {"postId": _POST_ID})
+        result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 5  # noqa: PLR2004
+        assert delete_route.call_count == 0

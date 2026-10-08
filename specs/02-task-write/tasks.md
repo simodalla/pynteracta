@@ -145,7 +145,7 @@ leggono prima del commit.
   3. Snapshot, controlli bloccanti; commit `feat(cli): comando tasks edit con occToken letto o
      imposto`.
 
-### [ ] T08 – Comando `tasks delete`
+### [x] T08 – Comando `tasks delete`
 
 - Criteri: 02-C11, 02-C12
 - Dipende da: T04, T05
