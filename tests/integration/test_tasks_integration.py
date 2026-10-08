@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import os
+import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from pynteracta.client import InteractaClient
+from pynteracta.exceptions import NotFoundError
 
 pytestmark = pytest.mark.integration
 
@@ -45,3 +49,55 @@ class TestTasksIntegration:
         assert task.id == task_id
         assert task.post_id is not None
         assert task.title is not None
+
+
+_WRITE_TITLE = "pynteracta integration test"
+_WRITE_TITLE_EDITED = "pynteracta integration test (edited)"
+
+
+class TestTasksWriteIntegration:
+    """Ciclo completo di scrittura su un post di una community di prova (spec 02).
+
+    Le stampe ``[T11]`` servono al maintainer per annotare il formato reale di ``expiration`` e
+    l'effetto dei campi omessi in ``edit`` (task manuale T11 della spec 02).
+    """
+
+    # criterio: 02-C16
+    def test_create_edit_delete_cycle(self, client: InteractaClient) -> None:
+        post_id = int(_require_env("PYNTERACTA_TEST_WRITE_POST_ID"))
+        client_uid = f"pynteracta-it-{int(time.time())}"
+        expiration = datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome"))
+        with client:
+            created = client.tasks.create(
+                post_id,
+                title=_WRITE_TITLE,
+                description_plain_text="Created by the write integration test; safe to delete.",
+                priority=1,
+                expiration=expiration,
+                client_uid=client_uid,
+            )
+            task_id = created.task_id
+            assert task_id is not None
+            try:
+                created_expiration = created.task.expiration if created.task else None
+                print(f"\n[T11] created task {task_id}: expiration={created_expiration!r}")
+                task = client.tasks.get(task_id)
+                assert task.title == _WRITE_TITLE
+                assert task.occ_token is not None
+                print(
+                    f"[T11] get: priority={task.priority} expiration={task.expiration!r} "
+                    f"occ_token={task.occ_token}"
+                )
+                edited = client.tasks.edit(task_id, task.occ_token, title=_WRITE_TITLE_EDITED)
+                assert edited.next_occ_token is not None
+                after = client.tasks.get(task_id)
+                assert after.title == _WRITE_TITLE_EDITED
+                print(
+                    f"[T11] after edit with title only: priority={after.priority} "
+                    f"expiration={after.expiration!r} (before: priority=1, expiration set)"
+                )
+            finally:
+                deleted_post = client.tasks.delete(task_id)
+                print(f"[T11] deleted task {task_id} (post {deleted_post})")
+            with pytest.raises(NotFoundError):
+                client.tasks.get(task_id)

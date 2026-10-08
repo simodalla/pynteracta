@@ -180,7 +180,7 @@ leggono prima del commit.
   4. `uv run mkdocs build --strict`, controlli bloccanti; commit `docs: scrittura dei task nelle
      pagine API e CLI, exit code 9, variabile per gli integration test`.
 
-### [ ] T10 – Integration test del ciclo `create → edit → delete`
+### [x] T10 – Integration test del ciclo `create → edit → delete`
 
 - Criteri: 02-C16 (codice)
 - Dipende da: T04
