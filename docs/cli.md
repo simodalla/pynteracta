@@ -861,7 +861,7 @@ Default table: `has_google_credentials`, `has_microsoft_credentials`, `has_custo
 
 ## `tasks` commands
 
-Fetch task detail. A task belongs to a post (`post_id`); `--web-url` deep-links to the **parent post**, since tasks have no standalone web view (D-v0.4-3).
+Fetch task detail, and — since 0.10.0 — create, edit and delete tasks. A task belongs to a post (`post_id`); `--web-url` deep-links to the **parent post**, since tasks have no standalone web view (D-v0.4-3).
 
 The default table shows curated fields: `id`, `post_id`, `title`, `state`, `priority`,
 `description` (truncated `descriptionPlainText`), `attachments_count`, `creation_timestamp`.
@@ -889,6 +889,68 @@ JSON/YAML, consistently with `posts get`.
 (open/closed/etc.). `currentWorkflowState` is the post's workflow state DTO and is only reachable
 via `.raw.currentWorkflowState` (D-v0.4-3, Q-v0.4-3).
 
+### `tasks create POST_ID`
+
+Create a task on a post. Simple fields come from flags; sub-tasks and attachments (references to
+files the server already knows) come from `--json FILE`, or `--json -` to read the body from
+stdin. Flags override the keys of the JSON body. **Only the fields you give are sent.**
+
+```bash
+pynteracta tasks create 21269 --title "Prepare the quarterly report" --priority 2 \
+    --assignee-user 1042 --watcher-user 1042 --watcher-user 1099 \
+    --expiration 2026-12-31T18:00 --timezone Europe/Rome
+pynteracta tasks create 21269 --json body.json            # full request body from a file
+echo '{"title": "From stdin", "subTasks": [{"description": "Step 1"}]}' \
+    | pynteracta tasks create 21269 --json -
+pynteracta tasks create 21269 --title T --output json --full   # whole response, nextOccToken included
+```
+
+| Option | Request field |
+|---|---|
+| `--title` | `title` |
+| `--description` | `descriptionPlainText` |
+| `--expiration`, `--timezone` | `expiration` (`{datetime, timezone}`) |
+| `--priority` | `priority` |
+| `--assignee-user`, `--assignee-group` | `assigneeUserId`, `assigneeGroupId` |
+| `--watcher-user`, `--watcher-group` (repeatable) | `watcherUserIds`, `watcherGroupIds` |
+| `--client-uid` | `clientUid` |
+| `--json FILE\|-` | any field of `CreateTaskRequestDTO` (unknown keys are rejected) |
+
+`--expiration` is an ISO 8601 date-time. Without an offset it is read in the `--timezone` zone
+(IANA name, default `Europe/Rome`); with an explicit offset (`2026-12-31T18:00+01:00`) the value
+is sent in UTC. The default table shows `id`, `post_id`, `title`, `state`, `priority`,
+`expiration`, `assignee`; `--output json --full` returns the whole server response.
+
+### `tasks edit TASK_ID`
+
+Edit a task. Same flags as `tasks create`, plus `--remove-watcher-user` and `--remove-watcher-group`
+(`--watcher-*` add watchers, `--remove-watcher-*` remove them). Only the fields you give are sent.
+
+```bash
+pynteracta tasks edit 7001 --title "Review quarterly report (updated)"
+pynteracta tasks edit 7001 --occ-token 3 --priority 1          # skip the preliminary read
+pynteracta tasks edit 7001 --watcher-user 1099 --remove-watcher-user 1042
+```
+
+Interacta protects edits with an optimistic concurrency token (`occToken`). Without `--occ-token`
+the command reads the task first and uses the token it finds; `--occ-token N` skips that read. If
+the task changed since it was read, the server answers `409` and the command exits with code **9**
+and the message `The resource changed since it was read (occToken mismatch): fetch it again and
+retry.` The command never retries on its own.
+
+### `tasks delete TASK_ID`
+
+Delete a task. The task is read first and its id and title shown in a confirmation prompt
+(`Delete task 7001 "Review quarterly report"? [y/N]`). `--yes` (`-y`) skips the prompt. Without an
+interactive terminal `--yes` is **required**: the command refuses (exit code 2) and nothing is
+deleted.
+
+```bash
+pynteracta tasks delete 7001                 # interactive confirmation
+pynteracta tasks delete 7001 --yes           # scripts
+pynteracta tasks delete 7001 -y --output json   # {"task_id": 7001, "post_id": 21269}
+```
+
 ---
 
 ## Exit codes
@@ -904,4 +966,5 @@ via `.raw.currentWorkflowState` (D-v0.4-3, Q-v0.4-3).
 | 6 | Validation error |
 | 7 | Transport error |
 | 8 | Server error |
+| 9 | Conflict: the resource changed since it was read (`409`, `occToken` mismatch) — fetch it again and retry |
 | 10 | Unexpected internal error |

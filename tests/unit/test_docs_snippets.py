@@ -126,3 +126,15 @@ def test_logging_page_states_redaction_guarantees() -> None:
         assert needle in guarantees, f"'{needle}' missing from the redaction guarantees"
     example = text.split("## Log format", 1)[1].split("\n## ", 1)[0]
     assert "interacta_auth_refresh_token=***REDACTED***" in example
+
+
+# criterio: 02-C15
+def test_tasks_pages_document_write_commands() -> None:
+    """Le pagine CLI e API documentano le scritture dei task e l'exit code 9."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in ("tasks create", "tasks edit", "tasks delete", "--json", "--occ-token", "--yes"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    assert "| 9 |" in cli, "exit code 9 missing from the exit-code table in docs/cli.md"
+    api = (_ROOT / "docs" / "api" / "tasks.md").read_text(encoding="utf-8")
+    for needle in ("create(", "edit(", "delete(", "TaskWriteResult", "occ_token", "expiration"):
+        assert needle in api, f"'{needle}' missing from docs/api/tasks.md"

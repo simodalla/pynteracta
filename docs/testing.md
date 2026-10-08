@@ -67,7 +67,12 @@ PYNTERACTA_SERVICE_ACCOUNT_KEY=tests/integration/.secrets/sa.json
 PYNTERACTA_TEST_COMMUNITY_ID=123
 PYNTERACTA_TEST_USER_ID=456
 PYNTERACTA_TEST_POST_ID=789
+PYNTERACTA_TEST_WRITE_POST_ID=790
 ```
+
+`PYNTERACTA_TEST_WRITE_POST_ID` enables the **write** integration test (create → edit → delete of a
+task). Point it at a post in a **test community**, never at production content: the test creates
+a task on it and deletes it at the end. Leave it empty to skip the write test.
 
 ### Step 3 — export the variables into your shell
 

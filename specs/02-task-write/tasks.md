@@ -161,7 +161,7 @@ leggono prima del commit.
   2. In `cli/tasks.py`: comando `delete` (GET, `confirm_destructive`, `delete`, testo o JSON).
   3. Controlli bloccanti; commit `feat(cli): comando tasks delete con conferma e --yes`.
 
-### [ ] T09 – Documentazione: pagine API e CLI, testing, `.env.example`
+### [x] T09 – Documentazione: pagine API e CLI, testing, `.env.example`
 
 - Criteri: 02-C15
 - Dipende da: T08
