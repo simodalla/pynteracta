@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-`pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async deferred to v0.3). Current scope: service-account and Google OAuth2 auth, JWT lifecycle + caching, read-only access to auth/identity, users, posts, communities, and catalogs. Optional extras: `yaml` and `parquet` for `--export` CLI support.
+`pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async deferred to v0.3). Current scope: service-account and Google OAuth2 auth, JWT lifecycle + caching, read access to auth/identity, users, posts, communities, catalogs, attachments, tasks, groups, hashtags and admin forms; the write surface (posts, tasks, admin, uploads) is in scope since [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md) and arrives with the next specs. Optional extras: `yaml` and `parquet` for `--export` CLI support.
 
 La fonte di verità sui requisiti è [`specs/prd.md`](specs/prd.md).
 
@@ -43,6 +43,12 @@ Vincoli che nessuna spec può violare. Le violazioni note stanno nella linea di 
   post non compaiono nei log applicativi. L'audit log opzionale (`audit_log`), che con
   `audit_log_bodies` registra i body delle risposte, è l'eccezione documentata, a carico di chi lo
   abilita.
+- **Nessuna operazione ripetuta in automatico verso Interacta.** Una scrittura (creazione,
+  modifica, eliminazione, upload) che fallisce in modo incerto — timeout, errore di rete dopo
+  l'invio — non si ritenta da sola: l'errore risale al chiamante con esito sconosciuto. Un
+  eventuale retry/backoff vale solo per le letture. I conflitti di concorrenza (`occToken`, `409`
+  → `ConcurrencyError`) non si risolvono rileggendo e riprovando. (Da
+  [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md).)
 
 ## Branch Discipline
 

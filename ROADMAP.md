@@ -86,12 +86,25 @@ add them. (`✅` = already shipped in 0.1.0, listed for context.)
 - `GET  admin/manage/catalogs/{catalogId}/entries/{entryId}/edit`
 - `GET  admin/manage/users/{userId}/credentials/edit`
 
-## Deferred / future (post read-completion)
+## Write surface (in scope since 2026-10-08, [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md))
 
-- **Write operations** — the 10 mutating endpoints, plus the read "form-prep" helpers
-  (`post-data-for-create/edit/copy`, `event-post-data-for-*`, `post-workflow-screen-data-for-edit`)
-  which are propaedeutic to writes and were intentionally excluded from the read line.
+The 34 mutating endpoints of the pinned swagger, plus the read "form-prep" helpers that are
+propaedeutic to them. One spec per group (order decided spec by spec, see `specs/prd.md`
+RF-021…RF-025):
+
+- **Posts & comments** (15) — `communication/posts/manage/*`: create/edit post and event-post,
+  custom data, attachments, watchers, workflow screen data and operations, copy, delete,
+  mark-as-erasable, event participation, create-comment; helpers `post-data-for-create|edit|copy`,
+  `event-post-data-for-*`, `post-workflow-screen-data-for-edit`.
+- **Tasks** (3) — `communication/tasks/manage/*`: create, edit, delete.
+- **Admin** (15) — `admin/manage/*`: users (create, edit, delete, credentials), groups (create,
+  edit, delete, members), catalogs and entries (create, edit, `deleted` flag), workspace edit.
+- **Attachment upload** (1) — `core/storage/upload-new-attachment`.
+
+## Deferred / future
+
 - **Async client** (`AsyncInteractaClient`).
 - **Alternate auth**: Microsoft OAuth2, username/password (same exchange pattern as Google OAuth2).
-- **Automatic retry/backoff** with jitter.
+- **Automatic retry/backoff** with jitter — **reads only**: writes are never retried automatically
+  (non-negotiable rule, ADR 0001).
 - **Strict-semver 1.0** once the surface is stable. (PyPI publication shipped in 0.9.4.)
