@@ -115,3 +115,14 @@ def test_doc_snippet_is_consistent_with_the_api(snippet: Snippet) -> None:
 
 def test_snippets_were_collected() -> None:
     assert len(_SNIPPETS) > _MIN_EXPECTED_SNIPPETS, "docs snippet collection looks broken"
+
+
+# criterio: 01-C11
+def test_logging_page_states_redaction_guarantees() -> None:
+    """La pagina Audit Logging dichiara le garanzie di redazione di cookie e header per nome."""
+    text = (_ROOT / "docs" / "logging.md").read_text(encoding="utf-8")
+    guarantees = text.split("## Redaction guarantees", 1)[1].split("\n## ", 1)[0]
+    for needle in ("Proxy-Authorization", "Set-Cookie", "api-key"):
+        assert needle in guarantees, f"'{needle}' missing from the redaction guarantees"
+    example = text.split("## Log format", 1)[1].split("\n## ", 1)[0]
+    assert "interacta_auth_refresh_token=***REDACTED***" in example
