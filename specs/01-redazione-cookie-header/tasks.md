@@ -106,7 +106,7 @@ in Conventional Commits con descrizione in italiano.
      non analizzabile → tutto redatto); nota "since 0.9.5" per coerenza con la nota v0.9.3.
   4. Verifiche del punto "Test"; commit `docs: garanzie di redazione per cookie e header sensibili`.
 
-### [ ] T05 – Chiusura: PRD
+### [x] T05 – Chiusura: PRD
 
 - Criteri: nessuno nuovo (chiusura della spec: "Requisiti nuovi" e conferme)
 - Dipende da: T04

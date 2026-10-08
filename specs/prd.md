@@ -76,9 +76,10 @@ Confermato dal maintainer il 2026-10-08.
   conservano commenti e formattazione del file (`tomlkit`).
 - RF-017. Audit log opzionale delle chiamate API (`audit_log`), su console o su file JSON lines
   rotante (`audit_log_file`, `audit_log_max_bytes`, `audit_log_backups`); i body sono registrati
-  solo con `audit_log_bodies`; `audit_log_raw` disattiva la redazione, con avviso.
+  solo con `audit_log_bodies`; `audit_log_raw` disattiva la redazione sul solo canale di logging,
+  con avviso. *(Confermato dal maintainer il 2026-10-08, spec 01.)*
 - RF-018. Hook di richiesta e risposta (`ClientHooks`) che ricevono `RequestInfo` e
-  `ResponseInfo`, senza tipi `httpx`.
+  `ResponseInfo`, senza tipi `httpx`. *(Confermato dal maintainer il 2026-10-08, spec 01.)*
 - RF-019. Errori tipizzati: ogni stato HTTP è mappato su una sottoclasse di `InteractaError`
   (autenticazione, permessi, non trovato, validazione, concorrenza, server, trasporto), con
   stato, metodo, URL, body e `request_id`.
@@ -108,9 +109,13 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
 
 *Da confermare.* Solo ciò che il codice o la configurazione mostrano.
 
-- RNF-001. Redazione: `Authorization`, i JWT e i campi `token|password|secret|privatekey|assertion|jwt`
-  dei body sono sostituiti da `***REDACTED***` prima di log, audit log e hook (vedi P-01 nella
-  linea di partenza per il caso non coperto).
+- RNF-001. Redazione prima di log, audit log e hook, dentro il transport: gli header
+  `Authorization`, `Proxy-Authorization` e quelli il cui nome contiene `token`, `secret`,
+  `password` o `api-key` perdono l'intero valore; in `Cookie` e `Set-Cookie` ogni cookie perde il
+  valore e conserva nome e attributi (un header cookie non analizzabile con certezza è redatto per
+  intero); i JWT sono sostituiti ovunque; i campi `token|password|secret|privatekey|assertion|jwt`
+  dei body sono sostituiti da `***REDACTED***`. *(Confermato dal maintainer il 2026-10-08;
+  precisato dalla spec 01, che chiude P-01.)*
 - RNF-002. Cache del token su file con permessi POSIX stretti (`0o600` file, `0o700` cartella),
   lettura rifiutata se più larghi; su Windows avviso una tantum e raccomandazione di
   `token_cache = "memory"`.
@@ -181,3 +186,5 @@ letture (façade con `.raw`, kwargs espliciti più `*_raw`, comando CLI, test un
   [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md).
 - 2026-10-08: §1 e §2 confermati dal maintainer; §1 aggiunge gli usi da strumenti di vibe coding e
   come base di un server MCP non ufficiale.
+- 2026-10-08: RNF-001 precisato dalla [spec 01](01-redazione-cookie-header/spec.md) (cookie e
+  header redatti per nome); RF-017, RF-018 e RNF-001 confermati dal maintainer.
