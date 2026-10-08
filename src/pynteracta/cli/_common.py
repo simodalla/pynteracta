@@ -19,6 +19,7 @@ from pynteracta.client import InteractaClient
 from pynteracta.config import _xdg_config_dir, load_config, resolve_profile
 from pynteracta.exceptions import (
     AuthenticationError,
+    ConcurrencyError,
     InteractaError,
     NotFoundError,
     ServerError,
@@ -40,6 +41,7 @@ EXIT_NOT_FOUND = 5
 EXIT_VALIDATION = 6
 EXIT_TRANSPORT = 7
 EXIT_SERVER = 8
+EXIT_CONFLICT = 9  # 409: la risorsa è cambiata dopo la lettura (occToken), rileggere e ripetere
 EXIT_INTERNAL = 10
 
 OutputOption = Annotated[
@@ -95,6 +97,7 @@ _EXIT_MAP: dict[type[InteractaError], int] = {
     ValidationError: EXIT_VALIDATION,
     TransportError: EXIT_TRANSPORT,
     ServerError: EXIT_SERVER,
+    ConcurrencyError: EXIT_CONFLICT,
 }
 
 
@@ -315,6 +318,50 @@ def validate_full_fields(full: bool, fields: str | None) -> None:
     if full and fields is not None:
         typer.echo("--full and --fields are mutually exclusive.", err=True)
         raise typer.Exit(EXIT_CONFIG)
+
+
+def _stdin_is_interactive() -> bool:
+    """True se lo standard input è un terminale; i test lo sostituiscono."""
+    return sys.stdin.isatty()
+
+
+def confirm_destructive(prompt: str, *, yes: bool) -> bool:
+    """Conferma di un'operazione distruttiva (RF-025).
+
+    Con ``yes`` non chiede nulla. In un terminale interattivo pone la domanda e restituisce la
+    risposta. Senza terminale e senza ``yes`` esce con ``EXIT_CONFIG``: nessuna cancellazione
+    silenziosa negli script.
+    """
+    if yes:
+        return True
+    if not _stdin_is_interactive():
+        typer.echo("--yes is required when not running interactively.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    return bool(typer.confirm(prompt, default=False))
+
+
+def load_json_body(source: str | None, dto_cls: type[Any]) -> dict[str, Any]:
+    """Corpo di una scrittura da ``--json FILE|-`` (``-`` = stdin), validato contro il DTO.
+
+    Restituisce un dict vuoto senza sorgente. JSON non valido, non oggetto, o con chiavi fuori da
+    ``dto_cls.model_fields`` → messaggio ed ``EXIT_CONFIG``, prima di qualunque richiesta.
+    """
+    if source is None:
+        return {}
+    text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+    try:
+        data: Any = json.loads(text)
+    except json.JSONDecodeError as exc:
+        typer.echo(f"--json: invalid JSON ({exc.msg} at line {exc.lineno}).", err=True)
+        raise typer.Exit(EXIT_CONFIG) from exc
+    if not isinstance(data, dict):
+        typer.echo("--json: the body must be a JSON object.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    unknown = sorted(set(data) - set(dto_cls.model_fields))
+    if unknown:
+        typer.echo(f"--json: unknown keys for {dto_cls.__name__}: {', '.join(unknown)}.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    return data
 
 
 def dump_full(obj: Any, *, exclude_none: bool = True) -> dict[str, Any]:
@@ -542,6 +589,12 @@ def handle_error(exc: InteractaError, *, console: Console) -> typer.Exit:
     _ = console
     code = error_exit_code(exc)
     parts = [f"Error: {exc}"]
+    if isinstance(exc, ConcurrencyError):
+        # Nessun nuovo tentativo da parte della CLI: decide chi la usa (ADR 0001, RF-025).
+        parts.append(
+            "  The resource changed since it was read (occToken mismatch): "
+            "fetch it again and retry."
+        )
     if exc.request_id:
         parts.append(f"  Request-ID: {exc.request_id}")
     if exc.status_code:

@@ -87,7 +87,7 @@ leggono prima del commit.
   3. Controlli bloccanti; commit `feat(tasks): modifica con occToken ed eliminazione di un task
      (edit, edit_raw, delete)`.
 
-### [ ] T05 – Helper CLI: exit code 9, conferma delle operazioni distruttive, corpo da `--json`
+### [x] T05 – Helper CLI: exit code 9, conferma delle operazioni distruttive, corpo da `--json`
 
 - Criteri: 02-C10 (exit code e messaggio), 02-C12 (helper)
 - Dipende da: nessuno
