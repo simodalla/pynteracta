@@ -89,7 +89,7 @@ in Conventional Commits con descrizione in italiano.
   2. Controlli bloccanti; commit `test: processore structlog e handler di file con cookie e header
      sensibili (01-C09)`.
 
-### [ ] T04 – Pagina "Audit Logging" del sito
+### [x] T04 – Pagina "Audit Logging" del sito
 
 - Criteri: 01-C11
 - Dipende da: T02
