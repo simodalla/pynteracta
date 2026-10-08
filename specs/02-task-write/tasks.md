@@ -231,7 +231,7 @@ leggono prima del commit.
     passati") su questo tenant fallisce con `500` se non si passa anche `--expiration`, e azzera
     priorità e descrizione se non si ripassano. Vedi la proposta in chat.
 
-### [ ] T13 – `tasks edit` come patch: base dal task letto (aggiunto il 2026-10-08 dopo T11)
+### [x] T13 – `tasks edit` come patch: base dal task letto (aggiunto il 2026-10-08 dopo T11)
 
 - Criteri: 02-C17, 02-C18 (sostituiscono 02-C09)
 - Dipende da: T07, T11

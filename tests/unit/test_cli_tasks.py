@@ -12,6 +12,8 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
+from pynteracta.cli.tasks import _edit_base
+from pynteracta.models.facade.tasks import Task
 
 _TASK_ID = 7001
 _POST_ID = 21269
@@ -333,10 +335,33 @@ def _edit_path(occ_token: int) -> str:
     return f"communication/tasks/manage/edit-task/{_TASK_ID}/{occ_token}"
 
 
+# Corpo che `tasks edit` ricava dal task letto (get_task_detail_response.json): il server
+# sostituisce il task intero, quindi i campi non indicati si rimandano (02-C17).
+_READ_BASE = {
+    "title": "Review quarterly report",
+    "descriptionDelta": '{"ops":[{"insert":"Please review the attached quarterly report.\\n"}]}',
+    "expiration": {"datetime": "2026-06-30T23:59:59", "timezone": "Europe/Rome"},
+    "priority": 2,
+    "assigneeUserId": 1042,
+    "subTasks": [
+        {"id": 801, "description": "Read introduction", "state": 1},
+        {"id": 802, "description": "Validate figures", "state": 0},
+    ],
+}
+_NEW_PRIORITY = 3
+_JSON_PRIORITY = 2
+_JSON_ASSIGNEE_GROUP = 9
+
+
 class TestTasksEdit:
-    # criterio: 02-C09
+    # criterio: 02-C17
+    def test_edit_base_from_fixture(self) -> None:
+        task = Task.from_dict(load_payload("get_task_detail_response.json"))
+        assert _edit_base(task) == _READ_BASE
+
+    # criterio: 02-C17
     @respx.mock
-    def test_edit_reads_occ_token_then_puts(self, runner: CliRunner) -> None:
+    def test_edit_reads_task_then_puts_patched_body(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
         put_route = mock_json(
             "PUT", _edit_path(_FIXTURE_OCC_TOKEN), load_payload("edit_task_response.json")
@@ -345,11 +370,11 @@ class TestTasksEdit:
         assert result.exit_code == 0, result.output
         assert get_route.call_count == 1
         assert put_route.call_count == 1
-        assert _sent_body(put_route) == {"title": "T2"}
+        assert _sent_body(put_route) == {**_READ_BASE, "title": "T2"}
 
-    # criterio: 02-C09
+    # criterio: 02-C17
     @respx.mock
-    def test_edit_with_occ_token_skips_get(self, runner: CliRunner) -> None:
+    def test_edit_with_occ_token_still_reads_base(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
         put_route = mock_json(
             "PUT", _edit_path(_FORCED_OCC_TOKEN), load_payload("edit_task_response.json")
@@ -363,18 +388,19 @@ class TestTasksEdit:
                 "--occ-token",
                 str(_FORCED_OCC_TOKEN),
                 "--priority",
-                str(_PRIORITY),
+                str(_NEW_PRIORITY),
             ],
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
-        assert get_route.call_count == 0
+        assert get_route.call_count == 1
         assert put_route.call_count == 1
-        assert _sent_body(put_route) == {"priority": _PRIORITY}
+        assert _sent_body(put_route) == {**_READ_BASE, "priority": _NEW_PRIORITY}
 
-    # criterio: 02-C09
+    # criterio: 02-C17
     @respx.mock
     def test_edit_watcher_flags_map_to_add_and_remove(self, runner: CliRunner) -> None:
+        mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
         put_route = mock_json(
             "PUT", _edit_path(_FORCED_OCC_TOKEN), load_payload("edit_task_response.json")
         )
@@ -395,9 +421,74 @@ class TestTasksEdit:
         )
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route) == {
+            **_READ_BASE,
             "addWatcherUserIds": [_WATCHER_A],
             "removeWatcherUserIds": [_WATCHER_B],
         }
+
+    # criterio: 02-C18
+    @respx.mock
+    def test_edit_description_flag_drops_delta(self, runner: CliRunner) -> None:
+        mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
+        put_route = mock_json(
+            "PUT", _edit_path(_FIXTURE_OCC_TOKEN), load_payload("edit_task_response.json")
+        )
+        result = runner.invoke(
+            app, ["tasks", "edit", str(_TASK_ID), "--description", "X"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        expected = {k: v for k, v in _READ_BASE.items() if k != "descriptionDelta"}
+        assert _sent_body(put_route) == {**expected, "descriptionPlainText": "X"}
+
+    # criterio: 02-C18
+    @respx.mock
+    def test_edit_flags_win_over_json_over_read(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
+        put_route = mock_json(
+            "PUT", _edit_path(_FIXTURE_OCC_TOKEN), load_payload("edit_task_response.json")
+        )
+        body = tmp_path / "body.json"
+        body.write_text(
+            json.dumps({"priority": _JSON_PRIORITY, "assigneeGroupId": _JSON_ASSIGNEE_GROUP})
+        )
+        result = runner.invoke(
+            app,
+            [
+                "tasks",
+                "edit",
+                str(_TASK_ID),
+                "--description",
+                "X",
+                "--priority",
+                str(_NEW_PRIORITY),
+                "--json",
+                str(body),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        sent = _sent_body(put_route)
+        assert sent["priority"] == _NEW_PRIORITY
+        assert sent["assigneeGroupId"] == _JSON_ASSIGNEE_GROUP
+        assert sent["assigneeUserId"] == _READ_BASE["assigneeUserId"]
+        assert sent["descriptionPlainText"] == "X"
+        assert "descriptionDelta" not in sent
+
+    # criterio: 02-C18
+    @respx.mock
+    def test_edit_base_skips_missing_fields(self, runner: CliRunner) -> None:
+        payload = dict(load_payload("get_task_detail_response.json"))
+        for key in ("expiration", "assigneeUser", "subTasks", "descriptionDelta"):
+            del payload[key]
+        mock_json("GET", _TASKS_GET_PATH, payload)
+        put_route = mock_json(
+            "PUT", _edit_path(_FIXTURE_OCC_TOKEN), load_payload("edit_task_response.json")
+        )
+        result = runner.invoke(app, ["tasks", "edit", str(_TASK_ID), "--title", "T2"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route) == {"title": "T2", "priority": _READ_BASE["priority"]}
 
     # criterio: 02-C10
     @respx.mock
@@ -415,7 +506,7 @@ class TestTasksEdit:
         assert "fetch it again and retry" in result.output
         assert put_route.call_count == 1
 
-    # criterio: 02-C09
+    # criterio: 02-C17
     @respx.mock
     def test_edit_task_without_occ_token_exits_1(self, runner: CliRunner) -> None:
         payload = dict(load_payload("get_task_detail_response.json"))
@@ -429,7 +520,7 @@ class TestTasksEdit:
         assert "occToken" in result.output
         assert put_route.call_count == 0
 
-    # criterio: 02-C09
+    # criterio: 02-C17
     @respx.mock
     def test_edit_json_output(self, runner: CliRunner, snapshot: object) -> None:
         mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))

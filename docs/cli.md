@@ -924,19 +924,27 @@ is sent in UTC. The default table shows `id`, `post_id`, `title`, `state`, `prio
 ### `tasks edit TASK_ID`
 
 Edit a task. Same flags as `tasks create`, plus `--remove-watcher-user` and `--remove-watcher-group`
-(`--watcher-*` add watchers, `--remove-watcher-*` remove them). Only the fields you give are sent.
+(`--watcher-*` add watchers, `--remove-watcher-*` remove them).
+
+The command behaves like a **patch**: the fields you do not mention keep their value. Interacta's
+edit endpoint replaces the whole task and clears whatever is missing from the request (and rejects
+a task without assignee or expiration), so the command reads the task first and sends back its
+title, rich-text description, expiration, priority, assignee and sub-tasks, overridden by `--json`
+and then by the flags. `--description` replaces the rich-text description with plain text.
+Sub-tasks sent back this way are re-created by the server with new ids. Watchers and attachments
+are not resent: they have their own add/remove semantics.
 
 ```bash
 pynteracta tasks edit 7001 --title "Review quarterly report (updated)"
-pynteracta tasks edit 7001 --occ-token 3 --priority 1          # skip the preliminary read
+pynteracta tasks edit 7001 --occ-token 3 --priority 1          # send token 3 instead of the one read
 pynteracta tasks edit 7001 --watcher-user 1099 --remove-watcher-user 1042
 ```
 
-Interacta protects edits with an optimistic concurrency token (`occToken`). Without `--occ-token`
-the command reads the task first and uses the token it finds; `--occ-token N` skips that read. If
-the task changed since it was read, the server answers `409` and the command exits with code **9**
-and the message `The resource changed since it was read (occToken mismatch): fetch it again and
-retry.` The command never retries on its own.
+Interacta protects edits with an optimistic concurrency token (`occToken`). The command uses the
+token it reads; `--occ-token N` sends `N` instead (the read still happens, to keep the other
+fields). If the task changed since it was read, the server answers `409` and the command exits
+with code **9** and the message `The resource changed since it was read (occToken mismatch): fetch
+it again and retry.` The command never retries on its own.
 
 ### `tasks delete TASK_ID`
 

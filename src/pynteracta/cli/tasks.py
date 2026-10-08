@@ -34,7 +34,7 @@ from pynteracta.cli._common import (
     validate_full_fields,
 )
 from pynteracta.exceptions import InteractaError
-from pynteracta.models.facade.tasks import TaskWriteResult
+from pynteracta.models.facade.tasks import Task, TaskWriteResult
 from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO, EditTaskRequestDTO
 
 app = typer.Typer(help="Task commands.", no_args_is_help=True)
@@ -99,8 +99,9 @@ OccTokenOption = Annotated[
     typer.Option(
         "--occ-token",
         help=(
-            "Concurrency token of the task as last read. If omitted the task is fetched first "
-            "and its token used. A 409 (token mismatch) exits with code 9; nothing is retried."
+            "Concurrency token to send instead of the one just read (the task is always read "
+            "to keep the fields you do not change). A 409 (token mismatch) exits with code 9; "
+            "nothing is retried."
         ),
     ),
 ]
@@ -151,6 +152,42 @@ def _validate_body(merged: dict[str, Any], dto_cls: type[Any]) -> Any:
 
 def _root(value: Any) -> Any:
     return getattr(value, "root", value)
+
+
+def _edit_base(task: Task) -> dict[str, Any]:
+    """Corpo di ``edit-task`` ricavato dal task letto (02-C17).
+
+    Il server sostituisce il task intero e azzera ciò che manca (spec 02, T11): i campi che
+    l'operatore non indica si rimandano come letti. Le chiavi assenti nel task non si inventano.
+    I watcher e gli allegati hanno coppie add/remove e non servono qui.
+    """
+    expiration = _root(task.expiration)
+    assignee_user = _root(task.assignee_user)
+    assignee_group = _root(task.assignee_group)
+    sub_tasks = [
+        {"id": sub.id, "description": sub.description, "state": sub.state} for sub in task.sub_tasks
+    ]
+    base: dict[str, Any] = {
+        "title": task.title,
+        "descriptionDelta": task.raw.descriptionDelta,
+        "expiration": (
+            {"datetime": expiration["localDatetime"], "timezone": expiration["timezone"]}
+            if isinstance(expiration, dict) and expiration.get("localDatetime")
+            else None
+        ),
+        "priority": task.priority,
+        "assigneeUserId": assignee_user.get("id") if isinstance(assignee_user, dict) else None,
+        "assigneeGroupId": assignee_group.get("id") if isinstance(assignee_group, dict) else None,
+        "subTasks": sub_tasks or None,
+    }
+    return {key: value for key, value in base.items() if value is not None}
+
+
+def _drop_delta_if_plain(merged: dict[str, Any]) -> dict[str, Any]:
+    """Un testo semplice sostituisce la descrizione: il delta letto non si rimanda (02-C18)."""
+    if "descriptionPlainText" in merged:
+        merged.pop("descriptionDelta", None)
+    return merged
 
 
 def _write_result_row(obj: object) -> dict[str, object]:
@@ -258,43 +295,47 @@ def tasks_edit(  # noqa: PLR0913
     export: ExportOption = None,
     export_format: ExportFormatOption = None,
 ) -> None:
-    """Edit a task.
+    """Edit a task, keeping the fields you do not mention.
 
-    Only the fields given are sent; --watcher-user/--watcher-group add watchers,
-    --remove-watcher-* remove them. Without --occ-token the task is read first to get its
-    concurrency token. If the task changed since it was read the server answers 409: the command
-    exits with code 9 and never retries.
+    The server replaces the whole task and clears what is missing, so the task is read first and
+    its title, description, expiration, priority, assignee and sub-tasks are sent back unless a
+    flag or --json overrides them (flags win over --json, --json over the task as read).
+    --description replaces the rich-text description. --watcher-user/--watcher-group add
+    watchers, --remove-watcher-* remove them. The concurrency token is the one just read, or
+    --occ-token. If the task changed since it was read the server answers 409: the command exits
+    with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
-    merged = _merge_body(
-        load_json_body(json_body, EditTaskRequestDTO),
-        title=title,
-        description_plain_text=description,
-        expiration=_parse_expiration(expiration, timezone),
-        priority=priority,
-        assignee_user_id=assignee_user,
-        assignee_group_id=assignee_group,
-        add_watcher_user_ids=watcher_user,
-        add_watcher_group_ids=watcher_group,
-        remove_watcher_user_ids=remove_watcher_user,
-        remove_watcher_group_ids=remove_watcher_group,
-    )
-    req = _validate_body(merged, EditTaskRequestDTO)
+    json_part = load_json_body(json_body, EditTaskRequestDTO)
+    expiration_part = _parse_expiration(expiration, timezone)
     try:
         with build_client(state) as client:
-            token = occ_token
+            task = client.tasks.get(task_id)
+            token = occ_token if occ_token is not None else task.occ_token
             if token is None:
-                token = client.tasks.get(task_id).occ_token
-                if token is None:
-                    typer.echo(
-                        f"Task {task_id} has no occToken in the server response: "
-                        "pass --occ-token explicitly.",
-                        err=True,
-                    )
-                    raise typer.Exit(EXIT_GENERIC)
+                typer.echo(
+                    f"Task {task_id} has no occToken in the server response: "
+                    "pass --occ-token explicitly.",
+                    err=True,
+                )
+                raise typer.Exit(EXIT_GENERIC)
+            merged = _merge_body(
+                {**_edit_base(task), **json_part},
+                title=title,
+                description_plain_text=description,
+                expiration=expiration_part,
+                priority=priority,
+                assignee_user_id=assignee_user,
+                assignee_group_id=assignee_group,
+                add_watcher_user_ids=watcher_user,
+                add_watcher_group_ids=watcher_group,
+                remove_watcher_user_ids=remove_watcher_user,
+                remove_watcher_group_ids=remove_watcher_group,
+            )
+            req = _validate_body(_drop_delta_if_plain(merged), EditTaskRequestDTO)
             result = client.tasks.edit_raw(task_id, token, req)
         render_output(
             resolve_output(state, output),

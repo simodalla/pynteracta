@@ -63,10 +63,18 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
     )
     print(created.task_id, created.next_occ_token, created.task.title)
 
-    # Edit: read first, pass the concurrency token explicitly
+    # Edit: read first, pass the concurrency token explicitly, and send back every field that
+    # must survive (the server clears what is missing: see "Omitted fields" below)
     task = client.tasks.get(created.task_id)
     try:
-        edited = client.tasks.edit(task.id, task.occ_token, title="Prepare the Q4 report")
+        edited = client.tasks.edit(
+            task.id,
+            task.occ_token,
+            title="Prepare the Q4 report",
+            priority=task.priority,
+            expiration=datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome")),
+            assignee_user_id=1042,
+        )
     except ConcurrencyError:
         # the task changed after we read it: re-read and decide — the library never retries
         raise
@@ -97,11 +105,26 @@ request. With an IANA zone (`ZoneInfo`) the local time and the zone name are sen
 (`{"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}`); with a fixed offset the value
 is converted to UTC and sent with `"timezone": "UTC"`.
 
-### Omitted fields in `edit()`
+### Omitted fields in `edit()`: the server replaces the task
 
-Fields you do not pass are not sent. Whether the server keeps or clears them is not documented in
-the Swagger: to be confirmed against a test tenant (spec 02, task T11); until then, pass every
-field you care about.
+Fields you do not pass are not sent, and the server treats the request as a **replacement**, not a
+patch (verified against a tenant, spec 02): `title`, description, `expiration`, `priority`, the
+assignee and `sub_tasks` that are missing from the request are **cleared**. Watchers and
+attachments are the exception: they are changed only through the `add_*` / `remove_*` arguments.
+
+!!! warning "Pass every field you want to keep"
+    Read the task first and send back what must survive. The CLI `tasks edit` does this for you;
+    the library does not, so that a call stays one explicit request. Sub-tasks sent back with their
+    `id` are re-created by the server with new ids.
+
+The same tenant also enforces fields the Swagger does not mark as required, on both `create()`
+and `edit()`: an assignee (`assignee_user_id` or `assignee_group_id`; without one the server
+answers `400` on the field `assignee`, raised as `ValidationError`) and an `expiration` (without
+one the server answers `500`, raised as `ServerError`). Every sub-task needs a non-zero `state`.
+When the mapped message is not enough, the server's detail is in `exc.response_body`.
+
+The server returns `expiration` as `{"zonedDatetime": "2026-12-31T18:00:00+01:00",
+"localDatetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}`.
 
 ## `state` vs `currentWorkflowState`
 
