@@ -104,7 +104,7 @@ contract test per i DTO delle tre scritture. Integration test opt-in che esegue 
 | 02-C09 | Quando si esegue `tasks edit 7001 --title T2`, la CLI fa prima `GET …/task-detail-by-id/7001` e poi `PUT …/edit-task/7001/<occToken letto>`; con `--occ-token 3` non fa la `GET` e usa `3`. | RF-022, RF-025 |
 | 02-C10 | Quando la `PUT` di `tasks edit` risponde `409`, il comando termina con exit code `9`, stampa `Task 7001 changed since it was read: fetch it again and retry` e il server ha ricevuto una sola `PUT`. | RF-025, RF-015a, RNF-009 |
 | 02-C11 | Quando si esegue `tasks delete 7001` in un terminale interattivo, il prompt riporta id e titolo; con risposta `y` parte la `DELETE` e il comando stampa `Task 7001 deleted (post 42)`; con risposta `n` nessuna `DELETE` parte e l'exit code è `0`. | RF-025, RF-025a |
-| 02-C12 | Quando si esegue `tasks delete 7001 --yes`, nessun prompt compare e la `DELETE` parte; senza terminale interattivo e senza `--yes`, nessuna `DELETE` parte, l'exit code è `6` (uso non valido) e il messaggio dice che serve `--yes`. | RF-025a |
+| 02-C12 | Quando si esegue `tasks delete 7001 --yes`, nessun prompt compare e la `DELETE` parte; senza terminale interattivo e senza `--yes`, nessuna `DELETE` parte, l'exit code è `2` (errore d'uso, come gli altri della CLI) e il messaggio dice che serve `--yes`. | RF-025a |
 | 02-C13 | Quando `create` va in timeout o errore di rete, viene sollevata `TransportError` e il server ha ricevuto al più una richiesta. | RNF-009 |
 | 02-C14 | I contract test dimostrano che i modelli generati `CreateTaskRequestDTO`, `CreateTaskResponseDTO`, `EditTaskRequestDTO`, `EditTaskResponseDTO`, `DeleteTaskResponseDTO` coprono tutte le proprietà del swagger pinnato, e le fixture JSON di risposta si leggono nelle façade. | RF-022, RNF-003 |
 | 02-C15 | `docs/cli.md` documenta `tasks create`, `tasks edit`, `tasks delete` e l'exit code `9`; `docs/api/tasks.md` documenta `create`, `edit`, `delete`, `TaskWriteResult`, `occ_token` e il formato della scadenza; `uv run mkdocs build --strict` e `test_docs_snippets` sono verdi. | RF-015 |
@@ -122,11 +122,11 @@ contract test per i DTO delle tre scritture. Integration test opt-in che esegue 
   degli errori).
 - `tasks edit` senza `--occ-token` su un task che il `GET` non trova → exit `5`, nessuna `PUT`
   (02-C09 implica la sequenza; il caso è coperto dal mapping errori esistente).
-- `--json -` con stdin vuoto o JSON non valido → exit `6`, nessuna richiesta.
-- `--json` con chiavi sconosciute → rifiutato con exit `6` (i DTO generati non le accettano in
+- `--json -` con stdin vuoto o JSON non valido → exit `2`, nessuna richiesta.
+- `--json` con chiavi sconosciute → rifiutato con exit `2` (i DTO generati non le accettano in
   modo silenzioso: la CLI valida con il DTO prima di inviare).
 - `--expiration` con offset esplicito (`2026-12-31T18:00+01:00`) → fuso dell'offset, `--timezone`
-  ignorato; `--timezone` non IANA → exit `6`.
+  ignorato; `--timezone` non IANA → exit `2`.
 - `tasks delete` con risposta al prompt diversa da `y`/`Y` → nessuna richiesta, exit `0` (02-C11).
 - Timeout **dopo** l'invio di `create`: il task potrebbe esistere; la libreria solleva
   `TransportError` e non riprova (02-C13); il chiamante può cercarlo con il `client_uid`, se lo
