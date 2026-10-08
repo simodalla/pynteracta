@@ -96,5 +96,14 @@ class TestTasksGet:
         task = api.get(_TASK_ID)
         assert task.raw is not None
         assert task.raw.id == _TASK_ID
-        # occToken only reachable via .raw
         assert task.raw.occToken == payload["occToken"]
+
+    # criterio: 02-C07
+    @respx.mock
+    def test_occ_token_exposed(self) -> None:
+        payload = load_payload("get_task_detail_response.json")
+        respx.get(f"{BASE_URL}/communication/tasks/data/task-detail-by-id/{_TASK_ID}").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        task = TasksAPI(make_transport()).get(_TASK_ID)
+        assert task.occ_token == payload["occToken"]

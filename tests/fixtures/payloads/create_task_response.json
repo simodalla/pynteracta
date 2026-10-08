@@ -1,0 +1,59 @@
+{
+  "taskId": 7002,
+  "nextOccToken": 1,
+  "taskData": {
+    "id": 7002,
+    "postId": 21269,
+    "title": "Prepare the quarterly report",
+    "description": "Collect the figures and draft the report.",
+    "expiration": {
+      "zonedDatetime": "2026-12-31T18:00:00+01:00",
+      "localDatetime": "2026-12-31T18:00:00",
+      "timezone": "Europe/Rome"
+    },
+    "priority": 2,
+    "subTasks": [],
+    "reminders": [],
+    "state": 0,
+    "assigneeUser": {
+      "id": 1042,
+      "name": "Alice Rossi"
+    },
+    "assigneeGroup": null,
+    "creatorUser": {
+      "id": 1099,
+      "name": "Bob Bianchi"
+    },
+    "creationTimestamp": 1767200000000,
+    "lastModifyUser": null,
+    "lastModifyTimestamp": null,
+    "lastReviewTimestamp": null,
+    "lastReviewUser": null,
+    "closingTimestamp": null,
+    "closingUser": null,
+    "attachments": [],
+    "mentions": [],
+    "watcherUsers": [
+      {
+        "id": 1042,
+        "name": "Alice Rossi"
+      }
+    ],
+    "watcherGroups": [],
+    "hashtags": [],
+    "occToken": 1,
+    "type": 1,
+    "attachmentsCount": 0,
+    "deleted": false
+  },
+  "capabilities": {
+    "canViewDetail": true,
+    "canModify": true,
+    "canUpdateState": true,
+    "canCopy": true,
+    "canDelete": true,
+    "canAddComment": true,
+    "canEditAttachments": true,
+    "canEditReminders": true
+  }
+}

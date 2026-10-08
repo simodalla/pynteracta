@@ -29,7 +29,7 @@ leggono prima del commit.
   4. Controlli bloccanti; commit `feat(api): utilità per le scritture (scadenza con fuso, corpo
      camelCase, PUT e DELETE nel client base)`.
 
-### [ ] T02 – Façade: `Task.occ_token`, `TaskWriteResult`, fixture e contract test
+### [x] T02 – Façade: `Task.occ_token`, `TaskWriteResult`, fixture e contract test
 
 - Criteri: 02-C07, 02-C14
 - Dipende da: nessuno

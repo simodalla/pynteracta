@@ -33,7 +33,7 @@ from pynteracta.models.facade.communities import (
     PostDefinitionMap,
 )
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
-from pynteracta.models.facade.tasks import Task
+from pynteracta.models.facade.tasks import Task, TaskWriteResult
 from pynteracta.models.facade.users import SystemUserList, UserForEdit, UserProfile
 from pynteracta.models.generated import external_v2 as generated
 
@@ -680,6 +680,79 @@ class TestGetTaskDetail:
         facade = Task.from_dict(payload)
         assert facade.raw.occToken == _TASK_OCC_TOKEN
         assert facade.raw.descriptionDelta is not None
+
+
+# ---------------------------------------------------------------------------
+# 17b. Task write DTOs (spec 02)
+# ---------------------------------------------------------------------------
+
+_CREATED_TASK_ID_CONTRACT = 7002
+_EDIT_NEXT_OCC_TOKEN_CONTRACT = 4
+
+
+class TestTaskWriteDTOs:
+    # criterio: 02-C14
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("CreateTaskRequestDTO", generated.CreateTaskRequestDTO),
+            ("CreateTaskResponseDTO", generated.CreateTaskResponseDTO),
+            ("EditTaskRequestDTO", generated.EditTaskRequestDTO),
+            ("EditTaskResponseDTO", generated.EditTaskResponseDTO),
+            ("DeleteTaskResponseDTO", generated.DeleteTaskResponseDTO),
+        ],
+    )
+    def test_write_dto_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 02-C14
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("ZonedDatetimeInputDTO", generated.ZonedDatetimeInputDTO1),
+            ("TaskDetailDTO", generated.TaskDetailDTO1),
+        ],
+    )
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(
+            swagger_definitions, definition, model, note="typed variant of RootModel stub"
+        )
+
+    # criterio: 02-C14
+    def test_facade_smoke_create(self) -> None:
+        facade = TaskWriteResult.from_create(load_payload("create_task_response.json"))
+        assert facade.raw is not None
+        assert facade.task_id == _CREATED_TASK_ID_CONTRACT
+        assert facade.next_occ_token == 1
+        assert facade.task is not None
+        assert facade.task.title == "Prepare the quarterly report"
+        assert facade.capabilities is not None
+        assert facade.capabilities.can_modify is True
+
+    # criterio: 02-C14
+    def test_facade_smoke_edit(self) -> None:
+        facade = TaskWriteResult.from_edit(load_payload("edit_task_response.json"))
+        assert facade.task_id == _TASK_ID
+        assert facade.next_occ_token == _EDIT_NEXT_OCC_TOKEN_CONTRACT
+        assert facade.task is not None
+        assert facade.task.title.endswith("(updated)")  # type: ignore[union-attr]
+
+    # criterio: 02-C14
+    def test_delete_response_fixture_parses(self) -> None:
+        dto = generated.DeleteTaskResponseDTO.model_validate(
+            load_payload("delete_task_response.json")
+        )
+        assert dto.postId == _POST_ID
 
 
 # ---------------------------------------------------------------------------
