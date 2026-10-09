@@ -4,16 +4,22 @@
 > Dinova S.r.l. / Maggioli S.p.A. It is neither sponsored nor endorsed by the vendor.*
 
 `pynteracta` is a Python 3.12+ library and CLI providing a Pythonic, type-safe interface to the
-Interacta REST API (`external_v2`). It is synchronous and read-only; the current version is listed
-in the [changelog](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
+Interacta REST API (`external_v2`). It is synchronous, with full read access and a write surface
+that grows one resource group at a time; the current version and its contents are listed in the
+[changelog](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
-## What's included (v0.9.x)
+## What's included
 
 - **Authentication** — service-account RS512 JWT assertion with token lifecycle and file/memory
   cache (POSIX `0o600`/`0o700` enforcement), and Google OAuth2 access-token exchange.
-- **Read-only resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
+- **Read resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). Each response is wrapped in a
   hand-written facade with a `.raw` escape hatch to the generated DTO.
+- **Write operations** — `tasks` create, edit and delete, in the library (explicit kwargs plus
+  `*_raw` variants) and in the CLI (`tasks create|edit|delete`, with confirmation for destructive
+  commands). Optimistic concurrency is surfaced as `ConcurrencyError` / exit code `9`; a write
+  that fails with an unknown outcome is never retried automatically. More write groups (posts,
+  comments, attachments, admin) follow, one per minor.
 - **Filtering & sorting** — curated kwargs and CLI flags for posts and users, custom-field and
   workflow screen-field filters, a label-based filter builder, opt-in validation against the
   community post-definition.
@@ -27,8 +33,8 @@ in the [changelog](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.m
 
 ## What's out of scope for now
 
-- Mutations (create/edit/delete on posts, users, comments) — deferred until the read surface has
-  been stable for a while.
+- Writes on posts, comments, attachments and the admin area — planned, not yet shipped; see the
+  [roadmap](https://github.com/simodalla/pynteracta/blob/main/ROADMAP.md).
 - Async client, alternate auth methods (Microsoft OAuth2, username/password), automatic
   retry/backoff — tracked under *Deferred / future* in the roadmap, no target version.
 - Strict-semver 1.0.
