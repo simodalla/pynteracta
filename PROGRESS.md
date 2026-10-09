@@ -1457,7 +1457,7 @@ surface, no new endpoint, no public signature change.
 
 ---
 
-## M26 — PyPI publication (v0.9.4) — in progress
+## M26 — PyPI publication (v0.9.4) — completed 2026-09-12
 
 Spec: [`specs/legacy/v0.9.4-pypi-publication.md`](specs/legacy/v0.9.4-pypi-publication.md). Infrastructure and
 documentation only — `src/` is untouched, so installed behaviour is identical to v0.9.3.
