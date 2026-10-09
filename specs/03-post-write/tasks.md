@@ -14,7 +14,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
 
 ## Elenco
 
-### [ ] T01 – `_put` con corpo vuoto e riga di ROADMAP
+### [x] T01 – `_put` con corpo vuoto e riga di ROADMAP
 
 - Criteri: 03-C08 (helper)
 - Dipende da: nessuno
