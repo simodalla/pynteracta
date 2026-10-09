@@ -155,8 +155,32 @@ NoAttachmentsOption = Annotated[
 def merge_custom_data(
     base: dict[str, Any], json_part: dict[str, Any], flags: dict[str, Any]
 ) -> dict[str, Any]:
-    """``customData`` unito campo per campo: flag > ``--json`` > letto (03-C20)."""
+    """``customData`` unito campo per campo: flag > ``--json`` > letto (03-C33)."""
     return {**(base.get("customData") or {}), **(json_part.get("customData") or {}), **flags}
+
+
+def to_write_value(value: Any) -> Any:
+    """Un valore letto nella forma che il server accetta in scrittura (03-C37, RF-021d).
+
+    Le letture restituiscono i riferimenti a voci di catalogo, utenti e gruppi come oggetti
+    completi; le scritture li accettano solo come id. Una lista di oggetti tutti con ``id``
+    diventa la lista degli id, un oggetto con ``id`` diventa l'id; ogni altro valore (scalari,
+    liste vuote, delta) resta com'è.
+    """
+    if isinstance(value, dict) and "id" in value:
+        return value["id"]
+    if (
+        isinstance(value, list)
+        and value
+        and all(isinstance(item, dict) and "id" in item for item in value)
+    ):
+        return [item["id"] for item in value]
+    return value
+
+
+def to_write_values(values: dict[str, Any] | None) -> dict[str, Any]:
+    """Applica :func:`to_write_value` a ogni campo di ``customData`` o ``screenData`` letti."""
+    return {key: to_write_value(value) for key, value in (values or {}).items()}
 
 
 def _content_base(content: Any) -> dict[str, Any]:
@@ -167,14 +191,14 @@ def _content_base(content: Any) -> dict[str, Any]:
         "title": content.title,
         "description": content.descriptionDelta,
         "descriptionFormat": _DELTA if content.descriptionDelta is not None else None,
-        "customData": content.customData or None,
+        "customData": to_write_values(content.customData) or None,
         "visibility": content.visibility,
     }
     return {key: value for key, value in base.items() if value is not None}
 
 
 def edit_base(form: PostForEdit) -> dict[str, Any]:
-    """Corpo di ``edit-post`` dai dati letti con ``post-data-for-edit`` (03-C19).
+    """Corpo di ``edit-post`` dai dati letti con ``post-data-for-edit`` (03-C32).
 
     Titolo, descrizione (il delta letto, con ``descriptionFormat: 1``), campi custom e
     visibilità si rimandano come letti, perché il server potrebbe azzerare ciò che manca.
@@ -184,7 +208,7 @@ def edit_base(form: PostForEdit) -> dict[str, Any]:
 
 
 def copy_base(form: PostForCopy) -> dict[str, Any]:
-    """Corpo di ``copy-post`` dai dati letti con ``post-data-for-copy`` (03-C22)."""
+    """Corpo di ``copy-post`` dai dati letti con ``post-data-for-copy`` (03-C35)."""
     base = _content_base(form.content_data)
     content = form.content_data
     if content is not None and content.announcement is not None:
@@ -214,8 +238,9 @@ def _patch_body(
 
 
 def screen_base(screen: WorkflowScreen) -> dict[str, Any]:
-    """Corpo di partenza delle scritture del workflow: i dati di screen letti (03-C27)."""
-    return {"screenData": screen.screen_data}
+    """Corpo di partenza delle scritture del workflow: i dati di screen letti, con i riferimenti
+    tradotti in id (03-C36)."""
+    return {"screenData": to_write_values(screen.screen_data)}
 
 
 def _merge_screen_data(

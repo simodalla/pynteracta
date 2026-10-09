@@ -7,7 +7,17 @@
     "announcement": false,
     "customData": {
       "1411": 226,
-      "1413": true
+      "1413": true,
+      "2003": [
+        {
+          "id": 89,
+          "catalogId": 12,
+          "label": "3 - Bassa",
+          "externalId": null,
+          "parentIds": [],
+          "deleted": false
+        }
+      ]
     },
     "currentWorkflowScreenData": {
       "5": "a",

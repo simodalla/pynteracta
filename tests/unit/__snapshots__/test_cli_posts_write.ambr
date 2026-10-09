@@ -60,16 +60,21 @@
 # ---
 # name: TestPostsWorkflow.test_workflow_screen_table
   '''
-     Workflow screen (post 21269)    
-  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
-  ┃ Key              ┃ Value        ┃
-  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
-  │ screen_occ_token │ 3            │
-  │ current_state    │ In revisione │
-  │ screen           │ Approvazione │
-  │ screen_data.5    │ a            │
-  │ screen_data.6    │ 1            │
-  └──────────────────┴──────────────┘
+                            Workflow screen (post 21269)                          
+  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key              ┃ Value                                                     ┃
+  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ screen_occ_token │ 3                                                         │
+  │ current_state    │ In revisione                                              │
+  │ screen           │ Approvazione                                              │
+  │ screen_data.5    │ a                                                         │
+  │ screen_data.6    │ 1                                                         │
+  │ screen_data.5233 │ [{'id': 8341, 'catalogId': 22, 'label':                   │
+  │                  │ 'Amministrazione', 'externalId': None, 'parentIds': [],   │
+  │                  │ 'deleted': False}]                                        │
+  │ screen_data.5237 │ [{'id': 3872, 'firstName': 'Alice', 'lastName': 'Rossi',  │
+  │                  │ 'caption': 'Alice Rossi', 'deleted': False}]              │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
   
   '''
 # ---

@@ -86,7 +86,8 @@ class TestPostForms:
         assert form.current_workflow_state.name == "In revisione"
         assert form.content_data is not None
         assert form.content_data.title == "Procedura di prova"
-        assert form.content_data.customData == {"1411": 226, "1413": True}
+        expected = load_payload("post_for_edit_response.json")["contentData"]["customData"]
+        assert form.content_data.customData == expected
 
     # criterio: 03-C29
     def test_for_copy(self) -> None:
@@ -147,7 +148,7 @@ class TestWorkflowFacades:
     # criterio: 03-C29
     def test_screen(self) -> None:
         screen = WorkflowScreen.from_dict(load_payload("workflow_screen_response.json"))
-        assert screen.screen_data == {"5": "a", "6": 1}
+        assert screen.screen_data == load_payload("workflow_screen_response.json")["screenData"]
         assert screen.screen_occ_token == _SCREEN_OCC_TOKEN
         assert screen.screen is not None
         assert screen.screen.name == "Approvazione"

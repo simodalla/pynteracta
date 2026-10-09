@@ -613,7 +613,14 @@ come from flags; the full request body (attachments, non-scalar values) from `--
 
 `--custom-data FIELD_ID=VALUE` and `--screen-data FIELD_ID=VALUE` are repeatable; `true`/`false`
 and integers are typed, anything else is a string (use `--json` for lists and objects). They are
-merged **field by field**: flags over `--json` over the values read from the server.
+merged **field by field**: flags over `--json` over the values read from the server. Values read
+from the server that reference catalog entries, users or groups are sent back **as ids** (the
+server returns them as objects but only accepts ids); values from flags and `--json` are sent as
+given, so write references as ids there too (`--json` with `{"customData": {"2003": [89]}}`).
+Rich-text (delta) fields read from the server are sent back unchanged; a new value for a delta
+field must be a **Quill delta** JSON, because `deltaAreaFormat` applies to every delta field of the
+request. Plain text is possible only with `--json` and `"deltaAreaFormat": 2`, and then every delta
+field sent must be plain text too.
 `--description` (and `--text` for comments) sends plain text (`descriptionFormat` / `commentFormat`
 `2`); use `--json` for a Quill delta. `--scheduled-publication` is an ISO 8601 date-time read in
 the `--timezone` zone (IANA name, default `Europe/Rome`) unless it has an offset.

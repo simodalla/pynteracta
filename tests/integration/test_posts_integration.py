@@ -16,6 +16,7 @@ import time
 
 import pytest
 
+from pynteracta.cli.posts_write import to_write_values
 from pynteracta.client import InteractaClient
 from pynteracta.exceptions import InteractaError, NotFoundError
 
@@ -25,6 +26,7 @@ _TITLE = "pynteracta integration test - safe to delete"
 _TITLE_EDITED = "pynteracta integration test (edited) - safe to delete"
 _TITLE_COPY = "pynteracta integration test (copy) - safe to delete"
 _DESCRIPTION = "Created by the post write integration test; safe to delete."
+_DESCRIPTION_EDITED = "Edited by the post write integration test; safe to delete."
 _PLAIN_TEXT = 2
 
 
@@ -101,13 +103,24 @@ class TestPostsWriteIntegration:
                     f"customData={before.customData if before else None!r}"
                 )
 
-                edited = client.posts.edit(post_id, form.occ_token, title=_TITLE_EDITED)
+                # edit sostituisce il post: si rimandano i campi letti, con i riferimenti
+                # tradotti in id come fa la CLI; la descrizione nuova va in testo semplice per
+                # verificare descriptionFormat 2 in modifica (T16, punto c).
+                edited = client.posts.edit(
+                    post_id,
+                    form.occ_token,
+                    title=_TITLE_EDITED,
+                    description=_DESCRIPTION_EDITED,
+                    description_format=_PLAIN_TEXT,
+                    custom_data=to_write_values(before.customData if before else None) or None,
+                    visibility=before.visibility if before else None,
+                )
                 assert edited.next_occ_token is not None
                 after = client.posts.get_for_edit(post_id).content_data
                 assert after is not None
                 assert after.title == _TITLE_EDITED
                 print(
-                    f"[T16] after edit with title only: description="
+                    f"[T16] after edit (plain-text description, custom data as ids): description="
                     f"{after.descriptionPlainText!r} visibility={after.visibility} "
                     f"customData={after.customData!r}"
                 )

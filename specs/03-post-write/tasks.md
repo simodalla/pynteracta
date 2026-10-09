@@ -310,7 +310,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
      → `skipped`.
   2. Controlli bloccanti; commit `test: integration test opt-in del ciclo di scrittura dei post`.
 
-### [ ] T18 – Base delle patch con i riferimenti come id (aggiunto il 2026-10-09 durante T16)
+### [x] T18 – Base delle patch con i riferimenti come id (aggiunto il 2026-10-09 durante T16)
 
 - Criteri: 03-C32, 03-C33, 03-C34, 03-C35, 03-C36, 03-C37 (sostituiscono 03-C19…C22, C27)
 - Dipende da: T11, T13, T15

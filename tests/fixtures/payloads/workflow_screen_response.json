@@ -1,7 +1,26 @@
 {
   "screenData": {
     "5": "a",
-    "6": 1
+    "6": 1,
+    "5233": [
+      {
+        "id": 8341,
+        "catalogId": 22,
+        "label": "Amministrazione",
+        "externalId": null,
+        "parentIds": [],
+        "deleted": false
+      }
+    ],
+    "5237": [
+      {
+        "id": 3872,
+        "firstName": "Alice",
+        "lastName": "Rossi",
+        "caption": "Alice Rossi",
+        "deleted": false
+      }
+    ]
   },
   "screenOccToken": 3,
   "screen": {

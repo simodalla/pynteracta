@@ -183,3 +183,15 @@ def test_posts_pages_document_write_commands() -> None:
         assert write_lines, f"no 'Write operations' line in {page.name}"
         paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
         assert "posts" in paragraph, f"posts missing from the write operations of {page.name}"
+
+
+# criterio: 03-C37
+def test_posts_pages_document_references_and_replacement() -> None:
+    """Le pagine dicono che edit sostituisce il post, che i riferimenti si scrivono come id e
+    che i valori nuovi dei campi delta sono Quill delta."""
+    api = (_ROOT / "docs" / "api" / "posts.md").read_text(encoding="utf-8")
+    for needle in ("replacement", "as ids", "REQUIRED_FIELD"):
+        assert needle in api, f"'{needle}' missing from docs/api/posts.md"
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in ("as ids", "Quill delta", "deltaAreaFormat"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"

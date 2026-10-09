@@ -91,7 +91,8 @@ class TestPostsPrep:
         assert form.current_workflow_state is not None
         assert form.content_data is not None
         assert form.content_data.title == "Procedura di prova"
-        assert form.content_data.customData == {"1411": 226, "1413": True}
+        expected = load_payload("post_for_edit_response.json")["contentData"]["customData"]
+        assert form.content_data.customData == expected
 
     # criterio: 03-C11
     @respx.mock
@@ -360,7 +361,7 @@ class TestPostsWorkflow:
         screen = _api().get_workflow_screen(_POST_ID)
         assert route.calls[0].request.url.query == b""
         assert isinstance(screen, WorkflowScreen)
-        assert screen.screen_data == {"5": "a", "6": 1}
+        assert screen.screen_data == load_payload("workflow_screen_response.json")["screenData"]
         assert screen.screen_occ_token == _SCREEN_OCC_TOKEN
         assert screen.screen is not None
         assert screen.screen.name == "Approvazione"

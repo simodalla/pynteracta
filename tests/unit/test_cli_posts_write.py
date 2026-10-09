@@ -14,7 +14,14 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli.posts_write import copy_base, edit_base, merge_custom_data, screen_base
+from pynteracta.cli.posts_write import (
+    copy_base,
+    edit_base,
+    merge_custom_data,
+    screen_base,
+    to_write_value,
+    to_write_values,
+)
 from pynteracta.models.facade.posts_write import PostForCopy, PostForEdit, WorkflowScreen
 
 _COMMUNITY_ID = 79
@@ -40,6 +47,7 @@ _SCREEN_PATH = f"{_MANAGE}/post-workflow-screen-data-for-edit/{_POST_ID}"
 _EXECUTE_PATH = f"{_MANAGE}/execute-post-workflow-operation/{_POST_ID}/12"
 _EDIT_SCREEN_PATH = f"{_MANAGE}/edit-post-workflow-screen-data/{_POST_ID}/3"
 _API_ROOT = "https://api.example.com/portal/api/external/v2"
+_SCREEN_WRITE = {"5": "a", "6": 1, "5233": [8341], "5237": [3872]}
 _WATCHERS_PATH = f"{_MANAGE}/edit-post-watchers/{_POST_ID}"
 _DETAIL_PATH = f"communication/posts/data/post-detail-by-id/{_POST_ID}"
 _POST_TITLE = "Aggiornamento procedure sicurezza Q2 2026"
@@ -53,7 +61,7 @@ _READ_BASE = {
     "title": _READ_CONTENT["title"],
     "description": _READ_CONTENT["descriptionDelta"],
     "descriptionFormat": 1,
-    "customData": {"1411": 226, "1413": True},
+    "customData": {"1411": 226, "1413": True, "2003": [89]},
     "visibility": 1,
 }
 
@@ -350,16 +358,16 @@ class TestPostsPrep:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["occToken"] == _OCC_TOKEN
-        assert data["contentData"]["customData"] == {"1411": 226, "1413": True}
+        assert data["contentData"]["customData"] == _READ_CONTENT["customData"]
 
 
 class TestPostsEdit:
-    # criterio: 03-C19
+    # criterio: 03-C32
     def test_edit_base_from_fixture(self) -> None:
         form = PostForEdit.from_dict(load_payload("post_for_edit_response.json"))
         assert edit_base(form) == _READ_BASE
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     def test_edit_base_skips_missing_fields(self) -> None:
         payload = load_payload("post_for_edit_response.json")
         for key in ("descriptionDelta", "customData", "visibility"):
@@ -367,7 +375,7 @@ class TestPostsEdit:
         assert edit_base(PostForEdit.from_dict(payload)) == {"title": _READ_CONTENT["title"]}
         assert edit_base(PostForEdit.from_dict({"occToken": 1})) == {}
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_reads_for_edit_then_puts_patched_body(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -378,7 +386,7 @@ class TestPostsEdit:
         assert put_route.call_count == 1
         assert _sent_body(put_route) == {**_READ_BASE, "title": "T2"}
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_with_occ_token_still_reads_base(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -394,7 +402,7 @@ class TestPostsEdit:
         assert get_route.call_count == 1
         assert _sent_body(put_route) == {**_READ_BASE, "title": "T2"}
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_base_skips_missing_fields_in_request(self, runner: CliRunner) -> None:
         payload = load_payload("post_for_edit_response.json")
@@ -406,7 +414,7 @@ class TestPostsEdit:
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route) == {"title": "T2", "visibility": 1}
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_without_occ_token_in_response_exits_1(self, runner: CliRunner) -> None:
         payload = load_payload("post_for_edit_response.json")
@@ -418,7 +426,7 @@ class TestPostsEdit:
         assert "--occ-token" in result.output
         assert put_route.call_count == 0
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_post_not_found_exits_5_without_put(self, runner: CliRunner) -> None:
         mock_json("GET", _FOR_EDIT_PATH, {"message": "not found"}, status=_HTTP_404)
@@ -431,7 +439,7 @@ class TestPostsEdit:
         assert result.exit_code == _EXIT_NOT_FOUND
         assert put_route.call_count == 0
 
-    # criterio: 03-C20
+    # criterio: 03-C33
     @respx.mock
     def test_edit_description_flag_sets_plain_format(self, runner: CliRunner) -> None:
         mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -444,7 +452,7 @@ class TestPostsEdit:
         assert body["description"] == "X"
         assert body["descriptionFormat"] == 2  # noqa: PLR2004
 
-    # criterio: 03-C20
+    # criterio: 03-C33
     @respx.mock
     def test_edit_flags_win_over_json_over_read(
         self, runner: CliRunner, tmp_path: pathlib.Path
@@ -452,7 +460,9 @@ class TestPostsEdit:
         mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
         put_route = mock_json("PUT", _EDIT_PATH, load_payload("edit_post_response.json"))
         body_file = tmp_path / "body.json"
-        body_file.write_text(json.dumps({"visibility": 2, "customData": {"1412": "a"}}), "utf-8")
+        body_file.write_text(
+            json.dumps({"visibility": 2, "customData": {"1412": "a", "2002": [7]}}), "utf-8"
+        )
         result = runner.invoke(
             app,
             [
@@ -469,10 +479,10 @@ class TestPostsEdit:
             "description": "X",
             "descriptionFormat": 2,
             "visibility": 2,
-            "customData": {"1411": 300, "1412": "a", "1413": True},
+            "customData": {"1411": 300, "1412": "a", "1413": True, "2002": [7], "2003": [89]},
         }
 
-    # criterio: 03-C20
+    # criterio: 03-C33
     @respx.mock
     def test_edit_json_description_keeps_read_format(
         self, runner: CliRunner, tmp_path: pathlib.Path
@@ -489,7 +499,7 @@ class TestPostsEdit:
         assert body["description"] == '{"ops":[]}'
         assert body["descriptionFormat"] == 1
 
-    # criterio: 03-C20
+    # criterio: 03-C33
     @respx.mock
     def test_edit_watcher_flags_map_to_add_and_remove(self, runner: CliRunner) -> None:
         mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -512,7 +522,7 @@ class TestPostsEdit:
             "draft": True,
         }
 
-    # criterio: 03-C20
+    # criterio: 03-C33
     def test_merge_custom_data(self) -> None:
         assert merge_custom_data(
             {"customData": {"1411": 226, "1413": True}},
@@ -521,7 +531,7 @@ class TestPostsEdit:
         ) == {"1411": 300, "1412": "a", "1413": True}
         assert merge_custom_data({}, {}, {}) == {}
 
-    # criterio: 03-C19
+    # criterio: 03-C32
     @respx.mock
     def test_edit_json_output(self, runner: CliRunner) -> None:
         mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -538,7 +548,7 @@ class TestPostsEdit:
 
 
 class TestPostsEditCustomData:
-    # criterio: 03-C21
+    # criterio: 03-C34
     @respx.mock
     def test_reads_then_puts_merged_custom_data(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -550,9 +560,9 @@ class TestPostsEditCustomData:
         )
         assert result.exit_code == 0, result.output
         assert get_route.call_count == 1
-        assert _sent_body(put_route) == {"customData": {"1411": 300, "1413": True}}
+        assert _sent_body(put_route) == {"customData": {"1411": 300, "1413": True, "2003": [89]}}
 
-    # criterio: 03-C21
+    # criterio: 03-C34
     @respx.mock
     def test_json_and_occ_token(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
         mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -576,11 +586,11 @@ class TestPostsEditCustomData:
         )  # fmt: skip
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route) == {
-            "customData": {"1411": 226, "1412": "a", "1413": True},
+            "customData": {"1411": 226, "1412": "a", "1413": True, "2003": [89]},
             "deltaAreaFormat": 2,
         }
 
-    # criterio: 03-C21
+    # criterio: 03-C34
     @respx.mock
     def test_without_data_exits_2_without_requests(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
@@ -590,12 +600,12 @@ class TestPostsEditCustomData:
 
 
 class TestPostsCopy:
-    # criterio: 03-C22
+    # criterio: 03-C35
     def test_copy_base_from_fixture(self) -> None:
         form = PostForCopy.from_dict(load_payload("post_for_copy_response.json"))
         assert copy_base(form) == {**_READ_BASE, "announcement": False}
 
-    # criterio: 03-C22
+    # criterio: 03-C35
     @respx.mock
     def test_copy_reads_for_copy_then_puts_base_with_title(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FOR_COPY_PATH, load_payload("post_for_copy_response.json"))
@@ -607,7 +617,7 @@ class TestPostsCopy:
         assert get_route.call_count == 1
         assert _sent_body(put_route) == {**_READ_BASE, "announcement": False, "title": "Copia"}
 
-    # criterio: 03-C22
+    # criterio: 03-C35
     @respx.mock
     def test_copy_table_shows_new_post(self, runner: CliRunner) -> None:
         mock_json("GET", _FOR_COPY_PATH, load_payload("post_for_copy_response.json"))
@@ -806,12 +816,12 @@ def _mock_screen() -> respx.Route:
 
 
 class TestPostsWorkflow:
-    # criterio: 03-C27
+    # criterio: 03-C36
     def test_screen_base(self) -> None:
         screen = WorkflowScreen.from_dict(load_payload("workflow_screen_response.json"))
-        assert screen_base(screen) == {"screenData": {"5": "a", "6": 1}}
+        assert screen_base(screen) == {"screenData": _SCREEN_WRITE}
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_workflow_screen_table(self, runner: CliRunner, snapshot: object) -> None:
         _mock_screen()
@@ -819,7 +829,7 @@ class TestPostsWorkflow:
         assert result.exit_code == 0, result.output
         assert result.output == snapshot
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_workflow_screen_operation_query(self, runner: CliRunner) -> None:
         route = _mock_screen()
@@ -832,7 +842,7 @@ class TestPostsWorkflow:
         assert route.calls[0].request.url.params["workflowOperationId"] == "12"
         assert "Approvazione" in result.output
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_execute_with_screen_data_reads_screen_then_posts_merged(
         self, runner: CliRunner
@@ -848,9 +858,12 @@ class TestPostsWorkflow:
         )
         assert result.exit_code == 0, result.output
         assert get_route.calls[0].request.url.params["workflowOperationId"] == "12"
-        assert _sent_body(post_route) == {"screenData": {"5": "x", "6": 1}, "screenOccToken": 3}
+        assert _sent_body(post_route) == {
+            "screenData": {**_SCREEN_WRITE, "5": "x"},
+            "screenOccToken": 3,
+        }
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_execute_without_data_posts_empty_body_without_get(self, runner: CliRunner) -> None:
         get_route = _mock_screen()
@@ -864,7 +877,7 @@ class TestPostsWorkflow:
         assert get_route.call_count == 0
         assert _sent_body(post_route) == {}
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_execute_screen_occ_token_flag_wins(self, runner: CliRunner) -> None:
         _mock_screen()
@@ -883,7 +896,7 @@ class TestPostsWorkflow:
         assert result.exit_code == 0, result.output
         assert _sent_body(post_route)["screenOccToken"] == 9  # noqa: PLR2004
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_execute_json_with_token_skips_get(
         self, runner: CliRunner, tmp_path: pathlib.Path
@@ -903,7 +916,7 @@ class TestPostsWorkflow:
         assert get_route.call_count == 0
         assert _sent_body(post_route) == {"screenData": {"5": "y"}, "screenOccToken": 4}
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_execute_table_shows_new_state(self, runner: CliRunner) -> None:
         mock_json("POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json"))
@@ -913,7 +926,7 @@ class TestPostsWorkflow:
         assert result.exit_code == 0, result.output
         assert "Approvato" in result.output
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_edit_screen_reads_then_puts_merged(self, runner: CliRunner) -> None:
         get_route = _mock_screen()
@@ -927,7 +940,7 @@ class TestPostsWorkflow:
         )
         assert result.exit_code == 0, result.output
         assert get_route.calls[0].request.url.query == b""
-        assert _sent_body(put_route) == {"screenData": {"5": "x", "6": 1}}
+        assert _sent_body(put_route) == {"screenData": {**_SCREEN_WRITE, "5": "x"}}
         assert "4" in result.output
 
 
@@ -960,7 +973,7 @@ class TestPostsWorkflowConflicts:
         assert _CONFLICT_MESSAGE in result.output
         assert put_route.call_count == 1
 
-    # criterio: 03-C27
+    # criterio: 03-C36
     @respx.mock
     def test_edit_screen_without_token_exits_1(self, runner: CliRunner) -> None:
         payload = load_payload("workflow_screen_response.json")
@@ -975,3 +988,34 @@ class TestPostsWorkflowConflicts:
         )
         assert result.exit_code == _EXIT_GENERIC
         assert "--screen-occ-token" in result.output
+
+
+class TestToWriteValue:
+    # criterio: 03-C37
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ([{"id": 89, "label": "x"}, {"id": 90}], [89, 90]),
+            ({"id": 3872, "firstName": "Alice"}, 3872),
+            ([], []),
+            (None, None),
+            (226, 226),
+            ("testo", "testo"),
+            (True, True),
+            ([1, 2], [1, 2]),
+            ([{"insert": "a"}], [{"insert": "a"}]),
+            ([{"id": 1}, {"insert": "a"}], [{"id": 1}, {"insert": "a"}]),
+            ({"insert": "a"}, {"insert": "a"}),
+        ],
+    )
+    def test_to_write_value(self, value: object, expected: object) -> None:
+        assert to_write_value(value) == expected
+
+    # criterio: 03-C37
+    def test_to_write_values(self) -> None:
+        assert to_write_values({"2003": [{"id": 89}], "1411": 226, "1999": None}) == {
+            "2003": [89],
+            "1411": 226,
+            "1999": None,
+        }
+        assert to_write_values(None) == {}

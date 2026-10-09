@@ -34,7 +34,8 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
         raise
     print(created.post_id, created.next_occ_token, created.post.title)
 
-    # Edit: read the editable data and the concurrency token first
+    # Edit replaces the post: read it first, then send back every field that must survive.
+    # References (catalog entries, users) are read as objects but written as ids.
     form = client.posts.get_for_edit(created.post_id)
     try:
         edited = client.posts.edit(
@@ -43,7 +44,7 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
             title="Safety procedures Q4 (rev. 2)",
             description=form.content_data.descriptionDelta,
             description_format=1,
-            custom_data=form.content_data.customData,
+            custom_data={"1411": 226, "1413": True, "2003": [89]},
             visibility=form.content_data.visibility,
         )
     except ConcurrencyError:
@@ -111,13 +112,22 @@ is converted to UTC.
 attachments the server already knows (`attachmentId`, or `name` + `contentRef`), as dicts or
 `InputPostAttachmentDTO1` models. Uploading new files is not part of the library yet.
 
-### Omitted fields in `edit()` and `copy()`
+### `edit()` is a replacement
 
-Fields you do not pass are not sent; what the server does with them (keep or clear) is **not
-documented by the API** and is being verified against a tenant. Until then, read the post with
-`get_for_edit()` (or `get_for_copy()`) and send back every field that must survive, as in the
-example above. The CLI commands `posts edit`, `posts edit-custom-data` and `posts copy` do this for
-you.
+Fields you do not pass are not sent, and the server treats `edit()` as a **replacement**, not a
+patch: a missing description counts as empty, so an `edit()` with only a title fails with `400
+REQUIRED_FIELD` on `description` (verified against a tenant). Read the post with
+`get_for_edit()` (or `get_for_copy()` before a copy) and send back every field that must survive,
+as in the example above. The CLI commands `posts edit`, `posts edit-custom-data` and `posts copy`
+do this for you.
+
+### References are written as ids
+
+Custom fields and workflow screen fields that point to catalog entries, users or groups are
+**read** as full objects (`"2003": [{"id": 89, "catalogId": 12, "label": "3 - Bassa", …}]`) but
+must be **written** as ids (`"2003": [89]`): sending the objects back fails with `400
+INVALID_VALUE`. Rich-text (delta) fields are written as Quill delta unless the request sets
+`delta_area_format=2`, which applies to every delta field of the request.
 
 ### Workflow
 
