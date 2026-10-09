@@ -96,7 +96,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   4. Snapshot, controlli bloccanti; commit `feat(posts): capabilities di copia, allegati e
      operazioni di workflow permesse`.
 
-### [ ] T05 – `PostsWriteAPI`: letture propedeutiche e `create`
+### [x] T05 – `PostsWriteAPI`: letture propedeutiche e `create`
 
 - Criteri: 03-C01, 03-C02 (create), 03-C03 (create), 03-C11, 03-C16 (libreria), 03-C17 (create)
 - Dipende da: T03
