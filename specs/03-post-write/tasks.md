@@ -310,6 +310,26 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
      → `skipped`.
   2. Controlli bloccanti; commit `test: integration test opt-in del ciclo di scrittura dei post`.
 
+### [ ] T18 – Base delle patch con i riferimenti come id (aggiunto il 2026-10-09 durante T16)
+
+- Criteri: 03-C32, 03-C33, 03-C34, 03-C35, 03-C36, 03-C37 (sostituiscono 03-C19…C22, C27)
+- Dipende da: T11, T13, T15
+- Test: `tests/unit/test_cli_posts_write.py::TestToWriteValue` (casi di 03-C37, rosso per
+  `ImportError`); i test di T11 e T13 cambiano marker e attese con le fixture estese (rossi: corpo
+  con gli oggetti letti); `test_docs_snippets.py::test_posts_pages_document_write_commands` esteso
+  (rosso prima delle pagine).
+- Passi:
+  1. Fixture: `post_for_edit_response.json`, `post_for_copy_response.json` con il riferimento
+     `2003`; `workflow_screen_response.json` con `5233` e `5237` come oggetti; eseguire la suite e
+     leggere ciò che cambia (snapshot di `get-for-edit` e `workflow-screen`).
+  2. Scrivere e aggiornare i test; eseguirli: rossi per il motivo giusto.
+  3. `cli/posts_write.py`: `to_write_value`, `to_write_values`; `edit_base`, `copy_base`,
+     `screen_base` traducono i valori letti.
+  4. Integration test: `edit` con descrizione e `customData` letti tradotti; `docs/api/posts.md`
+     e `docs/cli.md` come da 03-C37.
+  5. Controlli bloccanti, `uv run mkdocs build --strict`; commit `feat(cli): le patch dei post
+     rimandano i riferimenti letti come id (03-T18)`.
+
 ### [ ] T16 – Esecuzione sul tenant di prova e prove manuali (manuale)
 
 - Criteri: 03-C31 (esecuzione), verifica manuale della spec
@@ -325,12 +345,30 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   di prova con una transizione senza screen: `posts workflow-execute ID OP` con corpo `{}`
   accettato o rifiutato; (f) errori. Se il server **non** azzera i campi omessi, fermarsi: la base
   delle patch si riduce con una revisione della spec (03-C19…03-C22) prima di T17.
+- Esito parziale (2026-10-09, eseguito da Claude su richiesta del maintainer, variabili caricate
+  senza leggerle; community di prova 126):
+  - Community 126: campo custom `2003` "Priorità" obbligatorio, riferimento al catalogo 12. Senza
+    di esso `create` risponde `400`; con `PYNTERACTA_TEST_WRITE_CUSTOM_DATA={"2003": [89]}`
+    `create` riesce (post 23327, poi eliminato dal `finally`).
+  - (a) `edit-post` con il solo titolo → `400 REQUIRED_FIELD` su `description`: la modifica è una
+    **sostituzione** (la descrizione omessa conta come vuota). `get_for_edit` restituisce
+    `"2003"` come `[{"id": 89, "catalogId": 12, "label": "3 - Bassa", …}]`.
+  - Workflow, post 23325 (stato "Aperto"), `posts workflow-edit-screen --screen-data 5238=test`:
+    con i riferimenti letti rimandati come oggetti e senza `deltaAreaFormat` → `500`; con
+    `deltaAreaFormat: 2` → `400 INVALID_VALUE` su `5233` e `5237`; con `{"5233": [8341], "5237":
+    [3872]}` e `deltaAreaFormat: 2` → `200` (token 1791574767085 → 1791574963690; `5238` salvato
+    come delta `[{"insert":"test"},…]`).
+  - Post 23310: nessuna transizione e screen non modificabile → la lettura dello screen dello
+    stato corrente risponde `403`; il post adatto a `PYNTERACTA_TEST_WORKFLOW_POST_ID` è 23325.
+  - Da qui la revisione della spec del 2026-10-09 e T18. Restano: (b) copia, (c) formato della
+    descrizione in modifica, (d) `mark-erasable` contro `delete`, (e) transizione senza screen,
+    da eseguire dopo T18 con il ciclo completo.
 - Esito: <compilato a mano>
 
 ### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T16)
-- Dipende da: T14, T16
+- Dipende da: T14, T16, T18
 - Test: nessuno; verifica con la rilettura dei diff, il controllo che ogni link risolva,
   `test_docs_snippets` e `uv run mkdocs build --strict`.
 - Passi:
@@ -368,16 +406,22 @@ La riga `0.11.0 ⏳ M29` in `ROADMAP.md` la scrive T01; la sezione M29 in `PROGR
 | 03-C16 | T05, T10 |
 | 03-C17 | T05, T07 |
 | 03-C18 | T10 |
-| 03-C19 | T11 |
-| 03-C20 | T11 |
-| 03-C21 | T11 |
-| 03-C22 | T11 |
+| 03-C19 | T11 (sostituito il 2026-10-09) |
+| 03-C20 | T11 (sostituito il 2026-10-09) |
+| 03-C21 | T11 (sostituito il 2026-10-09) |
+| 03-C22 | T11 (sostituito il 2026-10-09) |
 | 03-C23 | T12 |
 | 03-C24 | T12 |
 | 03-C25 | T10 |
 | 03-C26 | T10 |
-| 03-C27 | T13 |
+| 03-C27 | T13 (sostituito il 2026-10-09) |
 | 03-C28 | T09, T11, T13 |
 | 03-C29 | T02, T03 |
 | 03-C30 | T14 |
 | 03-C31 | T15, T16 (manuale) |
+| 03-C32 | T18 |
+| 03-C33 | T18 |
+| 03-C34 | T18 |
+| 03-C35 | T18 |
+| 03-C36 | T18 |
+| 03-C37 | T18 |

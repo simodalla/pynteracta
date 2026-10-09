@@ -126,17 +126,29 @@ retry`; mai un secondo tentativo.
   [--timezone IANA] [--workflow-init-state ID] [--client-uid UID] [--json FILE|-]`: crea il post;
   tabella curata con id, community_id, title, visibility, stato di workflow corrente e
   next_occ_token.
+- **Valori letti e valori scritti** (revisione del 2026-10-09, T16): il server restituisce i
+  campi custom e i dati di screen che riferiscono voci di catalogo, utenti o gruppi come oggetti
+  completi (`[{"id": 89, "catalogId": 12, "label": "3 - Bassa", …}]`), ma in scrittura li accetta
+  solo come id (`[89]`; con gli oggetti risponde `400 INVALID_VALUE`). Quando una patch rimanda un
+  valore **letto**, la CLI lo traduce: una lista di oggetti con `id` diventa la lista degli id, un
+  oggetto con `id` diventa l'id, ogni altro valore resta com'è. I valori dati da `--json` e dai
+  flag non si traducono: si scrivono come id. I campi di tipo delta (testo ricco) letti si rimandano
+  così come sono, nel formato delta; un valore nuovo per un campo delta via `--custom-data` o
+  `--screen-data` deve essere JSON Quill delta, perché senza `deltaAreaFormat: 2` il server non
+  accetta testo semplice (risponde `500`) e `deltaAreaFormat` vale per tutti i campi delta del
+  corpo. Il testo semplice resta possibile con `--json` e `deltaAreaFormat: 2`, a carico di chi
+  lo usa.
 - `posts edit POST_ID [stessi flag di create tranne --announcement e --client-uid]
   [--remove-watcher-user ID]… [--occ-token N]` è una **patch**: legge `post-data-for-edit`,
   costruisce il corpo dai dati letti (`title`, `description` dal delta letto con
-  `descriptionFormat: 1`, `customData`, `visibility`), vi sovrappone `--json` e poi i flag, e
+  `descriptionFormat: 1`, `customData` con i riferimenti tradotti in id, `visibility`), vi sovrappone `--json` e poi i flag, e
   invia con l'`occToken` letto. `--custom-data` sovrascrive le sole chiavi indicate, le altre
   restano quelle lette. `--description` sostituisce la descrizione con testo semplice (formato
   `2`). Bozza, pubblicazione programmata, stato iniziale di workflow, watcher e allegati non
   compaiono nel corpo se non con i flag o `--json`. `--occ-token N` impone solo il token; la
   lettura avviene comunque. Un campo assente nel post letto non viene inventato.
 - `posts edit-custom-data POST_ID --custom-data ID=V… [--json FILE|-] [--occ-token N]`: legge
-  `post-data-for-edit`, parte dai `customData` letti, sovrascrive le chiavi indicate e invia
+  `post-data-for-edit`, parte dai `customData` letti (riferimenti tradotti in id), sovrascrive le chiavi indicate e invia
   `edit-post-custom-data` con il token letto.
 - `posts copy POST_ID [stessi flag di create] [--occ-token N]` è una patch come `posts edit`, con
   base dai dati di `post-data-for-copy` (`title`, `description`, `customData`, `visibility`,
@@ -159,12 +171,14 @@ retry`; mai un secondo tentativo.
   nome dello screen e i campi di `screen_data`.
 - `posts workflow-execute POST_ID OPERATION_ID [--screen-data ID=V]… [--json FILE|-]
   [--screen-occ-token N]`: con dati di screen (flag o `--json` senza `screenOccToken`) legge
-  prima lo screen della transizione per il token, parte dai `screenData` letti, sovrascrive le
+  prima lo screen della transizione per il token, parte dai `screenData` letti (riferimenti
+  tradotti in id), sovrascrive le
   chiavi indicate e invia `{"screenData": …, "screenOccToken": <letto>}`; senza dati invia `{}`
   e non legge nulla (transizione senza screen). `--screen-occ-token` impone il token. Mostra il
   nuovo stato e le transizioni permesse.
 - `posts workflow-edit-screen POST_ID [--screen-data ID=V]… [--json FILE|-]
-  [--screen-occ-token N]`: legge lo screen dello stato corrente, parte dai dati letti,
+  [--screen-occ-token N]`: legge lo screen dello stato corrente, parte dai dati letti (riferimenti
+  tradotti in id),
   sovrascrive e invia `edit-post-workflow-screen-data` con il token letto.
 
 ### Documentazione e test
@@ -199,19 +213,25 @@ test opt-in con il ciclo completo su una community di prova, con pulizia garanti
 | 03-C16 | Quando il server risponde `400` con un `CustomFieldValidationErrorResponseDTO` a `create`, viene sollevata `ValidationError` con `status_code == 400` e `response_body` che contiene `validationErrors`, e il server ha ricevuto una sola richiesta; in CLI l'exit code è `6` e il messaggio riporta il body. | RF-019, RF-021 |
 | 03-C17 | Quando `create` o `add_comment` va in timeout o errore di rete, viene sollevata `TransportError` e il server ha ricevuto al più una richiesta. | RNF-009 |
 | 03-C18 | Quando si esegue `posts create 79 --title T --description D --custom-data 1411=226 --watcher-user 7 --announcement --json body.json` con `body.json` = `{"title": "X", "visibility": 1}`, il corpo inviato è `{"announcement": true, "title": "T", "description": "D", "descriptionFormat": 2, "customData": {"1411": 226}, "watcherUserIds": [7], "visibility": 1}` (i flag prevalgono) e la tabella mostra id, community_id, title, visibility, stato corrente e next_occ_token del post creato; `--output json` restituisce la risposta serializzata. Senza `--announcement` il corpo ha `"announcement": false`. | RF-021, RF-015 |
-| 03-C19 | Quando si esegue `posts edit 21269 --title T2` e la `GET …/post-data-for-edit/21269` restituisce `occToken: 5` e `contentData` con `descriptionDelta`, `customData`, `visibility`, la `PUT …/edit-post/21269/5` ha corpo `{"title": "T2", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto>, "visibility": <letta>}` e nessun'altra chiave; con `--occ-token 3` la `GET` avviene lo stesso e la `PUT` usa `3`; quando il post letto non ha descrizione o custom data, le chiavi corrispondenti mancano. | RF-021, RF-025, RF-021b |
-| 03-C20 | Quando si esegue `posts edit 21269 --description X --custom-data 1411=300 --json body.json` con `body.json` = `{"visibility": 2, "customData": {"1412": "a"}}` sul post di 03-C19 (letto con `customData: {"1411": 226, "1413": true}`), il corpo contiene `description: "X"` con `descriptionFormat: 2` (il delta letto non viene inviato), `visibility: 2` (json > letto), `customData: {"1411": 300, "1412": "a", "1413": true}` (flag > json > letto, chiave per chiave). | RF-021, RF-021b |
-| 03-C21 | Quando si esegue `posts edit-custom-data 21269 --custom-data 1411=300` sul post di 03-C19, la CLI fa la `GET …/post-data-for-edit/21269` e poi `PUT …/edit-post-custom-data/21269/5` con corpo `{"customData": {"1411": 300, "1413": true}}`; senza né `--custom-data` né `--json` esce con exit `2` e nessuna richiesta parte. | RF-021, RF-021b |
-| 03-C22 | Quando si esegue `posts copy 21269 --title Copia` e la `GET …/post-data-for-copy/21269` restituisce `occToken: 5` e `contentData` con `title`, `descriptionDelta`, `customData`, `visibility`, `announcement`, la `PUT …/copy-post/21269/5` ha corpo `{"title": "Copia", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto>, "visibility": <letta>, "announcement": <letto>}` e la tabella mostra il post nuovo con il suo id. | RF-021, RF-021b |
+| 03-C19 | *Sostituito da 03-C32 il 2026-10-09 (T16: i riferimenti letti vanno scritti come id).* ~~Quando si esegue `posts edit 21269 --title T2` e la `GET …/post-data-for-edit/21269` restituisce `occToken: 5` e `contentData` con `descriptionDelta`, `customData`, `visibility`, la `PUT …/edit-post/21269/5` ha corpo `{"title": "T2", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto>, "visibility": <letta>}` e nessun'altra chiave; con `--occ-token 3` la `GET` avviene lo stesso e la `PUT` usa `3`; quando il post letto non ha descrizione o custom data, le chiavi corrispondenti mancano.~~ | RF-021, RF-025, RF-021b |
+| 03-C20 | *Sostituito da 03-C33 il 2026-10-09 (T16: i riferimenti letti vanno scritti come id).* ~~Quando si esegue `posts edit 21269 --description X --custom-data 1411=300 --json body.json` con `body.json` = `{"visibility": 2, "customData": {"1412": "a"}}` sul post di 03-C19 (letto con `customData: {"1411": 226, "1413": true}`), il corpo contiene `description: "X"` con `descriptionFormat: 2` (il delta letto non viene inviato), `visibility: 2` (json > letto), `customData: {"1411": 300, "1412": "a", "1413": true}` (flag > json > letto, chiave per chiave).~~ | RF-021, RF-021b |
+| 03-C21 | *Sostituito da 03-C34 il 2026-10-09 (T16: i riferimenti letti vanno scritti come id).* ~~Quando si esegue `posts edit-custom-data 21269 --custom-data 1411=300` sul post di 03-C19, la CLI fa la `GET …/post-data-for-edit/21269` e poi `PUT …/edit-post-custom-data/21269/5` con corpo `{"customData": {"1411": 300, "1413": true}}`; senza né `--custom-data` né `--json` esce con exit `2` e nessuna richiesta parte.~~ | RF-021, RF-021b |
+| 03-C22 | *Sostituito da 03-C35 il 2026-10-09 (T16: i riferimenti letti vanno scritti come id).* ~~Quando si esegue `posts copy 21269 --title Copia` e la `GET …/post-data-for-copy/21269` restituisce `occToken: 5` e `contentData` con `title`, `descriptionDelta`, `customData`, `visibility`, `announcement`, la `PUT …/copy-post/21269/5` ha corpo `{"title": "Copia", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto>, "visibility": <letta>, "announcement": <letto>}` e la tabella mostra il post nuovo con il suo id.~~ | RF-021, RF-021b |
 | 03-C23 | Quando si esegue `posts edit-watchers 21269 --add 7 --remove 8`, parte una sola `PUT …/edit-post-watchers/21269` con corpo `{"addWatcherUserIds": [7], "removeWatcherUserIds": [8]}` e il comando stampa `Watchers of post 21269 updated`; con `--output json` stampa `{"post_id": 21269, "added_user_ids": [7], "removed_user_ids": [8]}`; senza `--add` né `--remove` esce con exit `2` e nessuna richiesta parte. | RF-021, RF-015 |
 | 03-C24 | Quando si esegue `posts delete 21269` in un terminale interattivo, il prompt riporta id e titolo letti con `GET …/post-detail-by-id/21269`; con risposta `y` parte la `DELETE` e il comando stampa `Post 21269 deleted`; con risposta `n` nessuna `DELETE` parte e l'exit code è `0`; con `--yes` nessun prompt; senza terminale e senza `--yes` nessuna richiesta di scrittura parte, exit `2` e il messaggio dice che serve `--yes`. Lo stesso vale per `posts mark-erasable 21269` con il prompt `Mark post 21269 "<title>" as erasable? [y/N]`, la `PUT …/mark-post-as-erasable/21269` e il messaggio `Post 21269 marked as erasable`. | RF-025, RF-025a |
 | 03-C25 | Quando si esegue `posts comment 21269 --text Ciao --parent 5`, parte una sola `POST …/create-comment/21269` con corpo `{"comment": "Ciao", "commentFormat": 2, "parentCommentId": 5}` e la tabella mostra id, creatore, testo e creation_timestamp del commento; `--output json` restituisce la risposta serializzata; senza `--text` e senza `--json` esce con exit `2`. | RF-021, RF-015 |
 | 03-C26 | Quando si esegue `posts get-for-edit 21269`, la tabella ha in testa `occ_token` seguito da community_id, title, visibility e stato corrente; `posts get-for-copy 21269` mostra `occ_token` e title; `posts get-for-create 79` mostra i dati di `content_data`; `--no-attachments` manda `loadAttachments=false`; `--output json` e `--full` restituiscono il DTO intero. | RF-021a, RF-015 |
-| 03-C27 | Quando si esegue `posts workflow-execute 21269 12 --screen-data 5=x` e la `GET …/post-workflow-screen-data-for-edit/21269?workflowOperationId=12` restituisce `screenOccToken: 3` e `screenData: {"5": "a", "6": 1}`, la `POST …/execute-post-workflow-operation/21269/12` ha corpo `{"screenData": {"5": "x", "6": 1}, "screenOccToken": 3}`; senza `--screen-data` né `--json` non c'è alcuna `GET` e il corpo è `{}`; `--screen-occ-token 9` impone `9`. `posts workflow-edit-screen 21269 --screen-data 5=x` fa la `GET` senza query e la `PUT …/edit-post-workflow-screen-data/21269/3` con corpo `{"screenData": {"5": "x", "6": 1}}`. `posts workflow-screen 21269 --operation 12` mostra screen_occ_token, stato corrente, nome dello screen e i campi di screen_data. | RF-021, RF-025, RF-015 |
+| 03-C27 | *Sostituito da 03-C36 il 2026-10-09 (T16: i riferimenti letti vanno scritti come id).* ~~Quando si esegue `posts workflow-execute 21269 12 --screen-data 5=x` e la `GET …/post-workflow-screen-data-for-edit/21269?workflowOperationId=12` restituisce `screenOccToken: 3` e `screenData: {"5": "a", "6": 1}`, la `POST …/execute-post-workflow-operation/21269/12` ha corpo `{"screenData": {"5": "x", "6": 1}, "screenOccToken": 3}`; senza `--screen-data` né `--json` non c'è alcuna `GET` e il corpo è `{}`; `--screen-occ-token 9` impone `9`. `posts workflow-edit-screen 21269 --screen-data 5=x` fa la `GET` senza query e la `PUT …/edit-post-workflow-screen-data/21269/3` con corpo `{"screenData": {"5": "x", "6": 1}}`. `posts workflow-screen 21269 --operation 12` mostra screen_occ_token, stato corrente, nome dello screen e i campi di screen_data.~~ | RF-021, RF-025, RF-015 |
 | 03-C28 | Quando la `PUT` di `posts edit`, `posts edit-custom-data`, `posts copy`, `posts workflow-edit-screen` o la `POST` di `posts workflow-execute` risponde `409`, il comando termina con exit code `9`, stampa `Post 21269 changed since it was read: fetch it again and retry` e il server ha ricevuto una sola richiesta di scrittura. | RF-025, RF-015a, RNF-009 |
 | 03-C29 | I contract test dimostrano che i modelli generati `CreateCustomPostRequest`, `EditCustomPostRequestDTO`, `EditPostCustomDataRequestDTO`, `CopyCustomPostRequestDTO`, `EditPostWatchersRequestDTO`, `EditPostAttachmentsRequestDTO`, `CreatePostCommentRequestDTO`, `ExecutePostWorkflowOperationRequestDTO`, `EditPostWorkflowScreenDataRequestDTO`, `CreatePostResponseDTO`, `EditPostResponseDTO`, `CopyPostResponseDTO`, `EditPostAttachmentsResponseDTO`, `MarkPostAsErasableResponseDTO`, `DeletePostResponseDTO`, `CreatePostCommentResponseDTO`, `ExecutePostWorkflowOperationResponseDTO`, `EditPostWorkflowScreenDataResponseDTO`, `GetPostWorkflowScreenDataForEditResponseDTO`, `GetCustomPostForCreateResponseDTO`, `GetCustomPostForEditResponseDTO`, `GetCustomPostForCopyResponseDTO` coprono tutte le proprietà del swagger pinnato, e le fixture JSON di risposta si leggono nelle façade. | RF-021, RNF-003 |
 | 03-C30 | `docs/cli.md` documenta i quattordici comandi `posts` di questa spec; `docs/api/posts.md` documenta i metodi, le façade, `occ_token` dalle letture propedeutiche, il formato delle date e la semantica dei campi omessi; `docs/index.md` e `README.md` citano i post tra le scritture senza numeri di versione; `uv run mkdocs build --strict` e `test_docs_snippets` sono verdi. | RF-015 |
 | 03-C31 | Quando `PYNTERACTA_TEST_WRITE_COMMUNITY_ID` e `PYNTERACTA_TEST_USER_ID` sono impostate (integration, opt-in), il ciclo `create` (con `client_uid` riconoscibile) → `get_by_client_uid` → `get_for_edit` (occ_token) → `edit` → `edit_watchers` → `add_comment` → `get_for_copy` → `copy` → `delete` della copia → `delete` dell'originale termina senza errori sul tenant e i due post rispondono `404` al termine; la pulizia avviene anche se un passo intermedio fallisce; senza una delle variabili il test è saltato. Quando `PYNTERACTA_TEST_WORKFLOW_POST_ID` è impostata, `get_workflow_screen` restituisce `screen_occ_token` e `current_workflow_state` senza eseguire transizioni; senza la variabile è saltato. | RF-021, RF-025 |
+| 03-C32 | Quando si esegue `posts edit 21269 --title T2` e la `GET …/post-data-for-edit/21269` restituisce `occToken: 5` e `contentData` con `descriptionDelta`, `visibility` e `customData: {"1411": 226, "1413": true, "2003": [{"id": 89, "catalogId": 12, "label": "3 - Bassa"}]}`, la `PUT …/edit-post/21269/5` ha corpo `{"title": "T2", "description": <delta letto>, "descriptionFormat": 1, "customData": {"1411": 226, "1413": true, "2003": [89]}, "visibility": <letta>}` e nessun'altra chiave; con `--occ-token 3` la `GET` avviene lo stesso e la `PUT` usa `3`; quando il post letto non ha descrizione o custom data, le chiavi corrispondenti mancano. | RF-021, RF-025, RF-021b, RF-021d |
+| 03-C33 | Quando si esegue `posts edit 21269 --description X --custom-data 1411=300 --json body.json` con `body.json` = `{"visibility": 2, "customData": {"1412": "a", "2002": [7]}}` sul post di 03-C32, il corpo contiene `description: "X"` con `descriptionFormat: 2` (il delta letto non viene inviato), `visibility: 2` (json > letto), `customData: {"1411": 300, "1412": "a", "1413": true, "2002": [7], "2003": [89]}` (flag > json > letto tradotto, chiave per chiave; i valori di `--json` passano così come sono). | RF-021, RF-021b, RF-021d |
+| 03-C34 | Quando si esegue `posts edit-custom-data 21269 --custom-data 1411=300` sul post di 03-C32, la CLI fa la `GET …/post-data-for-edit/21269` e poi `PUT …/edit-post-custom-data/21269/5` con corpo `{"customData": {"1411": 300, "1413": true, "2003": [89]}}`; senza né `--custom-data` né `--json` esce con exit `2` e nessuna richiesta parte. | RF-021, RF-021b, RF-021d |
+| 03-C35 | Quando si esegue `posts copy 21269 --title Copia` e la `GET …/post-data-for-copy/21269` restituisce `occToken: 5` e `contentData` con `title`, `descriptionDelta`, `customData` (con il riferimento `2003` come in 03-C32), `visibility`, `announcement`, la `PUT …/copy-post/21269/5` ha corpo `{"title": "Copia", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto, con "2003": [89]>, "visibility": <letta>, "announcement": <letto>}` e la tabella mostra il post nuovo con il suo id. | RF-021, RF-021b, RF-021d |
+| 03-C36 | Quando si esegue `posts workflow-execute 21269 12 --screen-data 5=x` e la `GET …/post-workflow-screen-data-for-edit/21269?workflowOperationId=12` restituisce `screenOccToken: 3` e `screenData: {"5": "a", "6": 1, "5233": [{"id": 8341, "catalogId": 22}], "5237": [{"id": 3872, "firstName": "Alice"}]}`, la `POST …/execute-post-workflow-operation/21269/12` ha corpo `{"screenData": {"5": "x", "6": 1, "5233": [8341], "5237": [3872]}, "screenOccToken": 3}`; senza `--screen-data` né `--json` non c'è alcuna `GET` e il corpo è `{}`; `--screen-occ-token 9` impone `9`. `posts workflow-edit-screen 21269 --screen-data 5=x` fa la `GET` senza query e la `PUT …/edit-post-workflow-screen-data/21269/3` con lo stesso `screenData` tradotto. `posts workflow-screen 21269 --operation 12` mostra screen_occ_token, stato corrente, nome dello screen e i campi di screen_data. | RF-021, RF-025, RF-015, RF-021d |
+| 03-C37 | La funzione che traduce i valori letti restituisce: per `[{"id": 89, "label": "x"}, {"id": 90}]` → `[89, 90]`; per `{"id": 3872, "firstName": "Alice"}` → `3872`; per `[]`, `None`, `226`, `"testo"`, `true`, `[1, 2]`, `[{"insert": "a"}]` (oggetti senza `id`) → il valore invariato. `docs/api/posts.md` dice che `edit` sostituisce il post (la descrizione omessa conta come vuota) e che i riferimenti si scrivono come id; `docs/cli.md` dice che le patch traducono i riferimenti letti e che i valori nuovi dei campi delta sono JSON Quill delta. | RF-021d, RF-015 |
 
 ## Casi limite
 
@@ -224,11 +244,15 @@ test opt-in con il ciclo completo su una community di prova, con pulizia garanti
 - `delete`, `mark_as_erasable`, `edit` di un post inesistente → `404 → NotFoundError`, exit `5`
   in CLI (mapping esistente).
 - `posts edit`, `posts copy`, `posts edit-custom-data` su un post che la lettura propedeutica non
-  trova → exit `5`, nessuna scrittura, anche con `--occ-token` (03-C19, 03-C22, 03-C21).
+  trova → exit `5`, nessuna scrittura, anche con `--occ-token` (03-C32, 03-C35, 03-C34).
 - `posts edit` con `--json` che contiene `description` → vince sul delta letto; `descriptionFormat`
-  resta `1` se non indicato (03-C20: il formato `2` arriva solo da `--description`).
+  resta `1` se non indicato (03-C33: il formato `2` arriva solo da `--description`).
 - `posts edit` con `--json` che contiene `customData` → unione chiave per chiave con i dati letti,
-  poi i flag (03-C20).
+  poi i flag (03-C33).
+- Valore letto con oggetti senza `id` (per esempio un delta come lista di operazioni) → rimandato
+  invariato (03-C37).
+- Riferimento tolto da un campo obbligatorio con `--json` (`{"customData": {"2003": []}}`) →
+  decide il server (`400`), una sola richiesta.
 - `--custom-data` senza `=` o con id non numerico → exit `2`, nessuna richiesta.
 - `--json -` con stdin vuoto o JSON non valido, o chiavi sconosciute al DTO → exit `2`, nessuna
   richiesta (`load_json_body` esistente).
@@ -236,7 +260,7 @@ test opt-in con il ciclo completo su una community di prova, con pulizia garanti
   `2` (03-C03, comportamento di `tasks create`).
 - `posts delete` o `posts mark-erasable` con risposta al prompt diversa da `y`/`Y` → nessuna
   richiesta, exit `0` (03-C24).
-- `posts workflow-execute` di una transizione senza screen → corpo `{}`, nessuna `GET` (03-C27);
+- `posts workflow-execute` di una transizione senza screen → corpo `{}`, nessuna `GET` (03-C36);
   se il tenant richiede `"screenData": null` esplicito, lo si scopre nella verifica manuale e
   `execute_workflow_operation_raw` lo permette.
 - `edit_watchers` senza argomenti → `PUT` con corpo `{}` dalla libreria (una richiesta, campi
@@ -269,6 +293,10 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
   patch: rileggono i dati propedeutici e rimandano i campi non indicati; `--custom-data` e
   `--screen-data` sovrascrivono chiave per chiave; `--occ-token` e `--screen-occ-token` impongono
   solo il token.
+- RF-021d (precisa RF-021, revisione del 2026-10-09). In scrittura i riferimenti a voci di
+  catalogo, utenti e gruppi nei campi custom e nei dati di screen si inviano come id, anche se le
+  letture li restituiscono come oggetti; le patch della CLI traducono i valori letti che
+  rimandano. `edit-post` sostituisce il post: la descrizione omessa conta come vuota.
 - RF-021c (precisa RF-021). `edit_attachments` e gli `attachments` di `create`, `edit`, `copy`,
   `add_comment` accettano solo riferimenti già noti al server; `posts edit-attachments` in CLI è
   rimandato a dopo l'upload (RF-024).
@@ -303,6 +331,8 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
 | `PostCapabilities` estesa con copia, allegati e operazioni di workflow | Lasciare i flag in `.raw` | Un agente deve poter scoprire gli `operation_id` senza leggere il DTO grezzo |
 | Integration test con ciclo completo su una community di prova, workflow in sola lettura | Solo create → edit → delete; nessuna prova | Fissa contro il server reale copia, commenti e watcher; le transizioni cambiano stato e non si possono annullare |
 | `screenData` e `newScreenData` come mappe di valori qualsiasi, rigenerando i modelli con lo script (2026-10-09, T02) | Correggere a mano il file generato; aggirare la validazione nei `*_raw` e nelle façade | I modelli generati non si modificano a mano; lo script ha già il meccanismo per `customData` |
+| Riferimenti letti tradotti in id con una regola generica (lista di oggetti con `id` → id; oggetto con `id` → id) (2026-10-09, T16) | Traduzione guidata dal tipo del campo (una lettura in più della definizione dei post per i campi custom) | Nessuna chiamata in più; copre cataloghi, utenti e gruppi; le prove sul tenant hanno mostrato `400 INVALID_VALUE` con gli oggetti e `200` con gli id |
+| Campi delta: i valori letti si rimandano nel formato delta; i valori nuovi via flag devono essere JSON Quill delta; testo semplice solo con `--json` e `deltaAreaFormat: 2`, documentato (2026-10-09) | Opzione `--plain-text-fields` con conversione dei delta letti; rifiuto dei flag sui campi delta | `deltaAreaFormat` vale per tutto il corpo: convertire i delta letti perde la formattazione; nessuna opzione in più |
 | Riga `0.11.0` in ROADMAP | – | I `feat` producono un minor (politica pre-1.0) |
 
 ## Verifica manuale
@@ -316,11 +346,20 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
   in `docs/api/posts.md` e in `verifica.md`; se il server non azzera i campi omessi, la base delle
   patch in CLI si riduce ai soli campi passati con una revisione della spec (03-C19…03-C22). Fino a
   quell'esecuzione 03-C31 vale come saltato.
+  **Esito parziale (2026-10-09, T16)**: `create` con un campo custom obbligatorio passato come
+  lista di id funziona; `edit-post` con il solo titolo risponde `400 REQUIRED_FIELD` su
+  `description` (sostituzione); i riferimenti letti come oggetti e rimandati danno `400
+  INVALID_VALUE`, come id sono accettati; un campo delta con testo semplice senza
+  `deltaAreaFormat: 2` dà `500`. Da qui la revisione del 2026-10-09.
 
 ## Revisioni
 
 - 2026-10-09, durante T02: i dati di screen del workflow richiedono la rigenerazione dei modelli
   ("Comportamento attuale", "Decisioni"); nessun criterio cambia.
+- 2026-10-09, durante T16: le letture restituiscono i riferimenti come oggetti, le scritture li
+  vogliono come id; `edit-post` sostituisce il post. Le patch della CLI traducono i valori letti
+  (03-C19, 03-C20, 03-C21, 03-C22, 03-C27 sostituiti da 03-C32…03-C36; nuovo 03-C37; RF-021d); i
+  campi delta restano nel formato delta (decisione documentata).
 
 ## Domande aperte
 

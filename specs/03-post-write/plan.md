@@ -233,6 +233,12 @@ scrivono con il test che le usa. `_sent_body(route)` e `mock_json` come in `test
 | 03-C29 | `tests/contract/test_models.py::TestPostWriteDTOs::test_write_dto_superset` (22 DTO), `::test_typed_stub_superset` (8 varianti `…1`), `::test_facade_smoke_*` sulle fixture | contract |
 | 03-C30 | `test_docs_snippets.py::test_posts_pages_document_write_commands` (i quattordici nomi di comando in `cli.md`; `create(`, `edit(`, `copy(`, `add_comment(`, `execute_workflow_operation(`, `PostWriteResult`, `occ_token`, `get_for_edit` in `api/posts.md`; `posts` nella frase delle scritture di `index.md` e `README.md`); `uv run mkdocs build --strict` nei controlli di verifica | unitario + verifica |
 | 03-C31 | `tests/integration/test_posts_integration.py::TestPostsWriteIntegration::test_full_cycle` (skip senza le variabili; `create` → `get_by_client_uid` → `get_for_edit` → `edit` → `edit_watchers` → `add_comment` → `get_for_copy` → `copy` → `delete` × 2 in `finally` → `NotFoundError` × 2); `::test_workflow_screen_read_only` (skip senza `PYNTERACTA_TEST_WORKFLOW_POST_ID`) | integrazione (opt-in) + verifica manuale |
+| 03-C32 | `test_cli_posts_write.py::TestPostsEdit` — i test di T11 marcati 03-C19 passano a 03-C32 con la fixture `post_for_edit_response.json` che ha anche `"2003": [{"id": 89, …}]`: corpo atteso con `"2003": [89]`; `edit_base` testato da solo | unitario |
+| 03-C33 | i test di T11 marcati 03-C20 passano a 03-C33: `customData` unito con il letto tradotto, i valori di `--json` (`"2002": [7]`) invariati | unitario |
+| 03-C34 | i test di T11 marcati 03-C21 passano a 03-C34, corpo con `"2003": [89]` | unitario |
+| 03-C35 | i test di T11 marcati 03-C22 passano a 03-C35; `copy_base` sulla fixture `post_for_copy_response.json` con il riferimento | unitario |
+| 03-C36 | i test di T13 marcati 03-C27 passano a 03-C36 con `workflow_screen_response.json` che ha anche `5233` e `5237` come oggetti; `screen_base` testato da solo | unitario |
+| 03-C37 | `test_cli_posts_write.py::TestToWriteValue` parametrizzato sui casi del criterio; `test_docs_snippets.py::test_posts_pages_document_write_commands` esteso (`replacement`/`ids` in `docs/api/posts.md`, `Quill delta` in `docs/cli.md`) | unitario |
 
 Verifica manuale (dalla spec): l'esecuzione di 03-C31 sulla community di prova, più le prove a
 mano in un task dedicato (campi omessi in `edit-post`, `edit-post-custom-data` e `copy-post`;
@@ -280,3 +286,24 @@ patch si riduce con una revisione della spec (03-C19…03-C22), non con un aggiu
 - **Copertura di `cli/posts_write.py`** (14 comandi) → ogni ramo di errore (`--json` non valido,
   token assente, flag mancanti, timezone non valida, `409`, `404` dalla lettura) ha un test.
 - **`posts capabilities` cambia tabella** → snapshot rigenerato e riletto; nessuna colonna tolta.
+
+## Revisioni
+
+### 2026-10-09, durante T16: riferimenti letti scritti come id
+
+Le prove sul tenant hanno mostrato che le letture restituiscono i riferimenti (voci di catalogo,
+utenti, gruppi) come oggetti completi e le scritture li accettano solo come id, e che
+`edit-post` sostituisce il post. La libreria non cambia; cambia la base delle patch della CLI.
+
+| File | Modifica |
+|---|---|
+| `src/pynteracta/cli/posts_write.py` | `to_write_value(value) -> Any`: lista di dict tutti con `id` → lista degli id; dict con `id` → l'id; il resto invariato (lista vuota compresa). `to_write_values(mapping) -> dict` la applica a ogni valore. `edit_base`/`copy_base` traducono `customData`; `screen_base` traduce `screenData`. I valori di `--json` e dei flag non passano dalla traduzione |
+| `tests/fixtures/payloads/post_for_edit_response.json`, `post_for_copy_response.json` | `customData` con anche `"2003": [{"id": 89, "catalogId": 12, "label": "3 - Bassa", …}]` |
+| `tests/fixtures/payloads/workflow_screen_response.json` | `screenData` con anche `"5233"` (voce di catalogo) e `"5237"` (utente finto) come liste di oggetti |
+| `tests/unit/test_cli_posts_write.py` | marker 03-C19…C22, C27 → 03-C32…C36 con le nuove attese; `TestToWriteValue` (03-C37) |
+| `tests/integration/test_posts_integration.py` | `edit` rimanda descrizione (delta, formato 1) e `customData` letti tradotti con `to_write_values`, come fa la CLI; stampa `[T16]` dei campi dopo la modifica |
+| `docs/api/posts.md`, `docs/cli.md`, `tests/unit/test_docs_snippets.py` | `edit` come sostituzione, riferimenti come id, campi delta in formato delta (03-C37) |
+
+Scelta tecnica: la traduzione sta nel modulo CLI, non nella libreria, perché la libreria invia solo
+ciò che riceve; un chiamante della libreria può importare `to_write_values` da `cli/posts_write.py`
+solo come dettaglio interno, la documentazione gli mostra la forma con gli id.
