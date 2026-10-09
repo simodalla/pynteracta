@@ -134,7 +134,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `feat(posts): modifica, campi custom e copia di un post con
      occToken`.
 
-### [ ] T07 – Watcher, allegati, eliminazione, marcatura e commento
+### [x] T07 – Watcher, allegati, eliminazione, marcatura e commento
 
 - Criteri: 03-C02 (edit_watchers, edit_attachments, add_comment), 03-C08, 03-C09, 03-C10,
   03-C17 (add_comment)

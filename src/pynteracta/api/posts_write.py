@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from pynteracta.api._base import ResourceClient
 from pynteracta.api._utils import build_query_params, build_write_body, zoned_datetime_input
 from pynteracta.models.facade.posts_write import (
+    PostAttachmentsWriteResult,
+    PostComment,
     PostForCopy,
     PostForCreate,
     PostForEdit,
@@ -27,8 +29,13 @@ from pynteracta.models.facade.posts_write import (
 from pynteracta.models.generated.external_v2 import (
     CopyCustomPostRequestDTO,
     CreateCustomPostRequest,
+    CreatePostCommentRequestDTO,
+    DeletePostResponseDTO,
     EditCustomPostRequestDTO,
+    EditPostAttachmentsRequestDTO,
     EditPostCustomDataRequestDTO,
+    EditPostWatchersRequestDTO,
+    MarkPostAsErasableResponseDTO,
 )
 
 _MANAGE = "communication/posts/manage"
@@ -39,6 +46,11 @@ _CREATE_PATH = _MANAGE + "/create-post/{community_id}"
 _EDIT_PATH = _MANAGE + "/edit-post/{post_id}/{occ_token}"
 _CUSTOM_DATA_PATH = _MANAGE + "/edit-post-custom-data/{post_id}/{occ_token}"
 _COPY_PATH = _MANAGE + "/copy-post/{post_id}/{occ_token}"
+_WATCHERS_PATH = _MANAGE + "/edit-post-watchers/{post_id}"
+_ATTACHMENTS_PATH = _MANAGE + "/edit-post-attachments/{post_id}"
+_DELETE_PATH = _MANAGE + "/delete-post/{post_id}"
+_ERASABLE_PATH = _MANAGE + "/mark-post-as-erasable/{post_id}"
+_COMMENT_PATH = _MANAGE + "/create-comment/{post_id}"
 
 # Elementi di allegati e tabelle: dict nella forma del DTO oppure il modello generato.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -351,3 +363,130 @@ class PostsWriteAPI(ResourceClient):
     def _send_copy(self, post_id: int, occ_token: int, body: dict[str, Any]) -> PostWriteResult:
         path = _COPY_PATH.format(post_id=post_id, occ_token=occ_token)
         return PostWriteResult.from_copy(self._put(path, json=body))
+
+    # --- watcher e allegati -----------------------------------------------------------------
+
+    def edit_watchers(
+        self,
+        post_id: int,
+        *,
+        add_user_ids: list[int] | None = None,
+        remove_user_ids: list[int] | None = None,
+    ) -> None:
+        """PUT ``/communication/posts/manage/edit-post-watchers/{postId}``.
+
+        Senza ``occToken``. Il server risponde ``200`` senza corpo.
+
+        Args:
+            post_id: Il post.
+            add_user_ids: Utenti osservatori da aggiungere.
+            remove_user_ids: Utenti osservatori da togliere.
+        """
+        body = build_write_body(
+            add_watcher_user_ids=add_user_ids, remove_watcher_user_ids=remove_user_ids
+        )
+        self._put(_WATCHERS_PATH.format(post_id=post_id), json=body)
+
+    def edit_watchers_raw(self, post_id: int, req: EditPostWatchersRequestDTO) -> None:
+        """Come :meth:`edit_watchers`, da un ``EditPostWatchersRequestDTO``."""
+        self._put(_WATCHERS_PATH.format(post_id=post_id), json=_dump(req))
+
+    def edit_attachments(
+        self,
+        post_id: int,
+        *,
+        add: WriteItems = None,
+        update: WriteItems = None,
+        remove_ids: list[int] | None = None,
+    ) -> PostAttachmentsWriteResult:
+        """PUT ``/communication/posts/manage/edit-post-attachments/{postId}``.
+
+        Accetta solo allegati già noti al server (``attachmentId``, oppure ``name`` +
+        ``contentRef``): l'upload di file nuovi non fa parte di questa libreria (RF-024).
+
+        Args:
+            post_id: Il post.
+            add: Allegati da aggiungere, nella forma di ``InputPostAttachmentDTO``.
+            update: Allegati da aggiornare (con ``contentRef`` = nuova versione).
+            remove_ids: Id degli allegati da togliere.
+
+        Returns:
+            Un :class:`PostAttachmentsWriteResult` con gli allegati aggiunti, aggiornati e tolti.
+        """
+        body = build_write_body(
+            add_attachments=add, update_attachments=update, remove_attachment_ids=remove_ids
+        )
+        return self._send_attachments(post_id, body)
+
+    def edit_attachments_raw(
+        self, post_id: int, req: EditPostAttachmentsRequestDTO
+    ) -> PostAttachmentsWriteResult:
+        """Come :meth:`edit_attachments`, da un ``EditPostAttachmentsRequestDTO``."""
+        return self._send_attachments(post_id, _dump(req))
+
+    def _send_attachments(self, post_id: int, body: dict[str, Any]) -> PostAttachmentsWriteResult:
+        path = _ATTACHMENTS_PATH.format(post_id=post_id)
+        return PostAttachmentsWriteResult.from_dict(self._put(path, json=body))
+
+    # --- eliminazione -----------------------------------------------------------------------
+
+    def delete(self, post_id: int) -> int | None:
+        """DELETE ``/communication/posts/manage/delete-post/{postId}``.
+
+        Returns:
+            Il ``postId`` della risposta.
+        """
+        data = self._delete(_DELETE_PATH.format(post_id=post_id))
+        return DeletePostResponseDTO.model_validate(data).postId
+
+    def mark_as_erasable(self, post_id: int) -> int | None:
+        """PUT ``/communication/posts/manage/mark-post-as-erasable/{postId}``, senza corpo.
+
+        Il post viene eliminato e marcato per una futura cancellazione fisica.
+
+        Returns:
+            Il ``postId`` della risposta.
+        """
+        data = self._put(_ERASABLE_PATH.format(post_id=post_id))
+        return MarkPostAsErasableResponseDTO.model_validate(data).postId
+
+    # --- commenti ---------------------------------------------------------------------------
+
+    def add_comment(  # noqa: PLR0913
+        self,
+        post_id: int,
+        *,
+        comment: str | None = None,
+        comment_format: int | None = None,
+        client_uid: str | None = None,
+        attachments: WriteItems = None,
+        parent_comment_id: int | None = None,
+    ) -> PostComment:
+        """POST ``/communication/posts/manage/create-comment/{postId}``.
+
+        Args:
+            post_id: Il post da commentare.
+            comment: Testo, nel formato di ``comment_format``.
+            comment_format: ``1`` = Quill delta (default del server), ``2`` = testo semplice.
+            client_uid: Identificativo scelto dal chiamante.
+            attachments: Allegati già noti al server (``InputPostCommentAttachmentDTO``).
+            parent_comment_id: Commento a cui si risponde.
+
+        Returns:
+            Il commento creato (:class:`PostComment`).
+        """
+        body = build_write_body(
+            comment=comment,
+            comment_format=comment_format,
+            client_uid=client_uid,
+            attachments=attachments,
+            parent_comment_id=parent_comment_id,
+        )
+        return self._send_comment(post_id, body)
+
+    def add_comment_raw(self, post_id: int, req: CreatePostCommentRequestDTO) -> PostComment:
+        """Come :meth:`add_comment`, da un ``CreatePostCommentRequestDTO``."""
+        return self._send_comment(post_id, _dump(req))
+
+    def _send_comment(self, post_id: int, body: dict[str, Any]) -> PostComment:
+        return PostComment.from_dict(self._post(_COMMENT_PATH.format(post_id=post_id), json=body))

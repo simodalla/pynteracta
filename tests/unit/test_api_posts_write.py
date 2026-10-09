@@ -15,6 +15,8 @@ from api_helpers import BASE_URL, load_payload, make_transport
 from pynteracta.api.posts import PostsAPI
 from pynteracta.exceptions import ConcurrencyError, TransportError, ValidationError
 from pynteracta.models.facade.posts_write import (
+    PostAttachmentsWriteResult,
+    PostComment,
     PostForCopy,
     PostForCreate,
     PostForEdit,
@@ -36,6 +38,13 @@ _CREATE_PATH = f"{_MANAGE}/create-post/{_COMMUNITY_ID}"
 _EDIT_PATH = f"{_MANAGE}/edit-post/{_POST_ID}/{_OCC_TOKEN}"
 _CUSTOM_DATA_PATH = f"{_MANAGE}/edit-post-custom-data/{_POST_ID}/{_OCC_TOKEN}"
 _COPY_PATH = f"{_MANAGE}/copy-post/{_POST_ID}/{_OCC_TOKEN}"
+_WATCHERS_PATH = f"{_MANAGE}/edit-post-watchers/{_POST_ID}"
+_ATTACHMENTS_PATH = f"{_MANAGE}/edit-post-attachments/{_POST_ID}"
+_DELETE_PATH = f"{_MANAGE}/delete-post/{_POST_ID}"
+_ERASABLE_PATH = f"{_MANAGE}/mark-post-as-erasable/{_POST_ID}"
+_COMMENT_PATH = f"{_MANAGE}/create-comment/{_POST_ID}"
+_COMMENT_ID = 5601
+_PARENT_COMMENT_ID = 5
 _SCHEDULED = datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome"))
 _SCHEDULED_BODY = {"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}
 
@@ -243,6 +252,96 @@ class TestPostsCopy:
         assert result.post_id == _COPY_POST_ID
 
 
+class TestPostsWatchersAttachments:
+    # criterio: 03-C08
+    @respx.mock
+    def test_edit_watchers_body_and_none(self) -> None:
+        route = respx.put(_WATCHERS_PATH).mock(return_value=httpx.Response(200))
+        result = _api().edit_watchers(_POST_ID, add_user_ids=[7], remove_user_ids=[8])
+        assert result is None
+        assert route.call_count == 1
+        assert _sent(route) == {"addWatcherUserIds": [7], "removeWatcherUserIds": [8]}
+
+    # criterio: 03-C08
+    @respx.mock
+    def test_edit_attachments_body_and_result(self) -> None:
+        route = _mock_put(_ATTACHMENTS_PATH, "edit_post_attachments_response.json")
+        result = _api().edit_attachments(_POST_ID, remove_ids=[3])
+        assert route.call_count == 1
+        assert _sent(route) == {"removeAttachmentIds": [3]}
+        assert isinstance(result, PostAttachmentsWriteResult)
+        assert result.post_id == _POST_ID
+        assert [a.id for a in result.added] == [4]
+        assert result.updated == []
+        assert result.removed_ids == [3]
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_raw_equivalents(self) -> None:
+        watchers = respx.put(_WATCHERS_PATH).mock(return_value=httpx.Response(200))
+        attachments = _mock_put(_ATTACHMENTS_PATH, "edit_post_attachments_response.json")
+        api = _api()
+        api.edit_watchers_raw(_POST_ID, generated.EditPostWatchersRequestDTO(addWatcherUserIds=[7]))
+        api.edit_attachments_raw(
+            _POST_ID, generated.EditPostAttachmentsRequestDTO(removeAttachmentIds=[3])
+        )
+        assert _sent(watchers) == {"addWatcherUserIds": [7]}
+        assert _sent(attachments) == {"removeAttachmentIds": [3]}
+
+
+class TestPostsDelete:
+    # criterio: 03-C09
+    @respx.mock
+    def test_delete_returns_post_id(self) -> None:
+        route = respx.delete(_DELETE_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("delete_post_response.json"))
+        )
+        assert _api().delete(_POST_ID) == _POST_ID
+        assert route.call_count == 1
+
+    # criterio: 03-C09
+    @respx.mock
+    def test_mark_as_erasable_puts_without_body_and_returns_post_id(self) -> None:
+        route = _mock_put(_ERASABLE_PATH, "mark_post_erasable_response.json")
+        assert _api().mark_as_erasable(_POST_ID) == _POST_ID
+        assert route.call_count == 1
+        assert route.calls[0].request.content == b""
+
+
+class TestPostsComment:
+    # criterio: 03-C10
+    @respx.mock
+    def test_add_comment_body_and_facade(self) -> None:
+        route = respx.post(_COMMENT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_post_comment_response.json"))
+        )
+        comment = _api().add_comment(
+            _POST_ID, comment="Ciao", comment_format=2, parent_comment_id=_PARENT_COMMENT_ID
+        )
+        assert route.call_count == 1
+        assert _sent(route) == {
+            "comment": "Ciao",
+            "commentFormat": 2,
+            "parentCommentId": _PARENT_COMMENT_ID,
+        }
+        assert isinstance(comment, PostComment)
+        assert comment.id == _COMMENT_ID
+        assert comment.comment_plain_text == "Ciao"
+        assert comment.creator_user is not None
+        assert comment.parent_comment_id == _PARENT_COMMENT_ID
+        assert comment.raw is not None
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_add_comment_raw_equivalent(self) -> None:
+        route = respx.post(_COMMENT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_post_comment_response.json"))
+        )
+        req = generated.CreatePostCommentRequestDTO(comment="Ciao", commentFormat=2)
+        assert _api().add_comment_raw(_POST_ID, req).id == _COMMENT_ID
+        assert _sent(route) == {"comment": "Ciao", "commentFormat": 2}
+
+
 # criterio: 03-C03
 @pytest.mark.parametrize(
     ("method", "path", "fixture"),
@@ -305,4 +404,12 @@ class TestPostsErrors:
         with pytest.raises(ConcurrencyError) as exc_info:
             getattr(_api(), method)(_POST_ID, _OCC_TOKEN)
         assert exc_info.value.status_code == _HTTP_409
+        assert route.call_count == 1
+
+    # criterio: 03-C17
+    @respx.mock
+    def test_add_comment_timeout_raises_transport_error_once(self) -> None:
+        route = respx.post(_COMMENT_PATH).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(TransportError):
+            _api().add_comment(_POST_ID, comment="Ciao")
         assert route.call_count == 1
