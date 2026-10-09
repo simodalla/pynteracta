@@ -1,6 +1,62 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.10.0] - 2026-10-09
+
+### CI
+
+- **deps**: Bump the github-actions group across 1 directory with 8 updates
+- Pre-commit verde su tutti i file (ruamel.yaml nel hook mypy, file generati esclusi dai fixer)
+
+### Chores
+
+- Processore structlog e handler di file con cookie e header sensibili (01-T03)
+- La pagina Audit Logging dichiara le garanzie di redazione (01-C11) (01-T04)
+- Integration test opt-in del ciclo di scrittura dei task (02-T10)
+- **api**: Caratterizzazione dei rami TypeError di ResourceClient (02-T01)
+- **skills**: Rimozione di new-version e allineamento di release e WORKFLOW al metodo sddpa
+
+### Documentation
+
+- Adozione del metodo spec-driven (sddpa 0.3.0)
+- ADR 0001: apertura della superficie di scrittura verso Interacta
+- Conferma di scopo e attori del PRD, con gli usi vibe coding e server MCP
+- Spec 01: redazione di cookie e header sensibili nei log e nei hook
+- Piano 01: redazione di cookie e header sensibili nei log e nei hook
+- Task 01: redazione di cookie e header sensibili nei log e nei hook
+- Garanzie di redazione per cookie e header sensibili (01-T04)
+- PRD, RNF-001 precisato dalla spec 01 e conferma di RF-017, RF-018, RNF-001 (01-T05)
+- Verifica 01 con il problema di tracciabilità di 01-C11 e riapertura di T04
+- Verifica 01: redazione di cookie e header sensibili nei log e nei hook
+- Spec 02: scrittura dei task: creazione, modifica, eliminazione
+- Piano 02: scrittura dei task: creazione, modifica, eliminazione
+- Task 02: scrittura dei task: creazione, modifica, eliminazione
+- Scrittura dei task nelle pagine API e CLI, exit code 9, variabile per gli integration test (02-T09)
+- **spec**: Tasks edit come patch dopo l'esito di T11 (02-C17, 02-C18, T13)
+- PRD e CLAUDE.md per la spec 02 (02-T12)
+- Verifica 02 con il problema di copertura di api/_base.py e riapertura di T01
+- Verifica 02: scrittura dei task, creazione, modifica, eliminazione
+- Chiusura documentale della release 0.9.4 (ROADMAP, spec legacy, PROGRESS)
+- Release v0.10.0, riga di ROADMAP a shipped
+
+### Features
+
+- **api**: Utilità per le scritture (scadenza con fuso, corpo camelCase, PUT e DELETE nel client base) (02-T01)
+- **tasks**: Occ_token nella lettura e façade TaskWriteResult per le risposte di scrittura (02-T02)
+- **tasks**: Creazione di un task su un post (create, create_raw) (02-T03)
+- **tasks**: Modifica con occToken ed eliminazione di un task (edit, edit_raw, delete) (02-T04)
+- **cli**: Exit code 9 per i conflitti, conferma delle operazioni distruttive e corpo da --json (02-T05)
+- **cli**: Comando tasks create con flag e --json (02-T06)
+- **cli**: Comando tasks edit con occToken letto o imposto (02-T07)
+- **cli**: Comando tasks delete con conferma e --yes (02-T08)
+- **cli**: Tasks edit conserva i campi non indicati rileggendo il task (02-T13)
+
+### Fixes
+
+- **security**: Redazione per nome degli header sensibili (01-T01)
+- **security**: Redazione del valore dei cookie in Cookie e Set-Cookie (01-T02)
+- **deps**: Aggiornamento del lock e PyJWT >= 2.15.0 per gli avvisi Dependabot
+
 ## [0.9.4] - 2026-09-12
 
 ### CI
@@ -11,6 +67,7 @@ All notable changes to this project will be documented in this file.
 
 - Update CHANGELOG for v0.9.3
 - Document the PyPI rewrite discontinuity and install path
+- Update CHANGELOG for v0.9.4
 
 ## [0.9.3] - 2026-09-12
 
