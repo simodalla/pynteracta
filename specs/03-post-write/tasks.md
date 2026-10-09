@@ -115,7 +115,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `feat(posts): letture propedeutiche con occ_token e creazione di
      un post (create, create_raw)`.
 
-### [ ] T06 – `edit`, `edit_custom_data`, `copy` e il `409`
+### [x] T06 – `edit`, `edit_custom_data`, `copy` e il `409`
 
 - Criteri: 03-C02 (edit, edit_custom_data, copy), 03-C03 (edit, copy), 03-C04, 03-C05, 03-C06,
   03-C07 (tre metodi)

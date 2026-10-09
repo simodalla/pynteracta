@@ -13,7 +13,7 @@ import respx
 from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.posts import PostsAPI
-from pynteracta.exceptions import TransportError, ValidationError
+from pynteracta.exceptions import ConcurrencyError, TransportError, ValidationError
 from pynteracta.models.facade.posts_write import (
     PostForCopy,
     PostForCreate,
@@ -28,8 +28,14 @@ _POST_ID = 21269
 _NEW_POST_ID = 21270
 _OCC_TOKEN = 5
 _HTTP_400 = 400
+_HTTP_409 = 409
+_NEXT_OCC_TOKEN_EDIT = 6
+_COPY_POST_ID = 21271
 
 _CREATE_PATH = f"{_MANAGE}/create-post/{_COMMUNITY_ID}"
+_EDIT_PATH = f"{_MANAGE}/edit-post/{_POST_ID}/{_OCC_TOKEN}"
+_CUSTOM_DATA_PATH = f"{_MANAGE}/edit-post-custom-data/{_POST_ID}/{_OCC_TOKEN}"
+_COPY_PATH = f"{_MANAGE}/copy-post/{_POST_ID}/{_OCC_TOKEN}"
 _SCHEDULED = datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome"))
 _SCHEDULED_BODY = {"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}
 
@@ -162,6 +168,106 @@ class TestPostsCreate:
         assert route.call_count == 0
 
 
+def _mock_put(path: str, fixture: str) -> respx.Route:
+    return respx.put(path).mock(return_value=httpx.Response(200, json=load_payload(fixture)))
+
+
+class TestPostsEdit:
+    # criterio: 03-C04
+    @respx.mock
+    def test_edit_sends_only_given_fields(self) -> None:
+        route = _mock_put(_EDIT_PATH, "edit_post_response.json")
+        result = _api().edit(_POST_ID, _OCC_TOKEN, title="T2", remove_watcher_user_ids=[7])
+        assert route.call_count == 1
+        assert _sent(route) == {"title": "T2", "removeWatcherUserIds": [7]}
+        assert result.next_occ_token == _NEXT_OCC_TOKEN_EDIT
+        assert result.post is not None
+        assert result.post.title == "Procedura di prova (rev. 2)"
+        assert result.post_id == _POST_ID
+
+    # criterio: 03-C04
+    @respx.mock
+    def test_edit_without_fields_sends_empty_body(self) -> None:
+        route = _mock_put(_EDIT_PATH, "edit_post_response.json")
+        _api().edit(_POST_ID, _OCC_TOKEN)
+        assert _sent(route) == {}
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_edit_raw_equivalent(self) -> None:
+        route = _mock_put(_EDIT_PATH, "edit_post_response.json")
+        req = generated.EditCustomPostRequestDTO(title="T2", removeWatcherUserIds=[7])
+        result = _api().edit_raw(_POST_ID, _OCC_TOKEN, req)
+        assert _sent(route) == {"title": "T2", "removeWatcherUserIds": [7]}
+        assert result.next_occ_token == _NEXT_OCC_TOKEN_EDIT
+
+
+class TestPostsCustomData:
+    # criterio: 03-C05
+    @respx.mock
+    def test_edit_custom_data_body_and_result(self) -> None:
+        route = _mock_put(_CUSTOM_DATA_PATH, "edit_post_response.json")
+        result = _api().edit_custom_data(_POST_ID, _OCC_TOKEN, custom_data={"1411": 226})
+        assert route.call_count == 1
+        assert _sent(route) == {"customData": {"1411": 226}}
+        assert isinstance(result, PostWriteResult)
+        assert result.next_occ_token == _NEXT_OCC_TOKEN_EDIT
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_raw_equivalent(self) -> None:
+        route = _mock_put(_CUSTOM_DATA_PATH, "edit_post_response.json")
+        req = generated.EditPostCustomDataRequestDTO(customData={"1411": 226})
+        _api().edit_custom_data_raw(_POST_ID, _OCC_TOKEN, req)
+        assert _sent(route) == {"customData": {"1411": 226}}
+
+
+class TestPostsCopy:
+    # criterio: 03-C06
+    @respx.mock
+    def test_copy_body_and_result(self) -> None:
+        route = _mock_put(_COPY_PATH, "copy_post_response.json")
+        result = _api().copy(_POST_ID, _OCC_TOKEN, title="Copia")
+        assert route.call_count == 1
+        assert _sent(route) == {"title": "Copia"}
+        assert result.post_id == _COPY_POST_ID
+        assert result.next_occ_token == 1
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_raw_equivalent(self) -> None:
+        route = _mock_put(_COPY_PATH, "copy_post_response.json")
+        req = generated.CopyCustomPostRequestDTO(title="Copia", announcement=True)
+        result = _api().copy_raw(_POST_ID, _OCC_TOKEN, req)
+        assert _sent(route) == {"title": "Copia", "announcement": True}
+        assert result.post_id == _COPY_POST_ID
+
+
+# criterio: 03-C03
+@pytest.mark.parametrize(
+    ("method", "path", "fixture"),
+    [
+        ("edit", _EDIT_PATH, "edit_post_response.json"),
+        ("copy", _COPY_PATH, "copy_post_response.json"),
+    ],
+)
+class TestScheduledPublicationOnEditAndCopy:
+    @respx.mock
+    def test_zoneinfo_in_body(self, method: str, path: str, fixture: str) -> None:
+        route = _mock_put(path, fixture)
+        getattr(_api(), method)(_POST_ID, _OCC_TOKEN, scheduled_publication=_SCHEDULED)
+        assert _sent(route) == {"scheduledPublication": _SCHEDULED_BODY}
+
+    @respx.mock
+    def test_naive_raises_before_request(self, method: str, path: str, fixture: str) -> None:
+        route = _mock_put(path, fixture)
+        with pytest.raises(ValueError, match="timezone-aware"):
+            getattr(_api(), method)(
+                _POST_ID, _OCC_TOKEN, scheduled_publication=datetime(2026, 12, 31, 18, 0)
+            )
+        assert route.call_count == 0
+
+
 class TestPostsErrors:
     # criterio: 03-C16
     @respx.mock
@@ -180,4 +286,23 @@ class TestPostsErrors:
         route = respx.post(_CREATE_PATH).mock(side_effect=httpx.ReadTimeout("timed out"))
         with pytest.raises(TransportError):
             _api().create(_COMMUNITY_ID, title="T")
+        assert route.call_count == 1
+
+    # criterio: 03-C07
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [
+            ("edit", _EDIT_PATH),
+            ("edit_custom_data", _CUSTOM_DATA_PATH),
+            ("copy", _COPY_PATH),
+        ],
+    )
+    @respx.mock
+    def test_409_raises_concurrency_error_once(self, method: str, path: str) -> None:
+        route = respx.put(path).mock(
+            return_value=httpx.Response(_HTTP_409, json={"message": "occToken mismatch"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            getattr(_api(), method)(_POST_ID, _OCC_TOKEN)
+        assert exc_info.value.status_code == _HTTP_409
         assert route.call_count == 1

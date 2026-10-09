@@ -24,13 +24,21 @@ from pynteracta.models.facade.posts_write import (
     PostForEdit,
     PostWriteResult,
 )
-from pynteracta.models.generated.external_v2 import CreateCustomPostRequest
+from pynteracta.models.generated.external_v2 import (
+    CopyCustomPostRequestDTO,
+    CreateCustomPostRequest,
+    EditCustomPostRequestDTO,
+    EditPostCustomDataRequestDTO,
+)
 
 _MANAGE = "communication/posts/manage"
 _FOR_CREATE_PATH = _MANAGE + "/post-data-for-create/{community_id}"
 _FOR_EDIT_PATH = _MANAGE + "/post-data-for-edit/{post_id}"
 _FOR_COPY_PATH = _MANAGE + "/post-data-for-copy/{post_id}"
 _CREATE_PATH = _MANAGE + "/create-post/{community_id}"
+_EDIT_PATH = _MANAGE + "/edit-post/{post_id}/{occ_token}"
+_CUSTOM_DATA_PATH = _MANAGE + "/edit-post-custom-data/{post_id}/{occ_token}"
+_COPY_PATH = _MANAGE + "/copy-post/{post_id}/{occ_token}"
 
 # Elementi di allegati e tabelle: dict nella forma del DTO oppure il modello generato.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -165,3 +173,181 @@ class PostsWriteAPI(ResourceClient):
     def _send_create(self, community_id: int, body: dict[str, Any]) -> PostWriteResult:
         path = _CREATE_PATH.format(community_id=community_id)
         return PostWriteResult.from_create(self._post(path, json=body))
+
+    # --- modifica, campi custom, copia ----------------------------------------------------
+
+    def edit(  # noqa: PLR0913
+        self,
+        post_id: int,
+        occ_token: int,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        description_format: int | None = None,
+        custom_data: dict[str, Any] | None = None,
+        delta_area_format: int | None = None,
+        add_attachments: WriteItems = None,
+        update_attachments: WriteItems = None,
+        remove_attachment_ids: list[int] | None = None,
+        add_watcher_user_ids: list[int] | None = None,
+        remove_watcher_user_ids: list[int] | None = None,
+        visibility: int | None = None,
+        workflow_init_state_id: int | None = None,
+        draft: bool | None = None,
+        scheduled_publication: datetime | None = None,
+    ) -> PostWriteResult:
+        """PUT ``/communication/posts/manage/edit-post/{postId}/{occToken}``.
+
+        ``occ_token`` è quello letto con :meth:`get_for_edit`: se il post è cambiato nel
+        frattempo il server risponde ``409`` (:class:`~pynteracta.exceptions.ConcurrencyError`)
+        e la libreria non rilegge né riprova. Il corpo contiene solo i campi passati; l'effetto
+        sui campi omessi lo decide il server (vedi la documentazione).
+
+        Args:
+            post_id: Il post da modificare.
+            occ_token: Token di concorrenza ottimistica letto.
+            title: Titolo.
+            description: Descrizione, nel formato di ``description_format``.
+            description_format: ``1`` = Quill delta, ``2`` = testo semplice.
+            custom_data: Campi custom, per id del campo.
+            delta_area_format: Formato dei campi custom di tipo delta.
+            add_attachments: Allegati da aggiungere (``InputPostAttachmentDTO``, già noti al
+                server).
+            update_attachments: Allegati da aggiornare (con ``contentRef`` = nuova versione).
+            remove_attachment_ids: Allegati da togliere.
+            add_watcher_user_ids: Utenti osservatori da aggiungere.
+            remove_watcher_user_ids: Utenti osservatori da togliere.
+            visibility: ``1`` privato, ``2`` pubblico.
+            workflow_init_state_id: Stato iniziale del workflow.
+            draft: Bozza o pubblicato.
+            scheduled_publication: Pubblicazione programmata, ``datetime`` con fuso.
+
+        Returns:
+            Un :class:`PostWriteResult`; ``next_occ_token`` è il token per la modifica
+            successiva.
+        """
+        body = build_write_body(
+            title=title,
+            description=description,
+            description_format=description_format,
+            custom_data=custom_data,
+            delta_area_format=delta_area_format,
+            add_attachments=add_attachments,
+            update_attachments=update_attachments,
+            remove_attachment_ids=remove_attachment_ids,
+            add_watcher_user_ids=add_watcher_user_ids,
+            remove_watcher_user_ids=remove_watcher_user_ids,
+            visibility=visibility,
+            workflow_init_state_id=workflow_init_state_id,
+            draft=draft,
+            scheduled_publication=_zoned(scheduled_publication),
+        )
+        return self._send_edit(post_id, occ_token, body)
+
+    def edit_raw(
+        self, post_id: int, occ_token: int, req: EditCustomPostRequestDTO
+    ) -> PostWriteResult:
+        """Come :meth:`edit`, da un ``EditCustomPostRequestDTO`` già costruito."""
+        return self._send_edit(post_id, occ_token, _dump(req))
+
+    def _send_edit(self, post_id: int, occ_token: int, body: dict[str, Any]) -> PostWriteResult:
+        path = _EDIT_PATH.format(post_id=post_id, occ_token=occ_token)
+        return PostWriteResult.from_edit(self._put(path, json=body))
+
+    def edit_custom_data(
+        self,
+        post_id: int,
+        occ_token: int,
+        *,
+        custom_data: dict[str, Any] | None = None,
+        delta_area_format: int | None = None,
+        tables: WriteItems = None,
+    ) -> PostWriteResult:
+        """PUT ``/communication/posts/manage/edit-post-custom-data/{postId}/{occToken}``.
+
+        Modifica i soli campi custom. ``occ_token`` come in :meth:`edit`.
+
+        Args:
+            post_id: Il post da modificare.
+            occ_token: Token di concorrenza ottimistica letto con :meth:`get_for_edit`.
+            custom_data: Campi custom, per id del campo.
+            delta_area_format: Formato dei campi custom di tipo delta.
+            tables: Tabelle, nella forma di ``CreateEditPostTableRequestDTO``.
+
+        Returns:
+            Un :class:`PostWriteResult` con il ``next_occ_token``.
+        """
+        body = build_write_body(
+            custom_data=custom_data, delta_area_format=delta_area_format, tables=tables
+        )
+        return self._send_custom_data(post_id, occ_token, body)
+
+    def edit_custom_data_raw(
+        self, post_id: int, occ_token: int, req: EditPostCustomDataRequestDTO
+    ) -> PostWriteResult:
+        """Come :meth:`edit_custom_data`, da un ``EditPostCustomDataRequestDTO``."""
+        return self._send_custom_data(post_id, occ_token, _dump(req))
+
+    def _send_custom_data(
+        self, post_id: int, occ_token: int, body: dict[str, Any]
+    ) -> PostWriteResult:
+        path = _CUSTOM_DATA_PATH.format(post_id=post_id, occ_token=occ_token)
+        return PostWriteResult.from_edit(self._put(path, json=body))
+
+    def copy(  # noqa: PLR0913
+        self,
+        post_id: int,
+        occ_token: int,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        description_format: int | None = None,
+        custom_data: dict[str, Any] | None = None,
+        delta_area_format: int | None = None,
+        add_attachments: WriteItems = None,
+        update_attachments: WriteItems = None,
+        remove_attachment_ids: list[int] | None = None,
+        add_watcher_user_ids: list[int] | None = None,
+        remove_watcher_user_ids: list[int] | None = None,
+        visibility: int | None = None,
+        workflow_init_state_id: int | None = None,
+        draft: bool | None = None,
+        scheduled_publication: datetime | None = None,
+        announcement: bool | None = None,
+    ) -> PostWriteResult:
+        """PUT ``/communication/posts/manage/copy-post/{postId}/{occToken}``.
+
+        Crea un post nuovo copiando ``post_id``; ``occ_token`` è quello letto con
+        :meth:`get_for_copy`. Gli argomenti sono quelli di :meth:`edit` più ``announcement``.
+
+        Returns:
+            Un :class:`PostWriteResult` con il ``post_id`` del post **nuovo**.
+        """
+        body = build_write_body(
+            title=title,
+            description=description,
+            description_format=description_format,
+            custom_data=custom_data,
+            delta_area_format=delta_area_format,
+            add_attachments=add_attachments,
+            update_attachments=update_attachments,
+            remove_attachment_ids=remove_attachment_ids,
+            add_watcher_user_ids=add_watcher_user_ids,
+            remove_watcher_user_ids=remove_watcher_user_ids,
+            visibility=visibility,
+            workflow_init_state_id=workflow_init_state_id,
+            draft=draft,
+            scheduled_publication=_zoned(scheduled_publication),
+            announcement=announcement,
+        )
+        return self._send_copy(post_id, occ_token, body)
+
+    def copy_raw(
+        self, post_id: int, occ_token: int, req: CopyCustomPostRequestDTO
+    ) -> PostWriteResult:
+        """Come :meth:`copy`, da un ``CopyCustomPostRequestDTO`` già costruito."""
+        return self._send_copy(post_id, occ_token, _dump(req))
+
+    def _send_copy(self, post_id: int, occ_token: int, body: dict[str, Any]) -> PostWriteResult:
+        path = _COPY_PATH.format(post_id=post_id, occ_token=occ_token)
+        return PostWriteResult.from_copy(self._put(path, json=body))
