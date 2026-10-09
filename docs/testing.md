@@ -79,7 +79,10 @@ a task on it and deletes it at the end. Leave it empty to skip the write test.
 `PYNTERACTA_TEST_WRITE_COMMUNITY_ID` enables the **post write** integration test: it creates a post
 in that community, edits it, adds a watcher and a comment, copies it, and deletes both posts at the
 end (also when a step fails). It needs `PYNTERACTA_TEST_USER_ID` too (the watcher). Use a **test
-community** only. `PYNTERACTA_TEST_WORKFLOW_POST_ID` (optional) points at a post with a workflow:
+community** only. If that community has required custom fields, put them in
+`PYNTERACTA_TEST_WRITE_CUSTOM_DATA` as a JSON object; catalog and user references are written as
+lists of ids (`{"2003": [89]}`), not as the objects the server returns when reading.
+`PYNTERACTA_TEST_WORKFLOW_POST_ID` (optional) points at a post with a workflow:
 the test only reads its workflow screen and never executes a transition.
 
 ### Step 3 — export the variables into your shell

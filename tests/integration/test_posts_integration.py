@@ -10,13 +10,14 @@ contenuto della copia, formato della descrizione in modifica.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import time
 
 import pytest
 
 from pynteracta.client import InteractaClient
-from pynteracta.exceptions import NotFoundError
+from pynteracta.exceptions import InteractaError, NotFoundError
 
 pytestmark = pytest.mark.integration
 
@@ -31,6 +32,20 @@ def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         pytest.skip(f"{name} not set")
+    return value
+
+
+def _custom_data() -> dict[str, object] | None:
+    """Campi custom per ``create`` da ``PYNTERACTA_TEST_WRITE_CUSTOM_DATA`` (JSON), se impostata.
+
+    Servono quando la community di prova ha campi obbligatori; i riferimenti a catalogo o utenti
+    si scrivono come liste di id, per esempio ``{"2003": [89]}``.
+    """
+    raw = os.environ.get("PYNTERACTA_TEST_WRITE_CUSTOM_DATA")
+    if not raw:
+        return None
+    value = json.loads(raw)
+    assert isinstance(value, dict), "PYNTERACTA_TEST_WRITE_CUSTOM_DATA must be a JSON object"
     return value
 
 
@@ -61,13 +76,18 @@ class TestPostsWriteIntegration:
         created_ids: list[int] = []
         with client:
             try:
-                created = client.posts.create(
-                    community_id,
-                    title=_TITLE,
-                    description=_DESCRIPTION,
-                    description_format=_PLAIN_TEXT,
-                    client_uid=client_uid,
-                )
+                try:
+                    created = client.posts.create(
+                        community_id,
+                        title=_TITLE,
+                        description=_DESCRIPTION,
+                        description_format=_PLAIN_TEXT,
+                        custom_data=_custom_data(),
+                        client_uid=client_uid,
+                    )
+                except InteractaError as exc:
+                    print(f"\n[T16] create failed ({exc.status_code}): {exc.response_body!r}")
+                    raise
                 post_id = created.post_id
                 assert post_id is not None
                 created_ids.append(post_id)
