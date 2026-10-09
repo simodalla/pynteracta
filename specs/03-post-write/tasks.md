@@ -190,7 +190,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   4. Controlli bloccanti; commit `refactor(cli): helper di scrittura condivisi in cli/_write.py e
      messaggio del 409 con il nome della risorsa`.
 
-### [ ] T10 – Comandi `posts create`, `posts comment`, `posts get-for-*`
+### [x] T10 – Comandi `posts create`, `posts comment`, `posts get-for-*`
 
 - Criteri: 03-C16 (CLI), 03-C18, 03-C25, 03-C26
 - Dipende da: T05, T07, T09

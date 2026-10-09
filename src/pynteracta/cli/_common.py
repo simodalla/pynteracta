@@ -603,6 +603,9 @@ def handle_error(
                 "  The resource changed since it was read (occToken mismatch): "
                 "fetch it again and retry."
             )
+    if isinstance(exc, ValidationError) and exc.response_body:
+        # Il dettaglio del server (per esempio il campo custom non valido) serve all'operatore.
+        parts.append(f"  Details: {_compact_json(exc.response_body)}")
     if exc.request_id:
         parts.append(f"  Request-ID: {exc.request_id}")
     if exc.status_code:
