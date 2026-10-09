@@ -133,13 +133,24 @@ class TestPostsWriteIntegration:
 
                 copy_form = client.posts.get_for_copy(post_id)
                 assert copy_form.occ_token is not None
-                copied = client.posts.copy(post_id, copy_form.occ_token, title=_TITLE_COPY)
+                # anche copy sostituisce: si rimandano i campi letti (riferimenti come id)
+                copy_content = copy_form.content_data
+                copied = client.posts.copy(
+                    post_id,
+                    copy_form.occ_token,
+                    title=_TITLE_COPY,
+                    description=copy_content.descriptionDelta if copy_content else None,
+                    description_format=1,
+                    custom_data=to_write_values(copy_content.customData if copy_content else None)
+                    or None,
+                    visibility=copy_content.visibility if copy_content else None,
+                )
                 assert copied.post_id is not None
                 assert copied.post_id != post_id
                 created_ids.append(copied.post_id)
                 copy_content = client.posts.get_for_edit(copied.post_id).content_data
                 print(
-                    f"[T16] copy with title only: description="
+                    f"[T16] copy with the fields read: description="
                     f"{copy_content.descriptionPlainText if copy_content else None!r} "
                     f"customData={copy_content.customData if copy_content else None!r}"
                 )
