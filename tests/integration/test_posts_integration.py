@@ -76,18 +76,14 @@ class TestPostsWriteIntegration:
         created_ids: list[int] = []
         with client:
             try:
-                try:
-                    created = client.posts.create(
-                        community_id,
-                        title=_TITLE,
-                        description=_DESCRIPTION,
-                        description_format=_PLAIN_TEXT,
-                        custom_data=_custom_data(),
-                        client_uid=client_uid,
-                    )
-                except InteractaError as exc:
-                    print(f"\n[T16] create failed ({exc.status_code}): {exc.response_body!r}")
-                    raise
+                created = client.posts.create(
+                    community_id,
+                    title=_TITLE,
+                    description=_DESCRIPTION,
+                    description_format=_PLAIN_TEXT,
+                    custom_data=_custom_data(),
+                    client_uid=client_uid,
+                )
                 post_id = created.post_id
                 assert post_id is not None
                 created_ids.append(post_id)
@@ -134,6 +130,13 @@ class TestPostsWriteIntegration:
                     f"{copy_content.descriptionPlainText if copy_content else None!r} "
                     f"customData={copy_content.customData if copy_content else None!r}"
                 )
+            except InteractaError as exc:
+                # Il dettaglio del server serve al maintainer per T16 (campo rifiutato, ecc.).
+                print(
+                    f"\n[T16] {exc.request_method} {exc.request_url} failed "
+                    f"({exc.status_code}): {exc.response_body!r}"
+                )
+                raise
             finally:
                 for created_id in reversed(created_ids):
                     with contextlib.suppress(NotFoundError):
