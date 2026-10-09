@@ -44,6 +44,20 @@ class TestPostCapabilities:
         caps = PostCapabilities.from_dict(data)
         assert caps.raw.canEditWorkflowScreenData is False
 
+    # criterio: 03-C15
+    def test_capabilities_exposes_write_flags_and_operations(self) -> None:
+        caps = PostCapabilities.from_dict(load("get_post_capabilities_response.json"))
+        assert caps.can_copy is True
+        assert caps.can_edit_attachments is False
+        assert caps.can_edit_workflow_screen_data is False
+        ops = caps.workflow_permitted_operations
+        assert [(op.id, op.name) for op in ops] == [(12, "Approva"), (13, "Rifiuta")]
+        assert ops[0].toState is not None
+
+    def test_capabilities_without_operations(self) -> None:
+        caps = PostCapabilities.from_dict({"canViewDetail": True})
+        assert caps.workflow_permitted_operations == []
+
 
 class TestPostHistoryEventList:
     def test_from_dict(self) -> None:

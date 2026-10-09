@@ -76,7 +76,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti (anche `-m contract`); commit `feat(posts): façade per le risposte di
      scrittura, le letture propedeutiche, i commenti e il workflow`.
 
-### [ ] T04 – `PostCapabilities` estesa e `posts capabilities`
+### [x] T04 – `PostCapabilities` estesa e `posts capabilities`
 
 - Criteri: 03-C15
 - Dipende da: nessuno

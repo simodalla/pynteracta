@@ -12,6 +12,57 @@
   "canEditAttachments": false,
   "canEditVisibility": false,
   "canCreateTask": false,
-  "workflowPermittedOperations": [],
+  "workflowPermittedOperations": [
+    {
+      "id": 12,
+      "fromState": {
+        "id": 32,
+        "initState": false,
+        "name": "In revisione",
+        "metadata": {},
+        "terminal": false,
+        "deleted": false,
+        "externalId": null
+      },
+      "toState": {
+        "id": 33,
+        "initState": false,
+        "name": "Approvato",
+        "metadata": {},
+        "terminal": false,
+        "deleted": false,
+        "externalId": null
+      },
+      "name": "Approva",
+      "metadata": {},
+      "screen": null,
+      "externalId": null
+    },
+    {
+      "id": 13,
+      "fromState": {
+        "id": 32,
+        "initState": false,
+        "name": "In revisione",
+        "metadata": {},
+        "terminal": false,
+        "deleted": false,
+        "externalId": null
+      },
+      "toState": {
+        "id": 31,
+        "initState": false,
+        "name": "Bozza",
+        "metadata": {},
+        "terminal": false,
+        "deleted": false,
+        "externalId": null
+      },
+      "name": "Rifiuta",
+      "metadata": {},
+      "screen": null,
+      "externalId": null
+    }
+  ],
   "canEditWorkflowScreenData": false
 }
