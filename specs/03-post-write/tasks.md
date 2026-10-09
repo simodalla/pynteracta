@@ -168,7 +168,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `feat(posts): lettura dello screen, transizioni e dati di screen
      del workflow`.
 
-### [ ] T09 – Helper CLI condivisi: caratterizzazione, `cli/_write.py`, `parse_kv_values`, `handle_error(resource=)`
+### [x] T09 – Helper CLI condivisi: caratterizzazione, `cli/_write.py`, `parse_kv_values`, `handle_error(resource=)`
 
 - Criteri: 03-C28 (messaggio); base per 03-C18…C27
 - Dipende da: nessuno
