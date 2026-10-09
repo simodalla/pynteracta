@@ -50,7 +50,7 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 | **0.9.2** | Migration to GitHub: Actions CI, Pages, Releases (patch) | M24 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.2-github-migration.md](specs/legacy/v0.9.2-github-migration.md) |
 | **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.3-security-hardening.md](specs/legacy/v0.9.3-security-hardening.md) |
 | **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.4-pypi-publication.md](specs/legacy/v0.9.4-pypi-publication.md) |
-| **0.10.0** | Task write: create, edit, delete (first write group, ADR 0001); ships with the M27 audit-log redaction fix (P-01) | M27–M28 | ⏳ In progress | [specs/02-task-write/spec.md](specs/02-task-write/spec.md), [specs/01-redazione-cookie-header/spec.md](specs/01-redazione-cookie-header/spec.md) |
+| **0.10.0** | Task write: create, edit, delete (first write group, ADR 0001); ships with the M27 audit-log redaction fix (P-01) | M27–M28 | ✅ Shipped 2026-10-09 | [specs/02-task-write/spec.md](specs/02-task-write/spec.md), [specs/01-redazione-cookie-header/spec.md](specs/01-redazione-cookie-header/spec.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M28). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
