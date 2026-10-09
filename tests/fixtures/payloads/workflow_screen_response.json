@@ -1,0 +1,22 @@
+{
+  "screenData": {
+    "5": "a",
+    "6": 1
+  },
+  "screenOccToken": 3,
+  "screen": {
+    "id": 41,
+    "name": "Approvazione",
+    "message": "Indicare l'esito della revisione.",
+    "fieldMetadatas": []
+  },
+  "currentWorkflowState": {
+    "id": 32,
+    "initState": false,
+    "name": "In revisione",
+    "metadata": {},
+    "terminal": false,
+    "deleted": false,
+    "externalId": null
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "postId": 21269,
+  "addedAttachments": [
+    {
+      "contentRef": "storage/ref/abc",
+      "temporaryContentViewLink": null,
+      "temporaryContentDownloadLink": null,
+      "contentMimeType": "application/pdf",
+      "id": 4,
+      "name": "allegato.pdf",
+      "size": 1024,
+      "type": 1,
+      "deleted": false
+    }
+  ],
+  "updatedAttachments": [],
+  "removedAttachmentIds": [
+    3
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "comment": {
+    "id": 5601,
+    "commentDelta": "{\"ops\":[{\"insert\":\"Ciao\\n\"}]}",
+    "commentPlainText": "Ciao",
+    "clientUid": null,
+    "creatorUser": {
+      "id": 1042,
+      "firstName": "Maria",
+      "lastName": "Rossi",
+      "caption": "Maria Rossi",
+      "contactEmail": "m.rossi@example.it",
+      "serviceAccount": false,
+      "systemAccount": false,
+      "activeDWD": true,
+      "accountPhotoUrl": null,
+      "deleted": false,
+      "blocked": false,
+      "externalId": "EXT-1042",
+      "privateProfile": false
+    },
+    "creationTimestamp": 1748002000000,
+    "lastModifyTimestamp": null,
+    "mentions": [],
+    "attachments": [],
+    "deleted": false,
+    "parentComment": {
+      "id": 5,
+      "commentPlainText": "Commento padre",
+      "creatorUser": {
+        "id": 7,
+        "firstName": "Luca",
+        "lastName": "Bianchi",
+        "caption": "Luca Bianchi",
+        "contactEmail": "l.bianchi@example.it",
+        "serviceAccount": false,
+        "systemAccount": false,
+        "activeDWD": true,
+        "accountPhotoUrl": null,
+        "deleted": false,
+        "blocked": false,
+        "externalId": null,
+        "privateProfile": false
+      },
+      "creationTimestamp": 1748001000000,
+      "deleted": false
+    },
+    "likesCount": 0,
+    "likedByMe": false,
+    "showLikeSection": true,
+    "rightAlignText": false,
+    "customFieldInfo": null,
+    "streamingTimestamp": null,
+    "capabilities": null
+  }
+}

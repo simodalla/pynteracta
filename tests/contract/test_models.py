@@ -991,3 +991,132 @@ class TestGetUserCredentialsForEdit:
         assert facade.has_custom_credentials is True
         assert facade.custom_username == "m.rossi"
         assert facade.raw.occToken == _USER_CREDS_OCC_TOKEN_CONTRACT
+
+
+# ---------------------------------------------------------------------------
+# Spec 03: post write DTOs (custom posts, comments, workflow)
+# ---------------------------------------------------------------------------
+
+_POST_WRITE_DTOS = [
+    ("Create Custom Post Request", generated.CreateCustomPostRequest),
+    ("EditCustomPostRequestDTO", generated.EditCustomPostRequestDTO),
+    ("EditPostCustomDataRequestDTO", generated.EditPostCustomDataRequestDTO),
+    ("CopyCustomPostRequestDTO", generated.CopyCustomPostRequestDTO),
+    ("EditPostWatchersRequestDTO", generated.EditPostWatchersRequestDTO),
+    ("EditPostAttachmentsRequestDTO", generated.EditPostAttachmentsRequestDTO),
+    ("CreatePostCommentRequestDTO", generated.CreatePostCommentRequestDTO),
+    ("ExecutePostWorkflowOperationRequestDTO", generated.ExecutePostWorkflowOperationRequestDTO),
+    ("EditPostWorkflowScreenDataRequestDTO", generated.EditPostWorkflowScreenDataRequestDTO),
+    ("CreatePostResponseDTO", generated.CreatePostResponseDTO),
+    ("EditPostResponseDTO", generated.EditPostResponseDTO),
+    ("CopyPostResponseDTO", generated.CopyPostResponseDTO),
+    ("EditPostAttachmentsResponseDTO", generated.EditPostAttachmentsResponseDTO),
+    ("MarkPostAsErasableResponseDTO", generated.MarkPostAsErasableResponseDTO),
+    ("DeletePostResponseDTO", generated.DeletePostResponseDTO),
+    ("CreatePostCommentResponseDTO", generated.CreatePostCommentResponseDTO),
+    ("ExecutePostWorkflowOperationResponseDTO", generated.ExecutePostWorkflowOperationResponseDTO),
+    ("EditPostWorkflowScreenDataResponseDTO", generated.EditPostWorkflowScreenDataResponseDTO),
+    (
+        "GetPostWorkflowScreenDataForEditResponseDTO",
+        generated.GetPostWorkflowScreenDataForEditResponseDTO,
+    ),
+    ("GetCustomPostForCreateResponseDTO", generated.GetCustomPostForCreateResponseDTO),
+    ("GetCustomPostForEditResponseDTO", generated.GetCustomPostForEditResponseDTO),
+    ("GetCustomPostForCopyResponseDTO", generated.GetCustomPostForCopyResponseDTO),
+]
+
+_POST_WRITE_TYPED_STUBS = [
+    ("PostDetailDTO", generated.PostDetailDTO1),
+    ("PostEditableContentDataDTO", generated.PostEditableContentDataDTO1),
+    ("PostCommentDTO", generated.PostCommentDTO1),
+    ("PostWorkflowDefinitionStateDTO", generated.PostWorkflowDefinitionStateDTO1),
+    ("PostWorkflowDefinitionTransitionDTO", generated.PostWorkflowDefinitionTransitionDTO1),
+    ("WorkflowDefinitionScreenDTO", generated.WorkflowDefinitionScreenDTO1),
+    ("InputPostAttachmentDTO", generated.InputPostAttachmentDTO1),
+    ("InputPostCommentAttachmentDTO", generated.InputPostCommentAttachmentDTO1),
+]
+
+_POST_WRITE_FIXTURES = [
+    ("create_post_response.json", generated.CreatePostResponseDTO),
+    ("edit_post_response.json", generated.EditPostResponseDTO),
+    ("copy_post_response.json", generated.CopyPostResponseDTO),
+    ("delete_post_response.json", generated.DeletePostResponseDTO),
+    ("mark_post_erasable_response.json", generated.MarkPostAsErasableResponseDTO),
+    ("edit_post_attachments_response.json", generated.EditPostAttachmentsResponseDTO),
+    ("create_post_comment_response.json", generated.CreatePostCommentResponseDTO),
+    ("post_for_create_response.json", generated.GetCustomPostForCreateResponseDTO),
+    ("post_for_edit_response.json", generated.GetCustomPostForEditResponseDTO),
+    ("post_for_copy_response.json", generated.GetCustomPostForCopyResponseDTO),
+    ("workflow_screen_response.json", generated.GetPostWorkflowScreenDataForEditResponseDTO),
+    (
+        "execute_workflow_operation_response.json",
+        generated.ExecutePostWorkflowOperationResponseDTO,
+    ),
+    ("edit_workflow_screen_response.json", generated.EditPostWorkflowScreenDataResponseDTO),
+    (
+        "custom_field_validation_error_response.json",
+        generated.CustomFieldValidationErrorResponseDTO,
+    ),
+]
+
+# Stub annidati delle fixture da rivalidare nelle varianti tipizzate: (fixture, chiave, modello).
+_POST_WRITE_NESTED = [
+    ("create_post_response.json", "postData", generated.PostDetailDTO1),
+    ("edit_post_response.json", "postData", generated.PostDetailDTO1),
+    ("copy_post_response.json", "postData", generated.PostDetailDTO1),
+    ("create_post_comment_response.json", "comment", generated.PostCommentDTO1),
+    ("post_for_create_response.json", "contentData", generated.PostEditableContentDataDTO1),
+    ("post_for_edit_response.json", "contentData", generated.PostEditableContentDataDTO1),
+    ("post_for_copy_response.json", "contentData", generated.PostEditableContentDataDTO1),
+    ("workflow_screen_response.json", "screen", generated.WorkflowDefinitionScreenDTO1),
+]
+
+
+class TestPostWriteDTOs:
+    # criterio: 03-C29
+    @pytest.mark.parametrize(("definition", "model"), _POST_WRITE_DTOS)
+    def test_write_dto_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 03-C29
+    @pytest.mark.parametrize(("definition", "model"), _POST_WRITE_TYPED_STUBS)
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(
+            swagger_definitions, definition, model, note="typed variant of RootModel stub"
+        )
+
+    # criterio: 03-C29
+    @pytest.mark.parametrize(("fixture", "model"), _POST_WRITE_FIXTURES)
+    def test_response_fixtures_parse(self, fixture: str, model: type) -> None:
+        assert model.model_validate(load_payload(fixture)) is not None  # type: ignore[attr-defined]
+
+    # criterio: 03-C29
+    @pytest.mark.parametrize(("fixture", "key", "model"), _POST_WRITE_NESTED)
+    def test_response_fixtures_nested_typed(self, fixture: str, key: str, model: type) -> None:
+        assert model.model_validate(load_payload(fixture)[key]) is not None  # type: ignore[attr-defined]
+
+    # criterio: 03-C29
+    @pytest.mark.parametrize(
+        ("model", "field"),
+        [
+            (generated.GetPostWorkflowScreenDataForEditResponseDTO, "screenData"),
+            (generated.ExecutePostWorkflowOperationRequestDTO, "screenData"),
+            (generated.ExecutePostWorkflowOperationResponseDTO, "newScreenData"),
+            (generated.EditPostWorkflowScreenDataRequestDTO, "screenData"),
+            (generated.EditPostWorkflowScreenDataResponseDTO, "newScreenData"),
+        ],
+    )
+    def test_screen_data_accepts_scalar_values(self, model: type, field: str) -> None:
+        values = {"5": "x", "6": 1, "7": None, "8": [1, 2], "9": {"a": 1}}
+        parsed = model.model_validate({field: values})  # type: ignore[attr-defined]
+        assert getattr(parsed, field) == values

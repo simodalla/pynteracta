@@ -30,7 +30,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   4. Controlli bloccanti; commit `feat(api): PUT senza corpo di risposta vale come oggetto vuoto;
      riga 0.11.0 in ROADMAP`.
 
-### [ ] T02 – Fixture JSON, rigenerazione dei dati di screen e contract test dei DTO
+### [x] T02 – Fixture JSON, rigenerazione dei dati di screen e contract test dei DTO
 
 - Criteri: 03-C29 (DTO)
 - Dipende da: nessuno

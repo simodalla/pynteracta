@@ -704,9 +704,9 @@ class EditScreenContextDataDTO1(BaseModel):
             description="Transizione che l'utente vuole eseguire (null se edit di campi screen)"
         ),
     ] = None
-    screenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Campi screen')
-    ] = None
+    screenData: Annotated[dict[str, Any] | None, Field(description='Campi screen')] = (
+        None
+    )
     deltaAreaFormat: Annotated[
         int | None,
         Field(
@@ -721,9 +721,9 @@ class EditTaskContextDataDTO1(BaseModel):
         list[int] | None,
         Field(description="Lista degli ackTask che l'utente vuole confermare"),
     ] = None
-    screenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Campi screen')
-    ] = None
+    screenData: Annotated[dict[str, Any] | None, Field(description='Campi screen')] = (
+        None
+    )
     deltaAreaFormat: Annotated[
         int | None,
         Field(
@@ -1036,7 +1036,7 @@ class EditPostEventPartecipateRequestDTO(BaseModel):
 
 
 class ExecutePostWorkflowOperationRequestDTO(BaseModel):
-    screenData: dict[str, dict[str, Any]] | None = None
+    screenData: dict[str, Any] | None = None
     deltaAreaFormat: Annotated[
         int | None,
         Field(
@@ -1048,13 +1048,13 @@ class ExecutePostWorkflowOperationRequestDTO(BaseModel):
 
 class EditPostWorkflowScreenDataResponseDTO(BaseModel):
     nextScreenOccToken: int | None = None
-    newScreenData: dict[str, dict[str, Any]] | None = None
+    newScreenData: dict[str, Any] | None = None
     newLastModifyTimestamp: int | None = None
     postDataHasChanged: bool | None = None
 
 
 class EditPostWorkflowScreenDataRequestDTO(BaseModel):
-    screenData: dict[str, dict[str, Any]] | None = None
+    screenData: dict[str, Any] | None = None
     deltaAreaFormat: Annotated[
         int | None,
         Field(
@@ -4455,7 +4455,7 @@ class CreatePostCommentRequestDTO(BaseModel):
 
 class GetPostWorkflowScreenDataForEditResponseDTO(BaseModel):
     screenData: Annotated[
-        dict[str, dict[str, Any]] | None, Field(description='Dati dello screen.')
+        dict[str, Any] | None, Field(description='Dati dello screen.')
     ] = None
     screenOccToken: Annotated[
         int | None,
@@ -4475,7 +4475,7 @@ class GetPostWorkflowScreenDataForEditResponseDTO(BaseModel):
 
 class ExecutePostWorkflowOperationResponseDTO(BaseModel):
     newCurrentState: PostWorkflowDefinitionStateDTO | None = None
-    newScreenData: dict[str, dict[str, Any]] | None = None
+    newScreenData: dict[str, Any] | None = None
     newCurrentWorkflowPermittedOperations: (
         list[PostWorkflowDefinitionTransitionDTO] | None
     ) = None

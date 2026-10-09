@@ -1,0 +1,15 @@
+{
+  "validationErrors": {
+    "list": [
+      {
+        "code": "INVALID_VALUE",
+        "args": [],
+        "defaultMessage": "Valore non ammesso",
+        "field": "customData",
+        "validationId": null,
+        "validationTypeId": null,
+        "customFieldId": 1411
+      }
+    ]
+  }
+}
