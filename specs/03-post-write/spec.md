@@ -31,7 +31,11 @@ flag ma non `canCopy`, `canEditAttachments`, `canEditWorkflowScreenData` né le 
 workflow permesse (`workflowPermittedOperations`), che il DTO ha già. Il client base sa fare
 `GET`, `POST`, `PUT` e `DELETE`; la CLI ha la conferma dei comandi distruttivi, `--json FILE|-`,
 l'exit code `9` e la patch di `tasks edit` (spec 02). Tutti i DTO di richiesta e risposta di questa
-spec sono già nei modelli generati dal swagger pinnato: nessuna rigenerazione. Un'anomalia di
+spec sono già nei modelli generati dal swagger pinnato, ma i dati di screen del workflow
+(`screenData`, `newScreenData`) sono tipizzati come mappe di dizionari e rifiutano i valori
+semplici che il server usa (rilevato in T02, 2026-10-09): si rigenerano i modelli dal swagger
+invariato dopo aver aggiunto i due campi a quelli che lo script di generazione tratta come mappe
+di valori qualsiasi, come già `customData` e `currentWorkflowScreenData`. Un'anomalia di
 nome: il DTO di creazione è `CreateCustomPostRequest`, senza suffisso `DTO`, perché nel swagger si
 chiama "Create Custom Post Request".
 
@@ -298,6 +302,7 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
 | `edit_watchers` ed `edit_attachments` in libreria, solo i watcher in CLI | Entrambi in CLI; solo libreria | Gli allegati in CLI hanno senso solo con l'upload (RF-024); i watcher sono subito utili |
 | `PostCapabilities` estesa con copia, allegati e operazioni di workflow | Lasciare i flag in `.raw` | Un agente deve poter scoprire gli `operation_id` senza leggere il DTO grezzo |
 | Integration test con ciclo completo su una community di prova, workflow in sola lettura | Solo create → edit → delete; nessuna prova | Fissa contro il server reale copia, commenti e watcher; le transizioni cambiano stato e non si possono annullare |
+| `screenData` e `newScreenData` come mappe di valori qualsiasi, rigenerando i modelli con lo script (2026-10-09, T02) | Correggere a mano il file generato; aggirare la validazione nei `*_raw` e nelle façade | I modelli generati non si modificano a mano; lo script ha già il meccanismo per `customData` |
 | Riga `0.11.0` in ROADMAP | – | I `feat` producono un minor (politica pre-1.0) |
 
 ## Verifica manuale
@@ -311,6 +316,11 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
   in `docs/api/posts.md` e in `verifica.md`; se il server non azzera i campi omessi, la base delle
   patch in CLI si riduce ai soli campi passati con una revisione della spec (03-C19…03-C22). Fino a
   quell'esecuzione 03-C31 vale come saltato.
+
+## Revisioni
+
+- 2026-10-09, durante T02: i dati di screen del workflow richiedono la rigenerazione dei modelli
+  ("Comportamento attuale", "Decisioni"); nessun criterio cambia.
 
 ## Domande aperte
 

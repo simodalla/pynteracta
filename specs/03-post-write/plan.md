@@ -33,6 +33,8 @@ Fixture JSON e contract test per i 22 DTO; integration test opt-in nuovo
 
 | File | Nuovo o modificato | Responsabilità |
 |---|---|---|
+| `scripts/generate_models.py` | modificato | `screenData` e `newScreenData` in `_PATCHED_FIELDS`: `additionalProperties: {}` al posto di `{"type": "object"}` (revisione del 2026-10-09) |
+| `src/pynteracta/models/generated/external_v2.py` | rigenerato | `uv run python scripts/generate_models.py --offline`; il diff tocca solo sette campi `screenData`/`newScreenData` (`dict[str, dict[str, Any]]` → `dict[str, Any]`) |
 | `src/pynteracta/api/_base.py` | modificato | `_put`: `if not response.content: return {}` prima di `response.json()`, come `_delete` (03-C08, `edit_watchers`) |
 | `src/pynteracta/api/posts_write.py` | nuovo | `PostsWriteAPI(ResourceClient)`: costanti dei 15 percorsi `communication/posts/manage/…`; `get_for_create`, `get_for_edit`, `get_for_copy` (query `loadAttachments` solo se passata, via `build_query_params`); `create`/`create_raw` (`announcement` sempre nel corpo), `edit`/`edit_raw`, `edit_custom_data`/`_raw`, `copy`/`_raw`, `edit_watchers`/`_raw` (→ `None`), `edit_attachments`/`_raw`, `delete`, `mark_as_erasable` (`_put` senza `json`), `add_comment`/`_raw`, `get_workflow_screen` (query `workflowOperationId` solo se passato), `execute_workflow_operation`/`_raw`, `edit_workflow_screen`/`_raw`; alias di tipo `WriteItems` come in `tasks.py`; docstring Google in italiano con tutti i kwargs |
 | `src/pynteracta/api/posts.py` | modificato (una riga) | `class PostsAPI(PostsWriteAPI)`; docstring della classe cita le scritture |
@@ -63,11 +65,14 @@ Fixture JSON e contract test per i 22 DTO; integration test opt-in nuovo
 | `specs/prd.md` | modificato (chiusura) | RF-021a, RF-021b, RF-021c, RF-006a; conferma di RF-021, RF-006, §5 e §7 nella parte dei post |
 
 Non si toccano: `transport.py`, `hooks.py`, `client.py` (`client.posts` esiste già),
-`models/generated/`, `api/posts.py` oltre alla riga di ereditarietà.
+`api/posts.py` oltre alla riga di ereditarietà. `models/generated/` cambia solo per
+rigenerazione, mai a mano.
 
 ## Modello dati e migrazioni
 
-Nessuna modifica: i DTO sono già generati. Gli stub `RootModel` (`PostDetailDTO`,
+Nessuna modifica di schema: i DTO sono già generati. Revisione del 2026-10-09: i campi
+`screenData` e `newScreenData` (cinque DTO del workflow più due contesti di screen) diventano
+`dict[str, Any]` rigenerando i modelli con lo script corretto. Gli stub `RootModel` (`PostDetailDTO`,
 `PostCommentDTO`, `PostEditableContentDataDTO`, `PostWorkflowDefinitionStateDTO`,
 `PostWorkflowDefinitionTransitionDTO`, `WorkflowDefinitionScreenDTO`) hanno la variante tipizzata
 `…1` nello stesso modulo; `scheduledPublication` è lo stub `ZonedDatetimeInputDTO` che accetta un
@@ -240,6 +245,7 @@ patch si riduce con una revisione della spec (03-C19…03-C22), non con un aggiu
 
 | Scelta | Alternative scartate | Motivo |
 |---|---|---|
+| `screenData`/`newScreenData` corretti nello script di generazione e modelli rigenerati (2026-10-09) | modifica a mano del file generato; `model_construct` per aggirare la validazione | Regola del progetto: `models/generated/` non si modifica a mano; stesso meccanismo di `customData` |
 | Mixin `PostsWriteAPI` in `api/posts_write.py`, ereditato da `PostsAPI` | tutto in `api/posts.py` | Decisione del maintainer: `client.posts.*` unico, file leggibili, `posts.py` non cambia |
 | Façade in `models/facade/posts_write.py`; `PostCapabilities` resta in `posts.py` | tutto in `facade/posts.py` | Decisione del maintainer; `posts.py` tocca solo le capabilities |
 | Comandi in `cli/posts_write.py` sullo stesso `Typer` di `posts.py`; helper in `cli/_write.py` | tutto in `cli/posts.py`; helper duplicati; helper in `_common.py` | Decisione del maintainer: nessun codice doppio con `tasks.py`, `_common.py` non cresce; i comandi restano sotto `posts` |

@@ -30,10 +30,13 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   4. Controlli bloccanti; commit `feat(api): PUT senza corpo di risposta vale come oggetto vuoto;
      riga 0.11.0 in ROADMAP`.
 
-### [ ] T02 – Fixture JSON e contract test dei DTO
+### [ ] T02 – Fixture JSON, rigenerazione dei dati di screen e contract test dei DTO
 
 - Criteri: 03-C29 (DTO)
 - Dipende da: nessuno
+- Rivisto il 2026-10-09: tre fixture del workflow non si validavano perché `screenData` e
+  `newScreenData` erano `dict[str, dict]`; si aggiungono i passi 0 e il test
+  `::test_screen_data_accepts_scalar_values` (rosso prima della rigenerazione).
 - Test: `tests/contract/test_models.py::TestPostWriteDTOs::test_write_dto_superset` (i 22 DTO
   della spec, `CreateCustomPostRequest` compreso) e `::test_typed_stub_superset`
   (`PostDetailDTO1`, `PostEditableContentDataDTO1`, `PostCommentDTO1`,
@@ -42,6 +45,8 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   verdi subito (caratterizzano i modelli generati). Le fixture si dimostrano con
   `::test_response_fixtures_parse` parametrizzato: ogni fixture si valida nel suo DTO generato.
 - Passi:
+  0. `scripts/generate_models.py`: `screenData` e `newScreenData` in `_PATCHED_FIELDS`;
+     `uv run python scripts/generate_models.py --offline`; leggere il diff (solo quei campi).
   1. Scrivere le 14 fixture di `tests/fixtures/payloads/` elencate nel piano (`create_post_response.json`
      … `custom_field_validation_error_response.json`), sagomate sul swagger: `postData`/`contentData`
      completi con `descriptionDelta` finto, `customData: {"1411": 226, "1413": true}`,
@@ -50,7 +55,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   2. Scrivere i test; eseguirli: verdi (DTO già generati), tranne `test_response_fixtures_parse`
      che è rosso finché le fixture mancano.
   3. `uv run pytest -m contract` e controlli bloccanti; commit `test: fixture e contract test dei
-     DTO di scrittura dei post`.
+     DTO di scrittura dei post, dati di screen come valori qualsiasi (03-T02)`.
 
 ### [ ] T03 – Façade di scrittura dei post
 
