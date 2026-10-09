@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import pathlib
+from typing import NamedTuple
 
+import httpx
 import pytest
 import respx
 from api_helpers import load_payload, mock_json
@@ -34,6 +36,9 @@ _EDIT_PATH = f"{_MANAGE}/edit-post/{_POST_ID}/{_OCC_TOKEN}"
 _CUSTOM_DATA_PATH = f"{_MANAGE}/edit-post-custom-data/{_POST_ID}/{_OCC_TOKEN}"
 _COPY_PATH = f"{_MANAGE}/copy-post/{_POST_ID}/{_OCC_TOKEN}"
 _EXIT_GENERIC = 1
+_WATCHERS_PATH = f"{_MANAGE}/edit-post-watchers/{_POST_ID}"
+_DETAIL_PATH = f"communication/posts/data/post-detail-by-id/{_POST_ID}"
+_POST_TITLE = "Aggiornamento procedure sicurezza Q2 2026"
 _EXIT_NOT_FOUND = 5
 _EXIT_CONFLICT = 9
 _HTTP_404 = 404
@@ -70,6 +75,9 @@ def _sent_body(route: respx.Route, index: int = 0) -> dict:  # type: ignore[type
         "edit",
         "edit-custom-data",
         "copy",
+        "edit-watchers",
+        "delete",
+        "mark-erasable",
     ],
 )
 def test_posts_help_lists_write_commands(runner: CliRunner, command: str) -> None:
@@ -638,3 +646,147 @@ class TestPostsConflicts:
         assert result.exit_code == _EXIT_CONFLICT
         assert _CONFLICT_MESSAGE in result.output
         assert write_route.call_count == 1
+
+
+class TestPostsEditWatchers:
+    # criterio: 03-C23
+    @respx.mock
+    def test_add_and_remove_body_and_message(self, runner: CliRunner) -> None:
+        route = respx.put(f"https://api.example.com/portal/api/external/v2/{_WATCHERS_PATH}").mock(
+            return_value=httpx.Response(200)
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "edit-watchers", str(_POST_ID), "--add", "7", "--remove", "8"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert route.call_count == 1
+        assert _sent_body(route) == {"addWatcherUserIds": [7], "removeWatcherUserIds": [8]}
+        assert f"Watchers of post {_POST_ID} updated" in result.output
+
+    # criterio: 03-C23
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        respx.put(f"https://api.example.com/portal/api/external/v2/{_WATCHERS_PATH}").mock(
+            return_value=httpx.Response(200)
+        )
+        result = runner.invoke(
+            app,
+            ["--output", "json", "posts", "edit-watchers", str(_POST_ID), "--add", "7"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {
+            "post_id": _POST_ID,
+            "added_user_ids": [7],
+            "removed_user_ids": [],
+        }
+
+    # criterio: 03-C23
+    @respx.mock
+    def test_without_flags_exits_2(self, runner: CliRunner) -> None:
+        route = respx.put(f"https://api.example.com/portal/api/external/v2/{_WATCHERS_PATH}").mock(
+            return_value=httpx.Response(200)
+        )
+        result = runner.invoke(app, ["posts", "edit-watchers", str(_POST_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert route.call_count == 0
+
+
+class _Destructive(NamedTuple):
+    command: str
+    method: str
+    path: str
+    fixture: str
+    prompt: str
+    done: str
+
+
+_DESTRUCTIVE = [
+    _Destructive(
+        "delete",
+        "DELETE",
+        f"{_MANAGE}/delete-post/{_POST_ID}",
+        "delete_post_response.json",
+        f'Delete post {_POST_ID} "{_POST_TITLE}"?',
+        f"Post {_POST_ID} deleted",
+    ),
+    _Destructive(
+        "mark-erasable",
+        "PUT",
+        f"{_MANAGE}/mark-post-as-erasable/{_POST_ID}",
+        "mark_post_erasable_response.json",
+        f'Mark post {_POST_ID} "{_POST_TITLE}" as erasable?',
+        f"Post {_POST_ID} marked as erasable",
+    ),
+]
+
+
+def _mock_destructive(case: _Destructive) -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json("GET", _DETAIL_PATH, load_payload("get_post_detail_response.json"))
+    return get_route, mock_json(case.method, case.path, load_payload(case.fixture))
+
+
+# criterio: 03-C24
+@pytest.mark.parametrize("case", _DESTRUCTIVE, ids=["delete", "mark-erasable"])
+class TestPostsDestructive:
+    @respx.mock
+    def test_prompt_shows_id_and_title_and_y_writes(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch, case: _Destructive
+    ) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        get_route, write_route = _mock_destructive(case)
+        result = runner.invoke(
+            app, ["posts", case.command, str(_POST_ID)], env=BASE_ENV, input="y\n"
+        )
+        assert result.exit_code == 0, result.output
+        assert case.prompt in result.output
+        assert get_route.call_count == 1
+        assert write_route.call_count == 1
+        assert case.done in result.output
+
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch, case: _Destructive
+    ) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        _, write_route = _mock_destructive(case)
+        result = runner.invoke(
+            app, ["posts", case.command, str(_POST_ID)], env=BASE_ENV, input="n\n"
+        )
+        assert result.exit_code == 0, result.output
+        assert write_route.call_count == 0
+        assert case.done not in result.output
+
+    @respx.mock
+    def test_yes_skips_prompt(self, runner: CliRunner, case: _Destructive) -> None:
+        _, write_route = _mock_destructive(case)
+        result = runner.invoke(app, ["posts", case.command, str(_POST_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert case.prompt not in result.output
+        assert write_route.call_count == 1
+        assert case.done in result.output
+
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(
+        self, runner: CliRunner, case: _Destructive
+    ) -> None:
+        _, write_route = _mock_destructive(case)
+        result = runner.invoke(app, ["posts", case.command, str(_POST_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--yes is required" in result.output
+        assert write_route.call_count == 0
+
+    @respx.mock
+    def test_json_output(self, runner: CliRunner, case: _Destructive) -> None:
+        _mock_destructive(case)
+        result = runner.invoke(
+            app, ["--output", "json", "posts", case.command, str(_POST_ID), "-y"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {"post_id": _POST_ID}

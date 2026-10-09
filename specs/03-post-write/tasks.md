@@ -235,7 +235,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Snapshot, controlli bloccanti; commit `feat(cli): posts edit, edit-custom-data e copy come
      patch con occToken letto o imposto`.
 
-### [ ] T12 – Comandi `posts edit-watchers`, `posts delete`, `posts mark-erasable`
+### [x] T12 – Comandi `posts edit-watchers`, `posts delete`, `posts mark-erasable`
 
 - Criteri: 03-C23, 03-C24
 - Dipende da: T07, T10

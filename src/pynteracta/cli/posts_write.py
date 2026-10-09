@@ -7,6 +7,7 @@ invia una sola richiesta di scrittura e non riprova mai: un ``409`` esce con il 
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 import typer
@@ -23,6 +24,7 @@ from pynteracta.cli._common import (
     FullOption,
     OutputOption,
     build_client,
+    confirm_destructive,
     handle_error,
     load_json_body,
     make_console,
@@ -779,3 +781,119 @@ def posts_copy(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("edit-watchers")
+def posts_edit_watchers(
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    add: Annotated[
+        list[int] | None, typer.Option("--add", help="Watcher user ID to add (repeatable).")
+    ] = None,
+    remove: Annotated[
+        list[int] | None,
+        typer.Option("--remove", help="Watcher user ID to remove (repeatable)."),
+    ] = None,
+    output: OutputOption = None,
+) -> None:
+    """Add or remove the watchers of a post (no concurrency token needed)."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    if not add and not remove:
+        typer.echo("--add or --remove is required.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    try:
+        with build_client(state) as client:
+            client.posts.edit_watchers(post_id, add_user_ids=add, remove_user_ids=remove)
+        if resolve_output(state, output) == "json":
+            payload = {
+                "post_id": post_id,
+                "added_user_ids": add or [],
+                "removed_user_ids": remove or [],
+            }
+            typer.echo(json.dumps(payload))
+        elif not state.quiet:
+            console.print(f"Watchers of post {post_id} updated")
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+YesOption = Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")]
+
+
+def _destructive(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: int,
+    *,
+    yes: bool,
+    output: str | None,
+    prompt: str,
+    done: str,
+    erasable: bool,
+) -> None:
+    """Flusso comune di ``delete`` e ``mark-erasable``: lettura, conferma, una scrittura."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            post = client.posts.get(post_id)
+            if not confirm_destructive(prompt.format(id=post_id, title=post.title), yes=yes):
+                raise typer.Exit(EXIT_SUCCESS)
+            if erasable:
+                result_id = client.posts.mark_as_erasable(post_id)
+            else:
+                result_id = client.posts.delete(post_id)
+        if resolve_output(state, output) == "json":
+            typer.echo(json.dumps({"post_id": result_id}))
+        elif not state.quiet:
+            console.print(done.format(id=post_id))
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("delete")
+def posts_delete(
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    yes: YesOption = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a post.
+
+    The post is read first and its id and title shown in a confirmation prompt. Without an
+    interactive terminal --yes is required: nothing is deleted silently from a script.
+    """
+    _destructive(
+        ctx,
+        post_id,
+        yes=yes,
+        output=output,
+        prompt='Delete post {id} "{title}"?',
+        done="Post {id} deleted",
+        erasable=False,
+    )
+
+
+@app.command("mark-erasable")
+def posts_mark_erasable(
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    yes: YesOption = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a post and mark it for future physical erasure.
+
+    Same confirmation rules as 'posts delete': prompt with id and title, --yes to skip it,
+    refused without an interactive terminal and without --yes.
+    """
+    _destructive(
+        ctx,
+        post_id,
+        yes=yes,
+        output=output,
+        prompt='Mark post {id} "{title}" as erasable?',
+        done="Post {id} marked as erasable",
+        erasable=True,
+    )
