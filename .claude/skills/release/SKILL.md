@@ -1,104 +1,131 @@
 ---
 name: release
-description: Cut a pynteracta minor release — phase 6 RELEASE of WORKFLOW.md, after the version's work is merged to main. Flips the ROADMAP row to ✅ Shipped, freezes the spec header, then drives the version bump + tag with python-semantic-release (Option A) and regenerates the CHANGELOG with git-cliff. Use when finishing/shipping a version ("rilascia vX.Y", "chiudi il minor", "release vX.Y.0", "freeze the spec and tag"). Never pushes or publishes without an explicit request.
+description: Cut a pynteracta release — phase RELEASE of WORKFLOW.md, after the version's specs are verified (/sddpa:verifica) and merged to main. Flips the ROADMAP row(s) to ✅ Shipped, then drives the version bump + tag with python-semantic-release (Option A) and regenerates the CHANGELOG with git-cliff. Use when finishing/shipping a version ("rilascia vX.Y", "chiudi il minor", "release vX.Y.0", "taglia la release"). Never pushes or publishes without an explicit request. Not for planning or implementing (that is the /sddpa:* cycle).
 ---
 
-# release — cut the minor (RELEASE phase)
+# release — taglia la versione (fase RELEASE)
 
-Automates phase **6. RELEASE** of [`WORKFLOW.md`](../../../WORKFLOW.md) for `pynteracta`. This is the
-**one operation that commits on `main`** — the STOP rule's branch discipline is for feature work;
-the release commits land on `main` after the merge.
+Automatizza la fase **RELEASE** di [`WORKFLOW.md`](../../../WORKFLOW.md) per `pynteracta`. È la
+**sola operazione che committa su `main`**: la disciplina dei branch (regola STOP di `CLAUDE.md`,
+sezione 5 del metodo `sddpa`) vale per il lavoro delle spec; i commit di release atterrano su `main`
+dopo il merge. L'hook `PreToolUse` avvisa che sei su `main` quando modifichi `ROADMAP.md`: qui è
+atteso.
 
-## Release model — Option A (semantic-release is the driver)
+## Posizione nel metodo
 
-The package version is **dynamic**: hatchling reads `__version__` from
-`src/pynteracta/__init__.py` (`[tool.hatch.version]`). Ownership of the moving parts:
+Dall'adozione del metodo `sddpa` (CLAUDE.md, "Metodo") le fasi PLAN → LOG sono svolte dal ciclo
+`/sddpa:*`. In particolare:
 
-| Concern | Owner | Notes |
+- la spec è una cartella `specs/<nn>-<nome>/` con `spec.md`, `plan.md`, `tasks.md`, `verifica.md`;
+- `/sddpa:verifica` chiude la spec (`Stato: chiusa` in `spec.md`), scrive la sezione `M<n>` in
+  `PROGRESS.md` e propone il merge `--no-ff` su `main`. **Il congelamento della spec è quello**: la
+  release non tocca più le intestazioni delle spec;
+- una versione può raccogliere **più spec** (es. 0.10.0 = spec 01 + 02, M27–M28): la riga di
+  `ROADMAP.md` le elenca tutte nella colonna Spec.
+
+Questa skill fa solo ciò che resta: ROADMAP → ✅, bump + tag, CHANGELOG.
+
+## Modello di release — Opzione A (guida semantic-release)
+
+La versione del pacchetto è **dinamica**: hatchling legge `__version__` da
+`src/pynteracta/__init__.py` (`[tool.hatch.version]`). Chi possiede cosa:
+
+| Cosa | Chi | Note |
 |---|---|---|
-| Version number + git tag + `__version__` bump | **python-semantic-release** | Computed from Conventional Commits since the last tag. `tag_format = "v{version}"`, `major_on_zero = false`, `allow_zero_version = true`. |
-| `CHANGELOG.md` | **git-cliff** | Per CLAUDE.md. semantic-release runs with `--no-changelog` so the two never fight. |
-| ROADMAP row + spec freeze | **this skill** (a `chore:` doc commit) | The 2-file commit, like the historical `chore: release` commits. |
+| Numero di versione + tag git + bump di `__version__` | **python-semantic-release** | Calcolato dai Conventional Commits dall'ultimo tag. `tag_format = "v{version}"`, `major_on_zero = false`, `allow_zero_version = true`. |
+| `CHANGELOG.md` | **git-cliff** | Per CLAUDE.md. semantic-release gira con `--no-changelog` così i due non si pestano. |
+| Riga/e di ROADMAP | **questa skill** (un commit `docs:`) | Solo `ROADMAP.md`. |
 
-> **Invariant:** between releases, `__version__` equals the last released tag. semantic-release
-> re-establishes this on every release. If you find it drifted, sync it first with a `chore:` commit —
-> do not let a build go out with a stale version.
+> **Invariante:** tra una release e l'altra `__version__` è uguale all'ultimo tag. semantic-release
+> lo ristabilisce a ogni release. Se è andato fuori sincrono, riallinealo prima con un commit
+> `chore:`; mai far uscire una build con versione vecchia.
 
-## Pre-flight checks (abort if any fails — report, don't force)
+## Pre-flight (abortisci se uno fallisce: riporta, non forzare)
 
-1. **Merged.** The version's work is already merged to `main` (the `feat:` commit + its merge are in
-   `git log main`). This skill does **not** merge feature branches.
-2. **On main.** `git branch --show-current` == `main`. The release commits land here.
-3. **Clean tree.** `git status --porcelain` is empty (no stray WIP from another branch). If dirty,
-   stop — never sweep unrelated changes into the release.
-4. **Gate green.** `uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest --cov --cov-fail-under=85`.
-5. **Logged.** `PROGRESS.md` has the `M<n>` section for this version (phase 5 LOG done). If missing,
-   stop and run the LOG step first.
-6. **Spec is PLANNING.** The spec header still reads `Status: PLANNING — ⏳ In progress`. If already
-   frozen, the version was likely released — stop.
-7. **Version invariant.** `__version__` in `src/pynteracta/__init__.py` equals the last tag
-   (`git describe --tags --abbrev=0`). If not, sync it with a `chore:` commit before releasing.
+1. **Merge fatto.** I branch delle spec della versione sono già uniti su `main` (`git log main`
+   mostra i merge `--no-ff`). Questa skill **non** fa merge.
+2. **Su main.** `git branch --show-current` == `main`.
+3. **Albero pulito.** `git status --porcelain` vuoto. Se sporco, fermati: mai trascinare modifiche
+   estranee nella release.
+4. **Spec chiuse.** Per ogni spec elencata nella riga ⏳ di ROADMAP, `spec.md` ha `Stato: chiusa`
+   ed esiste `verifica.md` senza problemi aperti. Se una spec è `approvata` o `bozza`, fermati:
+   serve prima `/sddpa:verifica <nn>`.
+5. **Loggato.** `PROGRESS.md` ha la sezione `M<n>` di **ogni** milestone della riga (le scrive
+   `verifica`). Se manca, fermati.
+6. **Gate verde.** I controlli bloccanti e quelli di verifica della "Configurazione SDD" di CLAUDE.md:
+   ```bash
+   uv run ruff check . && uv run ruff format --check . && uv run mypy src \
+     && uv run pytest -m "not integration and not contract" --cov --cov-fail-under=85 \
+     && uv run pytest -m contract \
+     && uv run mkdocs build --strict && uv run pre-commit run --all-files
+   ```
+7. **Invariante di versione.** `__version__` in `src/pynteracta/__init__.py` è uguale all'ultimo
+   tag (`git describe --tags --abbrev=0`). Se no, riallinea con un commit `chore:` prima.
+8. **Nessuna release precedente lasciata aperta.** Nessun'altra riga ⏳ in ROADMAP il cui tag esiste
+   già (`git tag`). Se c'è, chiudila con un commit `docs:` separato prima di procedere.
 
-## Actions
+## Azioni
 
-Compute the **next version** first — never guess it. Preview with semantic-release:
+Calcola la **prossima versione** per prima cosa, mai a occhio:
 
 ```bash
-uv run semantic-release version --print        # prints the computed next version, no side effects
+uv run semantic-release version --print        # stampa la versione calcolata, senza effetti
 ```
 
-Use that `vX.Y.0` and **today's date** (YYYY-MM-DD) below.
+Usa quel `vX.Y.0` e la **data di oggi** (YYYY-MM-DD) qui sotto.
 
-### 1. Doc commit — flip ROADMAP + freeze spec (the 2-file commit)
+### 1. Commit documentale: ROADMAP → ✅ (un solo file)
 
-- **ROADMAP row.** In the **Versions** table of [`ROADMAP.md`](../../../ROADMAP.md), change only this
-  version's Status cell: `⏳ In progress` → `✅ Shipped <today>`. Touch no other row.
-- **Spec header.** In `specs/vX.Y-<slug>.md`, rewrite only the Status line:
-  `Status: PLANNING — ⏳ In progress.` → `Status: SHIPPED — vX.Y.0 (<today>). Frozen. Do not edit.`
-  Keep the rest byte-for-byte. Do not edit any other frozen spec.
-- **Commit** on `main`, staging only those two files (explicit paths, never `git add -A`):
+- Nella tabella **Versions** di [`ROADMAP.md`](../../../ROADMAP.md) cambia solo la cella Status
+  della riga di questa versione: `⏳ In progress` → `✅ Shipped <oggi>`. Nessun'altra riga.
+- Aggiorna, se serve, la nota sotto la tabella ("last used: M<n>").
+- **Non toccare** `specs/`: le spec sono già chiuse da `verifica` e non si modificano.
+- Commit su `main`, con il solo file indicato (percorso esplicito, mai `git add -A`):
   ```
-  chore: release vX.Y.0 — flip ROADMAP to shipped, freeze spec header
-
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  docs: release vX.Y.0, riga di ROADMAP a shipped
   ```
+  seguito dalla riga `Co-Authored-By` prevista dall'ambiente.
 
-### 2. Version bump + tag (semantic-release)
+### 2. Bump + tag (semantic-release)
 
 ```bash
 uv run semantic-release version --no-changelog --no-push --no-vcs-release --skip-build
 ```
 
-- `--no-changelog` → git-cliff owns `CHANGELOG.md` (next step), not semantic-release.
-- `--no-push --no-vcs-release` → **nothing leaves the machine**; push is a separate, explicit step.
-- `--skip-build` → building the wheel is CI's job; keep the release step side-effect-light.
+- `--no-changelog` → `CHANGELOG.md` è di git-cliff (passo 3), non di semantic-release.
+- `--no-push --no-vcs-release` → **niente esce dalla macchina**; il push è un passo separato.
+- `--skip-build` → la wheel la costruisce la CI.
 
-This bumps `__version__`, creates its own version commit, and tags `vX.Y.0`. Verify with
-`git show --stat HEAD` and `git tag --points-at HEAD`.
+Bumpa `__version__`, crea il proprio commit di versione e tagga `vX.Y.0`. Verifica con
+`git show --stat HEAD` e `git tag --points-at HEAD`.
 
 ### 3. CHANGELOG (git-cliff)
 
-Regenerate and commit separately — never hand-edit `CHANGELOG.md`:
+Rigenera e committa a parte, mai a mano:
 
 ```bash
 uv run git-cliff --tag vX.Y.0 -o CHANGELOG.md
-git commit -m "docs: update CHANGELOG for vX.Y.0" CHANGELOG.md
+git commit -m "docs: aggiornamento del CHANGELOG per vX.Y.0" CHANGELOG.md
 ```
 
-(The changelog has sometimes been regenerated in **batches** covering several versions — if that is
-the intent, say so and batch instead of committing per release.)
+(Il changelog è stato a volte rigenerato a **lotti** per più versioni: se è l'intento, dillo e
+fai un commit solo.)
 
-### 4. Hand back
+### 4. Consegna
 
-Report the doc commit SHA, the semantic-release version commit + tag, and the changelog commit.
-**Do not push and do not create a remote release** unless the user explicitly asks; then:
-`git push origin main --follow-tags`. PyPI stays off (`upload_to_pypi = false`).
+Riporta lo SHA del commit documentale, il commit di versione + tag di semantic-release e il commit
+del changelog. **Non fare push e non creare release remote** senza richiesta esplicita; su richiesta:
+`git push origin main --follow-tags`. Il push del tag avvia `release.yml` (GitHub Release + PyPI con
+trusted publishing): verificare che entrambi siano atterrati prima di annunciare la versione.
+Dopo il push su GitHub, lo specchio GitLab si aggiorna a mano con `scripts/mirror_to_gitlab.sh`.
 
-## Guardrails
+## Guardrail
 
-- The doc commit = **exactly two files** (ROADMAP + spec header). The version bump is semantic-release's
-  own separate commit — never fold them together.
-- Never run `semantic-release version` without `--no-push --no-vcs-release` unless the user asked to
-  publish — its default behaviour pushes and creates a remote release.
-- Never hand-edit `CHANGELOG.md`; never edit a different version's frozen spec.
-- Commit on `main` is allowed only for the release commits; all other work is on a branch.
+- Il commit documentale = **esattamente un file** (`ROADMAP.md`). Il bump è il commit separato di
+  semantic-release: mai fonderli.
+- Mai `semantic-release version` senza `--no-push --no-vcs-release` se non su richiesta di
+  pubblicare: il comportamento di default pusha e crea la release remota.
+- Mai modificare a mano `CHANGELOG.md`; mai modificare una spec chiusa o una spec in `specs/legacy/`.
+- Commit su `main` solo per i commit di release; tutto il resto su branch.
+- Messaggi di commit: Conventional Commits con descrizione in italiano (deroga della
+  Configurazione SDD).
