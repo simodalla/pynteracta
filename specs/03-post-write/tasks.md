@@ -290,7 +290,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   4. `uv run mkdocs build --strict`, controlli bloccanti; commit `docs: scrittura dei post nelle
      pagine API e CLI, home e README, variabili per gli integration test`.
 
-### [ ] T15 – Integration test del ciclo completo e della lettura dello screen
+### [x] T15 – Integration test del ciclo completo e della lettura dello screen
 
 - Criteri: 03-C31 (codice)
 - Dipende da: T08
