@@ -16,7 +16,8 @@ uv pip install "pynteracta[export]"   # + yaml/parquet export support
 Wheels and sdists are also attached to each
 [GitHub release](https://github.com/simodalla/pynteracta/releases); to pin an exact tag from the
 repository, use
-`uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.3"`.
+`uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@vX.Y.Z"` with a tag
+from the [releases page](https://github.com/simodalla/pynteracta/releases).
 
 ## CLI quickstart
 

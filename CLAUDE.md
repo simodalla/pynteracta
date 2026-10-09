@@ -210,6 +210,7 @@ Plugin: `sddpa` 0.3.0. Regole del metodo in `riferimenti/metodo.md` del plugin.
   - endpoint e DTO del swagger pinnato toccati; serve rigenerare i modelli con `scripts/generate_models.py` (solo se il swagger cambia)?
   - esposizione in CLI tramite `render_output` (così `--output`, `--full`, `--fields`, `--web-url`, `--export` compongono) e snapshot `syrupy`?
   - pagine di `docs/` da aggiornare (`cli.md`, `api/*.md`, guide)? Il sito è pubblico e `mkdocs build --strict` lo verifica
+  - la spec cambia la superficie o lo scope (nuovo gruppo di endpoint, scritture, auth, async)? Allora vanno aggiornati anche `docs/index.md` (home del sito) e `README.md`, che descrivono cosa c'è e cosa manca; non devono citare numeri di versione, che invecchiano a ogni release
   - riga ⏳ in `ROADMAP.md` all'apertura e sezione `M<n>` in `PROGRESS.md` (Done / Decisions / Follow-ups) alla verifica
 
 ## Lingua

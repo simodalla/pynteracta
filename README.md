@@ -9,8 +9,9 @@
 > Dinova S.r.l. / Maggioli S.p.A. It is neither sponsored nor endorsed by the vendor.*
 
 An unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`).
-Synchronous, read-only, typed: service-account and Google OAuth2 authentication, ten read
-resources, a Typer CLI with table/JSON/YAML output and file export. Current version: see
+Synchronous and typed: service-account and Google OAuth2 authentication, ten read resources, a
+write surface that grows one resource group at a time (tasks first), a Typer CLI with
+table/JSON/YAML output and file export. Current version and contents: see
 [`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 ## Installation
@@ -30,10 +31,10 @@ uv pip install "pynteracta[export]"
 
 Each release is also attached as a wheel and sdist to its
 [GitHub release](https://github.com/simodalla/pynteracta/releases). To pin an exact tag from the
-repository instead:
+repository instead, pick one from the releases page:
 
 ```bash
-uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@v0.9.3"
+uv pip install "pynteracta @ git+https://github.com/simodalla/pynteracta@vX.Y.Z"
 ```
 
 ## Quickstart — library
@@ -91,13 +92,17 @@ pynteracta posts list --community 79 --all --export posts.parquet
 pynteracta --version
 ```
 
-## Features (v0.9.x)
+## Features
 
 - **Authentication** — service-account RS512 JWT assertion with token lifecycle and file/memory
   cache (POSIX `0o600`/`0o700` enforcement), or Google OAuth2 access-token exchange.
 - **Read resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). One facade per response with
   a `.raw` escape hatch to the generated DTO.
+- **Write operations** — `tasks` create/edit/delete, with explicit kwargs and `*_raw` variants in
+  the library and `tasks create|edit|delete` in the CLI (confirmation on destructive commands,
+  exit code `9` on `occToken` conflicts, no automatic retry of uncertain writes). Further write
+  groups (posts, comments, attachments, admin) arrive one per minor.
 - **Filtering & sorting** — curated kwargs/flags for posts and users, custom-field and workflow
   screen-field filters with opt-in validation against the community post-definition, generic
   `--filter KEY=VALUE` passthrough.
@@ -161,7 +166,7 @@ What changed:
 | CLI command | `pynta` | **`pynteracta`** |
 | HTTP backend | `requests` | `httpx` |
 | License | BSD-3-Clause | **Apache-2.0** |
-| Scope | read + write | read-only surface (writes deferred) |
+| Scope | read + write | read surface complete; writes reopened one group at a time (tasks first) |
 
 **If you depend on the old line**, it is still published and installable — nothing has been removed
 or yanked. Pin it explicitly:
