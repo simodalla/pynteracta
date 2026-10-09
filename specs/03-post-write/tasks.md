@@ -269,7 +269,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Snapshot, controlli bloccanti; commit `feat(cli): posts workflow-screen, workflow-execute e
      workflow-edit-screen`.
 
-### [ ] T14 – Documentazione: pagine API e CLI, home, README, testing, `.env.example`
+### [x] T14 – Documentazione: pagine API e CLI, home, README, testing, `.env.example`
 
 - Criteri: 03-C30
 - Dipende da: T13
