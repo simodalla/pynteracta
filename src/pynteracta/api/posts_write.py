@@ -25,6 +25,9 @@ from pynteracta.models.facade.posts_write import (
     PostForCreate,
     PostForEdit,
     PostWriteResult,
+    WorkflowOperationResult,
+    WorkflowScreen,
+    WorkflowScreenWriteResult,
 )
 from pynteracta.models.generated.external_v2 import (
     CopyCustomPostRequestDTO,
@@ -35,6 +38,8 @@ from pynteracta.models.generated.external_v2 import (
     EditPostAttachmentsRequestDTO,
     EditPostCustomDataRequestDTO,
     EditPostWatchersRequestDTO,
+    EditPostWorkflowScreenDataRequestDTO,
+    ExecutePostWorkflowOperationRequestDTO,
     MarkPostAsErasableResponseDTO,
 )
 
@@ -51,6 +56,9 @@ _ATTACHMENTS_PATH = _MANAGE + "/edit-post-attachments/{post_id}"
 _DELETE_PATH = _MANAGE + "/delete-post/{post_id}"
 _ERASABLE_PATH = _MANAGE + "/mark-post-as-erasable/{post_id}"
 _COMMENT_PATH = _MANAGE + "/create-comment/{post_id}"
+_SCREEN_PATH = _MANAGE + "/post-workflow-screen-data-for-edit/{post_id}"
+_EXECUTE_PATH = _MANAGE + "/execute-post-workflow-operation/{post_id}/{operation_id}"
+_EDIT_SCREEN_PATH = _MANAGE + "/edit-post-workflow-screen-data/{post_id}/{screen_occ_token}"
 
 # Elementi di allegati e tabelle: dict nella forma del DTO oppure il modello generato.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -490,3 +498,106 @@ class PostsWriteAPI(ResourceClient):
 
     def _send_comment(self, post_id: int, body: dict[str, Any]) -> PostComment:
         return PostComment.from_dict(self._post(_COMMENT_PATH.format(post_id=post_id), json=body))
+
+    # --- workflow ---------------------------------------------------------------------------
+
+    def get_workflow_screen(
+        self, post_id: int, *, operation_id: int | None = None
+    ) -> WorkflowScreen:
+        """GET ``/communication/posts/manage/post-workflow-screen-data-for-edit/{postId}``.
+
+        Args:
+            post_id: Il post.
+            operation_id: Senza, lo screen dello stato corrente; con l'id di una transizione
+                (``workflowOperationId`` in query), lo screen di quella transizione.
+
+        Returns:
+            Dati, metadati e ``screen_occ_token`` dello screen (:class:`WorkflowScreen`).
+        """
+        params = build_query_params(workflow_operation_id=operation_id)
+        return WorkflowScreen.from_dict(
+            self._get(_SCREEN_PATH.format(post_id=post_id), params=params or None)
+        )
+
+    def execute_workflow_operation(
+        self,
+        post_id: int,
+        operation_id: int,
+        *,
+        screen_data: dict[str, Any] | None = None,
+        delta_area_format: int | None = None,
+        screen_occ_token: int | None = None,
+    ) -> WorkflowOperationResult:
+        """POST ``/communication/posts/manage/execute-post-workflow-operation/{postId}/{opId}``.
+
+        Esegue una transizione di workflow. Se la transizione ha uno screen, ``screen_data`` e
+        ``screen_occ_token`` (letto con :meth:`get_workflow_screen` passando ``operation_id``)
+        vanno nel corpo; senza argomenti il corpo è ``{}``. Gli ``operation_id`` permessi si
+        leggono da ``PostCapabilities.workflow_permitted_operations``.
+
+        Args:
+            post_id: Il post.
+            operation_id: La transizione da eseguire.
+            screen_data: Valori dei campi dello screen, per id del campo.
+            delta_area_format: Formato dei campi di tipo delta.
+            screen_occ_token: Token di concorrenza dello screen.
+
+        Returns:
+            Nuovo stato, dati di screen e transizioni permesse (:class:`WorkflowOperationResult`).
+        """
+        body = build_write_body(
+            screen_data=screen_data,
+            delta_area_format=delta_area_format,
+            screen_occ_token=screen_occ_token,
+        )
+        return self._send_execute(post_id, operation_id, body)
+
+    def execute_workflow_operation_raw(
+        self, post_id: int, operation_id: int, req: ExecutePostWorkflowOperationRequestDTO
+    ) -> WorkflowOperationResult:
+        """Come :meth:`execute_workflow_operation`, da un DTO già costruito."""
+        return self._send_execute(post_id, operation_id, _dump(req))
+
+    def _send_execute(
+        self, post_id: int, operation_id: int, body: dict[str, Any]
+    ) -> WorkflowOperationResult:
+        path = _EXECUTE_PATH.format(post_id=post_id, operation_id=operation_id)
+        return WorkflowOperationResult.from_dict(self._post(path, json=body))
+
+    def edit_workflow_screen(
+        self,
+        post_id: int,
+        screen_occ_token: int,
+        *,
+        screen_data: dict[str, Any] | None = None,
+        delta_area_format: int | None = None,
+    ) -> WorkflowScreenWriteResult:
+        """PUT ``/communication/posts/manage/edit-post-workflow-screen-data/{postId}/{token}``.
+
+        Modifica i dati di screen dello stato corrente. ``screen_occ_token`` è quello letto con
+        :meth:`get_workflow_screen`; un ``409`` diventa
+        :class:`~pynteracta.exceptions.ConcurrencyError`.
+
+        Args:
+            post_id: Il post.
+            screen_occ_token: Token di concorrenza dello screen.
+            screen_data: Valori dei campi dello screen, per id del campo.
+            delta_area_format: Formato dei campi di tipo delta.
+
+        Returns:
+            Un :class:`WorkflowScreenWriteResult` con il ``next_screen_occ_token``.
+        """
+        body = build_write_body(screen_data=screen_data, delta_area_format=delta_area_format)
+        return self._send_edit_screen(post_id, screen_occ_token, body)
+
+    def edit_workflow_screen_raw(
+        self, post_id: int, screen_occ_token: int, req: EditPostWorkflowScreenDataRequestDTO
+    ) -> WorkflowScreenWriteResult:
+        """Come :meth:`edit_workflow_screen`, da un DTO già costruito."""
+        return self._send_edit_screen(post_id, screen_occ_token, _dump(req))
+
+    def _send_edit_screen(
+        self, post_id: int, screen_occ_token: int, body: dict[str, Any]
+    ) -> WorkflowScreenWriteResult:
+        path = _EDIT_SCREEN_PATH.format(post_id=post_id, screen_occ_token=screen_occ_token)
+        return WorkflowScreenWriteResult.from_dict(self._put(path, json=body))

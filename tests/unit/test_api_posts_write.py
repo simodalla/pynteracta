@@ -21,6 +21,9 @@ from pynteracta.models.facade.posts_write import (
     PostForCreate,
     PostForEdit,
     PostWriteResult,
+    WorkflowOperationResult,
+    WorkflowScreen,
+    WorkflowScreenWriteResult,
 )
 from pynteracta.models.generated import external_v2 as generated
 
@@ -44,6 +47,11 @@ _DELETE_PATH = f"{_MANAGE}/delete-post/{_POST_ID}"
 _ERASABLE_PATH = f"{_MANAGE}/mark-post-as-erasable/{_POST_ID}"
 _COMMENT_PATH = f"{_MANAGE}/create-comment/{_POST_ID}"
 _COMMENT_ID = 5601
+_OPERATION_ID = 12
+_SCREEN_OCC_TOKEN = 3
+_SCREEN_PATH = f"{_MANAGE}/post-workflow-screen-data-for-edit/{_POST_ID}"
+_EXECUTE_PATH = f"{_MANAGE}/execute-post-workflow-operation/{_POST_ID}/{_OPERATION_ID}"
+_EDIT_SCREEN_PATH = f"{_MANAGE}/edit-post-workflow-screen-data/{_POST_ID}/{_SCREEN_OCC_TOKEN}"
 _PARENT_COMMENT_ID = 5
 _SCHEDULED = datetime(2026, 12, 31, 18, 0, tzinfo=ZoneInfo("Europe/Rome"))
 _SCHEDULED_BODY = {"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"}
@@ -342,6 +350,98 @@ class TestPostsComment:
         assert _sent(route) == {"comment": "Ciao", "commentFormat": 2}
 
 
+class TestPostsWorkflow:
+    # criterio: 03-C12
+    @respx.mock
+    def test_get_workflow_screen_without_operation(self) -> None:
+        route = respx.get(_SCREEN_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("workflow_screen_response.json"))
+        )
+        screen = _api().get_workflow_screen(_POST_ID)
+        assert route.calls[0].request.url.query == b""
+        assert isinstance(screen, WorkflowScreen)
+        assert screen.screen_data == {"5": "a", "6": 1}
+        assert screen.screen_occ_token == _SCREEN_OCC_TOKEN
+        assert screen.screen is not None
+        assert screen.screen.name == "Approvazione"
+        assert screen.current_workflow_state is not None
+        assert screen.current_workflow_state.name == "In revisione"
+
+    # criterio: 03-C12
+    @respx.mock
+    def test_get_workflow_screen_with_operation_query(self) -> None:
+        route = respx.get(_SCREEN_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("workflow_screen_response.json"))
+        )
+        _api().get_workflow_screen(_POST_ID, operation_id=_OPERATION_ID)
+        assert route.calls[0].request.url.params["workflowOperationId"] == str(_OPERATION_ID)
+
+    # criterio: 03-C13
+    @respx.mock
+    def test_execute_operation_body_and_result(self) -> None:
+        route = respx.post(_EXECUTE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("execute_workflow_operation_response.json")
+            )
+        )
+        result = _api().execute_workflow_operation(
+            _POST_ID, _OPERATION_ID, screen_data={"5": "x"}, screen_occ_token=_SCREEN_OCC_TOKEN
+        )
+        assert route.call_count == 1
+        assert _sent(route) == {"screenData": {"5": "x"}, "screenOccToken": _SCREEN_OCC_TOKEN}
+        assert isinstance(result, WorkflowOperationResult)
+        assert result.new_current_state is not None
+        assert result.new_current_state.name == "Approvato"
+        assert result.new_screen_data == {"5": "x", "6": 1}
+        assert result.new_permitted_operations == []
+        assert result.post_data_has_changed is True
+
+    # criterio: 03-C13
+    @respx.mock
+    def test_execute_operation_without_kwargs_sends_empty_body(self) -> None:
+        route = respx.post(_EXECUTE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("execute_workflow_operation_response.json")
+            )
+        )
+        _api().execute_workflow_operation(_POST_ID, _OPERATION_ID)
+        assert _sent(route) == {}
+
+    # criterio: 03-C14
+    @respx.mock
+    def test_edit_workflow_screen_body_and_result(self) -> None:
+        route = _mock_put(_EDIT_SCREEN_PATH, "edit_workflow_screen_response.json")
+        result = _api().edit_workflow_screen(_POST_ID, _SCREEN_OCC_TOKEN, screen_data={"5": "x"})
+        assert route.call_count == 1
+        assert _sent(route) == {"screenData": {"5": "x"}}
+        assert isinstance(result, WorkflowScreenWriteResult)
+        assert result.next_screen_occ_token == _SCREEN_OCC_TOKEN + 1
+        assert result.new_screen_data == {"5": "x", "6": 1}
+
+    # criterio: 03-C02
+    @respx.mock
+    def test_raw_equivalents(self) -> None:
+        execute = respx.post(_EXECUTE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("execute_workflow_operation_response.json")
+            )
+        )
+        edit = _mock_put(_EDIT_SCREEN_PATH, "edit_workflow_screen_response.json")
+        api = _api()
+        api.execute_workflow_operation_raw(
+            _POST_ID,
+            _OPERATION_ID,
+            generated.ExecutePostWorkflowOperationRequestDTO(screenData={"5": "x"}),
+        )
+        api.edit_workflow_screen_raw(
+            _POST_ID,
+            _SCREEN_OCC_TOKEN,
+            generated.EditPostWorkflowScreenDataRequestDTO(screenData={"5": "x"}),
+        )
+        assert _sent(execute) == {"screenData": {"5": "x"}}
+        assert _sent(edit) == {"screenData": {"5": "x"}}
+
+
 # criterio: 03-C03
 @pytest.mark.parametrize(
     ("method", "path", "fixture"),
@@ -413,3 +513,17 @@ class TestPostsErrors:
         with pytest.raises(TransportError):
             _api().add_comment(_POST_ID, comment="Ciao")
         assert route.call_count == 1
+
+    # criterio: 03-C07
+    @respx.mock
+    def test_409_on_workflow_raises_concurrency_error_once(self) -> None:
+        conflict = httpx.Response(_HTTP_409, json={"message": "occToken mismatch"})
+        execute = respx.post(_EXECUTE_PATH).mock(return_value=conflict)
+        edit = respx.put(_EDIT_SCREEN_PATH).mock(return_value=conflict)
+        api = _api()
+        with pytest.raises(ConcurrencyError):
+            api.execute_workflow_operation(_POST_ID, _OPERATION_ID, screen_data={"5": "x"})
+        with pytest.raises(ConcurrencyError):
+            api.edit_workflow_screen(_POST_ID, _SCREEN_OCC_TOKEN, screen_data={"5": "x"})
+        assert execute.call_count == 1
+        assert edit.call_count == 1

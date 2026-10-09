@@ -152,7 +152,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `feat(posts): watcher, allegati, eliminazione, marcatura per la
      cancellazione e commenti`.
 
-### [ ] T08 – Workflow in libreria
+### [x] T08 – Workflow in libreria
 
 - Criteri: 03-C02 (workflow), 03-C07 (workflow), 03-C12, 03-C13, 03-C14
 - Dipende da: T05
