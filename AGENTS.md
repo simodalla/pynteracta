@@ -6,11 +6,18 @@ This file provides agent-specific guidance for pynteracta. For general project s
 
 The following Claude Code skills are available for automated tasks:
 
-### `new-version`
-Scaffolds the next pynteracta minor version — implements PLAN + BRANCH phases from [WORKFLOW.md](WORKFLOW.md). Creates the feature branch (per the STOP rule), writes `specs/vX.Y-<slug>.md` with the canonical 7-section shape, and adds the ⏳ row to the ROADMAP version table. See [CLAUDE.md > Planning Documents](CLAUDE.md#planning-documents) for the planning doc strategy.
+### `sddpa:*` (plugin `sddpa`, marketplace `ucrls`)
+The spec-driven cycle that replaces the former `new-version` skill: `/sddpa:specifica <ambito>` →
+`/sddpa:piano <nn>` → `/sddpa:task <nn>` → `/sddpa:implementa [<nn>] <task>` → `/sddpa:verifica <nn>`,
+plus `/sddpa:adr <titolo>`. `specifica` creates the branch and writes `specs/<nn>-<nome>/spec.md`;
+`verifica` closes the spec, logs the `M<n>` section in `PROGRESS.md` and proposes the merge. See
+[CLAUDE.md > Metodo](CLAUDE.md#metodo) and [WORKFLOW.md](WORKFLOW.md).
 
 ### `release`
-Cuts a pynteracta minor release — implements the RELEASE phase from WORKFLOW.md after the version's work is merged to main. Flips the ROADMAP row to ✅ Shipped, freezes the spec header, then drives version bump + tag via python-semantic-release and regenerates CHANGELOG with git-cliff.
+Cuts a pynteracta release — the RELEASE phase from WORKFLOW.md, on `main` after the version's specs
+are closed by `/sddpa:verifica` and merged. Flips the ROADMAP row to ✅ Shipped (one-file `docs:`
+commit; the spec is already frozen by `verifica`), then drives version bump + tag via
+python-semantic-release and regenerates CHANGELOG with git-cliff. A version may bundle several specs.
 
 ### `verify`
 Verifies that a code change works by running the app and observing behavior. Use when asked to run/start the app, take screenshots, or confirm a fix works in the real app (not just tests).

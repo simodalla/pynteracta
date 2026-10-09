@@ -49,37 +49,44 @@ lifecycle. Knowing which file to touch is half the process.
 
 ## 3. The workflow (per version)
 
+Since the adoption of the `sddpa` method (see `CLAUDE.md` "Metodo"), phases PLAN → LOG are driven
+by the `/sddpa:*` skills and phase RELEASE by the project's `release` skill. The phase names below
+are kept for continuity with `PROGRESS.md` and the legacy specs.
+
 ```
-   ┌─ 1. PLAN ──────────────────────────────────────────────────────────────┐
-   │  • Pick the next scope from ROADMAP.md (one read group per minor).      │
-   │  • Create specs/vX.Y-<slug>.md  (copy the shape of an existing spec):   │
-   │      endpoints + DTOs, deliverables, acceptance criteria, open questions│
-   │  • Add a row to the ROADMAP version table; link the spec; mark ⏳.       │
-   └────────────────────────────────────────────────────────────────────────┘
-   ┌─ 2. BRANCH ────────────────────────────────────────────────────────────┐
-   │  • git checkout -b feature_<slug>   (or m<n>_<slug> / bugfix_<slug>)    │
-   │  • Verify: git branch --show-current  ≠ main   (see CLAUDE.md STOP)     │
-   └────────────────────────────────────────────────────────────────────────┘
-   ┌─ 3. IMPLEMENT ─────────────────────────────────────────────────────────┐
-   │  • Follow the spec. Regenerate models only if the swagger changed.      │
-   │  • Facade (extra="ignore", .raw) → api/ method (kwargs + *_raw) →        │
-   │    CLI (via render_output) → tests (unit + contract + fixtures) → docs. │
-   │  • Use Conventional Commits (feat: / fix: / docs: …).                   │
-   └────────────────────────────────────────────────────────────────────────┘
-   ┌─ 4. GATE ──────────────────────────────────────────────────────────────┐
-   │  ruff check . · ruff format --check . · mypy src ·                      │
-   │  pytest --cov --cov-fail-under=85                                       │
-   └────────────────────────────────────────────────────────────────────────┘
-   ┌─ 5. LOG ───────────────────────────────────────────────────────────────┐
-   │  • Append an M<n> section to PROGRESS.md: Done / Decisions / Follow-ups.│
-   │  • Resolve the spec's open questions; note the answers in PROGRESS.     │
-   └────────────────────────────────────────────────────────────────────────┘
-   ┌─ 6. RELEASE ───────────────────────────────────────────────────────────┐
-   │  • Merge to main; semantic-release cuts the tag; git-cliff the CHANGELOG│
-   │  • Pushing the tag runs release.yml: GitHub Release + PyPI (trusted     │
-   │    publishing). Verify both landed before announcing the version.       │
-   │  • Mark the version ✅ in ROADMAP.md and FREEZE its spec header.         │
-   └────────────────────────────────────────────────────────────────────────┘
+   ┌─ 1. PLAN  — /sddpa:specifica <ambito> → /sddpa:piano <nn> → /sddpa:task <nn> ─┐
+   │  • Pick the next scope from ROADMAP.md (one endpoint group per minor).         │
+   │  • specifica interviews, then writes specs/<nn>-<nome>/spec.md with            │
+   │    acceptance criteria <nn>-C<mm>; piano writes plan.md; task writes tasks.md. │
+   │  • Add a row to the ROADMAP version table; link the spec(s); mark ⏳.           │
+   └────────────────────────────────────────────────────────────────────────────────┘
+   ┌─ 2. BRANCH — created by specifica, before writing spec.md ─────────────────────┐
+   │  • git checkout -b m<n>_<nome>   (bugfix_<slug> for fixes outside a spec)      │
+   │  • Verify: git branch --show-current  ≠ main   (see CLAUDE.md STOP)            │
+   └────────────────────────────────────────────────────────────────────────────────┘
+   ┌─ 3. IMPLEMENT — /sddpa:implementa [<nn>] <task> ───────────────────────────────┐
+   │  • One task at a time, tests first, one commit per task.                       │
+   │  • Facade (extra="ignore", .raw) → api/ method (kwargs + *_raw) →               │
+   │    CLI (via render_output) → tests (unit + contract + fixtures) → docs.        │
+   │  • Regenerate models only if the swagger changed.                              │
+   └────────────────────────────────────────────────────────────────────────────────┘
+   ┌─ 4. GATE — the "Controlli bloccanti" of CLAUDE.md "Configurazione SDD" ────────┐
+   │  ruff check . · ruff format --check . · mypy src ·                             │
+   │  pytest -m "not integration and not contract" --cov · pytest -m contract       │
+   │  (+ mkdocs build --strict · pre-commit run --all-files at verification)        │
+   └────────────────────────────────────────────────────────────────────────────────┘
+   ┌─ 5. LOG — /sddpa:verifica <nn> ────────────────────────────────────────────────┐
+   │  • Traceability criteria → tests, checks, coverage, non-negotiable rules.      │
+   │  • Writes verifica.md, sets Stato: chiusa (the spec is frozen from here on),   │
+   │    appends the M<n> section to PROGRESS.md: Done / Decisions / Follow-ups.     │
+   │  • Proposes the --no-ff merge to main (separate confirmation; push, a third).  │
+   └────────────────────────────────────────────────────────────────────────────────┘
+   ┌─ 6. RELEASE — `release` skill, on main, after the merge ───────────────────────┐
+   │  • Flip the ROADMAP row to ✅; semantic-release bumps + tags; git-cliff the     │
+   │    CHANGELOG. A version may bundle several specs (M27–M28 → 0.10.0).           │
+   │  • Pushing the tag runs release.yml: GitHub Release + PyPI (trusted            │
+   │    publishing). Verify both landed before announcing the version.              │
+   └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Adding a new endpoint (recipe)
@@ -93,30 +100,33 @@ the CLI through `render_output` (so `--output`/`--full`/`--fields`/`--web-url`/`
 
 ## 4. Instructions for Claude Code
 
-When asked to work on a new version, milestone, feature or bugfix, follow this workflow end to end.
-Treat each numbered phase above as a gate: do not skip ahead.
+When asked to work on a new version, milestone, feature or bugfix, follow this workflow end to end
+through the `/sddpa:*` skills. Treat each numbered phase above as a gate: do not skip ahead.
 
-1. **Before touching any file**, confirm the scope and create the branch (phase 2). Run
+1. **Before touching any file**, confirm the scope and be on a dedicated branch. Run
    `git branch --show-current` and verify it is **not** `main`. This is the **STOP** rule from
-   [`CLAUDE.md`](CLAUDE.md) and it is non-negotiable.
+   [`CLAUDE.md`](CLAUDE.md) and it is non-negotiable. `/sddpa:specifica` creates the branch itself,
+   right before writing `spec.md`.
 2. **Find the current objective in [`ROADMAP.md`](ROADMAP.md), not here.** This document never names
    the version being worked on. If the user has not specified the scope, read the ROADMAP version
-   table and the backlog, then propose the next item.
-3. **Write the spec before the code.** Create `specs/vX.Y-<slug>.md` by copying the shape of an
-   existing spec, and add its row to the ROADMAP table marked ⏳. Do not start implementing until
-   the spec's deliverables and acceptance criteria are written down.
-4. **Implement in the canonical order** (phase 3): façade model → `api/` method → CLI → tests →
-   docs. Regenerate `models/generated/` **only** if the swagger changed, and never hand-edit it.
-5. **Run the full gate locally** (phase 4) before considering the work done:
-   `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`,
-   `uv run pytest --cov --cov-fail-under=85`.
-6. **Record what happened in [`PROGRESS.md`](PROGRESS.md)** (phase 5): append a section with Done /
-   Decisions / Follow-ups and resolve the spec's open questions. Never hand-edit `CHANGELOG.md` —
-   it is generated by `git-cliff`.
-7. **Use Conventional Commits** for every commit (`feat:`, `fix:`, `docs:`, `chore:`, …); the
-   `BREAKING CHANGE:` footer drives the version bump. Commits follow the method (the approval of a
-   spec, plan, task list or ADR is also the approval of its commit; one commit per task). Merge and
-   push only when the user asks.
-8. **At release** (phase 6): after merge to `main`, semantic-release cuts the tag and `git-cliff`
-   regenerates the changelog; mark the version ✅ in [`ROADMAP.md`](ROADMAP.md) and freeze the
-   spec's header. Never edit a frozen spec — supersede it with a new one.
+   table and the backlog, then propose the next item and start `/sddpa:specifica <ambito>`.
+3. **Write the spec before the code.** `/sddpa:specifica` writes `specs/<nn>-<nome>/spec.md` after
+   the interview, with verifiable acceptance criteria and no open questions; add the ⏳ row to the
+   ROADMAP table (a checklist item of the "Configurazione SDD"). Then `/sddpa:piano` and
+   `/sddpa:task`. Do not implement until the task list is approved.
+4. **Implement with `/sddpa:implementa`** in the canonical order: façade model → `api/` method →
+   CLI → tests → docs. Tests before code; one commit per task. Regenerate `models/generated/`
+   **only** if the swagger changed, and never hand-edit it.
+5. **Run the gate** (the "Controlli bloccanti" of CLAUDE.md) before and after every task; the
+   coverage rule is total ≥ 85 % and never below the baseline (`specs/00-partenza/partenza.md`).
+6. **Close the spec with `/sddpa:verifica`** (phase 5): it writes `verifica.md`, sets
+   `Stato: chiusa`, appends the `M<n>` section to [`PROGRESS.md`](PROGRESS.md) and proposes the
+   merge. Never hand-edit `CHANGELOG.md` — it is generated by `git-cliff`.
+7. **Use Conventional Commits** for every commit (`feat:`, `fix:`, `docs:`, `chore:`, …), with the
+   description in Italian; the `BREAKING CHANGE:` footer drives the version bump. The approval of a
+   spec, plan, task list or ADR is also the approval of its commit. Merge and push only when the
+   user asks, with separate confirmations.
+8. **At release** (phase 6), use the `release` skill on `main` after the merge: it flips the
+   ROADMAP row to ✅, lets semantic-release cut the tag and `git-cliff` regenerate the changelog.
+   The spec is already frozen by `verifica`: never edit a closed spec or a legacy spec — supersede
+   it with a new one.

@@ -16,8 +16,10 @@
    `specs/<nn>-<nome>/spec.md` (endpoints, deliverables, acceptance criteria, open questions).
 2. Add a row to the table below and link the spec.
 3. Implement on a dedicated branch (see the **STOP** section in [`CLAUDE.md`](CLAUDE.md)).
-4. Log the outcome in `PROGRESS.md`; let semantic-release cut the tag and `git-cliff` the changelog.
-5. Mark the version ✅ here and freeze its spec.
+4. Close the spec with `/sddpa:verifica <nn>`: it writes `verifica.md`, freezes the spec
+   (`Stato: chiusa`), logs the outcome in `PROGRESS.md` and proposes the merge to `main`.
+5. Release with the `release` skill on `main`: mark the version ✅ here, let semantic-release cut
+   the tag and `git-cliff` the changelog. A version may bundle several specs.
 
 ## Versioning policy
 
@@ -47,7 +49,7 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 | **0.9.1** | Documentation alignment & config fixes (patch) | M23 | ✅ Shipped 2026-09-11 | [specs/legacy/v0.9.1-docs-alignment.md](specs/legacy/v0.9.1-docs-alignment.md) |
 | **0.9.2** | Migration to GitHub: Actions CI, Pages, Releases (patch) | M24 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.2-github-migration.md](specs/legacy/v0.9.2-github-migration.md) |
 | **0.9.3** | Security hardening: response redaction & tenant-scoped token cache (patch) | M25 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.3-security-hardening.md](specs/legacy/v0.9.3-security-hardening.md) |
-| **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ⏳ In progress | [specs/legacy/v0.9.4-pypi-publication.md](specs/legacy/v0.9.4-pypi-publication.md) |
+| **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.4-pypi-publication.md](specs/legacy/v0.9.4-pypi-publication.md) |
 | **0.10.0** | Task write: create, edit, delete (first write group, ADR 0001); ships with the M27 audit-log redaction fix (P-01) | M27–M28 | ⏳ In progress | [specs/02-task-write/spec.md](specs/02-task-write/spec.md), [specs/01-redazione-cookie-header/spec.md](specs/01-redazione-cookie-header/spec.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M28). The gap M11–M13 is
