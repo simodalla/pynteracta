@@ -14,8 +14,8 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli.posts_write import copy_base, edit_base, merge_custom_data
-from pynteracta.models.facade.posts_write import PostForCopy, PostForEdit
+from pynteracta.cli.posts_write import copy_base, edit_base, merge_custom_data, screen_base
+from pynteracta.models.facade.posts_write import PostForCopy, PostForEdit, WorkflowScreen
 
 _COMMUNITY_ID = 79
 _POST_ID = 21269
@@ -36,6 +36,10 @@ _EDIT_PATH = f"{_MANAGE}/edit-post/{_POST_ID}/{_OCC_TOKEN}"
 _CUSTOM_DATA_PATH = f"{_MANAGE}/edit-post-custom-data/{_POST_ID}/{_OCC_TOKEN}"
 _COPY_PATH = f"{_MANAGE}/copy-post/{_POST_ID}/{_OCC_TOKEN}"
 _EXIT_GENERIC = 1
+_SCREEN_PATH = f"{_MANAGE}/post-workflow-screen-data-for-edit/{_POST_ID}"
+_EXECUTE_PATH = f"{_MANAGE}/execute-post-workflow-operation/{_POST_ID}/12"
+_EDIT_SCREEN_PATH = f"{_MANAGE}/edit-post-workflow-screen-data/{_POST_ID}/3"
+_API_ROOT = "https://api.example.com/portal/api/external/v2"
 _WATCHERS_PATH = f"{_MANAGE}/edit-post-watchers/{_POST_ID}"
 _DETAIL_PATH = f"communication/posts/data/post-detail-by-id/{_POST_ID}"
 _POST_TITLE = "Aggiornamento procedure sicurezza Q2 2026"
@@ -78,6 +82,9 @@ def _sent_body(route: respx.Route, index: int = 0) -> dict:  # type: ignore[type
         "edit-watchers",
         "delete",
         "mark-erasable",
+        "workflow-screen",
+        "workflow-execute",
+        "workflow-edit-screen",
     ],
 )
 def test_posts_help_lists_write_commands(runner: CliRunner, command: str) -> None:
@@ -790,3 +797,181 @@ class TestPostsDestructive:
         )
         assert result.exit_code == 0, result.output
         assert json.loads(result.output) == {"post_id": _POST_ID}
+
+
+def _mock_screen() -> respx.Route:
+    return respx.get(f"{_API_ROOT}/{_SCREEN_PATH}").mock(
+        return_value=httpx.Response(200, json=load_payload("workflow_screen_response.json"))
+    )
+
+
+class TestPostsWorkflow:
+    # criterio: 03-C27
+    def test_screen_base(self) -> None:
+        screen = WorkflowScreen.from_dict(load_payload("workflow_screen_response.json"))
+        assert screen_base(screen) == {"screenData": {"5": "a", "6": 1}}
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_workflow_screen_table(self, runner: CliRunner, snapshot: object) -> None:
+        _mock_screen()
+        result = runner.invoke(app, ["posts", "workflow-screen", str(_POST_ID)], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert result.output == snapshot
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_workflow_screen_operation_query(self, runner: CliRunner) -> None:
+        route = _mock_screen()
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-screen", str(_POST_ID), "--operation", "12"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert route.calls[0].request.url.params["workflowOperationId"] == "12"
+        assert "Approvazione" in result.output
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_execute_with_screen_data_reads_screen_then_posts_merged(
+        self, runner: CliRunner
+    ) -> None:
+        get_route = _mock_screen()
+        post_route = mock_json(
+            "POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json")
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-execute", str(_POST_ID), "12", "--screen-data", "5=x"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.calls[0].request.url.params["workflowOperationId"] == "12"
+        assert _sent_body(post_route) == {"screenData": {"5": "x", "6": 1}, "screenOccToken": 3}
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_execute_without_data_posts_empty_body_without_get(self, runner: CliRunner) -> None:
+        get_route = _mock_screen()
+        post_route = mock_json(
+            "POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json")
+        )
+        result = runner.invoke(
+            app, ["posts", "workflow-execute", str(_POST_ID), "12"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 0
+        assert _sent_body(post_route) == {}
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_execute_screen_occ_token_flag_wins(self, runner: CliRunner) -> None:
+        _mock_screen()
+        post_route = mock_json(
+            "POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json")
+        )
+        result = runner.invoke(
+            app,
+            [
+                "posts", "workflow-execute", str(_POST_ID), "12",
+                "--screen-data", "5=x",
+                "--screen-occ-token", "9",
+            ],
+            env=BASE_ENV,
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        assert _sent_body(post_route)["screenOccToken"] == 9  # noqa: PLR2004
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_execute_json_with_token_skips_get(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        get_route = _mock_screen()
+        post_route = mock_json(
+            "POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json")
+        )
+        body_file = tmp_path / "body.json"
+        body_file.write_text(json.dumps({"screenData": {"5": "y"}, "screenOccToken": 4}), "utf-8")
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-execute", str(_POST_ID), "12", "--json", str(body_file)],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 0
+        assert _sent_body(post_route) == {"screenData": {"5": "y"}, "screenOccToken": 4}
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_execute_table_shows_new_state(self, runner: CliRunner) -> None:
+        mock_json("POST", _EXECUTE_PATH, load_payload("execute_workflow_operation_response.json"))
+        result = runner.invoke(
+            app, ["posts", "workflow-execute", str(_POST_ID), "12"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert "Approvato" in result.output
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_edit_screen_reads_then_puts_merged(self, runner: CliRunner) -> None:
+        get_route = _mock_screen()
+        put_route = mock_json(
+            "PUT", _EDIT_SCREEN_PATH, load_payload("edit_workflow_screen_response.json")
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-edit-screen", str(_POST_ID), "--screen-data", "5=x"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.calls[0].request.url.query == b""
+        assert _sent_body(put_route) == {"screenData": {"5": "x", "6": 1}}
+        assert "4" in result.output
+
+
+class TestPostsWorkflowConflicts:
+    # criterio: 03-C28
+    @respx.mock
+    def test_execute_conflict_exits_9_without_retry(self, runner: CliRunner) -> None:
+        _mock_screen()
+        post_route = mock_json("POST", _EXECUTE_PATH, {"message": "conflict"}, status=_HTTP_409)
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-execute", str(_POST_ID), "12", "--screen-data", "5=x"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT_MESSAGE in result.output
+        assert post_route.call_count == 1
+
+    # criterio: 03-C28
+    @respx.mock
+    def test_edit_screen_conflict_exits_9_without_retry(self, runner: CliRunner) -> None:
+        _mock_screen()
+        put_route = mock_json("PUT", _EDIT_SCREEN_PATH, {"message": "conflict"}, status=_HTTP_409)
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-edit-screen", str(_POST_ID), "--screen-data", "5=x"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT_MESSAGE in result.output
+        assert put_route.call_count == 1
+
+    # criterio: 03-C27
+    @respx.mock
+    def test_edit_screen_without_token_exits_1(self, runner: CliRunner) -> None:
+        payload = load_payload("workflow_screen_response.json")
+        payload["screenOccToken"] = None
+        respx.get(f"{_API_ROOT}/{_SCREEN_PATH}").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        result = runner.invoke(
+            app,
+            ["posts", "workflow-edit-screen", str(_POST_ID), "--screen-data", "5=x"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_GENERIC
+        assert "--screen-occ-token" in result.output

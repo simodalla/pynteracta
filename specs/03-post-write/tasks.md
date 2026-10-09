@@ -251,7 +251,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `feat(cli): posts edit-watchers, delete e mark-erasable con
      conferma`.
 
-### [ ] T13 – Comandi del workflow
+### [x] T13 – Comandi del workflow
 
 - Criteri: 03-C27, 03-C28 (due comandi)
 - Dipende da: T08, T10

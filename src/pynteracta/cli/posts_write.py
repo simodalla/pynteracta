@@ -48,6 +48,9 @@ from pynteracta.models.facade.posts_write import (
     PostForCreate,
     PostForEdit,
     PostWriteResult,
+    WorkflowOperationResult,
+    WorkflowScreen,
+    WorkflowScreenWriteResult,
 )
 from pynteracta.models.generated.external_v2 import (
     CopyCustomPostRequestDTO,
@@ -55,6 +58,8 @@ from pynteracta.models.generated.external_v2 import (
     CreatePostCommentRequestDTO,
     EditCustomPostRequestDTO,
     EditPostCustomDataRequestDTO,
+    EditPostWorkflowScreenDataRequestDTO,
+    ExecutePostWorkflowOperationRequestDTO,
 )
 
 _PLAIN_TEXT = 2  # descriptionFormat / commentFormat: testo semplice
@@ -208,6 +213,18 @@ def _patch_body(
     return merged
 
 
+def screen_base(screen: WorkflowScreen) -> dict[str, Any]:
+    """Corpo di partenza delle scritture del workflow: i dati di screen letti (03-C27)."""
+    return {"screenData": screen.screen_data}
+
+
+def _merge_screen_data(
+    base: dict[str, Any], json_part: dict[str, Any], flags: dict[str, Any]
+) -> dict[str, Any]:
+    """``screenData`` unito campo per campo: flag > ``--json`` > letto."""
+    return {**(base.get("screenData") or {}), **(json_part.get("screenData") or {}), **flags}
+
+
 def _token_or_exit(token: int | None, post_id: int) -> int:
     if token is None:
         typer.echo(
@@ -220,6 +237,11 @@ def _token_or_exit(token: int | None, post_id: int) -> int:
 
 def _root(value: Any) -> Any:
     return getattr(value, "root", value)
+
+
+def _flatten(prefix: str, values: dict[str, Any] | None) -> dict[str, object]:
+    """Un campo per riga nelle tabelle: ``{"5": "a"}`` → ``{"screen_data.5": "a"}``."""
+    return {f"{prefix}.{key}": value for key, value in (values or {}).items()}
 
 
 def _state_name(state: Any) -> str | None:
@@ -302,7 +324,48 @@ def for_create_row(obj: object) -> dict[str, object]:
         "visibility": content.visibility,
         "announcement": content.announcement,
         "draft": content.draft,
-        "custom_data": content.customData,
+        **_flatten("custom_data", content.customData),
+    }
+
+
+def screen_row(obj: object) -> dict[str, object]:
+    """Tabella di ``workflow-screen``: token, stato, screen e valori dei campi."""
+    screen = obj if isinstance(obj, WorkflowScreen) else None
+    if screen is None:
+        return {}
+    return {
+        "screen_occ_token": screen.screen_occ_token,
+        "current_state": _state_name(screen.current_workflow_state),
+        "screen": screen.screen.name if screen.screen is not None else None,
+        **_flatten("screen_data", screen.screen_data),
+    }
+
+
+def operation_result_row(obj: object) -> dict[str, object]:
+    """Tabella di ``workflow-execute``: nuovo stato e transizioni permesse."""
+    result = obj if isinstance(obj, WorkflowOperationResult) else None
+    if result is None:
+        return {}
+    return {
+        "new_state": _state_name(result.new_current_state),
+        "permitted_operations": ", ".join(
+            f"{op.id} {op.name}" for op in result.new_permitted_operations
+        ),
+        "can_edit_screen_data": result.new_can_edit_workflow_screen_data,
+        "post_data_has_changed": result.post_data_has_changed,
+        **_flatten("screen_data", result.new_screen_data),
+    }
+
+
+def screen_write_row(obj: object) -> dict[str, object]:
+    """Tabella di ``workflow-edit-screen``: nuovo token e valori dei campi."""
+    result = obj if isinstance(obj, WorkflowScreenWriteResult) else None
+    if result is None:
+        return {}
+    return {
+        "next_screen_occ_token": result.next_screen_occ_token,
+        "post_data_has_changed": result.post_data_has_changed,
+        **_flatten("screen_data", result.new_screen_data),
     }
 
 
@@ -897,3 +960,191 @@ def posts_mark_erasable(
         done="Post {id} marked as erasable",
         erasable=True,
     )
+
+
+ScreenDataOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--screen-data",
+        help=(
+            "Workflow screen field value as FIELD_ID=VALUE (repeatable); true/false and "
+            "integers are typed. Use --json for list or object values."
+        ),
+    ),
+]
+ScreenOccTokenOption = Annotated[
+    int | None,
+    typer.Option(
+        "--screen-occ-token",
+        help="Screen concurrency token to send instead of the one just read.",
+    ),
+]
+ScreenJsonOption = Annotated[
+    str | None,
+    typer.Option(
+        "--json",
+        help=(
+            "Full request body as JSON: a file path, or '-' to read stdin. --screen-data "
+            "overrides the screenData fields it sets."
+        ),
+    ),
+]
+
+
+@app.command("workflow-screen")
+def posts_workflow_screen(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    operation: Annotated[
+        int | None,
+        typer.Option(
+            "--operation", help="Workflow operation ID: show the screen of that transition."
+        ),
+    ] = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Show the workflow screen of a post: its data and screen_occ_token.
+
+    Without --operation it is the screen of the current state; with it, the screen of that
+    transition. 'posts capabilities' lists the permitted operation IDs.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    try:
+        with build_client(state) as client:
+            screen = client.posts.get_workflow_screen(post_id, operation_id=operation)
+        _render_single(
+            state,
+            output,
+            screen,
+            screen_row,
+            title=f"Workflow screen (post {post_id})",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("workflow-execute")
+def posts_workflow_execute(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    operation_id: Annotated[int, typer.Argument(help="Workflow operation (transition) ID.")],
+    screen_data: ScreenDataOption = None,
+    screen_occ_token: ScreenOccTokenOption = None,
+    json_body: ScreenJsonOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Execute a workflow transition on a post.
+
+    Without screen data the body is empty (a transition without a screen). With --screen-data
+    or --json, the transition's screen is read first: its data are sent back with your fields
+    replaced, together with the screen_occ_token just read (or --screen-occ-token). If --json
+    already carries a screenOccToken the screen is not read. A 409 exits with code 9.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, ExecutePostWorkflowOperationRequestDTO)
+    flags = parse_kv_values(screen_data, option="--screen-data")
+    try:
+        with build_client(state) as client:
+            body: dict[str, Any] = dict(json_part)
+            if flags or ("screenData" in json_part and "screenOccToken" not in json_part):
+                screen = client.posts.get_workflow_screen(post_id, operation_id=operation_id)
+                body["screenData"] = _merge_screen_data(screen_base(screen), json_part, flags)
+                body["screenOccToken"] = screen.screen_occ_token
+            if screen_occ_token is not None:
+                body["screenOccToken"] = screen_occ_token
+            req = validate_body(body, ExecutePostWorkflowOperationRequestDTO)
+            result = client.posts.execute_workflow_operation_raw(post_id, operation_id, req)
+        _render_single(
+            state,
+            output,
+            result,
+            operation_result_row,
+            title=f"Workflow operation {operation_id} executed on post {post_id}",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("workflow-edit-screen")
+def posts_workflow_edit_screen(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    screen_data: ScreenDataOption = None,
+    screen_occ_token: ScreenOccTokenOption = None,
+    json_body: ScreenJsonOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit the workflow screen data of the current state of a post.
+
+    The screen is read first; its data are sent back with the fields given by --screen-data or
+    --json replaced, with the screen_occ_token just read (or --screen-occ-token). A 409 exits
+    with code 9 and is never retried.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, EditPostWorkflowScreenDataRequestDTO)
+    flags = parse_kv_values(screen_data, option="--screen-data")
+    try:
+        with build_client(state) as client:
+            screen = client.posts.get_workflow_screen(post_id)
+            token = screen_occ_token if screen_occ_token is not None else screen.screen_occ_token
+            if token is None:
+                typer.echo(
+                    f"Post {post_id} has no screenOccToken in the server response: "
+                    "pass --screen-occ-token explicitly.",
+                    err=True,
+                )
+                raise typer.Exit(EXIT_GENERIC)
+            body = {
+                **json_part,
+                "screenData": _merge_screen_data(screen_base(screen), json_part, flags),
+            }
+            req = validate_body(body, EditPostWorkflowScreenDataRequestDTO)
+            result = client.posts.edit_workflow_screen_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            screen_write_row,
+            title=f"Workflow screen of post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc

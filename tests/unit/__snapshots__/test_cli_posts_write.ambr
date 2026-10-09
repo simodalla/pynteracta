@@ -58,3 +58,18 @@
   
   '''
 # ---
+# name: TestPostsWorkflow.test_workflow_screen_table
+  '''
+     Workflow screen (post 21269)    
+  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+  ┃ Key              ┃ Value        ┃
+  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+  │ screen_occ_token │ 3            │
+  │ current_state    │ In revisione │
+  │ screen           │ Approvazione │
+  │ screen_data.5    │ a            │
+  │ screen_data.6    │ 1            │
+  └──────────────────┴──────────────┘
+  
+  '''
+# ---
