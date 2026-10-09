@@ -13,6 +13,7 @@ import typer
 
 from pynteracta.cli._common import (
     EXIT_CONFIG,
+    EXIT_GENERIC,
     EXIT_SUCCESS,
     CliState,
     EpochMs,
@@ -47,11 +48,15 @@ from pynteracta.models.facade.posts_write import (
     PostWriteResult,
 )
 from pynteracta.models.generated.external_v2 import (
+    CopyCustomPostRequestDTO,
     CreateCustomPostRequest,
     CreatePostCommentRequestDTO,
+    EditCustomPostRequestDTO,
+    EditPostCustomDataRequestDTO,
 )
 
 _PLAIN_TEXT = 2  # descriptionFormat / commentFormat: testo semplice
+_DELTA = 1  # descriptionFormat: Quill delta, il formato in cui il server restituisce la descrizione
 
 # --- opzioni condivise --------------------------------------------------------------------
 
@@ -116,6 +121,21 @@ JsonBodyOption = Annotated[
         ),
     ),
 ]
+RemoveWatcherUserOption = Annotated[
+    list[int] | None,
+    typer.Option("--remove-watcher-user", help="Watcher user ID to remove (repeatable)."),
+]
+OccTokenOption = Annotated[
+    int | None,
+    typer.Option(
+        "--occ-token",
+        help=(
+            "Concurrency token to send instead of the one just read (the post is always read "
+            "to keep the fields you do not change). A 409 (token mismatch) exits with code 9; "
+            "nothing is retried."
+        ),
+    ),
+]
 NoAttachmentsOption = Annotated[
     bool,
     typer.Option("--no-attachments", help="Do not load attachments (loadAttachments=false)."),
@@ -130,6 +150,70 @@ def merge_custom_data(
 ) -> dict[str, Any]:
     """``customData`` unito campo per campo: flag > ``--json`` > letto (03-C20)."""
     return {**(base.get("customData") or {}), **(json_part.get("customData") or {}), **flags}
+
+
+def _content_base(content: Any) -> dict[str, Any]:
+    """Corpo ricavato dai dati editabili letti: le chiavi assenti non si inventano."""
+    if content is None:
+        return {}
+    base: dict[str, Any] = {
+        "title": content.title,
+        "description": content.descriptionDelta,
+        "descriptionFormat": _DELTA if content.descriptionDelta is not None else None,
+        "customData": content.customData or None,
+        "visibility": content.visibility,
+    }
+    return {key: value for key, value in base.items() if value is not None}
+
+
+def edit_base(form: PostForEdit) -> dict[str, Any]:
+    """Corpo di ``edit-post`` dai dati letti con ``post-data-for-edit`` (03-C19).
+
+    Titolo, descrizione (il delta letto, con ``descriptionFormat: 1``), campi custom e
+    visibilità si rimandano come letti, perché il server potrebbe azzerare ciò che manca.
+    Bozza, pubblicazione programmata, watcher e allegati non ci sono: hanno flag propri.
+    """
+    return _content_base(form.content_data)
+
+
+def copy_base(form: PostForCopy) -> dict[str, Any]:
+    """Corpo di ``copy-post`` dai dati letti con ``post-data-for-copy`` (03-C22)."""
+    base = _content_base(form.content_data)
+    content = form.content_data
+    if content is not None and content.announcement is not None:
+        base["announcement"] = content.announcement
+    return base
+
+
+def _patch_body(
+    base: dict[str, Any],
+    json_part: dict[str, Any],
+    custom_flags: dict[str, Any],
+    *,
+    description: str | None,
+    **flags: Any,
+) -> dict[str, Any]:
+    """Letto < ``--json`` < flag; ``customData`` unito campo per campo; ``--description`` in
+    testo semplice."""
+    merged = merge_body(
+        {**base, **json_part},
+        description=description,
+        description_format=_PLAIN_TEXT if description is not None else None,
+        **flags,
+    )
+    if custom_flags or "customData" in base or "customData" in json_part:
+        merged["customData"] = merge_custom_data(base, json_part, custom_flags)
+    return merged
+
+
+def _token_or_exit(token: int | None, post_id: int) -> int:
+    if token is None:
+        typer.echo(
+            f"Post {post_id} has no occToken in the server response: pass --occ-token explicitly.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_GENERIC)
+    return token
 
 
 def _root(value: Any) -> Any:
@@ -493,3 +577,205 @@ def posts_get_for_copy(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
+
+
+@app.command("edit")
+def posts_edit(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    occ_token: OccTokenOption = None,
+    title: TitleOption = None,
+    description: DescriptionOption = None,
+    custom_data: CustomDataOption = None,
+    watcher_user: WatcherUserOption = None,
+    remove_watcher_user: RemoveWatcherUserOption = None,
+    visibility: VisibilityOption = None,
+    draft: DraftOption = False,
+    scheduled_publication: ScheduledPublicationOption = None,
+    timezone: TimezoneOption = DEFAULT_TIMEZONE,
+    workflow_init_state: WorkflowInitStateOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit a custom post, keeping the fields you do not mention.
+
+    The post is read first (post-data-for-edit) and its title, description, custom data and
+    visibility are sent back unless a flag or --json overrides them (flags win over --json,
+    --json over the post as read; customData is merged field by field). --description
+    replaces the description with plain text. --watcher-user adds watchers,
+    --remove-watcher-user removes them. The concurrency token is the one just read, or
+    --occ-token. If the post changed since it was read the command exits with code 9 and never
+    retries.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, EditCustomPostRequestDTO)
+    custom_flags = parse_kv_values(custom_data, option="--custom-data")
+    scheduled = parse_zoned_datetime(
+        scheduled_publication, timezone, option="--scheduled-publication"
+    )
+    try:
+        with build_client(state) as client:
+            form = client.posts.get_for_edit(post_id)
+            token = _token_or_exit(occ_token if occ_token is not None else form.occ_token, post_id)
+            merged = _patch_body(
+                edit_base(form),
+                json_part,
+                custom_flags,
+                description=description,
+                title=title,
+                add_watcher_user_ids=watcher_user,
+                remove_watcher_user_ids=remove_watcher_user,
+                visibility=visibility,
+                draft=True if draft else None,
+                scheduled_publication=scheduled,
+                workflow_init_state_id=workflow_init_state,
+            )
+            req = validate_body(merged, EditCustomPostRequestDTO)
+            result = client.posts.edit_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            write_result_row,
+            title=f"Post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("edit-custom-data")
+def posts_edit_custom_data(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    custom_data: CustomDataOption = None,
+    occ_token: OccTokenOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit only the custom fields of a post.
+
+    The post is read first; the custom data as read is sent back with the fields given by
+    --custom-data or --json replaced (one of the two is required). A 409 exits with code 9.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    if not custom_data and json_body is None:
+        typer.echo("--custom-data or --json is required.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    json_part = load_json_body(json_body, EditPostCustomDataRequestDTO)
+    custom_flags = parse_kv_values(custom_data, option="--custom-data")
+    try:
+        with build_client(state) as client:
+            form = client.posts.get_for_edit(post_id)
+            token = _token_or_exit(occ_token if occ_token is not None else form.occ_token, post_id)
+            base = {key: v for key, v in edit_base(form).items() if key == "customData"}
+            merged = {**json_part, "customData": merge_custom_data(base, json_part, custom_flags)}
+            req = validate_body(merged, EditPostCustomDataRequestDTO)
+            result = client.posts.edit_custom_data_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            write_result_row,
+            title=f"Custom data of post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("copy")
+def posts_copy(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="ID of the post to copy.")],
+    occ_token: OccTokenOption = None,
+    title: TitleOption = None,
+    description: DescriptionOption = None,
+    custom_data: CustomDataOption = None,
+    watcher_user: WatcherUserOption = None,
+    visibility: VisibilityOption = None,
+    announcement: AnnouncementOption = False,
+    draft: DraftOption = False,
+    scheduled_publication: ScheduledPublicationOption = None,
+    timezone: TimezoneOption = DEFAULT_TIMEZONE,
+    workflow_init_state: WorkflowInitStateOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Copy a custom post into a new one, changing the fields you mention.
+
+    The post is read first (post-data-for-copy); title, description, custom data, visibility
+    and announcement are copied unless a flag or --json overrides them. The result shows the
+    new post. A 409 exits with code 9 and is never retried.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, CopyCustomPostRequestDTO)
+    custom_flags = parse_kv_values(custom_data, option="--custom-data")
+    scheduled = parse_zoned_datetime(
+        scheduled_publication, timezone, option="--scheduled-publication"
+    )
+    try:
+        with build_client(state) as client:
+            form = client.posts.get_for_copy(post_id)
+            token = _token_or_exit(occ_token if occ_token is not None else form.occ_token, post_id)
+            merged = _patch_body(
+                copy_base(form),
+                json_part,
+                custom_flags,
+                description=description,
+                title=title,
+                add_watcher_user_ids=watcher_user,
+                visibility=visibility,
+                announcement=True if announcement else None,
+                draft=True if draft else None,
+                scheduled_publication=scheduled,
+                workflow_init_state_id=workflow_init_state,
+            )
+            req = validate_body(merged, CopyCustomPostRequestDTO)
+            result = client.posts.copy_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            write_result_row,
+            title=f"Post {post_id} copied to post {result.post_id}",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc

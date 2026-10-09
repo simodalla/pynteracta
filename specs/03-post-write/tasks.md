@@ -213,7 +213,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Snapshot, controlli bloccanti; commit `feat(cli): comandi posts create, comment e
      get-for-create|edit|copy`.
 
-### [ ] T11 – Comandi `posts edit`, `posts edit-custom-data`, `posts copy`
+### [x] T11 – Comandi `posts edit`, `posts edit-custom-data`, `posts copy`
 
 - Criteri: 03-C19, 03-C20, 03-C21, 03-C22, 03-C28 (tre comandi)
 - Dipende da: T06, T10
