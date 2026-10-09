@@ -33,6 +33,12 @@ from pynteracta.models.facade.communities import (
     PostDefinitionMap,
 )
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
+from pynteracta.models.facade.posts_write import (
+    PostComment,
+    PostForEdit,
+    PostWriteResult,
+    WorkflowScreen,
+)
 from pynteracta.models.facade.tasks import Task, TaskWriteResult
 from pynteracta.models.facade.users import SystemUserList, UserForEdit, UserProfile
 from pynteracta.models.generated import external_v2 as generated
@@ -1120,3 +1126,28 @@ class TestPostWriteDTOs:
         values = {"5": "x", "6": 1, "7": None, "8": [1, 2], "9": {"a": 1}}
         parsed = model.model_validate({field: values})  # type: ignore[attr-defined]
         assert getattr(parsed, field) == values
+
+    # criterio: 03-C29
+    def test_facade_smoke_write_result(self) -> None:
+        facade = PostWriteResult.from_create(load_payload("create_post_response.json"))
+        assert facade.raw is not None
+        assert facade.post is not None
+        assert facade.post_id == facade.raw.postId
+
+    # criterio: 03-C29
+    def test_facade_smoke_for_edit(self) -> None:
+        facade = PostForEdit.from_dict(load_payload("post_for_edit_response.json"))
+        assert facade.occ_token is not None
+        assert facade.content_data is not None
+
+    # criterio: 03-C29
+    def test_facade_smoke_comment(self) -> None:
+        facade = PostComment.from_dict(load_payload("create_post_comment_response.json"))
+        assert facade.id is not None
+        assert facade.creator_user is not None
+
+    # criterio: 03-C29
+    def test_facade_smoke_workflow_screen(self) -> None:
+        facade = WorkflowScreen.from_dict(load_payload("workflow_screen_response.json"))
+        assert facade.screen_occ_token is not None
+        assert facade.screen is not None

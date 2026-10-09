@@ -57,7 +57,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. `uv run pytest -m contract` e controlli bloccanti; commit `test: fixture e contract test dei
      DTO di scrittura dei post, dati di screen come valori qualsiasi (03-T02)`.
 
-### [ ] T03 – Façade di scrittura dei post
+### [x] T03 – Façade di scrittura dei post
 
 - Criteri: 03-C29 (façade); base per 03-C01…C14
 - Dipende da: T02
