@@ -30,8 +30,11 @@ from pynteracta.cli._common import (
 )
 from pynteracta.cli._write import (
     DEFAULT_TIMEZONE,
+    AttachOption,
+    append_attachments,
     merge_body,
     parse_zoned_datetime,
+    upload_all,
     validate_body,
 )
 from pynteracta.exceptions import InteractaError
@@ -192,6 +195,7 @@ def tasks_create(  # noqa: PLR0913
     watcher_user: WatcherUserOption = None,
     watcher_group: WatcherGroupOption = None,
     client_uid: ClientUidOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -202,8 +206,10 @@ def tasks_create(  # noqa: PLR0913
     """Create a task on a post.
 
     Simple fields come from flags; sub-tasks and attachments from --json (file or '-' for stdin).
-    Flags override the keys of the JSON body. Only the fields given are sent. The result shows
-    the created task; use --output json --full for the whole response (next occToken included).
+    Flags override the keys of the JSON body. Only the fields given are sent. --attach uploads
+    files and attaches them (a failed upload exits with code 11 and the task is not created).
+    The result shows the created task; use --output json --full for the whole response (next
+    occToken included).
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -221,9 +227,11 @@ def tasks_create(  # noqa: PLR0913
         watcher_group_ids=watcher_group,
         client_uid=client_uid,
     )
-    req = validate_body(merged, CreateTaskRequestDTO)
+    validate_body(merged, CreateTaskRequestDTO)
     try:
         with build_client(state) as client:
+            append_attachments(merged, "attachments", upload_all(client, attach))
+            req = validate_body(merged, CreateTaskRequestDTO)
             result = client.tasks.create_raw(post_id, req)
         render_output(
             resolve_output(state, output),
@@ -259,6 +267,7 @@ def tasks_edit(  # noqa: PLR0913
     watcher_group: WatcherGroupOption = None,
     remove_watcher_user: RemoveWatcherUserOption = None,
     remove_watcher_group: RemoveWatcherGroupOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -272,7 +281,9 @@ def tasks_edit(  # noqa: PLR0913
     its title, description, expiration, priority, assignee and sub-tasks are sent back unless a
     flag or --json overrides them (flags win over --json, --json over the task as read).
     --description replaces the rich-text description. --watcher-user/--watcher-group add
-    watchers, --remove-watcher-* remove them. The concurrency token is the one just read, or
+    watchers, --remove-watcher-* remove them. --attach uploads files and adds them to the task
+    (a failed upload exits with code 11 and the task is not changed). The concurrency token is
+    the one just read, or
     --occ-token. If the task changed since it was read the server answers 409: the command exits
     with code 9 and never retries.
     """
@@ -306,7 +317,10 @@ def tasks_edit(  # noqa: PLR0913
                 remove_watcher_user_ids=remove_watcher_user,
                 remove_watcher_group_ids=remove_watcher_group,
             )
-            req = validate_body(_drop_delta_if_plain(merged), EditTaskRequestDTO)
+            merged = _drop_delta_if_plain(merged)
+            validate_body(merged, EditTaskRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
+            req = validate_body(merged, EditTaskRequestDTO)
             result = client.tasks.edit_raw(task_id, token, req)
         render_output(
             resolve_output(state, output),
