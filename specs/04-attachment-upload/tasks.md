@@ -12,7 +12,8 @@ in italiano: `feat(api)`, `feat(transport)`, `feat(cli)`, `fix(logging)`, `refac
 del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allegato esistente `5`
 (versione) e `9` (rimozione), `attachmentId: 3` nel `--json`; host dello storage
 `https://storage.example.com`, bucket `bucket-test`; file creati in `tmp_path` (`nota.txt`,
-`a.txt`, `b.pdf`, `vuoto.txt`, `dati.xyz`).
+`a.txt`, `b.pdf`, `vuoto.txt`, `dati.sconosciuto`; non `dati.xyz`, che `mimetypes` conosce come
+`chemical/x-xyz`).
 
 ## Elenco
 
@@ -125,7 +126,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   4. Controlli bloccanti; commit `feat(api): façade UploadTicket e UploadedAttachment, protocollo
      WriteInput nei corpi di scrittura (04-T06)`.
 
-### [ ] T07 – `AttachmentsAPI.upload` e `request_upload_url`
+### [x] T07 – `AttachmentsAPI.upload` e `request_upload_url`
 
 - Criteri: 04-C01, 04-C02, 04-C03, 04-C04, 04-C05, 04-C06
 - Dipende da: T05, T06
