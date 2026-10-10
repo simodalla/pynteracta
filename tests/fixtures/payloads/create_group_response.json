@@ -1,0 +1,18 @@
+{
+  "id": 202,
+  "name": "QA",
+  "email": "qa@example.com",
+  "description": null,
+  "creationTimestamp": 1720000000000,
+  "lastModifyTimestamp": 1720000000000,
+  "visible": true,
+  "systemAccount": false,
+  "deleted": false,
+  "externalId": "qa-001",
+  "occToken": 1,
+  "membersCount": 2,
+  "tags": [],
+  "checkUserMemberResult": false,
+  "groupId": 202,
+  "nextOccToken": 1
+}

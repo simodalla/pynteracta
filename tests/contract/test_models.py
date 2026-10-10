@@ -1191,3 +1191,134 @@ class TestUploadNewAttachment:
         uploaded = UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
         assert uploaded.raw is ticket.raw
         assert uploaded.as_write_input()["contentRef"] == payload["contentRef"]
+
+
+# ---------------------------------------------------------------------------
+# 22. Admin write: users and groups (spec 05)
+# ---------------------------------------------------------------------------
+
+_CREATED_USER_ID_CONTRACT = 1043
+_CREATED_GROUP_ID_CONTRACT = 202
+_CONFLICT_GROUP_ID_CONTRACT = 202
+
+
+class TestAdminUsersWriteDTOs:
+    # criterio: 05-C22
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("CreateUserRequestDTO", generated.CreateUserRequestDTO),
+            ("CreateUserResponseDTO", generated.CreateUserResponseDTO),
+            ("EditUserRequestDTO", generated.EditUserRequestDTO),
+            ("EditUserResponseDTO", generated.EditUserResponseDTO),
+            ("EditUserCredentialsRequestDTO", generated.EditUserCredentialsRequestDTO),
+            ("EditUserCredentialsResponseDTO", generated.EditUserCredentialsResponseDTO),
+        ],
+    )
+    def test_schema_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 05-C22
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("UserCredentialsConfigurationDTO", generated.UserCredentialsConfigurationDTO1),
+            (
+                "ResetUserCustomCredentialsCommandDTO",
+                generated.ResetUserCustomCredentialsCommandDTO1,
+            ),
+            ("AdminUserPreferencesDTO", generated.AdminUserPreferencesDTO),
+            ("UserInfoDTO", generated.UserInfoDTO1),
+            ("UserSettingsRequestDTO", generated.UserSettingsRequestDTO1),
+            (
+                "CustomUserCredentialsConfigurationDTO",
+                generated.CustomUserCredentialsConfigurationDTOModel,
+            ),
+        ],
+    )
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(
+            swagger_definitions, definition, model, note="typed variant of RootModel stub"
+        )
+
+    # criterio: 05-C22
+    def test_fixtures_parse(self) -> None:
+        created = generated.CreateUserResponseDTO.model_validate(
+            load_payload("create_user_response.json")
+        )
+        assert created.userId == _CREATED_USER_ID_CONTRACT
+        assert created.generatedPassword == ["Xk7-fake-pw"]
+        edited = generated.EditUserResponseDTO.model_validate(
+            load_payload("edit_user_response.json")
+        )
+        assert edited.nextOccToken is not None
+        credentials = generated.EditUserCredentialsResponseDTO.model_validate(
+            load_payload("edit_user_credentials_response.json")
+        )
+        assert credentials.nextOccToken is not None
+
+
+class TestAdminGroupsWriteDTOs:
+    # criterio: 05-C22
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("CreateGroupRequestDTO", generated.CreateGroupRequestDTO),
+            ("CreateGroupResponseDTO", generated.CreateGroupResponseDTO),
+            ("EditGroupRequestDTO", generated.EditGroupRequestDTO),
+            ("EditGroupResponseDTO", generated.EditGroupResponseDTO),
+            ("EditMultipleGroupsMembersRequestDTO", generated.EditMultipleGroupsMembersRequestDTO),
+            ("EditGroupMembersRequestDTO", generated.EditGroupMembersRequestDTO),
+            (
+                "EditMultipleGroupsMembersResponseDTO",
+                generated.EditMultipleGroupsMembersResponseDTO,
+            ),
+        ],
+    )
+    def test_schema_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 05-C22
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+    ) -> None:
+        assert_superset(
+            swagger_definitions,
+            "GroupDTO",
+            generated.GroupDTOModel,
+            note="typed variant of RootModel stub",
+        )
+
+    # criterio: 05-C22
+    def test_fixtures_parse(self) -> None:
+        created = generated.CreateGroupResponseDTO.model_validate(
+            load_payload("create_group_response.json")
+        )
+        assert created.groupId == _CREATED_GROUP_ID_CONTRACT
+        edited = generated.EditGroupResponseDTO.model_validate(
+            load_payload("edit_group_response.json")
+        )
+        assert edited.nextOccToken is not None
+        members = generated.EditMultipleGroupsMembersResponseDTO.model_validate(
+            load_payload("edit_groups_members_response.json")
+        )
+        assert members.successGroups is not None
+        assert members.concurrencyErrorGroups is not None
+        conflict = generated.GroupDTOModel.model_validate(members.concurrencyErrorGroups[0].root)
+        assert conflict.id == _CONFLICT_GROUP_ID_CONTRACT

@@ -18,7 +18,7 @@ le costanti qui sopra con la stessa forma.
 
 ## Elenco
 
-### [ ] T01 – Riga di ROADMAP, fixture e contract test dei DTO
+### [x] T01 – Riga di ROADMAP, fixture e contract test dei DTO
 
 - Criteri: 05-C22 (DTO; lo smoke delle façade arriva con T02 e T03)
 - Dipende da: nessuno

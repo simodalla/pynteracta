@@ -7,8 +7,9 @@
   "externalId": "EXT-1042",
   "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1042",
   "userPreferences": {
-    "language": {"code": "it", "description": "Italiano"},
-    "timezone": {"id": 1, "code": "Europe/Rome", "zoneId": "Europe/Rome", "description": "Europe/Rome"}
+    "defaultLanguageId": "it",
+    "defaultTimezoneId": 1,
+    "emailNotificationsEnabled": true
   },
   "userInfo": {
     "area": {"id": 5, "name": "Software Engineering"},
@@ -16,6 +17,13 @@
     "privateEmail": null,
     "privateEmailVerified": false,
     "privateEmailVerificationRequired": false
+  },
+  "userSettings": {
+    "peopleSectionEnabled": true,
+    "visibleInPeopleSection": true,
+    "reducedProfile": false,
+    "viewUserProfiles": true,
+    "editPrivateEmailEnabled": false
   },
   "occToken": 42,
   "blocked": false

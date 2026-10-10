@@ -1,0 +1,8 @@
+{
+  "userId": 1043,
+  "accountPhotoUrl": "https://interacta.example.it/portal/api/external/v2/core/user-photo/1043",
+  "generatedPassword": ["Xk7-fake-pw"],
+  "expiredCredentials": true,
+  "sentEmailNotify": false,
+  "nextOccToken": 1
+}
