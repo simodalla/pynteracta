@@ -97,7 +97,8 @@ Confermato dal maintainer il 2026-10-08.
 Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): ogni spec
 che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0;
 RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md); RF-024
-dalla [spec 04](04-attachment-upload/spec.md); le altre non ancora implementate). Stessa forma delle letture (façade con `.raw`, kwargs espliciti
+dalla [spec 04](04-attachment-upload/spec.md); le altre non ancora implementate). Stessa forma
+delle letture (façade con `.raw`, kwargs espliciti
 più `*_raw`, comando CLI, test unit e contract).
 
 - RF-021. Post e commenti: creazione e modifica di post e post-evento (dati, campi custom,

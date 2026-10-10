@@ -1,6 +1,6 @@
 # 04 – Upload degli allegati
 
-Stato: approvata
+Stato: chiusa
 Branch: `m30_attachment_upload`
 Requisiti del PRD: RF-024, RF-021c, RNF-001, RNF-009; toccati RF-009, RF-015, RF-019, RF-021,
 RF-022, RNF-003
