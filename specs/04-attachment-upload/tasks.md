@@ -298,7 +298,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. `uv run mkdocs build --strict`, controlli bloccanti; commit `docs: upload degli allegati in
      libreria e CLI, redazione dei link firmati (04-T16)`.
 
-### [ ] T17 – Chiusura: PRD
+### [x] T17 – Chiusura: PRD
 
 - Criteri: nessuno nuovo (requisiti nuovi della spec)
 - Dipende da: T16
