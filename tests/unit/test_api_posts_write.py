@@ -316,6 +316,12 @@ class TestPostsDelete:
         assert route.call_count == 1
         assert route.calls[0].request.content == b""
 
+    # criterio: 03-C38
+    @respx.mock
+    def test_mark_as_erasable_returns_server_value_zero(self) -> None:
+        respx.put(_ERASABLE_PATH).mock(return_value=httpx.Response(200, json={"postId": 0}))
+        assert _api().mark_as_erasable(_POST_ID) == 0
+
 
 class TestPostsComment:
     # criterio: 03-C10

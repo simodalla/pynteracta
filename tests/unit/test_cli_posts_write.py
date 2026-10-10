@@ -799,6 +799,22 @@ class TestPostsDestructive:
         assert "--yes is required" in result.output
         assert write_route.call_count == 0
 
+    # criterio: 03-C38
+    @respx.mock
+    def test_server_post_id_zero_reports_requested_id(
+        self, runner: CliRunner, case: _Destructive
+    ) -> None:
+        mock_json("GET", _DETAIL_PATH, load_payload("get_post_detail_response.json"))
+        mock_json(case.method, case.path, {"postId": 0})
+        text = runner.invoke(app, ["posts", case.command, str(_POST_ID), "--yes"], env=BASE_ENV)
+        assert text.exit_code == 0, text.output
+        assert case.done in text.output
+        as_json = runner.invoke(
+            app, ["--output", "json", "posts", case.command, str(_POST_ID), "-y"], env=BASE_ENV
+        )
+        assert as_json.exit_code == 0, as_json.output
+        assert json.loads(as_json.output) == {"post_id": _POST_ID}
+
     @respx.mock
     def test_json_output(self, runner: CliRunner, case: _Destructive) -> None:
         _mock_destructive(case)

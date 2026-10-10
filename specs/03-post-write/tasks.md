@@ -395,10 +395,24 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   deve stampare l'id richiesto, la documentazione deve dire che la libreria restituisce il valore
   del server (`0`).
 
+### [x] T19 – `posts delete` e `posts mark-erasable` riportano l'id richiesto (aggiunto il 2026-10-10 dopo T16)
+
+- Criteri: 03-C38
+- Dipende da: T12, T16
+- Test: `tests/unit/test_cli_posts_write.py::TestPostsDestructive::test_server_post_id_zero_reports_requested_id`
+  (parametrizzato su `delete` e `mark-erasable`; risposta `{"postId": 0}`; testo e JSON con
+  `21269`; rosso: oggi stampa `0`); `tests/unit/test_api_posts_write.py::TestPostsDelete::test_mark_as_erasable_returns_server_value_zero`
+  (caratterizzazione: verde subito).
+- Passi:
+  1. Scrivere i test; eseguirli: il test CLI rosso, quello di libreria verde.
+  2. `cli/posts_write.py`: `_destructive` usa `post_id` nella risposta, non il valore del server.
+  3. Controlli bloccanti; commit `fix(cli): posts delete e mark-erasable riportano l'id del post
+     richiesto (03-T19)`.
+
 ### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T16)
-- Dipende da: T14, T16, T18
+- Dipende da: T14, T16, T18, T19
 - Test: nessuno; verifica con la rilettura dei diff, il controllo che ogni link risolva,
   `test_docs_snippets` e `uv run mkdocs build --strict`.
 - Passi:
@@ -455,3 +469,4 @@ La riga `0.11.0 ⏳ M29` in `ROADMAP.md` la scrive T01; la sezione M29 in `PROGR
 | 03-C35 | T18 |
 | 03-C36 | T18 |
 | 03-C37 | T18 |
+| 03-C38 | T19 |

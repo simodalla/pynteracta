@@ -928,12 +928,14 @@ def _destructive(  # noqa: PLR0913
             post = client.posts.get(post_id)
             if not confirm_destructive(prompt.format(id=post_id, title=post.title), yes=yes):
                 raise typer.Exit(EXIT_SUCCESS)
+            # Il server può rispondere postId 0 (mark-post-as-erasable, T16): si riporta l'id
+            # del post richiesto, non quello della risposta (03-C38).
             if erasable:
-                result_id = client.posts.mark_as_erasable(post_id)
+                client.posts.mark_as_erasable(post_id)
             else:
-                result_id = client.posts.delete(post_id)
+                client.posts.delete(post_id)
         if resolve_output(state, output) == "json":
-            typer.echo(json.dumps({"post_id": result_id}))
+            typer.echo(json.dumps({"post_id": post_id}))
         elif not state.quiet:
             console.print(done.format(id=post_id))
         raise typer.Exit(EXIT_SUCCESS)

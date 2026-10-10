@@ -232,6 +232,7 @@ test opt-in con il ciclo completo su una community di prova, con pulizia garanti
 | 03-C35 | Quando si esegue `posts copy 21269 --title Copia` e la `GET …/post-data-for-copy/21269` restituisce `occToken: 5` e `contentData` con `title`, `descriptionDelta`, `customData` (con il riferimento `2003` come in 03-C32), `visibility`, `announcement`, la `PUT …/copy-post/21269/5` ha corpo `{"title": "Copia", "description": <delta letto>, "descriptionFormat": 1, "customData": <letto, con "2003": [89]>, "visibility": <letta>, "announcement": <letto>}` e la tabella mostra il post nuovo con il suo id. | RF-021, RF-021b, RF-021d |
 | 03-C36 | Quando si esegue `posts workflow-execute 21269 12 --screen-data 5=x` e la `GET …/post-workflow-screen-data-for-edit/21269?workflowOperationId=12` restituisce `screenOccToken: 3` e `screenData: {"5": "a", "6": 1, "5233": [{"id": 8341, "catalogId": 22}], "5237": [{"id": 3872, "firstName": "Alice"}]}`, la `POST …/execute-post-workflow-operation/21269/12` ha corpo `{"screenData": {"5": "x", "6": 1, "5233": [8341], "5237": [3872]}, "screenOccToken": 3}`; senza `--screen-data` né `--json` non c'è alcuna `GET` e il corpo è `{}`; `--screen-occ-token 9` impone `9`. `posts workflow-edit-screen 21269 --screen-data 5=x` fa la `GET` senza query e la `PUT …/edit-post-workflow-screen-data/21269/3` con lo stesso `screenData` tradotto. `posts workflow-screen 21269 --operation 12` mostra screen_occ_token, stato corrente, nome dello screen e i campi di screen_data. | RF-021, RF-025, RF-015, RF-021d |
 | 03-C37 | La funzione che traduce i valori letti restituisce: per `[{"id": 89, "label": "x"}, {"id": 90}]` → `[89, 90]`; per `{"id": 3872, "firstName": "Alice"}` → `3872`; per `[]`, `None`, `226`, `"testo"`, `true`, `[1, 2]`, `[{"insert": "a"}]` (oggetti senza `id`) → il valore invariato. `docs/api/posts.md` dice che `edit` sostituisce il post (la descrizione omessa conta come vuota) e che i riferimenti si scrivono come id; `docs/cli.md` dice che le patch traducono i riferimenti letti e che i valori nuovi dei campi delta sono JSON Quill delta. | RF-021d, RF-015 |
+| 03-C38 | Quando il server risponde `{"postId": 0}` a `mark-post-as-erasable` (comportamento osservato sul tenant, T16), `client.posts.mark_as_erasable(21269)` restituisce `0` (il valore del server), mentre `posts mark-erasable 21269 --yes` stampa `Post 21269 marked as erasable` e con `--output json` `{"post_id": 21269}`: la CLI riporta l'id del post richiesto, non quello della risposta; lo stesso vale per `posts delete`. | RF-021, RF-025a |
 
 ## Casi limite
 
@@ -360,6 +361,9 @@ dedicata (`PYNTERACTA_TEST_WRITE_COMMUNITY_ID`), mai la community dei test di le
   vogliono come id; `edit-post` sostituisce il post. Le patch della CLI traducono i valori letti
   (03-C19, 03-C20, 03-C21, 03-C22, 03-C27 sostituiti da 03-C32…03-C36; nuovo 03-C37; RF-021d); i
   campi delta restano nel formato delta (decisione documentata).
+- 2026-10-10, dopo T16: `mark-post-as-erasable` risponde `postId: 0`; `posts delete` e
+  `posts mark-erasable` riportano l'id del post richiesto (nuovo 03-C38, task T19); la libreria
+  restituisce il valore del server.
 
 ## Domande aperte
 
