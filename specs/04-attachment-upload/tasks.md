@@ -16,7 +16,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
 
 ## Elenco
 
-### [ ] T01 – Riga di ROADMAP, fixture della risposta e contract test
+### [x] T01 – Riga di ROADMAP, fixture della risposta e contract test
 
 - Criteri: 04-C16 (DTO)
 - Dipende da: nessuno

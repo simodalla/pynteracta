@@ -1151,3 +1151,31 @@ class TestPostWriteDTOs:
         facade = WorkflowScreen.from_dict(load_payload("workflow_screen_response.json"))
         assert facade.screen_occ_token is not None
         assert facade.screen is not None
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: upload degli allegati
+# ---------------------------------------------------------------------------
+
+
+class TestUploadNewAttachment:
+    # criterio: 04-C16
+    def test_schema_superset(self, swagger_definitions: dict) -> None:  # type: ignore[type-arg]
+        assert_superset(
+            swagger_definitions,
+            "GetTemporaryImageUploadUrlBaseResponseDTO",
+            generated.GetTemporaryImageUploadUrlBaseResponseDTO,
+        )
+
+    # criterio: 04-C16
+    def test_fixture_parses(self) -> None:
+        payload = load_payload("upload_new_attachment_response.json")
+        dto = generated.GetTemporaryImageUploadUrlBaseResponseDTO.model_validate(payload)
+        assert dto.contentRef == payload["contentRef"]
+        assert dto.uploadMultipartRequestBodyParams is not None
+        assert set(dto.uploadMultipartRequestBodyParams) == {
+            "GoogleAccessId",
+            "key",
+            "policy",
+            "signature",
+        }
