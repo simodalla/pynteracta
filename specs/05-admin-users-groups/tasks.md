@@ -103,7 +103,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti (`mypy` strict sui tipi dei blocchi annidati); commit `feat(users):
      creazione, modifica, eliminazione e credenziali degli utenti su client.users (05-T04)`.
 
-### [ ] T05 – Creazione, modifica ed eliminazione dei gruppi in `GroupsAPI`
+### [x] T05 – Creazione, modifica ed eliminazione dei gruppi in `GroupsAPI`
 
 - Criteri: 05-C05 (gruppi), 05-C06 (`GroupForEdit.occ_token` via API), 05-C07, 05-C08, 05-C21
   (gruppi)

@@ -1,16 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Groups resource client."""
+"""Groups resource client: letture e scritture admin (spec 05)."""
 
 from __future__ import annotations
 
 from pynteracta.api._base import ResourceClient
-from pynteracta.api._utils import build_paginated_body
+from pynteracta.api._utils import build_paginated_body, build_write_body
 from pynteracta.models.facade.groups import (
     Group,
     GroupForEdit,
     GroupList,
     GroupMember,
     GroupMemberList,
+    GroupWriteResult,
 )
 from pynteracta.models.generated import external_v2 as generated
 from pynteracta.pagination import PageIterator
@@ -19,10 +20,18 @@ from pynteracta.transport import HttpTransport
 _LIST_PATH = "admin/data/groups"
 _LIST_MEMBERS_PATH = "admin/data/groups/{group_id}/members"
 _GET_FOR_EDIT_PATH = "admin/manage/groups/{group_id}/edit"
+_CREATE_PATH = "admin/manage/groups"
+_EDIT_PATH = "admin/manage/groups/{group_id}"
 
 
 class GroupsAPI(ResourceClient):
-    """Client for group listing, member listing, and group-for-edit endpoints."""
+    """Client for group listing, member listing, group-for-edit and admin write endpoints.
+
+    Le scritture (spec 05) inviano **solo i campi passati**, in una sola richiesta: un errore del
+    server o di rete risale al chiamante, mai un nuovo tentativo (ADR 0001). Il token di
+    concorrenza lo fornisce il chiamante, letto da ``GroupForEdit.occ_token``; un ``409`` è
+    ``ConcurrencyError``.
+    """
 
     def __init__(self, transport: HttpTransport) -> None:
         super().__init__(transport)
@@ -134,3 +143,83 @@ class GroupsAPI(ResourceClient):
         """
         path = _GET_FOR_EDIT_PATH.format(group_id=group_id)
         return GroupForEdit.from_dict(self._get(path))
+
+    # --- scritture admin (spec 05) -------------------------------------------------------
+
+    def create(
+        self,
+        *,
+        name: str | None = None,
+        email: str | None = None,
+        external_id: str | None = None,
+        visible: bool | None = None,
+        member_ids: list[int] | None = None,
+    ) -> GroupWriteResult:
+        """POST ``/admin/manage/groups``: crea un gruppo.
+
+        Args:
+            name: Nome del gruppo.
+            email: Email del gruppo.
+            external_id: Riferimento esterno.
+            visible: ``True`` = visibile per le menzioni; ``False`` = gruppo di sistema.
+            member_ids: Id degli utenti membri.
+        """
+        body = build_write_body(
+            name=name, email=email, external_id=external_id, visible=visible, member_ids=member_ids
+        )
+        return GroupWriteResult.from_create(self._post(_CREATE_PATH, json=body))
+
+    def create_raw(self, req: generated.CreateGroupRequestDTO) -> GroupWriteResult:
+        """POST ``/admin/manage/groups`` da un DTO già costruito."""
+        return GroupWriteResult.from_create(
+            self._post(_CREATE_PATH, json=req.model_dump(mode="json", exclude_none=True))
+        )
+
+    def edit(  # noqa: PLR0913
+        self,
+        group_id: int,
+        occ_token: int,
+        *,
+        name: str | None = None,
+        email: str | None = None,
+        external_id: str | None = None,
+        visible: bool | None = None,
+        member_ids: list[int] | None = None,
+    ) -> GroupWriteResult:
+        """PUT ``/admin/manage/groups/{groupId}``: modifica un gruppo.
+
+        Il corpo contiene solo i campi passati più l'``occToken``. ``member_ids``, se passato, è
+        la lista **completa** dei membri; per aggiungere o togliere singoli utenti si usa
+        :meth:`edit_members`. I campi omessi non vengono inviati: cosa ne fa il server è scritto
+        in ``docs/api/groups.md``.
+
+        Args:
+            group_id: Il gruppo da modificare.
+            occ_token: Token di concorrenza letto da ``GroupForEdit.occ_token``.
+            name: Nome del gruppo.
+            email: Email del gruppo.
+            external_id: Riferimento esterno.
+            visible: Visibilità per le menzioni.
+            member_ids: Lista completa degli id dei membri.
+        """
+        body = build_write_body(
+            name=name,
+            email=email,
+            external_id=external_id,
+            visible=visible,
+            member_ids=member_ids,
+            occ_token=occ_token,
+        )
+        path = _EDIT_PATH.format(group_id=group_id)
+        return GroupWriteResult.from_edit(self._put(path, json=body), group_id)
+
+    def edit_raw(self, group_id: int, req: generated.EditGroupRequestDTO) -> GroupWriteResult:
+        """PUT ``/admin/manage/groups/{groupId}`` da un DTO già costruito, ``occToken`` compreso."""
+        path = _EDIT_PATH.format(group_id=group_id)
+        return GroupWriteResult.from_edit(
+            self._put(path, json=req.model_dump(mode="json", exclude_none=True)), group_id
+        )
+
+    def delete(self, group_id: int) -> None:
+        """DELETE ``/admin/manage/groups/{groupId}``: elimina un gruppo; la risposta è vuota."""
+        self._delete(_EDIT_PATH.format(group_id=group_id))

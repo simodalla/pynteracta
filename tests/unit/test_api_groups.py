@@ -6,10 +6,13 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 import respx
-from api_helpers import BASE_URL, load_payload, make_transport
+from api_helpers import BASE_URL, load_payload, make_transport, mock_json
 
 from pynteracta.api.groups import GroupsAPI
+from pynteracta.exceptions import ConcurrencyError, NotFoundError, TransportError
+from pynteracta.models.generated import external_v2 as generated
 
 _GROUP_ID_1 = 201
 _GROUP_ID_2 = 202
@@ -126,3 +129,110 @@ class TestGroupsGetForEdit:
         result = api.get_for_edit(_GROUP_ID_1)
         assert result.occ_token == _OCC_TOKEN
         assert result.raw.occToken == _OCC_TOKEN
+
+
+# ---------------------------------------------------------------------------
+# Scritture (spec 05)
+# ---------------------------------------------------------------------------
+
+_CREATED_GROUP_ID = 202
+_CREATED_MEMBERS_COUNT = 2
+_EDIT_NEXT_OCC_TOKEN = 6
+_MEMBERS_NEXT_OCC_TOKEN = 6
+_MEMBERS_COUNT_AFTER = 3
+_CREATE_URL = f"{BASE_URL}/admin/manage/groups"
+_EDIT_URL = f"{BASE_URL}/admin/manage/groups/{_GROUP_ID_1}"
+_MEMBERS_URL = f"{BASE_URL}/admin/manage/groups/members"
+_HTTP_CONFLICT = 409
+
+
+def _body(route: respx.Route) -> dict:  # type: ignore[type-arg]
+    return json.loads(route.calls[0].request.content)  # type: ignore[no-any-return]
+
+
+class TestGroupsCreate:
+    # criterio: 05-C07
+    @respx.mock
+    def test_create_sends_only_given_fields_and_wraps_response(self) -> None:
+        route = mock_json("POST", "admin/manage/groups", load_payload("create_group_response.json"))
+        result = GroupsAPI(make_transport()).create(name="G", visible=True, member_ids=[1, 2])
+        assert route.call_count == 1
+        assert _body(route) == {"name": "G", "visible": True, "memberIds": [1, 2]}
+        assert result.group_id == _CREATED_GROUP_ID
+        assert result.next_occ_token == 1
+        assert result.name == "QA"
+        assert result.visible is True
+        assert result.members_count == _CREATED_MEMBERS_COUNT
+        assert result.raw.groupId == _CREATED_GROUP_ID
+
+    # criterio: 05-C07
+    @respx.mock
+    def test_create_raw_equivalent(self) -> None:
+        route = mock_json("POST", "admin/manage/groups", load_payload("create_group_response.json"))
+        req = generated.CreateGroupRequestDTO(name="G", visible=True, memberIds=[1, 2])
+        result = GroupsAPI(make_transport()).create_raw(req)
+        assert _body(route) == {"name": "G", "visible": True, "memberIds": [1, 2]}
+        assert result.group_id == _CREATED_GROUP_ID
+
+    # criterio: 05-C21
+    @respx.mock
+    def test_create_timeout_raises_transport_error_once(self) -> None:
+        route = respx.post(_CREATE_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(TransportError):
+            GroupsAPI(make_transport()).create(name="G")
+        assert route.call_count == 1
+
+
+class TestGroupsEdit:
+    # criterio: 05-C08
+    @respx.mock
+    def test_edit_sends_given_fields_and_occ_token(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_group_response.json"))
+        )
+        result = GroupsAPI(make_transport()).edit(_GROUP_ID_1, _OCC_TOKEN, name="G2")
+        assert route.call_count == 1
+        assert _body(route) == {"name": "G2", "occToken": _OCC_TOKEN}
+        assert result.group_id == _GROUP_ID_1
+        assert result.next_occ_token == _EDIT_NEXT_OCC_TOKEN
+
+    # criterio: 05-C08
+    @respx.mock
+    def test_edit_raw_equivalent(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_group_response.json"))
+        )
+        req = generated.EditGroupRequestDTO(name="G2", memberIds=[1], occToken=_OCC_TOKEN)
+        result = GroupsAPI(make_transport()).edit_raw(_GROUP_ID_1, req)
+        assert _body(route) == {"name": "G2", "memberIds": [1], "occToken": _OCC_TOKEN}
+        assert result.next_occ_token == _EDIT_NEXT_OCC_TOKEN
+
+    # criterio: 05-C05
+    @respx.mock
+    def test_edit_409_raises_concurrency_error_once(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(409, json={"message": "Concurrency error"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            GroupsAPI(make_transport()).edit(_GROUP_ID_1, _OCC_TOKEN, name="G2")
+        assert exc_info.value.status_code == _HTTP_CONFLICT
+        assert route.call_count == 1
+
+
+class TestGroupsDelete:
+    # criterio: 05-C08
+    @respx.mock
+    def test_delete_sends_one_request_and_returns_none(self) -> None:
+        route = respx.delete(_EDIT_URL).mock(return_value=httpx.Response(200))
+        assert GroupsAPI(make_transport()).delete(_GROUP_ID_1) is None
+        assert route.call_count == 1
+
+    # criterio: 05-C08
+    @respx.mock
+    def test_delete_404_raises_not_found(self) -> None:
+        route = respx.delete(_EDIT_URL).mock(
+            return_value=httpx.Response(404, json={"message": "Gruppo non esistente"})
+        )
+        with pytest.raises(NotFoundError):
+            GroupsAPI(make_transport()).delete(_GROUP_ID_1)
+        assert route.call_count == 1
