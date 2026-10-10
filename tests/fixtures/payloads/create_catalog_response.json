@@ -1,0 +1,5 @@
+{
+  "catalog": {"id": 6, "name": "Sedi", "etag": 1, "paged": false},
+  "parentCatalog": {"id": 3, "name": "Root", "etag": 4, "paged": false},
+  "occToken": 1
+}

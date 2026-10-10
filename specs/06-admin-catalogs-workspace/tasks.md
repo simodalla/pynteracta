@@ -20,7 +20,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
 
 ## Elenco
 
-### [ ] T01 – Riga di ROADMAP, fixture e contract test dei DTO
+### [x] T01 – Riga di ROADMAP, fixture e contract test dei DTO
 
 - Criteri: 06-C19 (DTO; lo smoke delle façade arriva con T02 e T03)
 - Dipende da: nessuno

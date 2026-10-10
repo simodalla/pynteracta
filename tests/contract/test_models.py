@@ -1355,3 +1355,113 @@ class TestAdminGroupsWriteDTOs:
         members = GroupMembersResult.from_dict(load_payload("edit_groups_members_response.json"))
         assert [g.id for g in members.success_groups] == [_GROUP_ID_CONTRACT]
         assert [g.id for g in members.concurrency_error_groups] == [_CONFLICT_GROUP_ID_CONTRACT]
+
+
+# ---------------------------------------------------------------------------
+# Spec 06: scritture admin di cataloghi, voci di catalogo e workspace
+# ---------------------------------------------------------------------------
+
+_CATALOG_ID_CONTRACT = 5
+_CREATED_CATALOG_ID_CONTRACT = 6
+_PARENT_CATALOG_ID_CONTRACT = 3
+_CREATED_ENTRY_ID_CONTRACT = 101
+_EDITED_ENTRY_ID_CONTRACT = 100
+_WORKSPACE_ID_CONTRACT = 88
+_WORKSPACE_NEXT_OCC_TOKEN_CONTRACT = 18
+
+
+class TestAdminCatalogsWorkspaceWriteDTOs:
+    # criterio: 06-C19
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("CreateEditCatalogRequestDTO", generated.CreateEditCatalogRequestDTO),
+            ("CreateEditCatalogResponseDTO", generated.CreateEditCatalogResponseDTO),
+            ("EditCatalogDeletedRequestDTO", generated.EditCatalogDeletedRequestDTO),
+            ("EditCatalogDeletedResponseDTO", generated.EditCatalogDeletedResponseDTO),
+            ("CreateEditCatalogEntryRequestDTO", generated.CreateEditCatalogEntryRequestDTO),
+            ("CreateEditCatalogEntryResponseDTO", generated.CreateEditCatalogEntryResponseDTO),
+            ("EditCatalogEntryDeletedRequestDTO", generated.EditCatalogEntryDeletedRequestDTO),
+            ("EditCatalogEntryDeletedResponseDTO", generated.EditCatalogEntryDeletedResponseDTO),
+            ("EditWorkspaceRequestDTO", generated.EditWorkspaceRequestDTO),
+            ("CreateUserRoleAssociationDTO", generated.CreateUserRoleAssociationDTO),
+            ("CreateGroupRoleAssociationDTO", generated.CreateGroupRoleAssociationDTO),
+        ],
+    )
+    def test_schema_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 06-C19
+    @pytest.mark.parametrize(
+        ("definition", "model"),
+        [
+            ("CatalogDTO", generated.CatalogDTOModel),
+            ("CatalogEntryDTO", generated.CatalogEntryDTO1),
+            ("CatalogEditableContentDTO", generated.CatalogEditableContentDTOModel),
+        ],
+    )
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(
+            swagger_definitions, definition, model, note="typed variant of RootModel stub"
+        )
+
+    # criterio: 06-C19
+    def test_fixtures_parse(self) -> None:
+        created = generated.CreateEditCatalogResponseDTO.model_validate(
+            load_payload("create_catalog_response.json")
+        )
+        assert created.catalog is not None
+        assert created.parentCatalog is not None
+        assert (
+            generated.CatalogDTOModel.model_validate(created.catalog.root).id
+            == _CREATED_CATALOG_ID_CONTRACT
+        )
+        assert (
+            generated.CatalogDTOModel.model_validate(created.parentCatalog.root).id
+            == _PARENT_CATALOG_ID_CONTRACT
+        )
+        edited = generated.CreateEditCatalogResponseDTO.model_validate(
+            load_payload("edit_catalog_response.json")
+        )
+        assert edited.parentCatalog is None
+        assert edited.occToken is not None
+        deleted = generated.EditCatalogDeletedResponseDTO.model_validate(
+            load_payload("edit_catalog_deleted_response.json")
+        )
+        assert deleted.catalogId == _CATALOG_ID_CONTRACT
+        assert deleted.deleted is True
+        entry = generated.CreateEditCatalogEntryResponseDTO.model_validate(
+            load_payload("create_catalog_entry_response.json")
+        )
+        assert entry.entry is not None
+        assert (
+            generated.CatalogEntryDTO1.model_validate(entry.entry.root).id
+            == _CREATED_ENTRY_ID_CONTRACT
+        )
+        edited_entry = generated.CreateEditCatalogEntryResponseDTO.model_validate(
+            load_payload("edit_catalog_entry_response.json")
+        )
+        assert edited_entry.entry is not None
+        assert (
+            generated.CatalogEntryDTO1.model_validate(edited_entry.entry.root).id
+            == _EDITED_ENTRY_ID_CONTRACT
+        )
+        entry_deleted = generated.EditCatalogDeletedResponseDTO.model_validate(
+            load_payload("edit_catalog_entry_deleted_response.json")
+        )
+        assert entry_deleted.catalogId == _CATALOG_ID_CONTRACT
+        workspace = generated.GetWorkspaceForEditResponseDTO.model_validate(
+            load_payload("edit_workspace_response.json")
+        )
+        assert workspace.id == _WORKSPACE_ID_CONTRACT
+        assert workspace.occToken == _WORKSPACE_NEXT_OCC_TOKEN_CONTRACT

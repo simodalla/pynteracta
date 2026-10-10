@@ -1,0 +1,11 @@
+{
+  "entry": {
+    "id": 101,
+    "catalogId": 5,
+    "label": "Bologna",
+    "externalId": "BO",
+    "parentIds": [10],
+    "deleted": false
+  },
+  "occToken": 1
+}
