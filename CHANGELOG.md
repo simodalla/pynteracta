@@ -1,6 +1,70 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.12.0] - 2026-10-10
+
+### Chores
+
+- Fixture e contract test della risposta di upload-new-attachment; riga 0.12.0 in ROADMAP (04-T01)
+- Caratterizzazione della redazione delle query e dei corpi non validi di posts create (04-T02)
+- Integration test opt-in del ciclo upload, allegato, nuova versione, rimozione (04-T14)
+- Fixture e contract test dei DTO di scrittura di utenti e gruppi; riga 0.13.0 in ROADMAP (05-T01)
+- Redazione di password e generatedPassword in audit log e hook (05-T07)
+- Integration test opt-in dei cicli di scrittura di gruppi e utenti (05-T14)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.11.0
+- Spec 04, upload degli allegati
+- Piano 04, upload degli allegati
+- Task 04, upload degli allegati
+- Esito della prova sul tenant dell'upload degli allegati (04-T15)
+- Upload degli allegati in libreria e CLI, redazione dei link firmati (04-T16)
+- PRD con RF-024 precisato, RF-024a, RNF-001 e RNF-011 (04-T17)
+- Verifica 04, upload degli allegati
+- Spec 05, anagrafiche admin: utenti e gruppi
+- Piano 05, anagrafiche admin: utenti e gruppi
+- Task 05, anagrafiche admin: utenti e gruppi
+- **spec**: Revisione della spec 05 dopo la prova sul tenant, criteri 05-C27..29 e task T18
+- **spec**: Esito di T15, la prova dei cicli di scrittura sul tenant (05-T15)
+- Scritture admin di utenti e gruppi in libreria e CLI (05-T16)
+- PRD con RF-023 precisato, RF-023a, RF-023b, RF-023c e RF-023d (05-T17)
+- Verifica 05, anagrafiche admin prima metà: utenti e gruppi (05)
+- Release v0.12.0, riga di ROADMAP a shipped
+
+### Features
+
+- **transport**: POST multipart verso lo storage senza token né corpo nei log, UploadError (04-T05)
+- **api**: Façade UploadTicket e UploadedAttachment, protocollo WriteInput nei corpi di scrittura (04-T06)
+- **api**: Upload degli allegati in due passi su client.attachments (04-T07)
+- **api**: UploadedAttachment accettato dalle scritture di post e task (04-T08)
+- **cli**: Exit code 11 per gli upload falliti e helper per --attach (04-T09)
+- **cli**: Comando attachments upload (04-T10)
+- **cli**: --attach su posts create, comment, edit e copy (04-T11)
+- **cli**: --attach su tasks create ed edit (04-T12)
+- **cli**: Comando posts edit-attachments con upload, nuove versioni e rimozioni (04-T13)
+- **users**: Occ_token sulle façade per-edit e façade UserWriteResult (05-T02)
+- **groups**: Façade GroupSummary, GroupWriteResult e GroupMembersResult (05-T03)
+- **users**: Creazione, modifica, eliminazione e credenziali degli utenti su client.users (05-T04)
+- **groups**: Creazione, modifica ed eliminazione dei gruppi su client.groups (05-T05)
+- **groups**: Modifica dei membri di uno o più gruppi, conflitto del 200 come ConcurrencyError (05-T06)
+- **cli**: Comando users create con credenziali e password da stdin o generata (05-T09)
+- **cli**: Users edit ed edit-credentials come patch con occToken letto o imposto (05-T10)
+- **cli**: Users delete con conferma (05-T11)
+- **cli**: Comandi groups create, edit (patch) e delete con conferma (05-T12)
+- **cli**: Groups edit-members per un gruppo o in blocco da --json (05-T13)
+
+### Fixes
+
+- **logging**: Redazione delle firme negli URL e delle chiavi signature e policy (04-T03)
+- **users**: GeneratedPassword stringa dal tenant normalizzata in lista, errore di forma senza valori (05-T15)
+- **cli**: Users edit-credentials invia solo i blocchi indicati; GET 204 vuota è NotFoundError (05-T18)
+
+### Refactors
+
+- **transport**: Request scomposta in helper condivisi (04-T04)
+- **cli**: Read_password e opzioni --json e --occ-token condivise in cli/_write.py (05-T08)
+
 ## [0.11.0] - 2026-10-10
 
 ### Chores
