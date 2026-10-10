@@ -135,7 +135,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(catalogs): creazione, modifica e disabilitazione delle
      voci di catalogo su client.catalogs (06-T05)`.
 
-### [ ] T06 – `edit_workspace` in `AdminManageAPI`
+### [x] T06 – `edit_workspace` in `AdminManageAPI`
 
 - Criteri: 06-C08, 06-C09 (workspace)
 - Dipende da: T02
