@@ -192,7 +192,7 @@ le costanti qui sopra con la stessa forma.
   3. Snapshot, controlli bloccanti; commit `feat(cli): comando users create con credenziali e
      password da stdin o generata (05-T09)`.
 
-### [ ] T10 – `users edit` e `users edit-credentials`
+### [x] T10 – `users edit` e `users edit-credentials`
 
 - Criteri: 05-C13, 05-C14, 05-C15 (utenti)
 - Dipende da: T09

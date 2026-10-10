@@ -261,3 +261,343 @@ class TestUsersCreate:
         )
         result = runner.invoke(app, ["users", "create", "--first-name", "A"], env=BASE_ENV)
         assert result.exit_code == 6  # noqa: PLR2004
+
+
+# ---------------------------------------------------------------------------
+# users edit / edit-credentials (T10)
+# ---------------------------------------------------------------------------
+
+_FORM_PATH = f"admin/manage/users/{_USER_ID}/edit"
+_EDIT_PATH = f"admin/manage/users/{_USER_ID}"
+_EDIT_URL = f"{BASE_URL}/{_EDIT_PATH}"
+_CREDENTIALS_FORM_PATH = f"admin/manage/users/{_USER_ID}/credentials/edit"
+_CREDENTIALS_PATH = f"admin/manage/users/{_USER_ID}/credentials"
+_CREDENTIALS_URL = f"{BASE_URL}/{_CREDENTIALS_PATH}"
+_FORM_OCC_TOKEN = 42
+_CREDENTIALS_OCC_TOKEN = 12
+_FORCED_OCC_TOKEN = 6
+_EXIT_CONFLICT = 9
+_CONFLICT = "User 42 changed since it was read: fetch it again and retry"
+_EDIT_BASE = {
+    "firstname": "Maria",
+    "lastname": "Rossi",
+    "contactEmail": "m.rossi@example.it",
+    "externalId": "EXT-1042",
+    "userPreferences": {
+        "defaultLanguageId": "it",
+        "defaultTimezoneId": 1,
+        "emailNotificationsEnabled": True,
+    },
+    "userInfo": {
+        "area": {"id": 5, "name": "Software Engineering"},
+        "businessUnit": {"id": 10, "name": "IT Department"},
+        "privateEmailVerified": False,
+        "privateEmailVerificationRequired": False,
+    },
+    "userSettings": {
+        "peopleSectionEnabled": True,
+        "visibleInPeopleSection": True,
+        "reducedProfile": False,
+        "viewUserProfiles": True,
+    },
+}
+_CUSTOM_READ = {"username": "m.rossi", "canUserManageCustomCredentials": True, "active": True}
+
+
+def _mock_edit_flow(
+    form: dict | None = None,  # type: ignore[type-arg]
+) -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json(
+        "GET",
+        _FORM_PATH,
+        form if form is not None else load_payload("get_user_for_edit_response.json"),
+    )
+    put_route = mock_json("PUT", _EDIT_PATH, load_payload("edit_user_response.json"))
+    return get_route, put_route
+
+
+def _mock_credentials_flow(
+    form: dict | None = None,  # type: ignore[type-arg]
+) -> tuple[respx.Route, respx.Route]:
+    payload = (
+        form if form is not None else load_payload("get_user_credentials_for_edit_response.json")
+    )
+    get_route = mock_json("GET", _CREDENTIALS_FORM_PATH, payload)
+    put_route = mock_json(
+        "PUT", _CREDENTIALS_PATH, load_payload("edit_user_credentials_response.json")
+    )
+    return get_route, put_route
+
+
+class TestEditBase:
+    # criterio: 05-C13
+    def test_edit_base_revalidates_blocks_and_drops_none(self) -> None:
+        from pynteracta.cli.users_write import _edit_base  # noqa: PLC0415
+        from pynteracta.models.facade.users import UserForEdit  # noqa: PLC0415
+
+        user = UserForEdit.from_dict(load_payload("get_user_for_edit_response.json"))
+        assert _edit_base(user) == _EDIT_BASE
+
+    # criterio: 05-C13
+    def test_edit_base_without_blocks(self) -> None:
+        from pynteracta.cli.users_write import _edit_base  # noqa: PLC0415
+        from pynteracta.models.facade.users import UserForEdit  # noqa: PLC0415
+
+        user = UserForEdit.from_dict({"firstname": "A", "occToken": 1})
+        assert _edit_base(user) == {"firstname": "A"}
+
+
+class TestUsersEdit:
+    # criterio: 05-C13
+    @respx.mock
+    def test_edit_reads_form_then_puts_patched_body(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_edit_flow()
+        result = runner.invoke(
+            app, ["users", "edit", str(_USER_ID), "--last-name", "C"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 1
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == {
+            **_EDIT_BASE,
+            "lastname": "C",
+            "occToken": _FORM_OCC_TOKEN,
+        }
+        assert str(_USER_ID) in result.output
+
+    # criterio: 05-C13
+    @respx.mock
+    def test_json_then_flags_precedence(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _, put_route = _mock_edit_flow()
+        body = tmp_path / "body.json"
+        body.write_text(
+            json.dumps({"externalId": "E9", "privateEmail": "p@b.it"}), encoding="utf-8"
+        )
+        result = runner.invoke(
+            app,
+            ["users", "edit", str(_USER_ID), "--json", str(body), "--external-id", "E10"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        sent = _sent_body(put_route)
+        assert sent["externalId"] == "E10"
+        assert sent["privateEmail"] == "p@b.it"
+        assert sent["firstname"] == "Maria"
+
+    # criterio: 05-C13
+    @respx.mock
+    def test_occ_token_overrides_but_get_still_happens(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_edit_flow()
+        result = runner.invoke(
+            app,
+            ["users", "edit", str(_USER_ID), "--last-name", "C", "--occ-token", "6"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 1
+        assert _sent_body(put_route)["occToken"] == _FORCED_OCC_TOKEN
+        assert _sent_body(put_route)["firstname"] == "Maria"
+
+    # criterio: 05-C13
+    @respx.mock
+    def test_missing_fields_are_not_invented(self, runner: CliRunner) -> None:
+        form = load_payload("get_user_for_edit_response.json")
+        for key in ("privateEmail", "externalId", "userSettings", "userInfo"):
+            form.pop(key, None)
+        _, put_route = _mock_edit_flow(form)
+        result = runner.invoke(
+            app, ["users", "edit", str(_USER_ID), "--last-name", "C"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        sent = _sent_body(put_route)
+        assert "privateEmail" not in sent
+        assert "externalId" not in sent
+        assert "userSettings" not in sent
+        assert "userInfo" not in sent
+        assert sent["userPreferences"] == _EDIT_BASE["userPreferences"]
+
+    # criterio: 05-C15
+    @respx.mock
+    def test_409_exits_9_without_retry(self, runner: CliRunner) -> None:
+        mock_json("GET", _FORM_PATH, load_payload("get_user_for_edit_response.json"))
+        put_route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(409, json={"message": "Concurrency error"})
+        )
+        result = runner.invoke(
+            app, ["users", "edit", str(_USER_ID), "--last-name", "C"], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT in result.output
+        assert put_route.call_count == 1
+
+    # criterio: 05-C13
+    @respx.mock
+    def test_missing_occ_token_exits_1_without_put(self, runner: CliRunner) -> None:
+        form = load_payload("get_user_for_edit_response.json")
+        form.pop("occToken")
+        _, put_route = _mock_edit_flow(form)
+        result = runner.invoke(
+            app, ["users", "edit", str(_USER_ID), "--last-name", "C"], env=BASE_ENV
+        )
+        assert result.exit_code == 1
+        assert "--occ-token" in result.output
+        assert put_route.call_count == 0
+
+    # criterio: 05-C13
+    @respx.mock
+    def test_form_not_found_exits_5_without_put(self, runner: CliRunner) -> None:
+        respx.get(f"{BASE_URL}/{_FORM_PATH}").mock(
+            return_value=httpx.Response(404, json={"message": "Utente non esistente"})
+        )
+        put_route = mock_json("PUT", _EDIT_PATH, load_payload("edit_user_response.json"))
+        result = runner.invoke(
+            app,
+            ["users", "edit", str(_USER_ID), "--last-name", "C", "--occ-token", "6"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 5  # noqa: PLR2004
+        assert put_route.call_count == 0
+
+
+class TestCredentialsBase:
+    # criterio: 05-C14
+    def test_credentials_base_drops_read_only_fields(self) -> None:
+        from pynteracta.cli.users_write import _credentials_base  # noqa: PLC0415
+        from pynteracta.models.facade.admin_manage import UserCredentialsForEdit  # noqa: PLC0415
+
+        form = UserCredentialsForEdit.from_dict(
+            load_payload("get_user_credentials_for_edit_response.json")
+        )
+        assert _credentials_base(form) == {"google": {"enabled": True}, "custom": _CUSTOM_READ}
+
+    # criterio: 05-C14
+    def test_credentials_base_empty_form(self) -> None:
+        from pynteracta.cli.users_write import _credentials_base  # noqa: PLC0415
+        from pynteracta.models.facade.admin_manage import UserCredentialsForEdit  # noqa: PLC0415
+
+        assert _credentials_base(UserCredentialsForEdit.from_dict({"occToken": 1})) == {}
+
+
+class TestUsersEditCredentials:
+    # criterio: 05-C14
+    @respx.mock
+    def test_google_flag_and_no_custom(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_credentials_flow()
+        result = runner.invoke(
+            app,
+            [
+                "users",
+                "edit-credentials",
+                str(_USER_ID),
+                "--google-account",
+                "a@b.it",
+                "--no-custom",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 1
+        assert _sent_body(put_route) == {
+            "userCredentialsConfiguration": {
+                "google": {"googleAccountId": "a@b.it", "enabled": True}
+            },
+            "occToken": _CREDENTIALS_OCC_TOKEN,
+        }
+
+    # criterio: 05-C14
+    @respx.mock
+    def test_username_and_inactive_keep_read_block_without_read_only_fields(
+        self, runner: CliRunner
+    ) -> None:
+        _, put_route = _mock_credentials_flow()
+        result = runner.invoke(
+            app,
+            [
+                "users",
+                "edit-credentials",
+                str(_USER_ID),
+                "--username",
+                "new.name",
+                "--custom-inactive",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["userCredentialsConfiguration"] == {
+            "google": {"enabled": True},
+            "custom": {**_CUSTOM_READ, "username": "new.name", "active": False},
+        }
+
+    # criterio: 05-C14
+    @respx.mock
+    def test_no_google_when_absent_is_fine(self, runner: CliRunner) -> None:
+        form = {
+            "occToken": _CREDENTIALS_OCC_TOKEN,
+            "userCredentialsConfiguration": {"custom": _CUSTOM_READ},
+        }
+        _, put_route = _mock_credentials_flow(form)
+        result = runner.invoke(
+            app,
+            ["users", "edit-credentials", str(_USER_ID), "--no-google", "--no-microsoft"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["userCredentialsConfiguration"] == {"custom": _CUSTOM_READ}
+
+    # criterio: 05-C14
+    @respx.mock
+    def test_json_block_overlays_read_form(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _, put_route = _mock_credentials_flow()
+        body = tmp_path / "body.json"
+        body.write_text(
+            json.dumps(
+                {
+                    "userCredentialsConfiguration": {
+                        "microsoft": {"microsoftAccountId": "m@b.it", "enabled": True}
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            [
+                "users",
+                "edit-credentials",
+                str(_USER_ID),
+                "--json",
+                str(body),
+                "--occ-token",
+                str(_FORCED_OCC_TOKEN),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route) == {
+            "userCredentialsConfiguration": {
+                "google": {"enabled": True},
+                "custom": _CUSTOM_READ,
+                "microsoft": {"microsoftAccountId": "m@b.it", "enabled": True},
+            },
+            "occToken": _FORCED_OCC_TOKEN,
+        }
+
+    # criterio: 05-C15
+    @respx.mock
+    def test_409_exits_9_without_retry(self, runner: CliRunner) -> None:
+        mock_json(
+            "GET",
+            _CREDENTIALS_FORM_PATH,
+            load_payload("get_user_credentials_for_edit_response.json"),
+        )
+        put_route = respx.put(_CREDENTIALS_URL).mock(
+            return_value=httpx.Response(409, json={"message": "Concurrency error"})
+        )
+        result = runner.invoke(
+            app,
+            ["users", "edit-credentials", str(_USER_ID), "--google-account", "a@b.it"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT in result.output
+        assert put_route.call_count == 1
