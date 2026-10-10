@@ -320,3 +320,136 @@ class TestCatalogsWriteErrors:
         with pytest.raises(TransportError):
             CatalogsAPI(make_transport()).create(name={"it": "Sedi"})
         assert route.call_count == 1
+
+
+_ENTRIES_ADMIN_PATH = f"{_CATALOG_PATH}/entries"
+_ENTRY_PATH = f"{_ENTRIES_ADMIN_PATH}/{_CATALOG_ENTRY_ID}"
+_ENTRY_DELETED_PATH = f"{_ENTRY_PATH}/deleted"
+_CREATED_ENTRY_ID = 101
+_PARENT_ENTRY_ID = 10
+_ENTRY_NEXT_OCC_TOKEN = 5
+
+
+class TestCatalogEntriesCreate:
+    # criterio: 06-C04
+    @respx.mock
+    def test_create_entry_sends_only_given_fields_and_wraps_response(self) -> None:
+        route = mock_json(
+            "POST", _ENTRIES_ADMIN_PATH, load_payload("create_catalog_entry_response.json")
+        )
+        result = CatalogsAPI(make_transport()).create_entry(
+            _CATALOG_ID, label={"it": "Bologna"}, parent_ids=[_PARENT_ENTRY_ID], external_id="BO"
+        )
+        assert route.call_count == 1
+        assert _body(route) == {
+            "label": {"it": "Bologna"},
+            "parentIds": [_PARENT_ENTRY_ID],
+            "externalId": "BO",
+        }
+        assert result.entry_id == _CREATED_ENTRY_ID
+        assert result.entry is not None
+        assert result.entry.label == "Bologna"
+        assert result.entry.external_id == "BO"
+        assert result.next_occ_token == 1
+        assert isinstance(result.raw, generated.CreateEditCatalogEntryResponseDTO)
+
+    # criterio: 06-C04
+    @respx.mock
+    def test_create_entry_raw_equivalent(self) -> None:
+        route = mock_json(
+            "POST", _ENTRIES_ADMIN_PATH, load_payload("create_catalog_entry_response.json")
+        )
+        req = generated.CreateEditCatalogEntryRequestDTO(
+            label={"it": "Bologna"}, parentIds=[_PARENT_ENTRY_ID], externalId="BO"
+        )
+        result = CatalogsAPI(make_transport()).create_entry_raw(_CATALOG_ID, req)
+        assert _body(route) == {
+            "label": {"it": "Bologna"},
+            "parentIds": [_PARENT_ENTRY_ID],
+            "externalId": "BO",
+        }
+        assert result.entry_id == _CREATED_ENTRY_ID
+
+
+class TestCatalogEntriesEdit:
+    # criterio: 06-C05
+    @respx.mock
+    def test_edit_entry_sends_given_fields_and_occ_token(self) -> None:
+        route = mock_json("PUT", _ENTRY_PATH, load_payload("edit_catalog_entry_response.json"))
+        result = CatalogsAPI(make_transport()).edit_entry(
+            _CATALOG_ID, _CATALOG_ENTRY_ID, _ENTRY_OCC_TOKEN, external_id="BO2"
+        )
+        assert route.call_count == 1
+        assert _body(route) == {"externalId": "BO2", "occToken": _ENTRY_OCC_TOKEN}
+        assert result.entry_id == _CATALOG_ENTRY_ID
+        assert result.next_occ_token == _ENTRY_NEXT_OCC_TOKEN
+
+    # criterio: 06-C05
+    @respx.mock
+    def test_edit_entry_raw_equivalent(self) -> None:
+        route = mock_json("PUT", _ENTRY_PATH, load_payload("edit_catalog_entry_response.json"))
+        req = generated.CreateEditCatalogEntryRequestDTO(
+            externalId="BO2", occToken=_ENTRY_OCC_TOKEN
+        )
+        result = CatalogsAPI(make_transport()).edit_entry_raw(_CATALOG_ID, _CATALOG_ENTRY_ID, req)
+        assert _body(route) == {"externalId": "BO2", "occToken": _ENTRY_OCC_TOKEN}
+        assert result.entry_id == _CATALOG_ENTRY_ID
+
+
+class TestCatalogEntriesSetDeleted:
+    # criterio: 06-C06
+    @respx.mock
+    def test_true_sends_exact_body_and_reads_catalog_id(self) -> None:
+        route = mock_json(
+            "PUT", _ENTRY_DELETED_PATH, load_payload("edit_catalog_entry_deleted_response.json")
+        )
+        result = CatalogsAPI(make_transport()).set_entry_deleted(
+            _CATALOG_ID, _CATALOG_ENTRY_ID, True
+        )
+        assert route.call_count == 1
+        assert route.calls[0].request.content == b'{"deleted":true}'
+        assert result.catalog_id == _CATALOG_ID
+        assert result.entry_id == _CATALOG_ENTRY_ID
+        assert result.deleted is True
+
+    # criterio: 06-C06
+    @respx.mock
+    def test_reads_entry_id_form(self) -> None:
+        mock_json("PUT", _ENTRY_DELETED_PATH, {"entryId": _CATALOG_ENTRY_ID, "deleted": True})
+        result = CatalogsAPI(make_transport()).set_entry_deleted(
+            _CATALOG_ID, _CATALOG_ENTRY_ID, True
+        )
+        assert result.catalog_id == _CATALOG_ID
+        assert result.entry_id == _CATALOG_ENTRY_ID
+        assert result.deleted is True
+
+    # criterio: 06-C06
+    @respx.mock
+    def test_false(self) -> None:
+        route = mock_json("PUT", _ENTRY_DELETED_PATH, {"catalogId": _CATALOG_ID, "deleted": False})
+        result = CatalogsAPI(make_transport()).set_entry_deleted(
+            _CATALOG_ID, _CATALOG_ENTRY_ID, False
+        )
+        assert _body(route) == {"deleted": False}
+        assert result.deleted is False
+
+
+class TestCatalogEntriesWriteErrors:
+    # criterio: 06-C09
+    @respx.mock
+    def test_edit_entry_409_raises_concurrency_error_once(self) -> None:
+        route = mock_json("PUT", _ENTRY_PATH, {}, status=_HTTP_CONFLICT)
+        with pytest.raises(ConcurrencyError) as exc_info:
+            CatalogsAPI(make_transport()).edit_entry(
+                _CATALOG_ID, _CATALOG_ENTRY_ID, _ENTRY_OCC_TOKEN, external_id="X"
+            )
+        assert exc_info.value.status_code == _HTTP_CONFLICT
+        assert route.call_count == 1
+
+    # criterio: 06-C09
+    @respx.mock
+    def test_set_entry_deleted_404_raises_not_found(self) -> None:
+        route = mock_json("PUT", _ENTRY_DELETED_PATH, {}, status=404)
+        with pytest.raises(NotFoundError):
+            CatalogsAPI(make_transport()).set_entry_deleted(_CATALOG_ID, _CATALOG_ENTRY_ID, True)
+        assert route.call_count == 1

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import builtins
 from typing import Any
 
 from pynteracta.api._base import ResourceClient
@@ -12,6 +13,7 @@ from pynteracta.models.facade.catalogs import (
     CatalogDeletedResult,
     CatalogEntry,
     CatalogEntryList,
+    CatalogEntryWriteResult,
     CatalogList,
     CatalogWriteResult,
     GetPostDefinitionCatalogsRequestDTO,
@@ -211,6 +213,89 @@ class CatalogsAPI(ResourceClient):
         path = _ADMIN_CATALOG_DELETED_PATH.format(catalog_id=catalog_id)
         return CatalogDeletedResult.from_dict(
             self._put(path, json={"deleted": deleted}), catalog_id
+        )
+
+    def create_entry(
+        self,
+        catalog_id: int,
+        *,
+        label: dict[str, str] | None = None,
+        parent_ids: builtins.list[int] | None = None,
+        external_id: str | None = None,
+    ) -> CatalogEntryWriteResult:
+        """POST ``/admin/manage/catalogs/{catalogId}/entries``: crea una voce.
+
+        Args:
+            catalog_id: Il catalogo della voce.
+            label: Etichetta per lingua, per esempio ``{"it": "Bologna"}``.
+            parent_ids: Id delle voci parent (cataloghi gerarchici).
+            external_id: Id esterno univoco.
+        """
+        body = build_write_body(label=label, parent_ids=parent_ids, external_id=external_id)
+        path = _ADMIN_ENTRIES_PATH.format(catalog_id=catalog_id)
+        return CatalogEntryWriteResult.from_dict(self._post(path, json=body), catalog_id)
+
+    def create_entry_raw(
+        self, catalog_id: int, req: generated.CreateEditCatalogEntryRequestDTO
+    ) -> CatalogEntryWriteResult:
+        """POST ``/admin/manage/catalogs/{catalogId}/entries`` da un DTO già costruito."""
+        path = _ADMIN_ENTRIES_PATH.format(catalog_id=catalog_id)
+        return CatalogEntryWriteResult.from_dict(
+            self._post(path, json=req.model_dump(mode="json", exclude_none=True)), catalog_id
+        )
+
+    def edit_entry(  # noqa: PLR0913
+        self,
+        catalog_id: int,
+        entry_id: int,
+        occ_token: int,
+        *,
+        label: dict[str, str] | None = None,
+        parent_ids: builtins.list[int] | None = None,
+        external_id: str | None = None,
+    ) -> CatalogEntryWriteResult:
+        """PUT ``/admin/manage/catalogs/{catalogId}/entries/{entryId}``: modifica una voce.
+
+        Il corpo contiene solo i campi passati più l'``occToken``; i campi omessi non vengono
+        inviati (semantica del server in ``docs/api/catalogs.md``).
+
+        Args:
+            catalog_id: Il catalogo della voce.
+            entry_id: La voce da modificare.
+            occ_token: Token letto da ``CatalogEntryForEdit.occ_token``.
+            label: Etichetta per lingua.
+            parent_ids: Id delle voci parent.
+            external_id: Id esterno univoco.
+        """
+        body = build_write_body(
+            label=label, parent_ids=parent_ids, external_id=external_id, occ_token=occ_token
+        )
+        path = _ADMIN_ENTRY_PATH.format(catalog_id=catalog_id, entry_id=entry_id)
+        return CatalogEntryWriteResult.from_dict(self._put(path, json=body), catalog_id, entry_id)
+
+    def edit_entry_raw(
+        self, catalog_id: int, entry_id: int, req: generated.CreateEditCatalogEntryRequestDTO
+    ) -> CatalogEntryWriteResult:
+        """PUT ``/admin/manage/catalogs/{catalogId}/entries/{entryId}`` da un DTO già costruito."""
+        path = _ADMIN_ENTRY_PATH.format(catalog_id=catalog_id, entry_id=entry_id)
+        return CatalogEntryWriteResult.from_dict(
+            self._put(path, json=req.model_dump(mode="json", exclude_none=True)),
+            catalog_id,
+            entry_id,
+        )
+
+    def set_entry_deleted(
+        self, catalog_id: int, entry_id: int, deleted: bool
+    ) -> CatalogDeletedResult:
+        """PUT ``/admin/manage/catalogs/{catalogId}/entries/{entryId}/deleted``.
+
+        Disabilita (``deleted=True``) o ripristina una voce; cancellazione logica, senza
+        ``occToken``. La risposta può portare ``catalogId`` o ``entryId``: il risultato ha sempre
+        entrambi gli id.
+        """
+        path = _ADMIN_ENTRY_DELETED_PATH.format(catalog_id=catalog_id, entry_id=entry_id)
+        return CatalogDeletedResult.from_dict(
+            self._put(path, json={"deleted": deleted}), catalog_id, entry_id
         )
 
     def get_for_edit(self, catalog_id: int) -> CatalogForEdit:

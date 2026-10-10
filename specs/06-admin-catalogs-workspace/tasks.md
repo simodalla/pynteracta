@@ -110,7 +110,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(catalogs): creazione, modifica e disabilitazione dei
      cataloghi su client.catalogs, alias get_for_edit e get_entry_for_edit (06-T04)`.
 
-### [ ] T05 – Scritture delle voci di catalogo in `CatalogsAPI`
+### [x] T05 – Scritture delle voci di catalogo in `CatalogsAPI`
 
 - Criteri: 06-C04, 06-C05, 06-C06, 06-C09 (voci)
 - Dipende da: T04
