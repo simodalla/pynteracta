@@ -23,9 +23,12 @@ from pynteracta.models.facade.auth import (
 )
 from pynteracta.models.facade.catalogs import (
     Catalog,
+    CatalogDeletedResult,
     CatalogEntry,
     CatalogEntryList,
+    CatalogEntryWriteResult,
     CatalogList,
+    CatalogWriteResult,
     GetPostDefinitionCatalogsRequestDTO,
     ListPostDefinitionCatalogEntriesRequestDTO,
 )
@@ -95,11 +98,14 @@ __all__ = [
     "AttachmentDetail",
     "AttachmentVisibility",
     "Catalog",
+    "CatalogDeletedResult",
     "CatalogEntry",
     "CatalogEntryForEdit",
     "CatalogEntryList",
+    "CatalogEntryWriteResult",
     "CatalogForEdit",
     "CatalogList",
+    "CatalogWriteResult",
     "CheckVisibilityRequestDTO",
     "Community",
     "CommunityDetail",

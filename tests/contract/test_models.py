@@ -27,7 +27,13 @@ from pynteracta.models.facade.attachments import (
     UploadTicket,
 )
 from pynteracta.models.facade.auth import CurrentUserResponse, ServiceAccountTokenResponse
-from pynteracta.models.facade.catalogs import CatalogEntryList, CatalogList
+from pynteracta.models.facade.catalogs import (
+    CatalogDeletedResult,
+    CatalogEntryList,
+    CatalogEntryWriteResult,
+    CatalogList,
+    CatalogWriteResult,
+)
 from pynteracta.models.facade.communities import (
     CommunityDetail,
     CommunityList,
@@ -1465,3 +1471,30 @@ class TestAdminCatalogsWorkspaceWriteDTOs:
         )
         assert workspace.id == _WORKSPACE_ID_CONTRACT
         assert workspace.occToken == _WORKSPACE_NEXT_OCC_TOKEN_CONTRACT
+
+    # criterio: 06-C19
+    def test_facade_smoke(self) -> None:
+        created = CatalogWriteResult.from_dict(load_payload("create_catalog_response.json"))
+        assert created.catalog_id == _CREATED_CATALOG_ID_CONTRACT
+        assert created.parent_catalog is not None
+        assert created.parent_catalog.id == _PARENT_CATALOG_ID_CONTRACT
+        edited = CatalogWriteResult.from_dict(
+            load_payload("edit_catalog_response.json"), catalog_id=_CATALOG_ID_CONTRACT
+        )
+        assert edited.catalog_id == _CATALOG_ID_CONTRACT
+        assert edited.next_occ_token is not None
+        entry = CatalogEntryWriteResult.from_dict(
+            load_payload("create_catalog_entry_response.json"), _CATALOG_ID_CONTRACT
+        )
+        assert entry.entry_id == _CREATED_ENTRY_ID_CONTRACT
+        deleted = CatalogDeletedResult.from_dict(
+            load_payload("edit_catalog_entry_deleted_response.json"),
+            _CATALOG_ID_CONTRACT,
+            _EDITED_ENTRY_ID_CONTRACT,
+        )
+        assert deleted.catalog_id == _CATALOG_ID_CONTRACT
+        assert deleted.entry_id == _EDITED_ENTRY_ID_CONTRACT
+        assert deleted.deleted is True
+        workspace = WorkspaceForEdit.from_dict(load_payload("edit_workspace_response.json"))
+        assert workspace.id == _WORKSPACE_ID_CONTRACT
+        assert workspace.occ_token == _WORKSPACE_NEXT_OCC_TOKEN_CONTRACT

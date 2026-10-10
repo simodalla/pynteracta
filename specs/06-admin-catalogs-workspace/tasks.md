@@ -59,7 +59,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti (gli snapshot di `admin-manage …` restano verdi); commit
      `feat(admin-manage): occ_token sulle façade per-edit e parent_catalog_id del catalogo (06-T02)`.
 
-### [ ] T03 – Façade dei cataloghi: campi nuovi di `Catalog`/`CatalogEntry` e façade di scrittura
+### [x] T03 – Façade dei cataloghi: campi nuovi di `Catalog`/`CatalogEntry` e façade di scrittura
 
 - Criteri: 06-C01, 06-C02, 06-C04 (campi del risultato), 06-C06 (façade), 06-C19 (smoke)
 - Dipende da: T01
