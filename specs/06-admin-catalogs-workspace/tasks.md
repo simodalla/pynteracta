@@ -173,7 +173,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(cli): helper per mappe LANG=TESTO e coppie di id in
      cli/_write.py (06-T07)`.
 
-### [ ] T08 – `catalogs create` e `catalogs create-entry`
+### [x] T08 – `catalogs create` e `catalogs create-entry`
 
 - Criteri: 06-C10, 06-C16
 - Dipende da: T04, T05, T07
