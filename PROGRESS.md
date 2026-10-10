@@ -1721,3 +1721,61 @@ Quarta spec del metodo: [`specs/04-attachment-upload/`](specs/04-attachment-uplo
 - `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` nel `.env` va quotata: né `source` né `uv run --env-file`
   leggono il JSON nudo; dirlo in `docs/testing.md` e `.env.example`.
 - Prossimi gruppi di scrittura (ADR 0001): post evento, anagrafiche admin (RF-023).
+
+## M31 — Anagrafiche admin, prima metà: utenti e gruppi — completata 2026-10-10
+
+Quinta spec del metodo: [`specs/05-admin-users-groups/`](specs/05-admin-users-groups/) (`spec.md`,
+`plan.md`, `tasks.md`, `verifica.md`). Quarto gruppo della superficie di scrittura aperta da
+[ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md), prima metà di RF-023.
+Minor **0.13.0**.
+
+### Fatto
+
+- Libreria: `client.users.create|edit|delete|edit_credentials` (+ `_raw`,
+  `get_credentials_for_edit` alias di `admin_manage.user_credentials_for_edit`);
+  `client.groups.create|edit|delete|edit_members|edit_members_bulk` (+ `_raw`); façade
+  `UserWriteResult`, `GroupSummary`, `GroupWriteResult`, `GroupMembersResult`; `occ_token` su
+  `UserForEdit`, `GroupForEdit`, `UserCredentialsForEdit`; il conflitto di `edit_members`
+  (stato `200`, gruppo in `concurrencyErrorGroups`) è `ConcurrencyError` (05-T02…T06).
+- Redazione: `password` e `generatedPassword` nei body, in audit log e hook (05-T07);
+  `UserWriteResult.from_create` normalizza la stringa del tenant e non mette la password nei
+  messaggi di eccezione (`41dfd76`).
+- CLI: `users create` (password da `--generate-password` o `--password-stdin`, mai da argomento),
+  `users edit` (patch), `users edit-credentials` (solo i blocchi indicati, `--no-*` rimuove con
+  conferma), `users delete`, `groups create`, `groups edit` (patch senza membri),
+  `groups edit-members` (singolo e bulk da `--json`, exit `9` sui conflitti), `groups delete`;
+  `read_password` e opzioni condivise in `cli/_write.py` (05-T08…T13, T18).
+- `ResourceClient._get`: un `204` senza corpo è `NotFoundError` (T18).
+- Documentazione: `docs/api/users.md` (riscritta), `docs/api/groups.md`,
+  `docs/api/admin_manage.md`, `docs/cli.md`, `docs/testing.md`, home e README; PRD con RF-023
+  precisato, RF-023a…RF-023d (05-T16, T17). Integration test opt-in dei due cicli eseguiti sul
+  tenant di prova (05-T14, T15).
+- 118 unit test e 24 contract test nuovi (1090 → 1208, 161 → 185); copertura totale 94,51 % →
+  94,94 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant** (T15): `generatedPassword` arriva come stringa, contro lo swagger;
+  `users.edit` esige `firstname` e `lastname` e azzera `contactEmail`, `privateEmail` ed
+  `externalId` omessi (preferenze, info e impostazioni mantenute); `groups.edit` esige `name` e
+  azzera `email`, `externalId` e `visible` omessi (membri mantenuti); in `edit_credentials` i
+  blocchi omessi sono mantenuti, `{active|enabled: false}` senza account id rimuove, con account
+  id è `INVALID_VALUE`, username e account id devono stare nel dominio del tenant; il form di un
+  utente inesistente risponde `204` vuoto; l'`occToken` restituito da `edit_members` vale per la
+  chiamata successiva.
+- Con l'approvazione del maintainer: `users edit-credentials` senza patch (05-C28, 05-C29);
+  `users.edit` resta "solo i campi passati" con avviso nei docs; `204` mappato per tutte le `GET`
+  (05-C27). Revisione della spec in `37d0cc0`, task T18.
+- Nella tabella curata di `users create` la password generata è una stringa; la lista grezza
+  resta in `--full`.
+
+### Follow-up
+
+- Release **0.13.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- Il ciclo gruppi di 05-C24 crea un gruppo vuoto: da solo non dimostra l'azzeramento dei campi
+  omessi (verificato con una sonda); crearlo pieno in un `bugfix_` o con la spec 06.
+- `occToken` è redatto nei body dell'audit log (la chiave contiene `token`): innocuo, ma rende
+  meno leggibile l'audit delle scritture.
+- `docs/testing.md`: suggerire `chmod 600 tests/integration/.env` e `set -a; source …; set +a`
+  al posto di `export $(… | xargs)`.
+- Seconda metà di RF-023 (cataloghi, voci di catalogo, workspace): spec 06. Poi i post evento.

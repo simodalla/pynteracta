@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import os
+import time
 
 import pytest
 
 from pynteracta.client import InteractaClient
+from pynteracta.exceptions import NotFoundError
 
 pytestmark = pytest.mark.integration
 
@@ -65,3 +67,57 @@ class TestHashtagsIntegration:
             result = client.hashtags.list_for_community(community_id)
         assert result.total_items_count is not None
         assert isinstance(result.items_typed, list)
+
+
+class TestGroupsWriteIntegration:
+    """Ciclo completo di scrittura di un gruppo (spec 05).
+
+    Le stampe ``[05-C26]`` servono al maintainer per annotare la semantica del server (campi
+    omessi in ``edit``, ``occToken`` restituito da ``edit_members``, esito della rilettura dopo
+    ``delete``): task manuale T15 della spec 05.
+    """
+
+    # criterio: 05-C24
+    def test_create_edit_members_delete_cycle(self, client: InteractaClient) -> None:
+        member_id = int(_require_env("PYNTERACTA_TEST_USER_ID"))
+        name = f"pynteracta-it-{int(time.time())}"
+        with client:
+            created = client.groups.create(name=name, visible=False)
+            group_id = created.group_id
+            assert group_id is not None
+            try:
+                form = client.groups.get_for_edit(group_id)
+                assert form.occ_token is not None
+                client.groups.edit(group_id, form.occ_token, name=f"{name}-edited")
+                after_edit = client.groups.get_for_edit(group_id)
+                print(
+                    f"\n[05-C26] groups.edit(name=...) con email, visible e memberIds omessi: "
+                    f"email={after_edit.email!r} visible={after_edit.visible!r} "
+                    f"members_count={after_edit.members_count!r}"
+                )
+                assert after_edit.name == f"{name}-edited"
+                assert after_edit.occ_token is not None
+                added = client.groups.edit_members(
+                    group_id, after_edit.occ_token, add_user_ids=[member_id]
+                )
+                print(
+                    f"[05-C26] edit_members: occToken restituito={added.next_occ_token!r} "
+                    f"(letto prima: {after_edit.occ_token!r}), "
+                    f"members_count={added.members_count!r}"
+                )
+                assert added.next_occ_token is not None
+                removed = client.groups.edit_members(
+                    group_id, added.next_occ_token, remove_user_ids=[member_id]
+                )
+                print(
+                    "[05-C26] edit_members con il token restituito dalla chiamata precedente: "
+                    f"riuscito, members_count={removed.members_count!r}"
+                )
+            finally:
+                client.groups.delete(group_id)
+            try:
+                after = client.groups.get_for_edit(group_id)
+                print(f"[05-C26] dopo delete il form esiste ancora: deleted={after.deleted!r}")
+                assert after.deleted is True
+            except NotFoundError:
+                print("[05-C26] dopo delete: NotFoundError, il gruppo non esiste più")

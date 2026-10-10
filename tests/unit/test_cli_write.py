@@ -8,6 +8,7 @@ spostati in ``cli/_write.py``.
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from pynteracta.cli._write import (
     merge_body,
     parse_id_path_pairs,
     parse_kv_values,
+    read_password,
     upload_all,
     validate_body,
 )
@@ -193,3 +195,45 @@ class TestParseIdPathPairs:
     def test_malformed_raises_bad_parameter(self, value: str) -> None:
         with pytest.raises(typer.BadParameter, match="--update"):
             parse_id_path_pairs([value], option="--update")
+
+
+class TestReadPassword:
+    """``--password-stdin`` (spec 05): prompt nascosto su terminale, o prima riga di stdin."""
+
+    # criterio: 05-C12
+    def test_interactive_prompts_hidden_with_confirmation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from pynteracta.cli import _common, _write  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        calls: list[dict[str, Any]] = []
+
+        def fake_prompt(text: str, **kwargs: Any) -> str:
+            calls.append({"text": text, **kwargs})
+            return "S3gret!"
+
+        monkeypatch.setattr(_write.typer, "prompt", fake_prompt)
+        assert read_password() == "S3gret!"
+        assert calls == [{"text": "Password", "hide_input": True, "confirmation_prompt": True}]
+
+    # criterio: 05-C12
+    def test_non_interactive_reads_first_stdin_line(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: False)
+        monkeypatch.setattr("sys.stdin", io.StringIO("S3gret!\r\nsecond line\n"))
+        assert read_password() == "S3gret!"
+
+    # criterio: 05-C12
+    def test_empty_stdin_exits_2(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pynteracta.cli import _common  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: False)
+        monkeypatch.setattr("sys.stdin", io.StringIO(""))
+        with pytest.raises(typer.Exit) as exc_info:
+            read_password()
+        assert exc_info.value.exit_code == _EXIT_CONFIG
+        assert "--password-stdin: no password read from stdin." in capsys.readouterr().err

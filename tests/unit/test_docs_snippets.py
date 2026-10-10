@@ -231,3 +231,76 @@ def test_attachments_pages_document_upload() -> None:
             if "attachment upload" in lowered:
                 assert "follow" not in lowered, f"{page.name} still lists upload as future"
                 assert "planned" not in lowered, f"{page.name} still lists upload as planned"
+
+
+_USERS_GROUPS_WRITE_COMMANDS = (
+    "users create",
+    "users edit ",
+    "users edit-credentials",
+    "users delete",
+    "groups create",
+    "groups edit ",
+    "groups edit-members",
+    "groups delete",
+)
+
+
+# criterio: 05-C23
+def test_users_groups_pages_document_write_commands() -> None:
+    """Le pagine CLI, API, home e README documentano le scritture admin di utenti e gruppi."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in (
+        *_USERS_GROUPS_WRITE_COMMANDS,
+        "--password-stdin",
+        "--generate-password",
+        "--no-custom",
+        "--add",
+        "--remove",
+    ):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    assert "| 9 |" in cli
+    assert "propaedeutic edit token for future write use" not in cli
+    assert "no write commands exist yet" not in cli
+    users = (_ROOT / "docs" / "api" / "users.md").read_text(encoding="utf-8")
+    for needle in (
+        "create(",
+        "edit(",
+        "delete(",
+        "edit_credentials(",
+        "get_credentials_for_edit",
+        "UserWriteResult",
+        "occ_token",
+        "generated_password",
+        "REQUIRED_FIELD",
+        "INVALID_VALUE",
+        "204",
+    ):
+        assert needle in users, f"'{needle}' missing from docs/api/users.md"
+    groups = (_ROOT / "docs" / "api" / "groups.md").read_text(encoding="utf-8")
+    for needle in (
+        "create(",
+        "edit(",
+        "delete(",
+        "edit_members(",
+        "edit_members_bulk(",
+        "GroupWriteResult",
+        "GroupMembersResult",
+        "occ_token",
+        "ConcurrencyError",
+    ):
+        assert needle in groups, f"'{needle}' missing from docs/api/groups.md"
+    assert "occToken only on .raw" not in groups
+    admin = (_ROOT / "docs" / "api" / "admin_manage.md").read_text(encoding="utf-8")
+    assert "deferred to v1.0+" not in admin
+    assert "edit_credentials" in admin
+    for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
+        text = page.read_text(encoding="utf-8")
+        assert "event posts, admin" not in text, f"{page.name} still lists admin writes as future"
+        write_lines = [line for line in text.splitlines() if "Write operations" in line]
+        assert write_lines, f"no 'Write operations' line in {page.name}"
+        paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
+        for needle in ("users", "groups"):
+            assert needle in paragraph, f"{needle} missing from the write operations of {page.name}"
+        assert not re.search(r"\b0\.1[0-9]\.[0-9]\b", paragraph), (
+            f"{page.name} cites a version number in the write operations paragraph"
+        )

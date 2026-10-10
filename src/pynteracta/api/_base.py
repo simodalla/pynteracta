@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from pynteracta.exceptions import NotFoundError
 from pynteracta.transport import HttpTransport
+
+_HTTP_NO_CONTENT = 204
 
 
 class ResourceClient:
@@ -15,7 +18,18 @@ class ResourceClient:
         self._transport = transport
 
     def _get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Una ``GET``; un ``204`` senza corpo è ``NotFoundError`` (05-C27).
+
+        È la risposta del tenant al form di un utente inesistente: non c'è JSON da leggere e la
+        risorsa non c'è. L'errore non passa dal transport, quindi gli hook non lo vedono, come
+        per il ``TypeError`` sul corpo che non è un oggetto.
+        """
         response = self._transport.request("GET", path, params=params)
+        if response.status_code == _HTTP_NO_CONTENT and not response.content:
+            msg = f"Empty 204 response from {path}: resource not found"
+            raise NotFoundError(
+                msg, status_code=_HTTP_NO_CONTENT, request_method="GET", request_url=path
+            )
         body: Any = response.json()
         if not isinstance(body, dict):
             msg = f"Expected JSON object response from {path}"

@@ -1,0 +1,45 @@
+# serializer version: 1
+# name: TestGroupsCreate.test_flags_body_and_table
+  '''
+           Group 202 created         
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value          ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+  │ group_id       │ 202            │
+  │ name           │ QA             │
+  │ email          │ qa@example.com │
+  │ visible        │ True           │
+  │ members_count  │ 2              │
+  │ next_occ_token │ 1              │
+  └────────────────┴────────────────┘
+  
+  '''
+# ---
+# name: TestGroupsEditMembers.test_add_remove_reads_occ_token_then_puts
+  '''
+          Members of group 201 updated        
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value                   ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ group_id       │ 201                     │
+  │ name           │ Engineering             │
+  │ email          │ engineering@example.com │
+  │ visible        │ True                    │
+  │ members_count  │ 3                       │
+  │ next_occ_token │ 6                       │
+  └────────────────┴─────────────────────────┘
+  
+  '''
+# ---
+# name: TestGroupsEditMembersBulk.test_json_rows_and_exit_9_on_conflict
+  '''
+                               Group members updated                             
+  ┏━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+  ┃ group_id ┃ name        ┃ members_count ┃ next_occ_token ┃ result            ┃
+  ┡━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+  │ 201      │ Engineering │ 3             │ 6              │ success           │
+  │ 202      │ QA          │ 2             │ 2              │ concurrency_error │
+  └──────────┴─────────────┴───────────────┴────────────────┴───────────────────┘
+  
+  '''
+# ---

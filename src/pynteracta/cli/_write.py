@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Helper condivisi dai comandi di scrittura della CLI (``tasks``, ``posts``).
+"""Helper condivisi dai comandi di scrittura della CLI (task, post, utenti, gruppi).
 
 Spostati da ``cli/tasks.py`` con la spec 03: data-ora con fuso, unione di ``--json`` e flag,
 validazione del corpo contro il DTO, coppie ``ID=VALORE`` ripetibili. Con la spec 04: upload dei
-file di ``--attach`` e coppie ``ID=PATH`` di ``--update``.
+file di ``--attach`` e coppie ``ID=PATH`` di ``--update``. Con la spec 05: le opzioni ``--json`` e
+``--occ-token`` condivise e la lettura della password da stdin o da prompt nascosto.
 """
 
 from __future__ import annotations
 
 import pathlib
+import sys
 from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -17,6 +19,7 @@ import pydantic
 import typer
 
 from pynteracta.api._utils import snake_to_camel, zoned_datetime_input
+from pynteracta.cli import _common
 from pynteracta.cli._common import EXIT_CONFIG, coerce_filter_value
 
 if TYPE_CHECKING:
@@ -34,6 +37,43 @@ AttachOption = Annotated[
         readable=True,
     ),
 ]
+JsonBodyOption = Annotated[
+    str | None,
+    typer.Option(
+        "--json",
+        help=(
+            "Full request body as JSON: a file path, or '-' to read stdin. Flags override the "
+            "keys they correspond to."
+        ),
+    ),
+]
+OccTokenOption = Annotated[
+    int | None,
+    typer.Option(
+        "--occ-token",
+        help=(
+            "Concurrency token to send instead of the one just read. A 409 (token mismatch) "
+            "exits with code 9; nothing is retried."
+        ),
+    ),
+]
+
+
+def read_password(*, option: str = "--password-stdin") -> str:
+    """La password custom di ``users create`` (spec 05), mai da un argomento.
+
+    Con un terminale interattivo la chiede con un prompt nascosto e la conferma; altrimenti
+    legge la prima riga dello standard input, senza il fine riga. Una stringa vuota → messaggio
+    con il nome di ``option`` ed ``EXIT_CONFIG``, prima di qualunque richiesta.
+    """
+    if _common._stdin_is_interactive():
+        password = str(typer.prompt("Password", hide_input=True, confirmation_prompt=True))
+    else:
+        password = sys.stdin.readline().rstrip("\r\n")
+    if not password:
+        typer.echo(f"{option}: no password read from stdin.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    return password
 
 
 def parse_zoned_datetime(value: str | None, timezone: str, *, option: str) -> dict[str, str] | None:

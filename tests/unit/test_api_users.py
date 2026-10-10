@@ -9,11 +9,15 @@ from datetime import UTC, datetime
 from typing import ClassVar
 
 import httpx
+import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, make_transport, mock_json
 
 from pynteracta.api.users import UsersAPI
+from pynteracta.exceptions import ConcurrencyError, NotFoundError, TransportError
+from pynteracta.models.facade.admin_manage import UserCredentialsForEdit
 from pynteracta.models.facade.users import ListSystemUsersRequestDTO
+from pynteracta.models.generated import external_v2 as generated
 
 
 class TestUsersAPI:
@@ -183,3 +187,234 @@ class TestUsersListFilters:
         body = json.loads(route.calls[0].request.content)
         assert body["fullTextFilter"] == "rossi"
         assert body["orderTypeId"] == "lastName"
+
+
+# ---------------------------------------------------------------------------
+# Scritture (spec 05)
+# ---------------------------------------------------------------------------
+
+_USER_ID = 42
+_OCC_TOKEN = 5
+_CREATED_USER_ID = 1043
+_EDIT_NEXT_OCC_TOKEN = 43
+_CREDENTIALS_NEXT_OCC_TOKEN = 13
+_CREDENTIALS_OCC_TOKEN = 12
+_CREATE_URL = f"{BASE_URL}/admin/manage/users"
+_EDIT_URL = f"{BASE_URL}/admin/manage/users/{_USER_ID}"
+_CREDENTIALS_URL = f"{BASE_URL}/admin/manage/users/{_USER_ID}/credentials"
+
+
+def _body(route: respx.Route) -> dict:  # type: ignore[type-arg]
+    return json.loads(route.calls[0].request.content)  # type: ignore[no-any-return]
+
+
+class TestUsersCreate:
+    # criterio: 05-C01
+    @respx.mock
+    def test_create_sends_only_given_fields_and_wraps_response(self) -> None:
+        route = mock_json("POST", "admin/manage/users", load_payload("create_user_response.json"))
+        result = UsersAPI(make_transport()).create(
+            firstname="A",
+            lastname="B",
+            contact_email="a@b.it",
+            user_credentials_configuration={"custom": {"username": "ab", "active": True}},
+            reset_user_custom_credentials_command={"generatePassword": True},
+        )
+        assert route.call_count == 1
+        assert _body(route) == {
+            "firstname": "A",
+            "lastname": "B",
+            "contactEmail": "a@b.it",
+            "userCredentialsConfiguration": {"custom": {"username": "ab", "active": True}},
+            "resetUserCustomCredentialsCommand": {"generatePassword": True},
+        }
+        assert result.user_id == _CREATED_USER_ID
+        assert result.next_occ_token == 1
+        assert result.generated_password == ["Xk7-fake-pw"]
+        assert result.expired_credentials is True
+        assert result.sent_email_notify is False
+        assert result.account_photo_url is not None
+        assert result.raw.userId == _CREATED_USER_ID
+
+    # criterio: 05-C01
+    @respx.mock
+    def test_create_raw_equivalent(self) -> None:
+        route = mock_json("POST", "admin/manage/users", load_payload("create_user_response.json"))
+        req = generated.CreateUserRequestDTO(
+            firstname="A",
+            lastname="B",
+            contactEmail="a@b.it",
+            userCredentialsConfiguration={"custom": {"username": "ab", "active": True}},
+            resetUserCustomCredentialsCommand={"generatePassword": True},
+        )
+        result = UsersAPI(make_transport()).create_raw(req)
+        assert route.call_count == 1
+        assert _body(route) == {
+            "firstname": "A",
+            "lastname": "B",
+            "contactEmail": "a@b.it",
+            "userCredentialsConfiguration": {"custom": {"username": "ab", "active": True}},
+            "resetUserCustomCredentialsCommand": {"generatePassword": True},
+        }
+        assert result.user_id == _CREATED_USER_ID
+
+    # criterio: 05-C01
+    @respx.mock
+    def test_create_without_fields_sends_empty_body(self) -> None:
+        route = mock_json("POST", "admin/manage/users", load_payload("create_user_response.json"))
+        UsersAPI(make_transport()).create()
+        assert _body(route) == {}
+
+    # criterio: 05-C21
+    @respx.mock
+    def test_create_timeout_raises_transport_error_once(self) -> None:
+        route = respx.post(_CREATE_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(TransportError):
+            UsersAPI(make_transport()).create(firstname="A")
+        assert route.call_count == 1
+
+
+class TestUsersEdit:
+    # criterio: 05-C02
+    @respx.mock
+    def test_edit_sends_given_fields_and_occ_token(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_user_response.json"))
+        )
+        result = UsersAPI(make_transport()).edit(
+            _USER_ID, _OCC_TOKEN, lastname="C", user_settings={"reducedProfile": True}
+        )
+        assert route.call_count == 1
+        assert _body(route) == {
+            "lastname": "C",
+            "userSettings": {"reducedProfile": True},
+            "occToken": _OCC_TOKEN,
+        }
+        assert result.user_id == _USER_ID
+        assert result.next_occ_token == _EDIT_NEXT_OCC_TOKEN
+        assert result.account_photo_url is not None
+
+    # criterio: 05-C02
+    @respx.mock
+    def test_edit_raw_equivalent(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_user_response.json"))
+        )
+        req = generated.EditUserRequestDTO(
+            lastname="C", userSettings={"reducedProfile": True}, occToken=_OCC_TOKEN
+        )
+        result = UsersAPI(make_transport()).edit_raw(_USER_ID, req)
+        assert _body(route) == {
+            "lastname": "C",
+            "userSettings": {"reducedProfile": True},
+            "occToken": _OCC_TOKEN,
+        }
+        assert result.user_id == _USER_ID
+
+    # criterio: 05-C02
+    @respx.mock
+    def test_edit_without_fields_sends_only_occ_token(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_user_response.json"))
+        )
+        UsersAPI(make_transport()).edit(_USER_ID, _OCC_TOKEN)
+        assert _body(route) == {"occToken": _OCC_TOKEN}
+
+    # criterio: 05-C05
+    @respx.mock
+    def test_edit_409_raises_concurrency_error_once(self) -> None:
+        route = respx.put(_EDIT_URL).mock(
+            return_value=httpx.Response(409, json={"message": "Concurrency error"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            UsersAPI(make_transport()).edit(_USER_ID, _OCC_TOKEN, lastname="C")
+        assert exc_info.value.status_code == 409
+        assert route.call_count == 1
+
+
+class TestUsersDelete:
+    # criterio: 05-C03
+    @respx.mock
+    def test_delete_sends_one_request_and_returns_none(self) -> None:
+        route = respx.delete(_EDIT_URL).mock(return_value=httpx.Response(200))
+        assert UsersAPI(make_transport()).delete(_USER_ID) is None
+        assert route.call_count == 1
+
+    # criterio: 05-C03
+    @respx.mock
+    def test_delete_404_raises_not_found(self) -> None:
+        route = respx.delete(_EDIT_URL).mock(
+            return_value=httpx.Response(404, json={"message": "Utente non esistente"})
+        )
+        with pytest.raises(NotFoundError):
+            UsersAPI(make_transport()).delete(_USER_ID)
+        assert route.call_count == 1
+
+
+class TestUsersEditCredentials:
+    # criterio: 05-C04
+    @respx.mock
+    def test_edit_credentials_wraps_blocks_and_occ_token(self) -> None:
+        route = respx.put(_CREDENTIALS_URL).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("edit_user_credentials_response.json")
+            )
+        )
+        result = UsersAPI(make_transport()).edit_credentials(
+            _USER_ID, _OCC_TOKEN, google={"googleAccountId": "a@b.it", "enabled": True}
+        )
+        assert route.call_count == 1
+        assert _body(route) == {
+            "userCredentialsConfiguration": {
+                "google": {"googleAccountId": "a@b.it", "enabled": True}
+            },
+            "occToken": _OCC_TOKEN,
+        }
+        assert result.user_id == _USER_ID
+        assert result.next_occ_token == _CREDENTIALS_NEXT_OCC_TOKEN
+
+    # criterio: 05-C04
+    @respx.mock
+    def test_edit_credentials_raw_equivalent(self) -> None:
+        route = respx.put(_CREDENTIALS_URL).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("edit_user_credentials_response.json")
+            )
+        )
+        req = generated.EditUserCredentialsRequestDTO(
+            userCredentialsConfiguration={"google": {"googleAccountId": "a@b.it", "enabled": True}},
+            occToken=_OCC_TOKEN,
+        )
+        result = UsersAPI(make_transport()).edit_credentials_raw(_USER_ID, req)
+        assert _body(route) == {
+            "userCredentialsConfiguration": {
+                "google": {"googleAccountId": "a@b.it", "enabled": True}
+            },
+            "occToken": _OCC_TOKEN,
+        }
+        assert result.next_occ_token == _CREDENTIALS_NEXT_OCC_TOKEN
+
+    # criterio: 05-C05
+    @respx.mock
+    def test_edit_credentials_409_raises_concurrency_error_once(self) -> None:
+        route = respx.put(_CREDENTIALS_URL).mock(
+            return_value=httpx.Response(409, json={"message": "Concurrency error"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            UsersAPI(make_transport()).edit_credentials(_USER_ID, _OCC_TOKEN, custom={})
+        assert exc_info.value.status_code == 409
+        assert route.call_count == 1
+
+    # criterio: 05-C06
+    @respx.mock
+    def test_get_credentials_for_edit_is_alias(self) -> None:
+        route = respx.get(f"{_CREDENTIALS_URL}/edit").mock(
+            return_value=httpx.Response(
+                200, json=load_payload("get_user_credentials_for_edit_response.json")
+            )
+        )
+        result = UsersAPI(make_transport()).get_credentials_for_edit(_USER_ID)
+        assert route.call_count == 1
+        assert isinstance(result, UserCredentialsForEdit)
+        assert result.occ_token == _CREDENTIALS_OCC_TOKEN
+        assert result.custom_username == "m.rossi"

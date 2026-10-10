@@ -5,9 +5,16 @@ Endpoints covered:
   POST /admin/data/users                         (endpoint 3 — list system users)
   GET  /core/user-profile/info                   (endpoint 4 — own profile)
   GET  /admin/manage/users/{userId}/edit         (endpoint 5 — user for edit)
+  POST /admin/manage/users                       (spec 05 — create)
+  PUT  /admin/manage/users/{userId}              (spec 05 — edit)
+  PUT  /admin/manage/users/{userId}/credentials  (spec 05 — edit credentials)
 """
 
 from __future__ import annotations
+
+from typing import Any
+
+from pydantic import ValidationError as PydanticValidationError
 
 from pynteracta.models.generated import external_v2 as generated
 
@@ -168,6 +175,11 @@ class UserForEdit:
         """URL of the user's current profile photo."""
         return self.raw.accountPhotoUrl
 
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza da passare a ``edit`` (spec 05, RF-023a)."""
+        return self.raw.occToken
+
     @classmethod
     def from_dict(cls, data: dict) -> UserForEdit:  # type: ignore[type-arg]
         """Parse from a raw API response dict.
@@ -180,3 +192,101 @@ class UserForEdit:
         """
         raw = generated.GetUserForEditResponseDTO.model_validate(data)
         return cls(raw)
+
+
+class UserWriteResult:
+    """Façade sulla risposta di ``create``, ``edit`` ed ``edit_credentials`` di un utente.
+
+    I tre DTO di risposta non hanno gli stessi campi: le proprietà assenti valgono ``None``.
+    ``user_id`` viene dalla risposta di creazione; per le modifiche è quello passato dal
+    chiamante, perché il server non lo restituisce.
+
+    Attributes:
+        raw: Il DTO generato sottostante (``CreateUserResponseDTO``, ``EditUserResponseDTO`` o
+            ``EditUserCredentialsResponseDTO``).
+    """
+
+    def __init__(
+        self,
+        raw: (
+            generated.CreateUserResponseDTO
+            | generated.EditUserResponseDTO
+            | generated.EditUserCredentialsResponseDTO
+        ),
+        *,
+        user_id: int | None = None,
+    ) -> None:
+        self.raw = raw
+        self._user_id = user_id
+
+    @property
+    def user_id(self) -> int | None:
+        """Id dell'utente scritto: dalla risposta di creazione, altrimenti quello passato."""
+        user_id = getattr(self.raw, "userId", None)
+        if user_id is not None:
+            return int(user_id)
+        return self._user_id
+
+    @property
+    def next_occ_token(self) -> int | None:
+        """Token di concorrenza da usare per la modifica successiva."""
+        return self.raw.nextOccToken
+
+    @property
+    def generated_password(self) -> list[str] | None:
+        """Password custom generata dal server alla creazione, se richiesta."""
+        value: list[str] | None = getattr(self.raw, "generatedPassword", None)
+        return value
+
+    @property
+    def expired_credentials(self) -> bool | None:
+        """Se le credenziali custom create vanno cambiate al primo accesso."""
+        value: bool | None = getattr(self.raw, "expiredCredentials", None)
+        return value
+
+    @property
+    def sent_email_notify(self) -> bool | None:
+        """Se il server ha inviato l'email di notifica delle credenziali."""
+        value: bool | None = getattr(self.raw, "sentEmailNotify", None)
+        return value
+
+    @property
+    def account_photo_url(self) -> str | None:
+        """URL della foto dell'utente dopo la scrittura."""
+        value: str | None = getattr(self.raw, "accountPhotoUrl", None)
+        return value
+
+    @classmethod
+    def from_create(cls, data: dict[str, Any]) -> UserWriteResult:
+        """Legge la risposta di ``POST admin/manage/users``.
+
+        Lo swagger dichiara ``generatedPassword`` come lista di stringhe, ma il tenant restituisce
+        una stringa (prova sul tenant, spec 05): la si normalizza in lista di un elemento. Se la
+        risposta non ha la forma attesa l'errore riporta solo i nomi dei campi, mai i valori, e
+        non incatena l'eccezione di pydantic: la password non deve finire in un messaggio di
+        eccezione (RNF-001).
+        """
+        payload = dict(data)
+        password = payload.get("generatedPassword")
+        if isinstance(password, str):
+            payload["generatedPassword"] = [password]
+        try:
+            raw = generated.CreateUserResponseDTO.model_validate(payload)
+        except PydanticValidationError as exc:
+            fields = sorted(
+                {".".join(str(part) for part in err["loc"]) or "<root>" for err in exc.errors()}
+            )
+        else:
+            return cls(raw)
+        msg = f"Unexpected create-user response: invalid field(s) {', '.join(fields)}"
+        raise ValueError(msg)
+
+    @classmethod
+    def from_edit(cls, data: dict[str, Any], user_id: int) -> UserWriteResult:
+        """Legge la risposta di ``PUT admin/manage/users/{userId}``."""
+        return cls(generated.EditUserResponseDTO.model_validate(data), user_id=user_id)
+
+    @classmethod
+    def from_credentials(cls, data: dict[str, Any], user_id: int) -> UserWriteResult:
+        """Legge la risposta di ``PUT admin/manage/users/{userId}/credentials``."""
+        return cls(generated.EditUserCredentialsResponseDTO.model_validate(data), user_id=user_id)
