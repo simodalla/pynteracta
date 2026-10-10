@@ -55,7 +55,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   2. Controlli bloccanti; commit `test: caratterizzazione della redazione delle query e dei corpi
      non validi di posts create e tasks create (04-T02)`.
 
-### [ ] T03 – Redazione delle query firmate e delle chiavi `signature`/`policy`
+### [x] T03 – Redazione delle query firmate e delle chiavi `signature`/`policy`
 
 - Criteri: 04-C08 (redazione)
 - Dipende da: T02

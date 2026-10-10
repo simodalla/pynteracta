@@ -23,8 +23,18 @@ _REDACTED = "***REDACTED***"
 # Matches the leading two Base64-encoded JSON header segments of a JWT.
 _JWT_RE = re.compile(r"eyJ[A-Za-z0-9+/._\-]{10,}")
 
-# Body fields whose *key* (case-insensitive) should always be redacted.
-_SENSITIVE_KEY_RE = re.compile(r"(?i)token|password|secret|privatekey|assertion|jwt")
+# Body fields whose *key* (case-insensitive) should always be redacted. ``signature`` e
+# ``policy`` sono i campi della policy firmata dello storage (spec 04).
+_SENSITIVE_KEY_RE = re.compile(
+    r"(?i)token|password|secret|privatekey|assertion|jwt|signature|policy"
+)
+
+# Parametro di query di un URL il cui nome contiene una parola sensibile (``Signature`` dei link
+# firmati, ``access_token``, ``apiKey``…): resta il nome, il valore è redatto. Il nome deve seguire
+# ``?`` o ``&``, così il testo ordinario non è toccato (spec 04).
+_SENSITIVE_QUERY_RE = re.compile(
+    r"(?i)([?&][^&=#\s]*(?:signature|token|secret|password|key)[^&=#\s]*=)([^&#\s\"']*)"
+)
 
 # Header il cui intero valore è sempre redatto, per nome (confronto in minuscolo): la lista fissa
 # degli header di autenticazione standard più un pattern sul nome, simmetrico a quello delle chiavi
@@ -64,7 +74,13 @@ _AUDIT_RAW_WARNED = False
 
 
 def redact_string(value: str) -> str:
-    """Replace any JWT-shaped substring with ``***REDACTED***``."""
+    """Redige una stringa: i valori dei parametri di query sensibili, poi i JWT.
+
+    I parametri di query il cui nome contiene ``signature``, ``token``, ``secret``, ``password``
+    o ``key`` perdono il valore (nome e altri parametri restano); ogni sottostringa a forma di
+    JWT diventa ``***REDACTED***``.
+    """
+    value = _SENSITIVE_QUERY_RE.sub(rf"\1{_REDACTED}", value)
     return _JWT_RE.sub(_REDACTED, value)
 
 
