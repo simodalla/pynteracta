@@ -1,6 +1,54 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.11.0] - 2026-10-10
+
+### Chores
+
+- Fixture e contract test dei DTO di scrittura dei post, dati di screen come valori qualsiasi (03-T02)
+- Integration test opt-in del ciclo di scrittura dei post (03-T15)
+- Campi custom obbligatori e dettaglio dell'errore nell'integration test dei post (03-T15)
+- Dettaglio del server per ogni passo che fallisce nell'integration test dei post (03-T15)
+- La copia dell'integration test rimanda i campi letti (03-T15)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.10.0
+- Home, README e quickstart aggiornati alla superficie di scrittura, senza numeri di versione
+- Spec 03, scrittura dei post custom, commenti e workflow
+- Piano 03, scrittura dei post custom, commenti e workflow
+- Task 03, scrittura dei post custom, commenti e workflow
+- Spec, piano e task 03 rivisti, dati di screen del workflow da rigenerare
+- Scrittura dei post nelle pagine API e CLI, home e README, variabili per gli integration test (03-T14)
+- Spec, piano e task 03 rivisti, riferimenti letti scritti come id
+- Esito delle prove sul tenant per la spec 03 (03-T16)
+- PRD e pagine aggiornate con l'esito delle prove sul tenant per la spec 03 (03-T17)
+- Verifica 03, scrittura dei post custom, commenti e workflow
+- Release v0.11.0, riga di ROADMAP a shipped
+
+### Features
+
+- **api**: PUT senza corpo di risposta vale come oggetto vuoto; riga 0.11.0 in ROADMAP (03-T01)
+- **posts**: Façade per le risposte di scrittura, le letture propedeutiche, i commenti e il workflow (03-T03)
+- **posts**: Capabilities di copia, allegati e operazioni di workflow permesse (03-T04)
+- **posts**: Letture propedeutiche con occ_token e creazione di un post (03-T05)
+- **posts**: Modifica, campi custom e copia di un post con occToken (03-T06)
+- **posts**: Watcher, allegati, eliminazione, marcatura per la cancellazione e commenti (03-T07)
+- **posts**: Lettura dello screen, transizioni e dati di screen del workflow (03-T08)
+- **cli**: Comandi posts create, comment e get-for-create|edit|copy (03-T10)
+- **cli**: Posts edit, edit-custom-data e copy come patch con occToken letto o imposto (03-T11)
+- **cli**: Posts edit-watchers, delete e mark-erasable con conferma (03-T12)
+- **cli**: Posts workflow-screen, workflow-execute e workflow-edit-screen (03-T13)
+- **cli**: Le patch dei post rimandano i riferimenti letti come id (03-T18)
+
+### Fixes
+
+- **cli**: Posts delete e mark-erasable riportano l'id del post richiesto (03-T19)
+
+### Refactors
+
+- **cli**: Helper di scrittura condivisi in cli/_write.py e messaggio del 409 con il nome della risorsa (03-T09)
+
 ## [0.10.0] - 2026-10-09
 
 ### CI
