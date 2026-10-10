@@ -301,7 +301,6 @@ _EDIT_BASE = {
         "viewUserProfiles": True,
     },
 }
-_CUSTOM_READ = {"username": "m.rossi", "canUserManageCustomCredentials": True, "active": True}
 
 
 def _mock_edit_flow(
@@ -459,101 +458,81 @@ class TestUsersEdit:
         assert put_route.call_count == 0
 
 
-class TestCredentialsBase:
-    # criterio: 05-C14
-    def test_credentials_base_drops_read_only_fields(self) -> None:
-        from pynteracta.cli.users_write import _credentials_base  # noqa: PLC0415
-        from pynteracta.models.facade.admin_manage import UserCredentialsForEdit  # noqa: PLC0415
+_CREDS_GOOGLE = {"googleAccountId": "a@b.it", "enabled": True}
+_CREDS_MICROSOFT = {"microsoftAccountId": "m@b.it", "enabled": True}
+_REMOVE_CUSTOM_PROMPT = f"Remove the custom credentials of user {_USER_ID}?"
 
-        form = UserCredentialsForEdit.from_dict(
-            load_payload("get_user_credentials_for_edit_response.json")
-        )
-        assert _credentials_base(form) == {"google": {"enabled": True}, "custom": _CUSTOM_READ}
 
-    # criterio: 05-C14
-    def test_credentials_base_empty_form(self) -> None:
-        from pynteracta.cli.users_write import _credentials_base  # noqa: PLC0415
-        from pynteracta.models.facade.admin_manage import UserCredentialsForEdit  # noqa: PLC0415
-
-        assert _credentials_base(UserCredentialsForEdit.from_dict({"occToken": 1})) == {}
+def _edit_credentials(*args: str) -> list[str]:
+    return ["users", "edit-credentials", str(_USER_ID), *args]
 
 
 class TestUsersEditCredentials:
-    # criterio: 05-C14
+    """Dopo T15: solo i blocchi indicati, niente patch (05-C28)."""
+
+    # criterio: 05-C28
     @respx.mock
-    def test_google_flag_and_no_custom(self, runner: CliRunner) -> None:
+    def test_google_flag_and_no_custom_send_only_those_blocks(self, runner: CliRunner) -> None:
         get_route, put_route = _mock_credentials_flow()
         result = runner.invoke(
             app,
-            [
-                "users",
-                "edit-credentials",
-                str(_USER_ID),
-                "--google-account",
-                "a@b.it",
-                "--no-custom",
-            ],
+            _edit_credentials("--google-account", "a@b.it", "--no-custom", "--yes"),
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
         assert get_route.call_count == 1
         assert _sent_body(put_route) == {
-            "userCredentialsConfiguration": {
-                "google": {"googleAccountId": "a@b.it", "enabled": True}
-            },
+            "userCredentialsConfiguration": {"google": _CREDS_GOOGLE, "custom": {"active": False}},
             "occToken": _CREDENTIALS_OCC_TOKEN,
         }
+        assert str(_USER_ID) in result.output
 
-    # criterio: 05-C14
+    # criterio: 05-C28
     @respx.mock
-    def test_username_and_inactive_keep_read_block_without_read_only_fields(
-        self, runner: CliRunner
-    ) -> None:
+    def test_username_sets_custom_active(self, runner: CliRunner) -> None:
+        _, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials("--username", "u@b.it"), env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["userCredentialsConfiguration"] == {
+            "custom": {"username": "u@b.it", "active": True}
+        }
+
+    # criterio: 05-C28
+    @respx.mock
+    def test_no_google_sends_enabled_false(self, runner: CliRunner) -> None:
+        _, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials("--no-google", "--yes"), env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["userCredentialsConfiguration"] == {
+            "google": {"enabled": False}
+        }
+
+    # criterio: 05-C28
+    @respx.mock
+    def test_custom_inactive_and_no_microsoft(self, runner: CliRunner) -> None:
         _, put_route = _mock_credentials_flow()
         result = runner.invoke(
-            app,
-            [
-                "users",
-                "edit-credentials",
-                str(_USER_ID),
-                "--username",
-                "new.name",
-                "--custom-inactive",
-            ],
-            env=BASE_ENV,
+            app, _edit_credentials("--custom-inactive", "--no-microsoft", "--yes"), env=BASE_ENV
         )
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route)["userCredentialsConfiguration"] == {
-            "google": {"enabled": True},
-            "custom": {**_CUSTOM_READ, "username": "new.name", "active": False},
+            "microsoft": {"enabled": False},
+            "custom": {"active": False},
         }
 
-    # criterio: 05-C14
+    # criterio: 05-C28
     @respx.mock
-    def test_no_google_when_absent_is_fine(self, runner: CliRunner) -> None:
-        form = {
-            "occToken": _CREDENTIALS_OCC_TOKEN,
-            "userCredentialsConfiguration": {"custom": _CUSTOM_READ},
-        }
-        _, put_route = _mock_credentials_flow(form)
-        result = runner.invoke(
-            app,
-            ["users", "edit-credentials", str(_USER_ID), "--no-google", "--no-microsoft"],
-            env=BASE_ENV,
-        )
-        assert result.exit_code == 0, result.output
-        assert _sent_body(put_route)["userCredentialsConfiguration"] == {"custom": _CUSTOM_READ}
-
-    # criterio: 05-C14
-    @respx.mock
-    def test_json_block_overlays_read_form(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+    def test_json_and_flags_merge_per_block(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
         _, put_route = _mock_credentials_flow()
         body = tmp_path / "body.json"
         body.write_text(
             json.dumps(
                 {
                     "userCredentialsConfiguration": {
-                        "microsoft": {"microsoftAccountId": "m@b.it", "enabled": True}
+                        "microsoft": _CREDS_MICROSOFT,
+                        "google": {"googleAccountId": "old@b.it", "enabled": False},
                     }
                 }
             ),
@@ -561,26 +540,69 @@ class TestUsersEditCredentials:
         )
         result = runner.invoke(
             app,
-            [
-                "users",
-                "edit-credentials",
-                str(_USER_ID),
-                "--json",
-                str(body),
-                "--occ-token",
-                str(_FORCED_OCC_TOKEN),
-            ],
+            _edit_credentials("--json", str(body), "--google-account", "a@b.it"),
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route) == {
             "userCredentialsConfiguration": {
-                "google": {"enabled": True},
-                "custom": _CUSTOM_READ,
-                "microsoft": {"microsoftAccountId": "m@b.it", "enabled": True},
+                "microsoft": _CREDS_MICROSOFT,
+                "google": _CREDS_GOOGLE,
             },
-            "occToken": _FORCED_OCC_TOKEN,
+            "occToken": _CREDENTIALS_OCC_TOKEN,
         }
+
+    # criterio: 05-C28
+    @respx.mock
+    def test_occ_token_skips_get(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_credentials_flow()
+        result = runner.invoke(
+            app,
+            _edit_credentials("--google-account", "a@b.it", "--occ-token", str(_FORCED_OCC_TOKEN)),
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 0
+        assert _sent_body(put_route)["occToken"] == _FORCED_OCC_TOKEN
+
+    # criterio: 05-C28
+    @respx.mock
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--username", "u@b.it", "--no-custom"],
+            ["--username", "u@b.it", "--custom-inactive"],
+            ["--google-account", "a@b.it", "--no-google"],
+            ["--microsoft-account", "m@b.it", "--no-microsoft"],
+        ],
+    )
+    def test_conflicting_flags_exit_2(self, runner: CliRunner, args: list[str]) -> None:
+        get_route, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials(*args, "--yes"), env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert get_route.call_count == 0
+        assert put_route.call_count == 0
+
+    # criterio: 05-C28
+    @respx.mock
+    def test_nothing_to_change_exits_2(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials(), env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "Nothing to change" in result.output
+        assert get_route.call_count == 0
+        assert put_route.call_count == 0
+
+    # criterio: 05-C27
+    @respx.mock
+    def test_form_204_exits_5_without_put(self, runner: CliRunner) -> None:
+        respx.get(f"{BASE_URL}/{_CREDENTIALS_FORM_PATH}").mock(return_value=httpx.Response(204))
+        put_route = mock_json(
+            "PUT", _CREDENTIALS_PATH, load_payload("edit_user_credentials_response.json")
+        )
+        result = runner.invoke(app, _edit_credentials("--google-account", "a@b.it"), env=BASE_ENV)
+        assert result.exit_code == 5  # noqa: PLR2004
+        assert put_route.call_count == 0
 
     # criterio: 05-C15
     @respx.mock
@@ -593,14 +615,52 @@ class TestUsersEditCredentials:
         put_route = respx.put(_CREDENTIALS_URL).mock(
             return_value=httpx.Response(409, json={"message": "Concurrency error"})
         )
-        result = runner.invoke(
-            app,
-            ["users", "edit-credentials", str(_USER_ID), "--google-account", "a@b.it"],
-            env=BASE_ENV,
-        )
+        result = runner.invoke(app, _edit_credentials("--google-account", "a@b.it"), env=BASE_ENV)
         assert result.exit_code == _EXIT_CONFLICT
         assert _CONFLICT in result.output
         assert put_route.call_count == 1
+
+
+class TestUsersEditCredentialsConfirm:
+    """La rimozione di un blocco chiede conferma come ``users delete`` (05-C29)."""
+
+    # criterio: 05-C29
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch)
+        get_route, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials("--no-custom"), input="n\n", env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _REMOVE_CUSTOM_PROMPT in result.output
+        assert get_route.call_count == 0
+        assert put_route.call_count == 0
+
+    # criterio: 05-C29
+    @respx.mock
+    def test_prompt_y_sends_removal(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch)
+        _, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials("--no-custom"), input="y\n", env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["userCredentialsConfiguration"] == {
+            "custom": {"active": False}
+        }
+
+    # criterio: 05-C29
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _not_interactive(monkeypatch)
+        _, put_route = _mock_credentials_flow()
+        result = runner.invoke(app, _edit_credentials("--no-google"), env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--yes is required" in result.output
+        assert put_route.call_count == 0
 
 
 # ---------------------------------------------------------------------------

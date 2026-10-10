@@ -7,13 +7,14 @@ from __future__ import annotations
 import json
 from typing import ClassVar
 
+import httpx
 import pytest
 import respx
-from api_helpers import load_payload, mock_json
+from api_helpers import BASE_URL, load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli._common import EXIT_CONFIG
+from pynteracta.cli._common import EXIT_CONFIG, EXIT_NOT_FOUND
 
 
 @pytest.fixture
@@ -76,6 +77,15 @@ class TestUsersProfile:
 
 
 class TestUsersGetForEdit:
+    # criterio: 05-C27
+    @respx.mock
+    def test_204_exits_5(self, runner: CliRunner) -> None:
+        """Utente inesistente: il tenant risponde ``204`` vuoto, non ``404``."""
+        respx.get(f"{BASE_URL}/admin/manage/users/1042/edit").mock(return_value=httpx.Response(204))
+        result = runner.invoke(app, ["users", "get-for-edit", "1042"], env=BASE_ENV)
+        assert result.exit_code == EXIT_NOT_FOUND
+        assert "JSONDecodeError" not in result.output
+
     @respx.mock
     def test_table_output(self, runner: CliRunner, snapshot: object) -> None:
         mock_json(

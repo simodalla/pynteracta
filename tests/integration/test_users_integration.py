@@ -76,19 +76,33 @@ class TestUsersWriteIntegration:
                 )
                 form = client.users.get_for_edit(user_id)
                 assert form.occ_token is not None
-                client.users.edit(user_id, form.occ_token, lastname=f"{stamp}-edited")
+                # Il server esige firstname e lastname e azzera contactEmail se omessa (T15).
+                client.users.edit(
+                    user_id,
+                    form.occ_token,
+                    firstname=form.first_name,
+                    lastname=f"{stamp}-edited",
+                    contact_email=form.contact_email,
+                )
                 after_edit = client.users.get_for_edit(user_id)
                 print(
-                    "[05-C26] users.edit(lastname=...) con gli altri campi omessi: "
-                    f"firstname={after_edit.first_name!r} "
-                    f"contact_email={after_edit.contact_email!r} "
-                    f"external_id={after_edit.external_id!r}"
+                    "[05-C26] users.edit(firstname, lastname, contactEmail) con gli altri campi "
+                    f"omessi: external_id={after_edit.external_id!r} "
+                    f"userSettings presenti={after_edit.raw.userSettings is not None} "
+                    f"userInfo presente={after_edit.raw.userInfo is not None}"
                 )
                 assert after_edit.last_name == f"{stamp}-edited"
+                assert after_edit.contact_email == email
                 creds = client.users.get_credentials_for_edit(user_id)
                 assert creds.occ_token is not None
                 client.users.edit_credentials(
-                    user_id, creds.occ_token, custom={"username": email, "active": False}
+                    user_id,
+                    creds.occ_token,
+                    custom={
+                        "username": email,
+                        "canUserManageCustomCredentials": True,
+                        "active": True,
+                    },
                 )
                 after_creds = client.users.get_credentials_for_edit(user_id)
                 print(
@@ -97,6 +111,17 @@ class TestUsersWriteIntegration:
                     f"has_custom={after_creds.has_custom_credentials!r} "
                     f"custom_active={after_creds.custom_active!r}"
                 )
+                assert after_creds.custom_username == email
+                assert after_creds.occ_token is not None
+                client.users.edit_credentials(
+                    user_id, after_creds.occ_token, custom={"active": False}
+                )
+                removed = client.users.get_credentials_for_edit(user_id)
+                print(
+                    "[05-C26] users.edit_credentials(custom={'active': False}) senza username: "
+                    f"has_custom={removed.has_custom_credentials!r}"
+                )
+                assert removed.has_custom_credentials is False
             finally:
                 client.users.delete(user_id)
             try:

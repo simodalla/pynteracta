@@ -13,9 +13,11 @@ import respx
 from api_helpers import BASE_URL, make_transport
 
 from pynteracta.api._base import ResourceClient
+from pynteracta.exceptions import NotFoundError
 
 _PATH = "some/resource/1"
 _EXPECTED_MESSAGE = f"Expected JSON object response from {_PATH}"
+_HTTP_NO_CONTENT = 204
 
 
 def _mock_array(method: str) -> respx.Route:
@@ -54,6 +56,18 @@ class TestResourceClientRejectsNonObjectBodies:
 
 
 class TestResourceClientEmptyBodies:
+    # criterio: 05-C27
+    @respx.mock
+    def test_get_204_raises_not_found(self) -> None:
+        """Il tenant risponde ``204`` vuoto al form di un utente inesistente (T15 della spec 05)."""
+        route = respx.get(f"{BASE_URL}/{_PATH}").mock(return_value=httpx.Response(204))
+        with pytest.raises(NotFoundError) as info:
+            ResourceClient(make_transport())._get(_PATH)
+        assert info.value.status_code == _HTTP_NO_CONTENT
+        assert info.value.request_method == "GET"
+        assert info.value.request_url == _PATH
+        assert route.call_count == 1
+
     # criterio: 03-C08
     @respx.mock
     def test_put_without_body_returns_empty_dict(self) -> None:

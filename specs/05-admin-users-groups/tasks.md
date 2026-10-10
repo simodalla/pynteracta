@@ -288,7 +288,7 @@ le costanti qui sopra con la stessa forma.
   l'approvazione del maintainer prima di T16.
 - Esito: *da compilare*.
 
-### [ ] T18 – Correzioni dalla prova sul tenant: `204` vuoto, `edit-credentials` senza patch, ciclo utenti
+### [x] T18 – Correzioni dalla prova sul tenant: `204` vuoto, `edit-credentials` senza patch, ciclo utenti
 
 Numerato dopo T17 per non rinumerare, si esegue prima di T16: nasce dalla prima esecuzione di
 T15 (2026-10-10), con le decisioni del maintainer registrate nella spec.

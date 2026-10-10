@@ -43,27 +43,15 @@ from pynteracta.cli._write import (
 )
 from pynteracta.cli.users import app
 from pynteracta.exceptions import InteractaError
-from pynteracta.models.facade.admin_manage import UserCredentialsForEdit
 from pynteracta.models.facade.users import UserForEdit, UserWriteResult
 from pynteracta.models.generated.external_v2 import (
     AdminUserPreferencesDTO,
     CreateUserRequestDTO,
-    CustomUserCredentialsConfigurationDTOModel,
     EditUserCredentialsRequestDTO,
     EditUserRequestDTO,
-    GoogleUserCredentialsConfigurationDTO,
-    MicrosoftUserCredentialsConfigurationDTO,
     UserInfoDTO1,
     UserSettingsRequestDTO1,
 )
-
-# Campi di sola lettura dei blocchi delle credenziali: il server li restituisce, non li accetta.
-_READ_ONLY_CREDENTIAL_KEYS = frozenset({"profilePhotoUrl", "canManageProfilePhoto"})
-_CREDENTIAL_DTOS: dict[str, type[BaseModel]] = {
-    "google": GoogleUserCredentialsConfigurationDTO,
-    "microsoft": MicrosoftUserCredentialsConfigurationDTO,
-    "custom": CustomUserCredentialsConfigurationDTOModel,
-}
 
 # Opzioni anagrafiche condivise da `create` ed `edit`.
 FirstNameOption = Annotated[str | None, typer.Option("--first-name", help="First name.")]
@@ -167,55 +155,46 @@ def _edit_base(user: UserForEdit) -> dict[str, Any]:
     return {key: value for key, value in base.items() if value is not None}
 
 
-def _credentials_base(form: UserCredentialsForEdit) -> dict[str, Any]:
-    """``userCredentialsConfiguration`` ricavata dal form letto (05-C14), senza i campi di sola
-    lettura."""
-    config = _as_dict(form.raw.userCredentialsConfiguration) or {}
-    base: dict[str, Any] = {}
-    for key, dto_cls in _CREDENTIAL_DTOS.items():
-        block = _typed_block(config.get(key), dto_cls)
-        if block is None:
-            continue
-        for read_only in _READ_ONLY_CREDENTIAL_KEYS:
-            block.pop(read_only, None)
-        base[key] = block
-    return base
+# Blocchi di `edit-credentials`: nome, chiave dell'account, chiave del flag, opzioni della CLI.
+_CREDENTIAL_BLOCKS: tuple[tuple[str, str, str, str, str], ...] = (
+    ("google", "googleAccountId", "enabled", "--google-account", "--no-google"),
+    ("microsoft", "microsoftAccountId", "enabled", "--microsoft-account", "--no-microsoft"),
+    ("custom", "username", "active", "--username", "--no-custom"),
+)
 
 
-def _apply_credentials_flags(  # noqa: PLR0913
-    base: dict[str, Any],
+def _usage_error(message: str) -> typer.Exit:
+    typer.echo(message, err=True)
+    return typer.Exit(EXIT_CONFIG)
+
+
+def _credentials_blocks(
+    json_config: dict[str, Any],
     *,
-    google_account: str | None,
-    microsoft_account: str | None,
-    username: str | None,
-    custom_active: bool | None,
-    no_google: bool,
-    no_microsoft: bool,
-    no_custom: bool,
+    values: dict[str, str | None],
+    removals: dict[str, bool],
 ) -> dict[str, Any]:
-    """Sovrappone i flag di ``edit-credentials`` alla base letta; ``--no-*`` toglie il blocco."""
-    out = dict(base)
-    if google_account is not None:
-        out["google"] = {
-            **out.get("google", {}),
-            "googleAccountId": google_account,
-            "enabled": True,
-        }
-    if microsoft_account is not None:
-        out["microsoft"] = {
-            **out.get("microsoft", {}),
-            "microsoftAccountId": microsoft_account,
-            "enabled": True,
-        }
-    if username is not None:
-        custom = out.get("custom", {})
-        out["custom"] = {**custom, "username": username, "active": custom.get("active", True)}
-    if custom_active is not None:
-        out["custom"] = {**out.get("custom", {}), "active": custom_active}
-    for drop, key in ((no_google, "google"), (no_microsoft, "microsoft"), (no_custom, "custom")):
-        if drop:
-            out.pop(key, None)
-    return out
+    """``userCredentialsConfiguration`` di ``edit-credentials``: solo i blocchi indicati (05-C28).
+
+    Parte da ``--json`` e sovrappone i flag blocco per blocco: un account id imposta il blocco
+    abilitato (``enabled``/``active`` vero), ``--no-*`` lo rimuove (``enabled``/``active`` falso
+    senza account id: l'unica forma che il server accetta, rivisto dopo T15). Il server mantiene
+    i blocchi omessi, quindi non si rimanda nulla del form letto. Un flag di impostazione e uno
+    di rimozione sullo stesso blocco, o nessun blocco, sono errori d'uso.
+    """
+    config = dict(json_config)
+    for block, id_key, flag_key, set_opt, remove_opt in _CREDENTIAL_BLOCKS:
+        value = values.get(block)
+        remove = removals.get(block, False)
+        if value is not None and remove:
+            raise _usage_error(f"{set_opt} and {remove_opt} are mutually exclusive.")
+        if value is not None:
+            config[block] = {id_key: value, flag_key: True}
+        elif remove:
+            config[block] = {flag_key: False}
+    if not config:
+        raise _usage_error("Nothing to change: pass a flag or --json.")
+    return config
 
 
 def _edit_row(obj: object) -> dict[str, object]:
@@ -423,13 +402,6 @@ def users_edit_credentials(  # noqa: PLR0913
     google_account: GoogleAccountOption = None,
     microsoft_account: MicrosoftAccountOption = None,
     username: UsernameOption = None,
-    custom_active: Annotated[
-        bool | None,
-        typer.Option(
-            "--custom-active/--custom-inactive",
-            help="Activate or deactivate the custom credentials.",
-        ),
-    ] = None,
     no_google: Annotated[
         bool, typer.Option("--no-google", help="Remove the Google credentials.")
     ] = False,
@@ -439,43 +411,60 @@ def users_edit_credentials(  # noqa: PLR0913
     no_custom: Annotated[
         bool, typer.Option("--no-custom", help="Remove the custom credentials.")
     ] = False,
+    custom_inactive: Annotated[
+        bool,
+        typer.Option(
+            "--custom-inactive",
+            help="Same as --no-custom: the server has no inactive custom credentials, only "
+            "removed ones.",
+        ),
+    ] = False,
     json_body: JsonBodyOption = None,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Do not ask for confirmation when removing.")
+    ] = False,
     output: OutputOption = None,
     full: FullOption = False,
     fields: FieldsOption = None,
     export: ExportOption = None,
     export_format: ExportFormatOption = None,
 ) -> None:
-    """Edit a user's credentials, keeping the blocks you do not mention.
+    """Edit a user's credentials: only the blocks you mention are sent.
 
-    The credentials form is read first; its google, microsoft and custom blocks are sent back
-    (without the read-only fields) unless a flag or --json overrides them, and --no-google,
-    --no-microsoft, --no-custom drop a block. The password cannot be changed here: the API
-    only sets it at creation. A 409 exits with code 9 and never retries.
+    The server keeps the blocks you omit. --google-account, --microsoft-account and --username
+    set a block (enabled or active); --no-google, --no-microsoft and --no-custom remove one,
+    after a confirmation prompt (skipped with --yes). The credentials form is read only for the
+    occToken, not at all with --occ-token. The password cannot be changed here: the API only
+    sets it at creation. A 409 exits with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
     json_part = load_json_body(json_body, EditUserCredentialsRequestDTO)
+    removals = {
+        "google": no_google,
+        "microsoft": no_microsoft,
+        "custom": no_custom or custom_inactive,
+    }
+    config = _credentials_blocks(
+        json_part.get("userCredentialsConfiguration") or {},
+        values={"google": google_account, "microsoft": microsoft_account, "custom": username},
+        removals=removals,
+    )
+    for block, remove in removals.items():
+        if remove and not confirm_destructive(
+            f"Remove the {block} credentials of user {user_id}?", yes=yes
+        ):
+            raise typer.Exit(EXIT_SUCCESS)
     try:
         with build_client(state) as client:
-            form = client.users.get_credentials_for_edit(user_id)
-            token = _require_token(user_id, occ_token, form.occ_token)
-            base = {
-                **_credentials_base(form),
-                **(json_part.get("userCredentialsConfiguration") or {}),
-            }
-            config = _apply_credentials_flags(
-                base,
-                google_account=google_account,
-                microsoft_account=microsoft_account,
-                username=username,
-                custom_active=custom_active,
-                no_google=no_google,
-                no_microsoft=no_microsoft,
-                no_custom=no_custom,
+            read_token = (
+                None
+                if occ_token is not None
+                else client.users.get_credentials_for_edit(user_id).occ_token
             )
+            token = _require_token(user_id, occ_token, read_token)
             req = validate_body(
                 {"userCredentialsConfiguration": config, "occToken": token},
                 EditUserCredentialsRequestDTO,
