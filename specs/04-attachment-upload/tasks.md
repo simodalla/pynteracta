@@ -73,7 +73,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   4. Controlli bloccanti; commit `fix(logging): redazione delle firme negli URL e delle chiavi
      signature e policy (04-T03)`.
 
-### [ ] T04 – Scomposizione di `HttpTransport.request()`
+### [x] T04 – Scomposizione di `HttpTransport.request()`
 
 - Criteri: nessuno (preparazione di 04-C01, C04, C05, C09)
 - Dipende da: nessuno
