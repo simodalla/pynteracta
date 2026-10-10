@@ -42,6 +42,21 @@
   
   '''
 # ---
+# name: TestPostsEditAttachments.test_add_update_remove_body_and_table
+  '''
+     Attachments of post 21269    
+              updated             
+  ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+  ┃ Key         ┃ Value          ┃
+  ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+  │ post_id     │ 21269          │
+  │ added       │ 4 allegato.pdf │
+  │ updated     │ 5 b.pdf        │
+  │ removed_ids │ 9              │
+  └─────────────┴────────────────┘
+  
+  '''
+# ---
 # name: TestPostsPrep.test_get_for_edit_table_starts_with_occ_token
   '''
           Post 21269 (for edit)         

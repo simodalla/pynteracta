@@ -8,6 +8,7 @@ invia una sola richiesta di scrittura e non riprova mai: un ``409`` esce con il 
 from __future__ import annotations
 
 import json
+import pathlib
 from typing import Annotated, Any
 
 import typer
@@ -38,6 +39,7 @@ from pynteracta.cli._write import (
     AttachOption,
     append_attachments,
     merge_body,
+    parse_id_path_pairs,
     parse_kv_values,
     parse_zoned_datetime,
     upload_all,
@@ -46,6 +48,7 @@ from pynteracta.cli._write import (
 from pynteracta.cli.posts import app
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.posts_write import (
+    PostAttachmentsWriteResult,
     PostComment,
     PostForCopy,
     PostForCreate,
@@ -925,6 +928,97 @@ def posts_edit_watchers(
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
+
+
+def _attachment_labels(items: list[Any]) -> str:
+    """``"4 allegato.pdf, 5 b.pdf"``: id e nome degli allegati scritti."""
+    return ", ".join(f"{item.id} {item.name}" for item in items)
+
+
+def attachments_write_row(obj: object) -> dict[str, object]:
+    """Riga curata di ``posts edit-attachments``: post, allegati aggiunti, aggiornati e tolti."""
+    result = obj if isinstance(obj, PostAttachmentsWriteResult) else None
+    if result is None:
+        return {}
+    return {
+        "post_id": result.post_id,
+        "added": _attachment_labels(result.added),
+        "updated": _attachment_labels(result.updated),
+        "removed_ids": ", ".join(str(i) for i in result.removed_ids),
+    }
+
+
+@app.command("edit-attachments")
+def posts_edit_attachments(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    add: Annotated[
+        list[pathlib.Path] | None,
+        typer.Option(
+            "--add",
+            help="File to upload and add (repeatable).",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
+    update: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--update",
+            help="ID=PATH: upload PATH as a new version of attachment ID (repeatable).",
+        ),
+    ] = None,
+    remove: Annotated[
+        list[int] | None,
+        typer.Option("--remove", help="Attachment ID to remove (repeatable)."),
+    ] = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Add, replace or remove the attachments of a post (no concurrency token needed).
+
+    --add uploads a file and attaches it; --update ID=PATH uploads PATH as a new version of
+    attachment ID; --remove drops an attachment. Files are uploaded first, in order; if one is
+    rejected the command exits with code 11 and the post is not changed. Then one request
+    applies all the changes.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    if not add and not update and not remove:
+        typer.echo("--add, --remove or --update is required.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    pairs = parse_id_path_pairs(update, option="--update")
+    for _, path in pairs:
+        if not path.is_file():
+            raise typer.BadParameter(f"--update: file not found: {path}")
+    try:
+        with build_client(state) as client:
+            added = upload_all(client, add)
+            updated = [client.attachments.upload(path).as_version_of(i) for i, path in pairs]
+            result = client.posts.edit_attachments(
+                post_id, add=added or None, update=updated or None, remove_ids=remove or None
+            )
+        _render_single(
+            state,
+            output,
+            result,
+            attachments_write_row,
+            title=f"Attachments of post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
 
 
 YesOption = Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")]

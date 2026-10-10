@@ -228,7 +228,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
      (`addAttachments`); `validate_body` di `create` dentro il client; testi di aiuto.
   3. Controlli bloccanti; commit `feat(cli): --attach su tasks create ed edit (04-T12)`.
 
-### [ ] T13 – `posts edit-attachments`
+### [x] T13 – `posts edit-attachments`
 
 - Criteri: 04-C13
 - Dipende da: T09

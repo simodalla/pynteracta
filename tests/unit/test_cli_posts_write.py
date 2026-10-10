@@ -88,6 +88,7 @@ def _sent_body(route: respx.Route, index: int = 0) -> dict:  # type: ignore[type
         "edit-custom-data",
         "copy",
         "edit-watchers",
+        "edit-attachments",
         "delete",
         "mark-erasable",
         "workflow-screen",
@@ -1188,3 +1189,115 @@ class TestPostsAttach:
         assert result.exit_code == _EXIT_CONFIG
         assert route.call_count == 0
         assert len(respx.calls) == 0
+
+
+_ATTACHMENTS_PATH = f"{_MANAGE}/edit-post-attachments/{_POST_ID}"
+
+
+def _attachments_response() -> dict:  # type: ignore[type-arg]
+    payload = load_payload("edit_post_attachments_response.json")
+    added = payload["addedAttachments"][0]
+    payload["updatedAttachments"] = [{**added, "id": 5, "name": "b.pdf", "versionNumber": 2}]
+    payload["removedAttachmentIds"] = [9]
+    return payload  # type: ignore[no-any-return]
+
+
+class TestPostsEditAttachments:
+    # criterio: 04-C13
+    @respx.mock
+    def test_add_update_remove_body_and_table(
+        self, runner: CliRunner, snapshot: object, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage()
+        route = mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        a, b = _files(tmp_path, "a.txt", "b.pdf")
+        result = runner.invoke(
+            app,
+            [
+                "posts", "edit-attachments", str(_POST_ID),
+                "--add", a, "--update", f"5={b}", "--remove", "9",
+            ],
+            env=BASE_ENV,
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        assert storage.call_count == 2  # noqa: PLR2004
+        assert route.call_count == 1
+        assert _sent_body(route) == {
+            "addAttachments": [_ref("a.txt")],
+            "updateAttachments": [{"attachmentId": 5, **_ref("b.pdf")}],
+            "removeAttachmentIds": [9],
+        }
+        assert result.output == snapshot
+
+    # criterio: 04-C13
+    @respx.mock
+    def test_json_output_full(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        result = runner.invoke(
+            app,
+            [
+                "--output", "json", "posts", "edit-attachments", str(_POST_ID),
+                "--remove", "9", "--full",
+            ],
+            env=BASE_ENV,
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        record = data[0] if isinstance(data, list) else data
+        assert record["postId"] == _POST_ID
+        assert record["removedAttachmentIds"] == [9]
+        assert record["updatedAttachments"][0]["id"] == 5  # noqa: PLR2004
+
+    # criterio: 04-C13
+    @respx.mock
+    def test_no_option_exits_2_without_requests(self, runner: CliRunner) -> None:
+        route = mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        result = runner.invoke(app, ["posts", "edit-attachments", str(_POST_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--add, --remove or --update is required" in result.output
+        assert route.call_count == 0
+        assert len(respx.calls) == 0
+
+    # criterio: 04-C13
+    @respx.mock
+    @pytest.mark.parametrize("value", ["b.pdf", "x=b.pdf"])
+    def test_update_malformed_exits_2(
+        self, runner: CliRunner, tmp_path: pathlib.Path, value: str
+    ) -> None:
+        route = mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        result = runner.invoke(
+            app, ["posts", "edit-attachments", str(_POST_ID), "--update", value], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert "ID=PATH" in result.output
+        assert route.call_count == 0
+        assert len(respx.calls) == 0
+
+    # criterio: 04-C13
+    @respx.mock
+    def test_update_missing_file_exits_2_without_requests(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        route = mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        result = runner.invoke(
+            app,
+            ["posts", "edit-attachments", str(_POST_ID), "--update", f"5={tmp_path / 'manca.pdf'}"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert route.call_count == 0
+        assert len(respx.calls) == 0
+
+    # criterio: 04-C14
+    @respx.mock
+    def test_failed_upload_exits_11_without_put(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        _mock_storage(httpx.Response(400, text="<Error/>"))
+        route = mock_json("PUT", _ATTACHMENTS_PATH, _attachments_response())
+        (a,) = _files(tmp_path, "a.txt")
+        result = runner.invoke(
+            app, ["posts", "edit-attachments", str(_POST_ID), "--add", a], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_UPLOAD
+        assert route.call_count == 0
