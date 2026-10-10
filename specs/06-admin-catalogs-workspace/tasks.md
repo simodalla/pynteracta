@@ -155,7 +155,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti (`mypy` strict sulle liste di dict o DTO); commit
      `feat(admin-manage): modifica del workspace con occToken nel path (06-T06)`.
 
-### [ ] T07 – Helper della CLI: mappe per lingua e coppie di id
+### [x] T07 – Helper della CLI: mappe per lingua e coppie di id
 
 - Criteri: 06-C10 (helper), 06-C17 (helper)
 - Dipende da: nessuno

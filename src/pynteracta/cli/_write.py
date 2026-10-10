@@ -4,7 +4,8 @@
 Spostati da ``cli/tasks.py`` con la spec 03: data-ora con fuso, unione di ``--json`` e flag,
 validazione del corpo contro il DTO, coppie ``ID=VALORE`` ripetibili. Con la spec 04: upload dei
 file di ``--attach`` e coppie ``ID=PATH`` di ``--update``. Con la spec 05: le opzioni ``--json`` e
-``--occ-token`` condivise e la lettura della password da stdin o da prompt nascosto.
+``--occ-token`` condivise e la lettura della password da stdin o da prompt nascosto. Con la spec
+06: mappe per lingua ``LANG=TESTO`` e coppie di id ``ID=ID``.
 """
 
 from __future__ import annotations
@@ -160,3 +161,45 @@ def parse_id_path_pairs(values: list[str] | None, *, option: str) -> list[tuple[
             raise typer.BadParameter(f"{option} must be ID=PATH, got: {item!r}")
         pairs.append((int(key), pathlib.Path(path)))
     return pairs
+
+
+def parse_lang_map(values: list[str] | None, *, option: str) -> dict[str, str]:
+    """Coppie ``LANG=TESTO`` ripetibili (``--name``, ``--label``, ``--description``) → mappa.
+
+    Si divide al primo ``=``; la lingua è ripulita dagli spazi, il testo resta una stringa così
+    com'è (nessuna conversione, a differenza di :func:`parse_kv_values`). Un token senza ``=`` o
+    con la lingua vuota → :class:`typer.BadParameter`.
+    """
+    out: dict[str, str] = {}
+    for item in values or []:
+        lang, sep, text = item.partition("=")
+        if not sep or not lang.strip():
+            raise typer.BadParameter(f"{option} must be LANG=TEXT, got: {item!r}")
+        out[lang.strip()] = text
+    return out
+
+
+def parse_int_pairs(
+    values: list[str] | None, *, option: str, form: str = "USER_ID=ROLE_ID"
+) -> list[tuple[int, int]]:
+    """Coppie ``ID=ID`` ripetibili (``--add-user-role``, ``--add-group-role``) → tuple di interi.
+
+    Un token senza ``=`` o con un lato non intero → :class:`typer.BadParameter` che cita ``form``.
+    """
+    pairs: list[tuple[int, int]] = []
+    for item in values or []:
+        left, sep, right = item.partition("=")
+        if not sep or not left.strip().isdigit() or not right.strip().isdigit():
+            raise typer.BadParameter(f"{option} must be {form}, got: {item!r}")
+        pairs.append((int(left), int(right)))
+    return pairs
+
+
+def merge_lang_map(merged: dict[str, Any], key: str, flag_map: dict[str, str]) -> None:
+    """Unisce chiave per chiave la mappa per lingua ``key`` del corpo con quella dei flag.
+
+    La mappa già nel corpo (letta dal form o da ``--json``) resta; le lingue dei flag la
+    aggiornano. Senza flag il corpo non cambia.
+    """
+    if flag_map:
+        merged[key] = {**(merged.get(key) or {}), **flag_map}
