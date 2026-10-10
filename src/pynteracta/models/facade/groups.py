@@ -1,7 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Facade models for the groups endpoints."""
+"""Facade models for the groups endpoints.
+
+Letture (elenco, membri, form di modifica) e, dalla spec 05, i risultati delle scritture:
+:class:`GroupWriteResult` per ``create``, ``edit`` ed ``edit_members``, :class:`GroupMembersResult`
+con le due liste di :class:`GroupSummary` per ``edit_members_bulk``.
+"""
 
 from __future__ import annotations
+
+from typing import Any
 
 from pynteracta.models.generated import external_v2 as generated
 
@@ -308,3 +315,168 @@ class GroupForEdit:
         """Parse from a raw API response dict."""
         raw = generated.GetGroupForEditResponseDTO.model_validate(data)
         return cls(raw)
+
+
+class GroupSummary:
+    """Façade sul ``GroupDTO`` restituito nelle liste di ``edit_members`` (spec 05).
+
+    ``successGroups`` e ``concurrencyErrorGroups`` sono liste di stub ``RootModel[Any]``; la
+    façade avvolge il gemello tipizzato ``GroupDTOModel``.
+
+    Attributes:
+        raw: Il DTO tipizzato sottostante.
+    """
+
+    def __init__(self, raw: generated.GroupDTOModel) -> None:
+        self.raw = raw
+
+    @property
+    def id(self) -> int | None:
+        return self.raw.id
+
+    @property
+    def name(self) -> str | None:
+        return self.raw.name
+
+    @property
+    def email(self) -> str | None:
+        return self.raw.email
+
+    @property
+    def visible(self) -> bool | None:
+        return self.raw.visible
+
+    @property
+    def deleted(self) -> bool | None:
+        return self.raw.deleted
+
+    @property
+    def members_count(self) -> int | None:
+        return self.raw.membersCount
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza del gruppo dopo la scrittura."""
+        return self.raw.occToken
+
+    @classmethod
+    def from_stub(cls, stub: generated.GroupDTO) -> GroupSummary:
+        """Rivalida uno stub ``GroupDTO`` in :class:`GroupSummary`."""
+        root = _resolve_root(stub)
+        if isinstance(root, dict):
+            return cls(generated.GroupDTOModel.model_validate(root))
+        msg = f"Unexpected stub root type: {type(root)}"
+        raise ValueError(msg)
+
+
+class GroupWriteResult:
+    """Façade sulla risposta di ``create``, ``edit`` ed ``edit_members`` di un gruppo (spec 05).
+
+    I DTO non hanno gli stessi campi: le proprietà assenti valgono ``None``. ``group_id`` viene
+    da ``groupId`` (creazione) o ``id`` (membri), altrimenti è quello passato dal chiamante;
+    ``next_occ_token`` viene da ``nextOccToken`` o, per il gruppo restituito da ``edit_members``,
+    dal suo ``occToken``.
+
+    Attributes:
+        raw: Il DTO generato sottostante (``CreateGroupResponseDTO``, ``EditGroupResponseDTO`` o
+            ``GroupDTOModel``).
+    """
+
+    def __init__(
+        self,
+        raw: (
+            generated.CreateGroupResponseDTO
+            | generated.EditGroupResponseDTO
+            | generated.GroupDTOModel
+        ),
+        *,
+        group_id: int | None = None,
+    ) -> None:
+        self.raw = raw
+        self._group_id = group_id
+
+    @property
+    def group_id(self) -> int | None:
+        """Id del gruppo scritto: dalla risposta, altrimenti quello passato."""
+        for attr in ("groupId", "id"):
+            value = getattr(self.raw, attr, None)
+            if value is not None:
+                return int(value)
+        return self._group_id
+
+    @property
+    def next_occ_token(self) -> int | None:
+        """Token di concorrenza da usare per la modifica successiva."""
+        value: int | None = getattr(self.raw, "nextOccToken", None)
+        if value is not None:
+            return value
+        occ: int | None = getattr(self.raw, "occToken", None)
+        return occ
+
+    @property
+    def name(self) -> str | None:
+        value: str | None = getattr(self.raw, "name", None)
+        return value
+
+    @property
+    def email(self) -> str | None:
+        value: str | None = getattr(self.raw, "email", None)
+        return value
+
+    @property
+    def visible(self) -> bool | None:
+        value: bool | None = getattr(self.raw, "visible", None)
+        return value
+
+    @property
+    def members_count(self) -> int | None:
+        value: int | None = getattr(self.raw, "membersCount", None)
+        return value
+
+    @classmethod
+    def from_create(cls, data: dict[str, Any]) -> GroupWriteResult:
+        """Legge la risposta di ``POST admin/manage/groups``."""
+        return cls(generated.CreateGroupResponseDTO.model_validate(data))
+
+    @classmethod
+    def from_edit(cls, data: dict[str, Any], group_id: int) -> GroupWriteResult:
+        """Legge la risposta di ``PUT admin/manage/groups/{groupId}``."""
+        return cls(generated.EditGroupResponseDTO.model_validate(data), group_id=group_id)
+
+    @classmethod
+    def from_member_edit(cls, summary: GroupSummary) -> GroupWriteResult:
+        """Avvolge il gruppo restituito in ``successGroups`` da ``edit_members``."""
+        return cls(summary.raw, group_id=summary.id)
+
+
+class GroupMembersResult:
+    """Façade sulla risposta di ``PUT admin/manage/groups/members`` (spec 05).
+
+    Il server risponde ``200`` anche con conflitti: :attr:`success_groups` e
+    :attr:`concurrency_error_groups` dicono com'è andata gruppo per gruppo.
+
+    Attributes:
+        raw: Il DTO generato sottostante.
+    """
+
+    def __init__(self, raw: generated.EditMultipleGroupsMembersResponseDTO) -> None:
+        self.raw = raw
+
+    @staticmethod
+    def _summaries(items: list[generated.GroupDTO] | None) -> list[GroupSummary]:
+        return [GroupSummary.from_stub(item) for item in items or []]
+
+    @property
+    def success_groups(self) -> list[GroupSummary]:
+        """Gruppi modificati, con il nuovo ``occ_token``."""
+        return self._summaries(self.raw.successGroups)
+
+    @property
+    def concurrency_error_groups(self) -> list[GroupSummary]:
+        """Gruppi non modificati perché cambiati dopo la lettura dell'``occToken``."""
+        return self._summaries(self.raw.concurrencyErrorGroups)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> GroupMembersResult:
+        """Parse from a raw API response dict."""
+        return cls(generated.EditMultipleGroupsMembersResponseDTO.model_validate(data))

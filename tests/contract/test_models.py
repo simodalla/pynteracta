@@ -34,6 +34,7 @@ from pynteracta.models.facade.communities import (
     PostDefinition,
     PostDefinitionMap,
 )
+from pynteracta.models.facade.groups import GroupMembersResult, GroupWriteResult
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
 from pynteracta.models.facade.posts_write import (
     PostComment,
@@ -1272,6 +1273,19 @@ class TestAdminUsersWriteDTOs:
         )
         assert credentials.nextOccToken is not None
 
+    # criterio: 05-C22
+    def test_facade_smoke(self) -> None:
+        created = UserWriteResult.from_create(load_payload("create_user_response.json"))
+        assert created.user_id == _CREATED_USER_ID_CONTRACT
+        assert created.generated_password == ["Xk7-fake-pw"]
+        edited = UserWriteResult.from_edit(load_payload("edit_user_response.json"), _USER_ID)
+        assert edited.user_id == _USER_ID
+        assert edited.next_occ_token is not None
+        credentials = UserWriteResult.from_credentials(
+            load_payload("edit_user_credentials_response.json"), _USER_ID
+        )
+        assert credentials.next_occ_token is not None
+
 
 class TestAdminGroupsWriteDTOs:
     # criterio: 05-C22
@@ -1330,13 +1344,14 @@ class TestAdminGroupsWriteDTOs:
 
     # criterio: 05-C22
     def test_facade_smoke(self) -> None:
-        created = UserWriteResult.from_create(load_payload("create_user_response.json"))
-        assert created.user_id == _CREATED_USER_ID_CONTRACT
-        assert created.generated_password == ["Xk7-fake-pw"]
-        edited = UserWriteResult.from_edit(load_payload("edit_user_response.json"), _USER_ID)
-        assert edited.user_id == _USER_ID
-        assert edited.next_occ_token is not None
-        credentials = UserWriteResult.from_credentials(
-            load_payload("edit_user_credentials_response.json"), _USER_ID
+        created = GroupWriteResult.from_create(load_payload("create_group_response.json"))
+        assert created.group_id == _CREATED_GROUP_ID_CONTRACT
+        assert created.next_occ_token is not None
+        edited = GroupWriteResult.from_edit(
+            load_payload("edit_group_response.json"), _GROUP_ID_CONTRACT
         )
-        assert credentials.next_occ_token is not None
+        assert edited.group_id == _GROUP_ID_CONTRACT
+        assert edited.next_occ_token is not None
+        members = GroupMembersResult.from_dict(load_payload("edit_groups_members_response.json"))
+        assert [g.id for g in members.success_groups] == [_GROUP_ID_CONTRACT]
+        assert [g.id for g in members.concurrency_error_groups] == [_CONFLICT_GROUP_ID_CONTRACT]

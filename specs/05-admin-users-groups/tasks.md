@@ -65,7 +65,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti; commit `feat(users): occ_token sulle façade per-edit e façade
      UserWriteResult (05-T02)`.
 
-### [ ] T03 – Façade dei gruppi: `GroupSummary`, `GroupWriteResult`, `GroupMembersResult`
+### [x] T03 – Façade dei gruppi: `GroupSummary`, `GroupWriteResult`, `GroupMembersResult`
 
 - Criteri: 05-C07/C08/C09 (campi del risultato), 05-C10 (façade), 05-C22 (smoke gruppi)
 - Dipende da: T01

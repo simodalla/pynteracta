@@ -46,6 +46,9 @@ from pynteracta.models.facade.groups import (
     GroupList,
     GroupMember,
     GroupMemberList,
+    GroupMembersResult,
+    GroupSummary,
+    GroupWriteResult,
     Tag,
 )
 from pynteracta.models.facade.hashtags import (
@@ -114,6 +117,9 @@ __all__ = [
     "GroupList",
     "GroupMember",
     "GroupMemberList",
+    "GroupMembersResult",
+    "GroupSummary",
+    "GroupWriteResult",
     "Hashtag",
     "HashtagList",
     "ListCommunitiesRequestDTO",
