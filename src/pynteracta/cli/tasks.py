@@ -31,6 +31,8 @@ from pynteracta.cli._common import (
 from pynteracta.cli._write import (
     DEFAULT_TIMEZONE,
     AttachOption,
+    JsonBodyOption,
+    OccTokenOption,
     append_attachments,
     merge_body,
     parse_zoned_datetime,
@@ -87,27 +89,6 @@ WatcherGroupOption = Annotated[
 ]
 ClientUidOption = Annotated[
     str | None, typer.Option("--client-uid", help="Client-side identifier for the task.")
-]
-JsonBodyOption = Annotated[
-    str | None,
-    typer.Option(
-        "--json",
-        help=(
-            "Full request body as JSON: a file path, or '-' to read stdin. Needed for sub-tasks "
-            "and attachments. Flags override the keys they correspond to."
-        ),
-    ),
-]
-OccTokenOption = Annotated[
-    int | None,
-    typer.Option(
-        "--occ-token",
-        help=(
-            "Concurrency token to send instead of the one just read (the task is always read "
-            "to keep the fields you do not change). A 409 (token mismatch) exits with code 9; "
-            "nothing is retried."
-        ),
-    ),
 ]
 RemoveWatcherUserOption = Annotated[
     list[int] | None,

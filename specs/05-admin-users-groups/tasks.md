@@ -155,7 +155,7 @@ le costanti qui sopra con la stessa forma.
   2. Controlli bloccanti; commit `test: redazione di password e generatedPassword in audit log e
      hook (05-T07)`.
 
-### [ ] T08 – Helper della CLI: `read_password` e opzioni condivise
+### [x] T08 – Helper della CLI: `read_password` e opzioni condivise
 
 - Criteri: 05-C12 (helper)
 - Dipende da: nessuno
