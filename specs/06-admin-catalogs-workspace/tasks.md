@@ -248,7 +248,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(cli): cancellazione logica e ripristino di cataloghi e
      voci con conferma su delete (06-T10)`.
 
-### [ ] T11 – `admin-manage edit-workspace`
+### [x] T11 – `admin-manage edit-workspace`
 
 - Criteri: 06-C17, 06-C13 (workspace)
 - Dipende da: T06, T07

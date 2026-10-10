@@ -10,6 +10,9 @@ import typer
 
 from pynteracta import __version__
 from pynteracta.cli import admin_manage as _admin_manage_cli
+from pynteracta.cli import (
+    admin_manage_write as _admin_manage_write_cli,  # noqa: F401  (registra la scrittura)
+)
 from pynteracta.cli import attachments as _attachments_cli
 from pynteracta.cli import auth as _auth_cli
 from pynteracta.cli import catalogs as _catalogs_cli

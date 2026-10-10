@@ -1,0 +1,32 @@
+# serializer version: 1
+# name: TestEditWorkspace.test_flags_read_token_then_put_exact_body
+  '''
+          Workspace 88 updated        
+  ┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+  ┃ Key                 ┃ Value      ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+  │ id                  │ 88         │
+  │ name                │ Operations │
+  │ admin_users_count   │ 3          │
+  │ member_users_count  │ 26         │
+  │ admin_groups_count  │ 1          │
+  │ member_groups_count │ 4          │
+  │ occ_token           │ 18         │
+  └─────────────────────┴────────────┘
+  
+  '''
+# ---
+# name: TestEditWorkspace.test_json_output
+  '''
+  {
+    "id": 88,
+    "name": "Operations",
+    "admin_users_count": 3,
+    "member_users_count": 26,
+    "admin_groups_count": 1,
+    "member_groups_count": 4,
+    "occ_token": 18
+  }
+  
+  '''
+# ---
