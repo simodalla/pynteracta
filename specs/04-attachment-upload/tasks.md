@@ -87,7 +87,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Gli stessi test, stesso numero, verdi; controlli bloccanti; commit `refactor(transport):
      request scomposta in helper condivisi (04-T04)`.
 
-### [ ] T05 – `UploadError` e `HttpTransport.post_multipart`
+### [x] T05 – `UploadError` e `HttpTransport.post_multipart`
 
 - Criteri: 04-C04, 04-C05, 04-C09, 04-C08 (transport)
 - Dipende da: T03, T04

@@ -60,3 +60,22 @@ def test_permission_error_distinct_from_builtin() -> None:
     assert PermissionError is not builtins.PermissionError
     with pytest.raises(PermissionError):
         raise PermissionError("denied", status_code=403)
+
+
+# criterio: 04-C04
+def test_upload_error_is_interacta_error_with_file_name() -> None:
+    from pynteracta.exceptions import UploadError  # noqa: PLC0415
+
+    err = UploadError(
+        "Upload of nota.txt failed",
+        status_code=400,
+        request_method="POST",
+        request_url="https://storage.example.com/bucket-test",
+        response_body="<Error/>",
+        file_name="nota.txt",
+    )
+    assert isinstance(err, InteractaError)
+    assert err.file_name == "nota.txt"
+    assert err.status_code == 400  # noqa: PLR2004
+    assert err.request_id is None
+    assert UploadError("x").file_name is None

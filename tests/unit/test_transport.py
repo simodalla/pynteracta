@@ -645,3 +645,150 @@ class TestResponseRedaction:
         transport = self._auth_transport()
         response = transport.request("GET", "big")
         assert response.status_code == _HTTP_200
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: POST multipart verso lo storage (post_multipart)
+# ---------------------------------------------------------------------------
+
+_STORAGE_URL = "https://storage.example.com/bucket-test"
+_SIGNED_STORAGE_URL = f"{_STORAGE_URL}?Expires=1&X-Goog-Signature=SIGNED-SECRET"
+_FORM = {
+    "GoogleAccessId": "fake@test.iam.gserviceaccount.com",
+    "key": "temporary-uploads/abc",
+    "policy": "POLICY-SECRET",
+    "signature": "FORM-SIGNATURE-SECRET",
+}
+_FILE_BYTES = b"contenuto del file di prova"
+_HTTP_204 = 204
+_HTTP_400 = 400
+_STORAGE_ERROR = "<?xml version='1.0'?><Error><Code>InvalidPolicy</Code></Error>"
+
+
+def _upload(transport: HttpTransport, url: str = _STORAGE_URL) -> httpx.Response:
+    return transport.post_multipart(
+        url,
+        fields=_FORM,
+        file_name="nota.txt",
+        content=io.BytesIO(_FILE_BYTES),
+        content_type="text/plain",
+    )
+
+
+class TestPostMultipart:
+    # criterio: 04-C01
+    @respx.mock
+    def test_no_authorization_and_user_agent_present(self) -> None:
+        route = respx.post(_STORAGE_URL).mock(return_value=httpx.Response(_HTTP_204))
+        response = _upload(_make_transport(token_provider=lambda: _FAKE_JWT))
+        assert response.status_code == _HTTP_204
+        request = route.calls[0].request
+        assert "Authorization" not in request.headers
+        assert request.headers["User-Agent"] == _DEFAULT_USER_AGENT
+
+    # criterio: 04-C01
+    @respx.mock
+    def test_multipart_fields_then_file_in_order(self) -> None:
+        route = respx.post(_STORAGE_URL).mock(return_value=httpx.Response(_HTTP_204))
+        _upload(_make_transport())
+        request = route.calls[0].request
+        assert request.headers["Content-Type"].startswith("multipart/form-data; boundary=")
+        body = request.content
+        positions = [body.index(f'name="{name}"'.encode()) for name in _FORM]
+        file_pos = body.index(b'name="file"; filename="nota.txt"')
+        assert positions == sorted(positions)
+        assert max(positions) < file_pos
+        assert b"Content-Type: text/plain" in body[file_pos:]
+        assert _FILE_BYTES in body[file_pos:]
+        for name, value in _FORM.items():
+            assert f'name="{name}"\r\n\r\n{value}\r\n'.encode() in body
+
+    # criterio: 04-C09
+    @respx.mock
+    def test_hooks_see_request_without_body_and_response_status(self) -> None:
+        respx.post(_STORAGE_URL).mock(return_value=httpx.Response(_HTTP_204))
+        hooks = _RecordingHooks()
+        _upload(_make_transport(hooks=hooks, audit=True, audit_bodies=True))
+        assert len(hooks.requests) == 1
+        req = hooks.requests[0]
+        assert req.method == "POST"
+        assert req.url == _STORAGE_URL
+        assert req.body is None
+        assert "Authorization" not in req.headers
+        assert len(hooks.responses) == 1
+        assert hooks.responses[0].status_code == _HTTP_204
+        assert hooks.responses[0].body is None
+        assert hooks.errors == []
+
+    # criterio: 04-C09
+    @respx.mock
+    def test_audit_events_carry_no_file_bytes_nor_form_fields(self) -> None:
+        respx.post(_STORAGE_URL).mock(return_value=httpx.Response(_HTTP_204))
+        with capture_logs() as logs:
+            _upload(_make_transport(audit=True, audit_bodies=True))
+        audit = [e for e in logs if e.get("event", "").startswith("audit.")]
+        assert [e["event"] for e in audit] == ["audit.request", "audit.response"]
+        assert audit[0]["url"] == _STORAGE_URL
+        assert audit[1]["status"] == _HTTP_204
+        assert all(e.get("body") is None for e in audit)
+        dumped = repr(logs)
+        assert "contenuto del file" not in dumped
+        for value in _FORM.values():
+            assert value not in dumped
+
+    # criterio: 04-C04
+    @respx.mock
+    def test_non_2xx_raises_upload_error_with_file_name(self) -> None:
+        from pynteracta.exceptions import UploadError  # noqa: PLC0415
+
+        route = respx.post(_STORAGE_URL).mock(
+            return_value=httpx.Response(_HTTP_400, text=_STORAGE_ERROR)
+        )
+        hooks = _RecordingHooks()
+        with pytest.raises(UploadError) as exc_info:
+            _upload(_make_transport(hooks=hooks))
+        err = exc_info.value
+        assert err.status_code == _HTTP_400
+        assert err.request_method == "POST"
+        assert err.request_url == _STORAGE_URL
+        assert err.response_body == _STORAGE_ERROR
+        assert err.request_id is None
+        assert err.file_name == "nota.txt"
+        assert "nota.txt" in str(err)
+        assert hooks.errors == [err]
+        assert route.call_count == 1
+
+    # criterio: 04-C05
+    @respx.mock
+    def test_timeout_maps_to_transport_error(self) -> None:
+        route = respx.post(_STORAGE_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        hooks = _RecordingHooks()
+        with pytest.raises(TransportError):
+            _upload(_make_transport(hooks=hooks))
+        assert route.call_count == 1
+        assert len(hooks.errors) == 1
+
+    # criterio: 04-C08
+    @respx.mock
+    def test_upload_error_url_query_is_redacted(self) -> None:
+        from pynteracta.exceptions import UploadError  # noqa: PLC0415
+
+        respx.post(_SIGNED_STORAGE_URL).mock(
+            return_value=httpx.Response(_HTTP_400, text=_STORAGE_ERROR)
+        )
+        with pytest.raises(UploadError) as exc_info:
+            _upload(_make_transport(), _SIGNED_STORAGE_URL)
+        assert exc_info.value.request_url is not None
+        assert "SIGNED-SECRET" not in exc_info.value.request_url
+        assert f"X-Goog-Signature={_REDACTED}" in exc_info.value.request_url
+
+    # criterio: 04-C08
+    @respx.mock
+    def test_signed_url_redacted_in_hooks_and_audit(self) -> None:
+        respx.post(_SIGNED_STORAGE_URL).mock(return_value=httpx.Response(_HTTP_204))
+        hooks = _RecordingHooks()
+        with capture_logs() as logs:
+            _upload(_make_transport(hooks=hooks, audit=True), _SIGNED_STORAGE_URL)
+        assert "SIGNED-SECRET" not in hooks.requests[0].url
+        assert "SIGNED-SECRET" not in hooks.responses[0].url
+        assert "SIGNED-SECRET" not in repr(logs)

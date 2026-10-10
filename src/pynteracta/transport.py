@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import sys
 import time
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, BinaryIO
 
 import httpx
 import structlog
@@ -20,6 +20,7 @@ from pynteracta.exceptions import (
     NotFoundError,
     ServerError,
     TransportError,
+    UploadError,
     ValidationError,
 )
 
@@ -132,6 +133,53 @@ class HttpTransport:
         if self._hooks is not None:
             self._hooks.on_error(mapped)
         raise mapped
+
+    def post_multipart(
+        self,
+        url: str,
+        *,
+        fields: Mapping[str, str],
+        file_name: str,
+        content: BinaryIO,
+        content_type: str,
+    ) -> httpx.Response:
+        """Carica un file con un form multipart ``POST`` su un URL assoluto (spec 04).
+
+        Serve al secondo passo dell'upload: lo storage del tenant accetta i campi della policy
+        firmata seguiti dal campo ``file``. La richiesta porta solo lo ``User-Agent``, mai il
+        token Interacta. Passa da log, audit e hook come le altre, con l'URL redatto e il corpo
+        sempre assente: né i byte del file né i campi del form vi compaiono, neppure con
+        ``audit_bodies``. Una sola richiesta: una risposta non 2xx diventa :class:`UploadError`,
+        timeout ed errori di rete :class:`TransportError`.
+        """
+        headers = {"User-Agent": self._user_agent}
+        redacted_url = redact_string(url)
+        self._emit_request("POST", redacted_url, headers, None)
+        response, elapsed_ms = self._send(
+            "POST",
+            url,
+            redacted_url=redacted_url,
+            headers=headers,
+            data=dict(fields),
+            files={"file": (file_name, content, content_type)},
+        )
+        self._emit_response(response, redacted_url, elapsed_ms, capture_body=False)
+        if response.is_success:
+            return response
+        _log.warning(
+            "http.error", status=response.status_code, error_type="upload_error", url=redacted_url
+        )
+        err = UploadError(
+            f"Upload of {file_name} failed",
+            status_code=response.status_code,
+            request_method="POST",
+            request_url=redacted_url,
+            response_body=response.text or None,
+            file_name=file_name,
+        )
+        if self._hooks is not None:
+            self._hooks.on_error(err)
+        raise err
 
     def close(self) -> None:
         """Close the underlying ``httpx.Client``."""
