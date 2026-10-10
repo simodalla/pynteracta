@@ -7,9 +7,10 @@ import copy
 import json
 import pathlib
 
+import httpx
 import pytest
 import respx
-from api_helpers import load_payload, mock_json
+from api_helpers import full_url, load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
@@ -228,3 +229,107 @@ class TestEditWorkspace:
             in result.output
         )
         assert put_route.call_count == 1
+
+
+_UPLOAD_PATH = "core/storage/upload-new-attachment"
+_STORAGE_URL = "https://storage.example.com/bucket-test"
+_EXIT_UPLOAD = 11
+
+
+def _ticket(content_ref: str) -> httpx.Response:
+    payload = load_payload("upload_new_attachment_response.json")
+    payload["contentRef"] = content_ref
+    return httpx.Response(200, json=payload)
+
+
+def _mock_uploads(*storage: httpx.Response) -> tuple[respx.Route, respx.Route]:
+    tickets = respx.post(full_url(_UPLOAD_PATH)).mock(
+        side_effect=[_ticket("ref-cover"), _ticket("ref-logo")]
+    )
+    route = respx.post(_STORAGE_URL)
+    route.mock(side_effect=list(storage) or [httpx.Response(204), httpx.Response(204)])
+    return tickets, route
+
+
+def _image(tmp_path: pathlib.Path, name: str) -> str:
+    path = tmp_path / name
+    path.write_bytes(b"\x89PNG fake " + name.encode())
+    return str(path)
+
+
+class TestEditWorkspaceUploads:
+    # criterio: 06-C18
+    @respx.mock
+    def test_cover_and_logo_uploaded_in_order_then_put(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        tickets, storage = _mock_uploads()
+        _, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            [
+                "admin-manage",
+                "edit-workspace",
+                str(_WORKSPACE_ID),
+                "--cover",
+                _image(tmp_path, "cover.png"),
+                "--logo",
+                _image(tmp_path, "logo.png"),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert tickets.call_count == 2  # noqa: PLR2004
+        assert storage.call_count == 2  # noqa: PLR2004
+        assert b'filename="cover.png"' in storage.calls[0].request.content
+        assert b'filename="logo.png"' in storage.calls[1].request.content
+        assert _sent_body(put_route) == {
+            "newCoverImageContentRef": "ref-cover",
+            "newLogoContentRef": "ref-logo",
+        }
+        urls = [str(call.request.url) for call in respx.calls]
+        assert urls[-1] == full_url(_PUT_PATH)
+
+    # criterio: 06-C18
+    @respx.mock
+    def test_cover_upload_failure_exits_11_without_put(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        tickets, storage = _mock_uploads(httpx.Response(400, text="<Error/>"))
+        _, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            [
+                "admin-manage",
+                "edit-workspace",
+                str(_WORKSPACE_ID),
+                "--cover",
+                _image(tmp_path, "cover.png"),
+                "--logo",
+                _image(tmp_path, "logo.png"),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_UPLOAD
+        assert tickets.call_count == 1
+        assert storage.call_count == 1
+        assert not put_route.called
+
+    # criterio: 06-C18
+    @respx.mock
+    def test_cover_alone_counts_as_input(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _mock_uploads()
+        _, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            [
+                "admin-manage",
+                "edit-workspace",
+                str(_WORKSPACE_ID),
+                "--cover",
+                _image(tmp_path, "cover.png"),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route) == {"newCoverImageContentRef": "ref-cover"}

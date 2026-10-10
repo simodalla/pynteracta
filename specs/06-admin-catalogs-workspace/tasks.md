@@ -271,7 +271,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      di `admin-manage workspace` restano verdi); commit `feat(cli): admin-manage edit-workspace
      con i soli campi indicati e occToken letto o imposto (06-T11)`.
 
-### [ ] T12 – `edit-workspace --cover` e `--logo`
+### [x] T12 – `edit-workspace --cover` e `--logo`
 
 - Criteri: 06-C18
 - Dipende da: T11

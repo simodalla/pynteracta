@@ -8,6 +8,7 @@ campi indicati, in una sola richiesta mai ripetuta; un ``409`` esce con il codic
 
 from __future__ import annotations
 
+import pathlib
 from typing import Annotated, Any
 
 import typer
@@ -140,6 +141,26 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
         list[int] | None,
         typer.Option("--remove-role-association", help="Role association ID to remove."),
     ] = None,
+    cover: Annotated[
+        pathlib.Path | None,
+        typer.Option(
+            "--cover",
+            help="Upload this file and set it as the cover image.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
+    logo: Annotated[
+        pathlib.Path | None,
+        typer.Option(
+            "--logo",
+            help="Upload this file and set it as the logo.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
     occ_token: OccTokenOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
@@ -148,12 +169,13 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
     export: ExportOption = None,
     export_format: ExportFormatOption = None,
 ) -> None:
-    """Edit a workspace: name, description, members and roles (requires admin permissions).
+    """Edit a workspace: name, description, members, roles and images (requires admin).
 
     Only the fields you give are sent; nothing of the current form is sent back. The
     concurrency token is read from the workspace's edit form, or given with --occ-token (then
-    nothing is read). Translations of the name go through --json. A 409 exits with code 9 and
-    never retries.
+    nothing is read). --cover and --logo upload the files first (in this order) and stop at the
+    first failed upload with exit code 11, before the edit is sent. Translations of the name go
+    through --json. A 409 exits with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -173,7 +195,7 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
         ),
         remove_role_association=remove_role_association,
     )
-    if not merged:
+    if not merged and cover is None and logo is None:
         typer.echo("Nothing to send: pass at least one option or --json.", err=True)
         raise typer.Exit(EXIT_CONFIG)
     req = validate_body(merged, EditWorkspaceRequestDTO)
@@ -183,6 +205,13 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
             if token is None:
                 form = client.admin_manage.workspace_for_edit(workspace_id)
                 token = _require_token(workspace_id, form.occ_token)
+            images: dict[str, str | None] = {}
+            if cover is not None:
+                images["newCoverImageContentRef"] = client.attachments.upload(cover).content_ref
+            if logo is not None:
+                images["newLogoContentRef"] = client.attachments.upload(logo).content_ref
+            if images:
+                req = req.model_copy(update=images)
             result = client.admin_manage.edit_workspace_raw(workspace_id, token, req)
         render_output(
             resolve_output(state, output),
