@@ -1,6 +1,6 @@
 # 05 – Anagrafiche admin, prima metà: utenti e gruppi
 
-Stato: approvata
+Stato: chiusa
 Branch: `m31_admin_users_groups`
 Requisiti del PRD: RF-023, RF-025, RF-025a, RF-015, RF-015a, RNF-001, RNF-009; toccati RF-005,
 RF-011, RF-013, RF-019, §6 "Dati scritti sul tenant"
