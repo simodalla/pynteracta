@@ -1,0 +1,28 @@
+# serializer version: 1
+# name: TestUsersCreate.test_json_output
+  '''
+  {
+    "user_id": 1043,
+    "next_occ_token": 1,
+    "generated_password": "Xk7-fake-pw",
+    "expired_credentials": true,
+    "sent_email_notify": false
+  }
+  
+  '''
+# ---
+# name: TestUsersCreate.test_table_output_shows_generated_password
+  '''
+            User 1043 created          
+  ┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+  ┃ Key                 ┃ Value       ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+  │ user_id             │ 1043        │
+  │ next_occ_token      │ 1           │
+  │ generated_password  │ Xk7-fake-pw │
+  │ expired_credentials │ True        │
+  │ sent_email_notify   │ False       │
+  └─────────────────────┴─────────────┘
+  
+  '''
+# ---

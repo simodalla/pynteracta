@@ -172,7 +172,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti e i test dei task; commit `refactor(cli): read_password e opzioni --json e
      --occ-token condivise in cli/_write.py (05-T08)`.
 
-### [ ] T09 – `users create`
+### [x] T09 – `users create`
 
 - Criteri: 05-C11, 05-C12
 - Dipende da: T04, T08

@@ -23,6 +23,9 @@ from pynteracta.cli import (
 )
 from pynteracta.cli import tasks as _tasks_cli
 from pynteracta.cli import users as _users_cli
+from pynteracta.cli import (
+    users_write as _users_write_cli,  # noqa: F401  (registra i comandi di scrittura)
+)
 from pynteracta.cli._common import LOG_LEVELS, CliState, resolve_log_level
 from pynteracta.logging import setup_default_logging
 
