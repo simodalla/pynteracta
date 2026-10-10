@@ -6,7 +6,7 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 import respx
@@ -14,7 +14,7 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli.catalogs_write import _catalog_edit_base, _entry_edit_base
+from pynteracta.cli.catalogs_write import _catalog_edit_base, _display_name, _entry_edit_base
 from pynteracta.models.facade.admin_manage import CatalogEntryForEdit, CatalogForEdit
 
 BASE_ENV = {"PYNTERACTA_BASE_URL": "https://api.example.com"}
@@ -452,3 +452,235 @@ class TestCatalogEntriesEdit:
             "fetch it again and retry" in result.output
         )
         assert put_route.call_count == 1
+
+
+_CATALOG_DELETED_PATH = f"{_CATALOG_PATH}/deleted"
+_ENTRY_DELETED_PATH = f"{_ENTRY_PATH}/deleted"
+
+
+def _interactive(monkeypatch: pytest.MonkeyPatch, value: bool) -> None:
+    from pynteracta.cli import _common  # noqa: PLC0415
+
+    monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: value)
+
+
+# criterio: 06-C14
+@pytest.mark.parametrize(
+    ("mapping", "expected"),
+    [
+        ({"en": "Departments", "it": "Reparti"}, "Reparti"),
+        ({"en": "Departments", "de": "Abteilungen"}, "Departments"),
+        ({}, ""),
+        (None, ""),
+    ],
+)
+def test_display_name(mapping: dict[str, str] | None, expected: str) -> None:
+    assert _display_name(mapping) == expected
+
+
+def _mock_catalog_delete(
+    form: dict[str, Any] | None = None, *, deleted: bool = True
+) -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json("GET", f"{_CATALOG_PATH}/edit", form or _CATALOG_FORM)
+    put_route = mock_json(
+        "PUT", _CATALOG_DELETED_PATH, {"catalogId": _CATALOG_ID, "deleted": deleted}
+    )
+    return get_route, put_route
+
+
+def _mock_entry_delete(*, deleted: bool = True) -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json("GET", f"{_ENTRY_PATH}/edit", _ENTRY_FORM)
+    put_route = mock_json(
+        "PUT", _ENTRY_DELETED_PATH, {"catalogId": _CATALOG_ID, "deleted": deleted}
+    )
+    return get_route, put_route
+
+
+class TestCatalogsDelete:
+    # criterio: 06-C14
+    @respx.mock
+    def test_prompt_shows_id_and_it_name_and_y_deletes(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, True)
+        _, put_route = _mock_catalog_delete()
+        result = runner.invoke(
+            app, ["catalogs", "delete", str(_CATALOG_ID)], env=BASE_ENV, input="y\n"
+        )
+        assert result.exit_code == 0, result.output
+        assert f'Delete catalog {_CATALOG_ID} "Reparti"? [y/N]' in result.output
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == {"deleted": True}
+        assert f"Catalog {_CATALOG_ID} deleted" in result.output
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, True)
+        _, put_route = _mock_catalog_delete()
+        result = runner.invoke(
+            app, ["catalogs", "delete", str(_CATALOG_ID)], env=BASE_ENV, input="n\n"
+        )
+        assert result.exit_code == 0, result.output
+        assert not put_route.called
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_yes_skips_prompt(self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
+        _interactive(monkeypatch, False)
+        _, put_route = _mock_catalog_delete()
+        result = runner.invoke(app, ["catalogs", "delete", str(_CATALOG_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert "[y/N]" not in result.output
+        assert put_route.call_count == 1
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_catalog_delete()
+        result = runner.invoke(
+            app,
+            ["--output", "json", "catalogs", "delete", str(_CATALOG_ID), "--yes"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout) == {"catalog_id": _CATALOG_ID, "deleted": True}
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, False)
+        _, put_route = _mock_catalog_delete()
+        result = runner.invoke(app, ["catalogs", "delete", str(_CATALOG_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--yes" in result.output
+        assert not put_route.called
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_name_missing_shows_empty_string(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, True)
+        _mock_catalog_delete({"id": _CATALOG_ID, "occToken": _CATALOG_OCC_TOKEN})
+        result = runner.invoke(
+            app, ["catalogs", "delete", str(_CATALOG_ID)], env=BASE_ENV, input="n\n"
+        )
+        assert f'Delete catalog {_CATALOG_ID} ""? [y/N]' in result.output
+
+    # criterio: 06-C14
+    def test_help_says_logical_and_reversible(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["catalogs", "delete", "--help"], env=BASE_ENV)
+        assert result.exit_code == 0
+        assert "logical" in result.output.lower()
+        assert "restore" in result.output
+
+
+class TestCatalogsRestore:
+    # criterio: 06-C15
+    @respx.mock
+    def test_restore_puts_false_without_prompt_even_non_interactive(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, False)
+        get_route, put_route = _mock_catalog_delete(deleted=False)
+        result = runner.invoke(app, ["catalogs", "restore", str(_CATALOG_ID)], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert not get_route.called
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == {"deleted": False}
+        assert f"Catalog {_CATALOG_ID} restored" in result.output
+
+    # criterio: 06-C15
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_catalog_delete(deleted=False)
+        result = runner.invoke(
+            app, ["--output", "json", "catalogs", "restore", str(_CATALOG_ID)], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout) == {"catalog_id": _CATALOG_ID, "deleted": False}
+
+
+class TestCatalogEntriesDelete:
+    _PROMPT = f'Delete entry {_ENTRY_ID} "Ingegneria" of catalog {_CATALOG_ID}? [y/N]'
+    _ARGS: ClassVar[list[str]] = ["catalogs", "delete-entry", str(_CATALOG_ID), str(_ENTRY_ID)]
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_prompt_and_y_deletes(self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
+        _interactive(monkeypatch, True)
+        _, put_route = _mock_entry_delete()
+        result = runner.invoke(app, self._ARGS, env=BASE_ENV, input="y\n")
+        assert result.exit_code == 0, result.output
+        assert self._PROMPT in result.output
+        assert _sent_body(put_route) == {"deleted": True}
+        assert f"Entry {_ENTRY_ID} of catalog {_CATALOG_ID} deleted" in result.output
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, True)
+        _, put_route = _mock_entry_delete()
+        result = runner.invoke(app, self._ARGS, env=BASE_ENV, input="n\n")
+        assert result.exit_code == 0, result.output
+        assert not put_route.called
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_yes_skips_prompt_and_json(self, runner: CliRunner) -> None:
+        _, put_route = _mock_entry_delete()
+        result = runner.invoke(app, ["--output", "json", *self._ARGS, "--yes"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert put_route.call_count == 1
+        assert json.loads(result.stdout) == {
+            "catalog_id": _CATALOG_ID,
+            "entry_id": _ENTRY_ID,
+            "deleted": True,
+        }
+
+    # criterio: 06-C14
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, False)
+        _, put_route = _mock_entry_delete()
+        result = runner.invoke(app, self._ARGS, env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert not put_route.called
+
+
+class TestCatalogEntriesRestore:
+    _ARGS: ClassVar[list[str]] = ["catalogs", "restore-entry", str(_CATALOG_ID), str(_ENTRY_ID)]
+
+    # criterio: 06-C15
+    @respx.mock
+    def test_restore_without_prompt(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch, False)
+        get_route, put_route = _mock_entry_delete(deleted=False)
+        result = runner.invoke(app, self._ARGS, env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert not get_route.called
+        assert _sent_body(put_route) == {"deleted": False}
+        assert f"Entry {_ENTRY_ID} of catalog {_CATALOG_ID} restored" in result.output
+
+    # criterio: 06-C15
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_entry_delete(deleted=False)
+        result = runner.invoke(app, ["--output", "json", *self._ARGS], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout) == {
+            "catalog_id": _CATALOG_ID,
+            "entry_id": _ENTRY_ID,
+            "deleted": False,
+        }

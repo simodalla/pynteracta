@@ -9,6 +9,7 @@ chiave per chiave alla mappa di ``--json`` o del form letto.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 import typer
@@ -23,6 +24,7 @@ from pynteracta.cli._common import (
     FullOption,
     OutputOption,
     build_client,
+    confirm_destructive,
     handle_error,
     load_json_body,
     make_console,
@@ -92,6 +94,42 @@ def _entry_edit_base(form: CatalogEntryForEdit) -> dict[str, Any]:
         parents = [CatalogEntry.from_stub(p) for p in form.raw.parents]
         body["parentIds"] = [p.id for p in parents if p.id is not None]
     return body
+
+
+def _display_name(mapping: dict[str, str] | None) -> str:
+    """Il nome da mostrare nel prompt: la lingua ``it`` se c'è, altrimenti la prima, o ``""``."""
+    if not mapping:
+        return ""
+    return mapping.get("it", next(iter(mapping.values())))
+
+
+YesOption = Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")]
+
+
+def _print_deleted(  # noqa: PLR0913
+    state: CliState,
+    console: Any,
+    output: str | None,
+    *,
+    catalog_id: int,
+    entry_id: int | None,
+    deleted: bool,
+) -> None:
+    """Esito di ``delete``/``restore``: riga di testo o JSON con gli id e il flag."""
+    if resolve_output(state, output) == "json":
+        payload: dict[str, Any] = {"catalog_id": catalog_id}
+        if entry_id is not None:
+            payload["entry_id"] = entry_id
+        payload["deleted"] = deleted
+        typer.echo(json.dumps(payload))
+        return
+    if state.quiet:
+        return
+    verb = "deleted" if deleted else "restored"
+    if entry_id is None:
+        console.print(f"Catalog {catalog_id} {verb}")
+    else:
+        console.print(f"Entry {entry_id} of catalog {catalog_id} {verb}")
 
 
 def _require_token(resource: str, occ_token: int | None, read_token: int | None) -> int:
@@ -369,3 +407,100 @@ def catalogs_edit_entry(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console, resource=resource) from exc
+
+
+@app.command("delete")
+def catalogs_delete(
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    yes: YesOption = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a catalog (logical deletion: 'catalogs restore' brings it back).
+
+    The catalog stays on the tenant with deleted=true. Its edit form is read first and its id
+    and name shown in a confirmation prompt; without an interactive terminal --yes is required.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            form = client.catalogs.get_for_edit(catalog_id)
+            prompt = f'Delete catalog {catalog_id} "{_display_name(form.name)}"?'
+            if not confirm_destructive(prompt, yes=yes):
+                raise typer.Exit(EXIT_SUCCESS)
+            client.catalogs.set_deleted(catalog_id, True)
+        _print_deleted(state, console, output, catalog_id=catalog_id, entry_id=None, deleted=True)
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("restore")
+def catalogs_restore(
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    output: OutputOption = None,
+) -> None:
+    """Restore a deleted catalog (sets deleted=false; no confirmation)."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            client.catalogs.set_deleted(catalog_id, False)
+        _print_deleted(state, console, output, catalog_id=catalog_id, entry_id=None, deleted=False)
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("delete-entry")
+def catalogs_delete_entry(
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    entry_id: Annotated[int, typer.Argument(help="Entry ID.")],
+    yes: YesOption = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a catalog entry (logical deletion: 'catalogs restore-entry' brings it back).
+
+    The entry stays on the tenant with deleted=true. Its edit form is read first and its id and
+    label shown in a confirmation prompt; without an interactive terminal --yes is required.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            form = client.catalogs.get_entry_for_edit(catalog_id, entry_id)
+            label = _display_name(form.label)
+            prompt = f'Delete entry {entry_id} "{label}" of catalog {catalog_id}?'
+            if not confirm_destructive(prompt, yes=yes):
+                raise typer.Exit(EXIT_SUCCESS)
+            client.catalogs.set_entry_deleted(catalog_id, entry_id, True)
+        _print_deleted(
+            state, console, output, catalog_id=catalog_id, entry_id=entry_id, deleted=True
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@app.command("restore-entry")
+def catalogs_restore_entry(
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    entry_id: Annotated[int, typer.Argument(help="Entry ID.")],
+    output: OutputOption = None,
+) -> None:
+    """Restore a deleted catalog entry (sets deleted=false; no confirmation)."""
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            client.catalogs.set_entry_deleted(catalog_id, entry_id, False)
+        _print_deleted(
+            state, console, output, catalog_id=catalog_id, entry_id=entry_id, deleted=False
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc

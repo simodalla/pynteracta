@@ -223,7 +223,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(cli): catalogs edit ed edit-entry come patch con occToken
      letto o imposto (06-T09)`.
 
-### [ ] T10 – `catalogs delete|restore` e `delete-entry|restore-entry`
+### [x] T10 – `catalogs delete|restore` e `delete-entry|restore-entry`
 
 - Criteri: 06-C14, 06-C15
 - Dipende da: T08
