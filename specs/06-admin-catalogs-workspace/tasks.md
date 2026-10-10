@@ -290,7 +290,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Controlli bloccanti; commit `feat(cli): copertina e logo del workspace da file con
      l'upload della spec 04 (06-T12)`.
 
-### [ ] T13 – Integration test opt-in dei cicli di catalogo e di workspace
+### [x] T13 – Integration test opt-in dei cicli di catalogo e di workspace
 
 - Criteri: 06-C21, 06-C22 (test; l'esecuzione è T14)
 - Dipende da: T05, T06
