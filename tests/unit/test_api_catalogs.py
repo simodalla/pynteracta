@@ -6,14 +6,18 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 import respx
-from api_helpers import BASE_URL, load_payload, make_transport
+from api_helpers import BASE_URL, load_payload, make_transport, mock_json
 
 from pynteracta.api.catalogs import CatalogsAPI
+from pynteracta.exceptions import ConcurrencyError, NotFoundError, TransportError
+from pynteracta.models.facade.admin_manage import CatalogEntryForEdit, CatalogForEdit
 from pynteracta.models.facade.catalogs import (
     GetPostDefinitionCatalogsRequestDTO,
     ListPostDefinitionCatalogEntriesRequestDTO,
 )
+from pynteracta.models.generated import external_v2 as generated
 
 _CATALOGS_URL = f"{BASE_URL}/communication/settings/post-definition/catalogs"
 _ENTRIES_URL = f"{BASE_URL}/communication/settings/post-definition/catalogs/5/entries"
@@ -147,3 +151,172 @@ class TestCatalogsAPI:
         api = CatalogsAPI(make_transport())
         entries = list(api.iterate_entries(_CATALOG_ID))
         assert len(entries) == 1
+
+
+# --- scritture admin (spec 06) -------------------------------------------------------------
+
+_ADMIN_CATALOGS_PATH = "admin/manage/catalogs"
+_CATALOG_PATH = f"admin/manage/catalogs/{_CATALOG_ID}"
+_CATALOG_DELETED_PATH = f"{_CATALOG_PATH}/deleted"
+_CREATED_CATALOG_ID = 6
+_PARENT_ID = 3
+_CATALOG_OCC_TOKEN = 9
+_CATALOG_NEXT_OCC_TOKEN = 10
+_ENTRY_OCC_TOKEN = 4
+_HTTP_CONFLICT = 409
+
+
+def _body(route: respx.Route) -> dict:  # type: ignore[type-arg]
+    return json.loads(route.calls[0].request.content)  # type: ignore[no-any-return]
+
+
+class TestCatalogsCreate:
+    # criterio: 06-C01
+    @respx.mock
+    def test_create_sends_only_given_fields_and_wraps_response(self) -> None:
+        route = mock_json(
+            "POST", _ADMIN_CATALOGS_PATH, load_payload("create_catalog_response.json")
+        )
+        result = CatalogsAPI(make_transport()).create(
+            name={"it": "Sedi", "en": "Sites"}, parent_id=_PARENT_ID
+        )
+        assert route.call_count == 1
+        assert _body(route) == {"name": {"it": "Sedi", "en": "Sites"}, "parentId": _PARENT_ID}
+        assert result.catalog_id == _CREATED_CATALOG_ID
+        assert result.catalog is not None
+        assert result.catalog.name == "Sedi"
+        assert result.parent_catalog is not None
+        assert result.parent_catalog.id == _PARENT_ID
+        assert result.next_occ_token == 1
+        assert isinstance(result.raw, generated.CreateEditCatalogResponseDTO)
+
+    # criterio: 06-C01
+    @respx.mock
+    def test_create_raw_equivalent(self) -> None:
+        route = mock_json(
+            "POST", _ADMIN_CATALOGS_PATH, load_payload("create_catalog_response.json")
+        )
+        req = generated.CreateEditCatalogRequestDTO(
+            name={"it": "Sedi", "en": "Sites"}, parentId=_PARENT_ID
+        )
+        result = CatalogsAPI(make_transport()).create_raw(req)
+        assert _body(route) == {"name": {"it": "Sedi", "en": "Sites"}, "parentId": _PARENT_ID}
+        assert result.catalog_id == _CREATED_CATALOG_ID
+
+    # criterio: 06-C01
+    @respx.mock
+    def test_create_without_parent_omits_key(self) -> None:
+        route = mock_json(
+            "POST", _ADMIN_CATALOGS_PATH, load_payload("create_catalog_response.json")
+        )
+        CatalogsAPI(make_transport()).create(name={"it": "Sedi"})
+        assert _body(route) == {"name": {"it": "Sedi"}}
+
+
+class TestCatalogsEdit:
+    # criterio: 06-C02
+    @respx.mock
+    def test_edit_sends_given_fields_and_occ_token(self) -> None:
+        route = mock_json("PUT", _CATALOG_PATH, load_payload("edit_catalog_response.json"))
+        result = CatalogsAPI(make_transport()).edit(
+            _CATALOG_ID, _CATALOG_OCC_TOKEN, name={"en": "Sites"}
+        )
+        assert route.call_count == 1
+        assert _body(route) == {"name": {"en": "Sites"}, "occToken": _CATALOG_OCC_TOKEN}
+        assert result.catalog_id == _CATALOG_ID
+        assert result.next_occ_token == _CATALOG_NEXT_OCC_TOKEN
+
+    # criterio: 06-C02
+    @respx.mock
+    def test_edit_raw_equivalent_with_deleted_in_dto(self) -> None:
+        route = mock_json("PUT", _CATALOG_PATH, load_payload("edit_catalog_response.json"))
+        req = generated.CreateEditCatalogRequestDTO(
+            name={"en": "Sites"}, deleted=False, occToken=_CATALOG_OCC_TOKEN
+        )
+        result = CatalogsAPI(make_transport()).edit_raw(_CATALOG_ID, req)
+        assert _body(route) == {
+            "name": {"en": "Sites"},
+            "deleted": False,
+            "occToken": _CATALOG_OCC_TOKEN,
+        }
+        assert result.catalog_id == _CATALOG_ID
+
+
+class TestCatalogsSetDeleted:
+    # criterio: 06-C03
+    @respx.mock
+    def test_true_sends_exact_body(self) -> None:
+        route = mock_json(
+            "PUT", _CATALOG_DELETED_PATH, load_payload("edit_catalog_deleted_response.json")
+        )
+        result = CatalogsAPI(make_transport()).set_deleted(_CATALOG_ID, True)
+        assert route.call_count == 1
+        assert route.calls[0].request.content == b'{"deleted":true}'
+        assert result.catalog_id == _CATALOG_ID
+        assert result.entry_id is None
+        assert result.deleted is True
+
+    # criterio: 06-C03
+    @respx.mock
+    def test_false_sends_exact_body(self) -> None:
+        route = mock_json(
+            "PUT", _CATALOG_DELETED_PATH, {"catalogId": _CATALOG_ID, "deleted": False}
+        )
+        result = CatalogsAPI(make_transport()).set_deleted(_CATALOG_ID, False)
+        assert _body(route) == {"deleted": False}
+        assert result.deleted is False
+
+
+class TestCatalogsForEditAliases:
+    # criterio: 06-C07
+    @respx.mock
+    def test_get_for_edit_same_route_and_facade(self) -> None:
+        route = mock_json(
+            "GET", f"{_CATALOG_PATH}/edit", load_payload("get_catalog_for_edit_response.json")
+        )
+        form = CatalogsAPI(make_transport()).get_for_edit(_CATALOG_ID)
+        assert route.call_count == 1
+        assert isinstance(form, CatalogForEdit)
+        assert form.occ_token == _CATALOG_OCC_TOKEN
+
+    # criterio: 06-C07
+    @respx.mock
+    def test_get_entry_for_edit_same_route_and_facade(self) -> None:
+        route = mock_json(
+            "GET",
+            f"{_CATALOG_PATH}/entries/{_CATALOG_ENTRY_ID}/edit",
+            load_payload("get_catalog_entry_for_edit_response.json"),
+        )
+        form = CatalogsAPI(make_transport()).get_entry_for_edit(_CATALOG_ID, _CATALOG_ENTRY_ID)
+        assert route.call_count == 1
+        assert isinstance(form, CatalogEntryForEdit)
+        assert form.occ_token == _ENTRY_OCC_TOKEN
+
+
+class TestCatalogsWriteErrors:
+    # criterio: 06-C09
+    @respx.mock
+    def test_edit_409_raises_concurrency_error_once(self) -> None:
+        route = mock_json("PUT", _CATALOG_PATH, {}, status=_HTTP_CONFLICT)
+        with pytest.raises(ConcurrencyError) as exc_info:
+            CatalogsAPI(make_transport()).edit(_CATALOG_ID, _CATALOG_OCC_TOKEN, name={"it": "X"})
+        assert exc_info.value.status_code == _HTTP_CONFLICT
+        assert route.call_count == 1
+
+    # criterio: 06-C09
+    @respx.mock
+    def test_set_deleted_404_raises_not_found(self) -> None:
+        route = mock_json("PUT", _CATALOG_DELETED_PATH, {}, status=404)
+        with pytest.raises(NotFoundError):
+            CatalogsAPI(make_transport()).set_deleted(_CATALOG_ID, True)
+        assert route.call_count == 1
+
+    # criterio: 06-C09
+    @respx.mock
+    def test_create_timeout_raises_transport_error_once(self) -> None:
+        route = respx.post(f"{BASE_URL}/{_ADMIN_CATALOGS_PATH}").mock(
+            side_effect=httpx.ReadTimeout("timed out")
+        )
+        with pytest.raises(TransportError):
+            CatalogsAPI(make_transport()).create(name={"it": "Sedi"})
+        assert route.call_count == 1

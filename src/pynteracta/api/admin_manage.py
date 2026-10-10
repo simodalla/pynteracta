@@ -4,7 +4,8 @@
 The admin/manage *edit* endpoints return the full entity state plus an ``occToken`` (optimistic
 concurrency control) for the write surface. This client exposes the four read-form helpers; the
 user credentials write lives on ``client.users`` (``get_credentials_for_edit``,
-``edit_credentials``, spec 05), the others arrive with their write spec.
+``edit_credentials``, spec 05), the catalog and entry writes on ``client.catalogs``
+(``get_for_edit``, ``get_entry_for_edit`` sono alias dei form, spec 06).
 """
 
 from __future__ import annotations
@@ -47,6 +48,9 @@ class AdminManageAPI(ResourceClient):
     def catalog_for_edit(self, catalog_id: int) -> CatalogForEdit:
         """GET ``/admin/manage/catalogs/{catalogId}/edit``.
 
+        Stessa richiesta di :meth:`~pynteracta.api.catalogs.CatalogsAPI.get_for_edit`; la
+        scrittura è :meth:`~pynteracta.api.catalogs.CatalogsAPI.edit` (spec 06).
+
         Args:
             catalog_id: The catalog ID to fetch.
         """
@@ -55,6 +59,9 @@ class AdminManageAPI(ResourceClient):
 
     def catalog_entry_for_edit(self, catalog_id: int, entry_id: int) -> CatalogEntryForEdit:
         """GET ``/admin/manage/catalogs/{catalogId}/entries/{entryId}/edit``.
+
+        Stessa richiesta di :meth:`~pynteracta.api.catalogs.CatalogsAPI.get_entry_for_edit`; la
+        scrittura è :meth:`~pynteracta.api.catalogs.CatalogsAPI.edit_entry` (spec 06).
 
         Args:
             catalog_id: The catalog ID owning the entry.

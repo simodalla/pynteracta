@@ -82,7 +82,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      CatalogEntryWriteResult e CatalogDeletedResult; etag, voci, catalog_id e deleted su Catalog e
      CatalogEntry (06-T03)`.
 
-### [ ] T04 – Scritture dei cataloghi in `CatalogsAPI` e alias dei form
+### [x] T04 – Scritture dei cataloghi in `CatalogsAPI` e alias dei form
 
 - Criteri: 06-C01, 06-C02, 06-C03, 06-C07 (alias), 06-C09 (cataloghi)
 - Dipende da: T02, T03
