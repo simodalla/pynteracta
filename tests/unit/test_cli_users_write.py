@@ -601,3 +601,86 @@ class TestUsersEditCredentials:
         assert result.exit_code == _EXIT_CONFLICT
         assert _CONFLICT in result.output
         assert put_route.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# users delete (T11)
+# ---------------------------------------------------------------------------
+
+_DELETE_DONE = f"User {_USER_ID} deleted"
+_DELETE_PROMPT = f'Delete user {_USER_ID} "Maria Rossi"?'
+
+
+def _mock_delete_flow() -> tuple[respx.Route, respx.Route]:
+    get_route = mock_json("GET", _FORM_PATH, load_payload("get_user_for_edit_response.json"))
+    delete_route = respx.delete(_EDIT_URL).mock(return_value=httpx.Response(200))
+    return get_route, delete_route
+
+
+class TestUsersDelete:
+    # criterio: 05-C16
+    @respx.mock
+    def test_prompt_shows_id_and_full_name_and_y_deletes(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch)
+        get_route, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["users", "delete", str(_USER_ID)], env=BASE_ENV, input="y\n")
+        assert result.exit_code == 0, result.output
+        assert _DELETE_PROMPT in result.output
+        assert get_route.call_count == 1
+        assert delete_route.call_count == 1
+        assert _DELETE_DONE in result.output
+
+    # criterio: 05-C16
+    @respx.mock
+    def test_prompt_n_does_nothing(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _interactive(monkeypatch)
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["users", "delete", str(_USER_ID)], env=BASE_ENV, input="n\n")
+        assert result.exit_code == 0, result.output
+        assert delete_route.call_count == 0
+        assert _DELETE_DONE not in result.output
+
+    # criterio: 05-C16
+    @respx.mock
+    def test_yes_skips_prompt(self, runner: CliRunner) -> None:
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["users", "delete", str(_USER_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert "?" not in result.output
+        assert delete_route.call_count == 1
+        assert _DELETE_DONE in result.output
+
+    # criterio: 05-C16
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_delete_flow()
+        result = runner.invoke(
+            app, ["--output", "json", "users", "delete", str(_USER_ID), "-y"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {"user_id": _USER_ID}
+
+    # criterio: 05-C16
+    @respx.mock
+    def test_non_interactive_without_yes_refuses(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _not_interactive(monkeypatch)
+        _, delete_route = _mock_delete_flow()
+        result = runner.invoke(app, ["users", "delete", str(_USER_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--yes is required" in result.output
+        assert delete_route.call_count == 0
+
+    # criterio: 05-C16
+    @respx.mock
+    def test_not_found_exits_5(self, runner: CliRunner) -> None:
+        respx.get(f"{BASE_URL}/{_FORM_PATH}").mock(
+            return_value=httpx.Response(404, json={"message": "Utente non esistente"})
+        )
+        result = runner.invoke(app, ["users", "delete", str(_USER_ID), "--yes"], env=BASE_ENV)
+        assert result.exit_code == 5  # noqa: PLR2004

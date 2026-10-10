@@ -8,6 +8,7 @@ password custom non passa mai da un argomento: ``--password-stdin`` o ``--genera
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 import typer
@@ -24,6 +25,7 @@ from pynteracta.cli._common import (
     FullOption,
     OutputOption,
     build_client,
+    confirm_destructive,
     handle_error,
     load_json_body,
     make_console,
@@ -495,3 +497,33 @@ def users_edit_credentials(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console, resource=f"User {user_id}") from exc
+
+
+@app.command("delete")
+def users_delete(
+    ctx: typer.Context,
+    user_id: Annotated[int, typer.Argument(help="User ID.")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")] = False,
+    output: OutputOption = None,
+) -> None:
+    """Delete a user.
+
+    The user is read first and its id and name shown in a confirmation prompt. Without an
+    interactive terminal --yes is required: nothing is deleted silently from a script.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    try:
+        with build_client(state) as client:
+            user = client.users.get_for_edit(user_id)
+            name = " ".join(part for part in (user.first_name, user.last_name) if part)
+            if not confirm_destructive(f'Delete user {user_id} "{name}"?', yes=yes):
+                raise typer.Exit(EXIT_SUCCESS)
+            client.users.delete(user_id)
+        if resolve_output(state, output) == "json":
+            typer.echo(json.dumps({"user_id": user_id}))
+        elif not state.quiet:
+            console.print(f"User {user_id} deleted")
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc

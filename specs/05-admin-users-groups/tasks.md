@@ -211,7 +211,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti; commit `feat(cli): users edit ed edit-credentials come patch con occToken
      letto o imposto (05-T10)`.
 
-### [ ] T11 – `users delete`
+### [x] T11 – `users delete`
 
 - Criteri: 05-C16 (utenti)
 - Dipende da: T09
