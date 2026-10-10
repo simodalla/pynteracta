@@ -181,7 +181,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   4. Controlli bloccanti; commit `feat(cli): exit code 11 per gli upload falliti e helper per
      --attach (04-T09)`.
 
-### [ ] T10 – `attachments upload`
+### [x] T10 – `attachments upload`
 
 - Criteri: 04-C10
 - Dipende da: T09

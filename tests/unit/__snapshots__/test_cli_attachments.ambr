@@ -83,3 +83,16 @@
   
   '''
 # ---
+# name: TestAttachmentsUpload.test_table_output
+  '''
+                                 Uploaded nota.txt                                
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                    ┃ Value                                               ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ name                   │ nota.txt                                            │
+  │ content_ref            │ 4af991d23a3e0b5c7d8e9f00112233445566778899aabbccdd… │
+  │ temporary_download_url │ https://storage.example.com/bucket-test/temporary-… │
+  └────────────────────────┴─────────────────────────────────────────────────────┘
+  
+  '''
+# ---

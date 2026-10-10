@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""attachments sub-commands: list, get, check-visibility."""
+"""attachments sub-commands: list, get, check-visibility, upload (spec 04)."""
 
 from __future__ import annotations
 
+import pathlib
 from typing import Annotated
 
 import typer
@@ -234,6 +235,63 @@ def attachments_check_visibility(  # noqa: PLR0913
             fields=fields,
             console=console,
             title="Attachment visibility check",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+            single_command=True,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+def upload_row(obj: object) -> dict[str, object]:
+    """Riga curata di ``attachments upload``: nome, riferimento e link temporaneo."""
+    return {
+        "name": getattr(obj, "name", None),
+        "content_ref": getattr(obj, "content_ref", None),
+        "temporary_download_url": getattr(obj, "temporary_download_url", None),
+    }
+
+
+@app.command("upload")
+def attachments_upload(  # noqa: PLR0913
+    ctx: typer.Context,
+    path: Annotated[
+        pathlib.Path,
+        typer.Argument(help="File to upload.", exists=True, dir_okay=False, readable=True),
+    ],
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Name to upload the file with (default: the file name)."),
+    ] = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Upload a file to the tenant's temporary storage and print its content reference.
+
+    The reference (name + content_ref) can be attached to a post, comment or task with --json;
+    --attach on those commands does the upload for you. The temporary_download_url is a signed
+    link that expires. A file rejected by the storage exits with code 11; nothing is retried.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    try:
+        with build_client(state) as client:
+            uploaded = client.attachments.upload(path, name=name)
+        render_output(
+            resolve_output(state, output),
+            [uploaded],
+            upload_row,
+            full=full,
+            fields=fields,
+            console=console,
+            title=f"Uploaded {uploaded.name}",
             export_path=export,
             export_format=export_format,
             quiet=state.quiet,
