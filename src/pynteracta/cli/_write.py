@@ -2,13 +2,15 @@
 """Helper condivisi dai comandi di scrittura della CLI (``tasks``, ``posts``).
 
 Spostati da ``cli/tasks.py`` con la spec 03: data-ora con fuso, unione di ``--json`` e flag,
-validazione del corpo contro il DTO, coppie ``ID=VALORE`` ripetibili.
+validazione del corpo contro il DTO, coppie ``ID=VALORE`` ripetibili. Con la spec 04: upload dei
+file di ``--attach`` e coppie ``ID=PATH`` di ``--update``.
 """
 
 from __future__ import annotations
 
+import pathlib
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pydantic
@@ -17,7 +19,21 @@ import typer
 from pynteracta.api._utils import snake_to_camel, zoned_datetime_input
 from pynteracta.cli._common import EXIT_CONFIG, coerce_filter_value
 
+if TYPE_CHECKING:
+    from pynteracta.client import InteractaClient
+
 DEFAULT_TIMEZONE = "Europe/Rome"
+
+AttachOption = Annotated[
+    list[pathlib.Path] | None,
+    typer.Option(
+        "--attach",
+        help="File to upload and attach (repeatable). Stops at the first failed upload.",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+]
 
 
 def parse_zoned_datetime(value: str | None, timezone: str, *, option: str) -> dict[str, str] | None:
@@ -74,3 +90,33 @@ def parse_kv_values(values: list[str] | None, *, option: str) -> dict[str, Any]:
         key, value = item.split("=", 1)
         out[key.strip()] = coerce_filter_value(value)
     return out
+
+
+def upload_all(client: InteractaClient, paths: list[pathlib.Path] | None) -> list[dict[str, Any]]:
+    """Carica i file di ``--attach`` nell'ordine dato e ne restituisce i riferimenti.
+
+    Ogni riferimento è ``{"name", "contentRef"}``. Il primo errore risale subito: i file dopo non
+    sono caricati e il chiamante non invia la scrittura (spec 04).
+    """
+    return [client.attachments.upload(path).as_write_input() for path in paths or []]
+
+
+def append_attachments(merged: dict[str, Any], key: str, items: list[dict[str, Any]]) -> None:
+    """Accoda ``items`` alla lista ``key`` del corpo (dopo quelli di ``--json``), se ce ne sono."""
+    if items:
+        merged[key] = [*merged.get(key, []), *items]
+
+
+def parse_id_path_pairs(values: list[str] | None, *, option: str) -> list[tuple[int, pathlib.Path]]:
+    """Coppie ``ID=PATH`` ripetibili (``--update``) → lista di ``(id, percorso)``.
+
+    Si divide al primo ``=``: il percorso può contenerne altri. Un token senza ``=``, con un id
+    non intero o con il percorso vuoto → :class:`typer.BadParameter`.
+    """
+    pairs: list[tuple[int, pathlib.Path]] = []
+    for item in values or []:
+        key, sep, path = item.partition("=")
+        if not sep or not path or not key.strip().isdigit():
+            raise typer.BadParameter(f"{option} must be ID=PATH, got: {item!r}")
+        pairs.append((int(key), pathlib.Path(path)))
+    return pairs

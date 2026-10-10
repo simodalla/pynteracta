@@ -24,6 +24,7 @@ from pynteracta.exceptions import (
     NotFoundError,
     ServerError,
     TransportError,
+    UploadError,
     ValidationError,
 )
 from pynteracta.exceptions import PermissionError as InteractaPermissionError
@@ -43,6 +44,7 @@ EXIT_TRANSPORT = 7
 EXIT_SERVER = 8
 EXIT_CONFLICT = 9  # 409: la risorsa è cambiata dopo la lettura (occToken), rileggere e ripetere
 EXIT_INTERNAL = 10
+EXIT_UPLOAD = 11  # lo storage ha rifiutato un file (spec 04): nessuna scrittura è partita
 
 OutputOption = Annotated[
     str | None,
@@ -95,6 +97,7 @@ _EXIT_MAP: dict[type[InteractaError], int] = {
     InteractaPermissionError: EXIT_PERMISSION,
     NotFoundError: EXIT_NOT_FOUND,
     ValidationError: EXIT_VALIDATION,
+    UploadError: EXIT_UPLOAD,
     TransportError: EXIT_TRANSPORT,
     ServerError: EXIT_SERVER,
     ConcurrencyError: EXIT_CONFLICT,
@@ -603,6 +606,9 @@ def handle_error(
                 "  The resource changed since it was read (occToken mismatch): "
                 "fetch it again and retry."
             )
+    if isinstance(exc, UploadError) and exc.response_body:
+        # Il corpo dello storage (XML) dice perché il file è stato rifiutato.
+        parts.append(f"  Details: {' '.join(str(exc.response_body).split())}")
     if isinstance(exc, ValidationError) and exc.response_body:
         # Il dettaglio del server (per esempio il campo custom non valido) serve all'operatore.
         parts.append(f"  Details: {_compact_json(exc.response_body)}")

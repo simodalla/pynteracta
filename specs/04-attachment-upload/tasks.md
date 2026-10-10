@@ -164,7 +164,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Controlli bloccanti; commit `feat(api): UploadedAttachment accettato dalle scritture di post
      e task (04-T08)`.
 
-### [ ] T09 – Exit code `11` e helper della CLI per gli allegati
+### [x] T09 – Exit code `11` e helper della CLI per gli allegati
 
 - Criteri: 04-C15; base per 04-C10…C14
 - Dipende da: T05, T07
