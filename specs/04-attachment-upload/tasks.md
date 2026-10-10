@@ -260,7 +260,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Controlli bloccanti; commit `test: integration test opt-in del ciclo upload, allegato, nuova
      versione, rimozione (04-T14)`.
 
-### [ ] T15 – Esecuzione dell'integration test sul tenant di prova (manuale)
+### [x] T15 – Esecuzione dell'integration test sul tenant di prova (manuale)
 
 - Criteri: 04-C18
 - Chi: maintainer
@@ -268,7 +268,16 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   `uv run pytest -m integration tests/integration/test_attachments_integration.py -s`; riportare
   l'esito e la riga `[T15]`. Se il server rifiuta o ignora il nome in `updateAttachments`, si
   rivede la spec (nome omesso nelle nuove versioni) con la sua approvazione prima di T16.
-- Esito: <compilato a mano>
+- Esito (2026-10-10, eseguito da Claude su richiesta del maintainer, community di prova `126`):
+  `test_full_cycle` **verde**. Upload, post con l'allegato (`id=9466`, versione 1, `text/plain`),
+  nuova versione con `updateAttachments` e il nome: il server **accetta** il nome e lo applica
+  (stesso id `9466`, `versionNumber` 2, nome `pynteracta-it-nota-v2.txt`); rimozione e
+  cancellazione del post riuscite. La spec non va rivista.
+  Note: la riga `PYNTERACTA_TEST_WRITE_CUSTOM_DATA={"2003": [89]}` del `.env` non è leggibile né
+  da `source` né da `uv run --env-file` (JSON non quotato): si passa a mano nel comando.
+  `TestAttachmentsIntegration::test_list_for_post` (v0.3, fuori da questa spec) fallisce anche su
+  `main`: `total_items_count` è `None` perché il server lo calcola solo con
+  `calculateTotalItemsCount`; è un difetto preesistente del test, da seguire a parte.
 
 ### [ ] T16 – Documentazione
 
