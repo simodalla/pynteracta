@@ -9,11 +9,14 @@ invia una sola richiesta di scrittura e non riprova mai: un ``409`` esce con il 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 import typer
 
 from pynteracta.cli._common import (
+    EXIT_CONFIG,
+    EXIT_CONFLICT,
     EXIT_GENERIC,
     EXIT_SUCCESS,
     CliState,
@@ -35,8 +38,12 @@ from pynteracta.cli._common import (
 from pynteracta.cli._write import JsonBodyOption, OccTokenOption, merge_body, validate_body
 from pynteracta.cli.groups import app
 from pynteracta.exceptions import InteractaError
-from pynteracta.models.facade.groups import GroupForEdit, GroupWriteResult
-from pynteracta.models.generated.external_v2 import CreateGroupRequestDTO, EditGroupRequestDTO
+from pynteracta.models.facade.groups import GroupForEdit, GroupSummary, GroupWriteResult
+from pynteracta.models.generated.external_v2 import (
+    CreateGroupRequestDTO,
+    EditGroupRequestDTO,
+    EditMultipleGroupsMembersRequestDTO,
+)
 
 NameOption = Annotated[str | None, typer.Option("--name", help="Group name.")]
 EmailOption = Annotated[str | None, typer.Option("--email", help="Group email address.")]
@@ -259,6 +266,183 @@ def groups_delete(
             typer.echo(json.dumps({"group_id": group_id}))
         elif not state.quiet:
             console.print(f"Group {group_id} deleted")
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+@dataclass
+class _MembersRow:
+    """Una riga del bulk di ``edit-members``: il gruppo e com'è andata (05-C19)."""
+
+    group: GroupSummary
+    result: str
+
+    @property
+    def raw(self) -> Any:
+        """Il DTO del gruppo, così ``--full``, ``--fields`` ed ``--export`` compongono."""
+        return self.group.raw
+
+
+def _members_row(obj: object) -> dict[str, object]:
+    row = obj if isinstance(obj, _MembersRow) else None
+    group = row.group if row is not None else None
+    return {
+        "group_id": group.id if group is not None else None,
+        "name": group.name if group is not None else None,
+        "members_count": group.members_count if group is not None else None,
+        "next_occ_token": group.occ_token if group is not None else None,
+        "result": row.result if row is not None else None,
+    }
+
+
+def _usage_error(message: str) -> typer.Exit:
+    typer.echo(message, err=True)
+    return typer.Exit(EXIT_CONFIG)
+
+
+@app.command("edit-members")
+def groups_edit_members(  # noqa: PLR0913
+    ctx: typer.Context,
+    group_id: Annotated[
+        int | None, typer.Argument(help="Group ID (omit it with --json to edit several groups).")
+    ] = None,
+    add: Annotated[
+        list[int] | None, typer.Option("--add", help="User ID to add (repeatable).")
+    ] = None,
+    remove: Annotated[
+        list[int] | None, typer.Option("--remove", help="User ID to remove (repeatable).")
+    ] = None,
+    occ_token: OccTokenOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Add or remove members of a group, or of several groups at once.
+
+    With GROUP_ID, --add/--remove change that group: the concurrency token is read from its
+    edit form unless --occ-token is given. Without GROUP_ID, --json sends the full request
+    body (groupMembers with id, occToken, addUserIds, deleteUserIds per group) as it is and the
+    output has one row per group with its result; if any group is in conflict the exit code is
+    9. Nothing is ever retried.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    if group_id is not None:
+        if json_body is not None:
+            raise _usage_error("--json edits several groups: do not pass GROUP_ID with it.")
+        if not add and not remove:
+            raise _usage_error("--add or --remove is required.")
+        _edit_members_single(
+            state,
+            console,
+            group_id,
+            add=add,
+            remove=remove,
+            occ_token=occ_token,
+            output=output,
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+        )
+        return
+    if json_body is None:
+        raise _usage_error(
+            "GROUP_ID with --add/--remove, or --json for several groups, is required."
+        )
+    if add or remove or occ_token is not None:
+        raise _usage_error("--add, --remove and --occ-token need a GROUP_ID.")
+    _edit_members_bulk(
+        state,
+        console,
+        json_body,
+        output=output,
+        full=full,
+        fields=fields,
+        export=export,
+        export_format=export_format,
+    )
+
+
+def _edit_members_single(  # noqa: PLR0913
+    state: CliState,
+    console: Any,
+    group_id: int,
+    *,
+    add: list[int] | None,
+    remove: list[int] | None,
+    occ_token: int | None,
+    output: str | None,
+    full: bool,
+    fields: str | None,
+    export: Any,
+    export_format: str | None,
+) -> None:
+    try:
+        with build_client(state) as client:
+            token = occ_token
+            if token is None:
+                token = _require_token(
+                    group_id, None, client.groups.get_for_edit(group_id).occ_token
+                )
+            result = client.groups.edit_members(
+                group_id, token, add_user_ids=add or None, remove_user_ids=remove or None
+            )
+        _render(
+            state,
+            output,
+            result,
+            title=f"Members of group {group_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Group {group_id}") from exc
+
+
+def _edit_members_bulk(  # noqa: PLR0913
+    state: CliState,
+    console: Any,
+    json_body: str,
+    *,
+    output: str | None,
+    full: bool,
+    fields: str | None,
+    export: Any,
+    export_format: str | None,
+) -> None:
+    body = load_json_body(json_body, EditMultipleGroupsMembersRequestDTO)
+    req = validate_body(body, EditMultipleGroupsMembersRequestDTO)
+    try:
+        with build_client(state) as client:
+            result = client.groups.edit_members_bulk_raw(req)
+        rows = [_MembersRow(g, "success") for g in result.success_groups] + [
+            _MembersRow(g, "concurrency_error") for g in result.concurrency_error_groups
+        ]
+        render_output(
+            resolve_output(state, output),
+            rows,
+            _members_row,
+            full=full,
+            fields=fields,
+            console=console,
+            title="Group members updated",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+        )
+        if result.concurrency_error_groups:
+            raise typer.Exit(EXIT_CONFLICT)
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc

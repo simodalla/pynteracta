@@ -273,3 +273,201 @@ class TestGroupsDelete:
         assert result.exit_code == _EXIT_CONFIG
         assert "--yes is required" in result.output
         assert delete_route.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# groups edit-members (T13)
+# ---------------------------------------------------------------------------
+
+_MEMBERS_PATH = "admin/manage/groups/members"
+_MEMBERS_URL = f"{BASE_URL}/{_MEMBERS_PATH}"
+_MEMBERS_PAYLOAD = load_payload("edit_groups_members_response.json")
+_ADD_ID = 1
+_REMOVE_ID = 2
+
+
+def _conflict_payload() -> dict:  # type: ignore[type-arg]
+    return {"successGroups": [], "concurrencyErrorGroups": [_MEMBERS_PAYLOAD["successGroups"][0]]}
+
+
+class TestGroupsEditMembers:
+    # criterio: 05-C18
+    @respx.mock
+    def test_add_remove_reads_occ_token_then_puts(
+        self, runner: CliRunner, snapshot: object
+    ) -> None:
+        get_route = mock_json("GET", _FORM_PATH, _FORM)
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "groups",
+                "edit-members",
+                str(_GROUP_ID),
+                "--add",
+                str(_ADD_ID),
+                "--remove",
+                str(_REMOVE_ID),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 1
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == {
+            "groupMembers": [
+                {
+                    "id": _GROUP_ID,
+                    "occToken": _FORM_OCC_TOKEN,
+                    "addUserIds": [_ADD_ID],
+                    "deleteUserIds": [_REMOVE_ID],
+                }
+            ]
+        }
+        assert result.output == snapshot
+
+    # criterio: 05-C18
+    @respx.mock
+    def test_occ_token_skips_get(self, runner: CliRunner) -> None:
+        get_route = mock_json("GET", _FORM_PATH, _FORM)
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "--output",
+                "json",
+                "groups",
+                "edit-members",
+                str(_GROUP_ID),
+                "--add",
+                str(_ADD_ID),
+                "--occ-token",
+                str(_FORCED_OCC_TOKEN),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 0
+        assert _sent_body(put_route) == {
+            "groupMembers": [
+                {"id": _GROUP_ID, "occToken": _FORCED_OCC_TOKEN, "addUserIds": [_ADD_ID]}
+            ]
+        }
+        assert json.loads(result.output)["next_occ_token"] == 6  # noqa: PLR2004
+
+    # criterio: 05-C18
+    @respx.mock
+    def test_conflict_exits_9(self, runner: CliRunner) -> None:
+        mock_json("GET", _FORM_PATH, _FORM)
+        put_route = mock_json("PUT", _MEMBERS_PATH, _conflict_payload())
+        result = runner.invoke(
+            app, ["groups", "edit-members", str(_GROUP_ID), "--add", str(_ADD_ID)], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT in result.output
+        assert put_route.call_count == 1
+
+    # criterio: 05-C18
+    @respx.mock
+    def test_without_add_or_remove_exits_2(self, runner: CliRunner) -> None:
+        get_route = mock_json("GET", _FORM_PATH, _FORM)
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(app, ["groups", "edit-members", str(_GROUP_ID)], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert "--add or --remove is required" in result.output
+        assert get_route.call_count == 0
+        assert put_route.call_count == 0
+
+    # criterio: 05-C19
+    @respx.mock
+    def test_group_id_with_json_exits_2(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        body = tmp_path / "body.json"
+        body.write_text(json.dumps({"groupMembers": []}), encoding="utf-8")
+        result = runner.invoke(
+            app,
+            ["groups", "edit-members", str(_GROUP_ID), "--add", "1", "--json", str(body)],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert put_route.call_count == 0
+
+    # criterio: 05-C19
+    @respx.mock
+    def test_no_group_id_and_no_json_exits_2(self, runner: CliRunner) -> None:
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(app, ["groups", "edit-members"], env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFIG
+        assert put_route.call_count == 0
+
+
+class TestGroupsEditMembersBulk:
+    _BODY = {  # noqa: RUF012
+        "groupMembers": [
+            {"id": _GROUP_ID, "occToken": _FORM_OCC_TOKEN, "addUserIds": [_ADD_ID]},
+            {"id": _CREATED_GROUP_ID, "occToken": 1, "deleteUserIds": [_REMOVE_ID]},
+        ]
+    }
+
+    def _body_file(self, tmp_path: pathlib.Path) -> pathlib.Path:
+        body = tmp_path / "body.json"
+        body.write_text(json.dumps(self._BODY), encoding="utf-8")
+        return body
+
+    # criterio: 05-C19
+    @respx.mock
+    def test_json_rows_and_exit_9_on_conflict(
+        self, runner: CliRunner, tmp_path: pathlib.Path, snapshot: object
+    ) -> None:
+        put_route = mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(
+            app, ["groups", "edit-members", "--json", str(self._body_file(tmp_path))], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFLICT, result.output
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == self._BODY
+        assert result.output == snapshot
+
+    # criterio: 05-C19
+    @respx.mock
+    def test_all_success_exits_0(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        payload = {"successGroups": _MEMBERS_PAYLOAD["successGroups"], "concurrencyErrorGroups": []}
+        mock_json("PUT", _MEMBERS_PATH, payload)
+        result = runner.invoke(
+            app,
+            [
+                "--output",
+                "json",
+                "groups",
+                "edit-members",
+                "--json",
+                str(self._body_file(tmp_path)),
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        rows = json.loads(result.output)
+        assert [(r["group_id"], r["result"]) for r in rows] == [(_GROUP_ID, "success")]
+
+    # criterio: 05-C19
+    @respx.mock
+    def test_json_output_full_has_raw_groups(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        mock_json("PUT", _MEMBERS_PATH, _MEMBERS_PAYLOAD)
+        result = runner.invoke(
+            app,
+            [
+                "--output",
+                "json",
+                "groups",
+                "edit-members",
+                "--json",
+                str(self._body_file(tmp_path)),
+                "--full",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFLICT, result.output
+        rows = json.loads(result.output)
+        assert [r["id"] for r in rows] == [_GROUP_ID, _CREATED_GROUP_ID]

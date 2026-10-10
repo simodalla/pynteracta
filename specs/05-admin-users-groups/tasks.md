@@ -242,7 +242,7 @@ le costanti qui sopra con la stessa forma.
   3. Snapshot, controlli bloccanti; commit `feat(cli): comandi groups create, edit (patch) e
      delete con conferma (05-T12)`.
 
-### [ ] T13 – `groups edit-members`, singolo e bulk
+### [x] T13 – `groups edit-members`, singolo e bulk
 
 - Criteri: 05-C18, 05-C19
 - Dipende da: T06, T12
