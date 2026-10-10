@@ -409,7 +409,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   3. Controlli bloccanti; commit `fix(cli): posts delete e mark-erasable riportano l'id del post
      richiesto (03-T19)`.
 
-### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
+### [x] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T16)
 - Dipende da: T14, T16, T18, T19

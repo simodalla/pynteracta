@@ -698,6 +698,8 @@ library (`edit_attachments`) but not yet from the CLI.
 #### `posts delete POST_ID` and `posts mark-erasable POST_ID`
 
 `delete` removes the post; `mark-erasable` removes it and marks it for future physical erasure.
+After either command the post is no longer readable (`404`). Both print the id of the post you
+asked for (the server answers `postId: 0` to `mark-erasable`).
 Both read the post first and ask for confirmation with its id and title
 (`Delete post 21269 "Safety procedures Q4"? [y/N]`). `--yes` (`-y`) skips the prompt; without an
 interactive terminal `--yes` is **required** (exit code 2, nothing is deleted).

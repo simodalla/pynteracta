@@ -72,7 +72,7 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
 | `edit_watchers(post_id, add_user_ids, remove_user_ids)` / `edit_watchers_raw` | `PUT …/edit-post-watchers/{postId}` | `None` |
 | `edit_attachments(post_id, add, update, remove_ids)` / `edit_attachments_raw` | `PUT …/edit-post-attachments/{postId}` | `PostAttachmentsWriteResult` |
 | `delete(post_id)` | `DELETE …/delete-post/{postId}` | the `postId` |
-| `mark_as_erasable(post_id)` | `PUT …/mark-post-as-erasable/{postId}` | the `postId` |
+| `mark_as_erasable(post_id)` | `PUT …/mark-post-as-erasable/{postId}` | the server's `postId` (observed: `0`) |
 | `add_comment(post_id, …)` / `add_comment_raw` | `POST …/create-comment/{postId}` | `PostComment` |
 | `get_workflow_screen(post_id, operation_id=None)` | `GET …/post-workflow-screen-data-for-edit/{postId}` | `WorkflowScreen` (with `screen_occ_token`) |
 | `execute_workflow_operation(post_id, operation_id, …)` / `_raw` | `POST …/execute-post-workflow-operation/{postId}/{opId}` | `WorkflowOperationResult` |
@@ -112,14 +112,16 @@ is converted to UTC.
 attachments the server already knows (`attachmentId`, or `name` + `contentRef`), as dicts or
 `InputPostAttachmentDTO1` models. Uploading new files is not part of the library yet.
 
-### `edit()` is a replacement
+### `edit()` and `copy()` are replacements
 
 Fields you do not pass are not sent, and the server treats `edit()` as a **replacement**, not a
 patch: a missing description counts as empty, so an `edit()` with only a title fails with `400
 REQUIRED_FIELD` on `description` (verified against a tenant). Read the post with
 `get_for_edit()` (or `get_for_copy()` before a copy) and send back every field that must survive,
-as in the example above. The CLI commands `posts edit`, `posts edit-custom-data` and `posts copy`
-do this for you.
+as in the example above. `copy()` behaves the same way: the copy does not inherit the fields you
+omit, so send back the description, custom data and visibility read with `get_for_copy()`.
+`description_format=2` (plain text) is accepted by `edit()` too. The CLI commands `posts edit`,
+`posts edit-custom-data` and `posts copy` do all this for you.
 
 ### References are written as ids
 
@@ -142,18 +144,30 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
     caps = client.posts.capabilities(21269)
     operation = caps.workflow_permitted_operations[0]
     screen = client.posts.get_workflow_screen(21269, operation_id=operation.id)
+    # screen.screen_data returns references as objects: write them back as ids
     result = client.posts.execute_workflow_operation(
         21269,
         operation.id,
-        screen_data={**screen.screen_data, "5": "approved"},
+        screen_data={"5233": [8341], "5237": [3872]},
         screen_occ_token=screen.screen_occ_token,
     )
     print(result.new_current_state.name, [op.name for op in result.new_permitted_operations])
 ```
 
-A transition without a screen is executed with no arguments (empty body).
-`edit_workflow_screen()` changes the screen data of the current state, with the token read by
-`get_workflow_screen(post_id)`.
+A transition without a screen is executed with no arguments: the server accepts the empty body
+(verified against a tenant). `edit_workflow_screen()` changes the screen data of the current state,
+with the token read by `get_workflow_screen(post_id)`; all the transitions of a post share that
+`screen_occ_token`. When the screen data of the current state are not editable
+(`capabilities().can_edit_workflow_screen_data` is `False`), `get_workflow_screen(post_id)`
+without `operation_id` raises `PermissionError` (`403`); the screen of a permitted transition can
+still be read with `operation_id`.
+
+### Delete and mark as erasable
+
+`delete()` and `mark_as_erasable()` both make the post unreadable through the API (`404` on
+every read afterwards). `mark_as_erasable()` also marks it for future physical erasure; its
+response carries `postId: 0` on the tenants observed so far, and the method returns that value
+as is. The CLI reports the id you asked for.
 
 ## API Reference
 
