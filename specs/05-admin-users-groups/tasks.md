@@ -224,7 +224,7 @@ le costanti qui sopra con la stessa forma.
   2. `cli/users_write.py`: comando `delete` con `confirm_destructive`.
   3. Controlli bloccanti; commit `feat(cli): users delete con conferma (05-T11)`.
 
-### [ ] T12 – `groups create`, `groups edit`, `groups delete`
+### [x] T12 – `groups create`, `groups edit`, `groups delete`
 
 - Criteri: 05-C15 (gruppi), 05-C16 (gruppi), 05-C17
 - Dipende da: T05, T08

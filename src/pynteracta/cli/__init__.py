@@ -16,6 +16,9 @@ from pynteracta.cli import catalogs as _catalogs_cli
 from pynteracta.cli import communities as _communities_cli
 from pynteracta.cli import config as _config_cli
 from pynteracta.cli import groups as _groups_cli
+from pynteracta.cli import (
+    groups_write as _groups_write_cli,  # noqa: F401  (registra i comandi di scrittura)
+)
 from pynteracta.cli import hashtags as _hashtags_cli
 from pynteracta.cli import posts as _posts_cli
 from pynteracta.cli import (

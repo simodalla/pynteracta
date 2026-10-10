@@ -1,0 +1,17 @@
+# serializer version: 1
+# name: TestGroupsCreate.test_flags_body_and_table
+  '''
+           Group 202 created         
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value          ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+  │ group_id       │ 202            │
+  │ name           │ QA             │
+  │ email          │ qa@example.com │
+  │ visible        │ True           │
+  │ members_count  │ 2              │
+  │ next_occ_token │ 1              │
+  └────────────────┴────────────────┘
+  
+  '''
+# ---
