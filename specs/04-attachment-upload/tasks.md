@@ -195,7 +195,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Generare e leggere lo snapshot; controlli bloccanti; commit `feat(cli): comando attachments
      upload (04-T10)`.
 
-### [ ] T11 – `--attach` sui comandi dei post
+### [x] T11 – `--attach` sui comandi dei post
 
 - Criteri: 04-C11, 04-C12 (post), 04-C14
 - Dipende da: T02, T09
@@ -209,6 +209,9 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   1. Scrivere i test; eseguirli: rossi.
   2. `cli/posts_write.py`: `attach: AttachOption` su `create`, `comment`, `edit`, `copy`;
      `validate_body` dentro il client dopo `append_attachments`; testi di aiuto.
+     Nota di implementazione: il corpo si valida anche **prima** degli upload, così un `--json`
+     non valido esce con `2` senza caricare file (la caratterizzazione di T02 resta vera anche
+     con `--attach`); la seconda validazione copre i riferimenti accodati.
   3. Snapshot di `--help` esistenti rigenerati e riletti se cambiano.
   4. Controlli bloccanti; commit `feat(cli): --attach su posts create, comment, edit e copy
      (04-T11)`.

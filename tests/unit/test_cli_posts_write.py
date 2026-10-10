@@ -1054,3 +1054,137 @@ class TestToWriteValue:
             "1999": None,
         }
         assert to_write_values(None) == {}
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: --attach sui comandi dei post
+# ---------------------------------------------------------------------------
+
+_UPLOAD_PATH = "core/storage/upload-new-attachment"
+_STORAGE_URL = "https://storage.example.com/bucket-test"
+_CONTENT_REF = load_payload("upload_new_attachment_response.json")["contentRef"]
+_EXIT_UPLOAD = 11
+
+
+def _mock_storage(*responses: httpx.Response) -> respx.Route:
+    """Il primo passo risponde sempre con la fixture; lo storage con ``responses`` in ordine."""
+    mock_json("POST", _UPLOAD_PATH, load_payload("upload_new_attachment_response.json"))
+    route = respx.post(_STORAGE_URL)
+    if len(responses) > 1:
+        route.mock(side_effect=list(responses))
+    else:
+        route.mock(return_value=responses[0] if responses else httpx.Response(204))
+    return route
+
+
+def _files(tmp_path: pathlib.Path, *names: str) -> list[str]:
+    paths = []
+    for name in names:
+        path = tmp_path / name
+        path.write_bytes(b"contenuto di " + name.encode())
+        paths.append(str(path))
+    return paths
+
+
+def _ref(name: str) -> dict[str, str]:
+    return {"name": name, "contentRef": _CONTENT_REF}
+
+
+class TestPostsAttach:
+    # criterio: 04-C11
+    @respx.mock
+    def test_create_two_attach_appended_after_json_items(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage()
+        route = mock_json("POST", _CREATE_PATH, load_payload("create_post_response.json"))
+        body_file = tmp_path / "body.json"
+        body_file.write_text(json.dumps({"attachments": [{"attachmentId": 3}]}), encoding="utf-8")
+        a, b = _files(tmp_path, "a.txt", "b.pdf")
+        result = runner.invoke(
+            app,
+            [
+                "posts", "create", str(_COMMUNITY_ID), "--title", "T",
+                "--attach", a, "--attach", b, "--json", str(body_file),
+            ],
+            env=BASE_ENV,
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        assert storage.call_count == 2  # noqa: PLR2004
+        assert b'filename="a.txt"' in storage.calls[0].request.content
+        assert b'filename="b.pdf"' in storage.calls[1].request.content
+        assert route.call_count == 1
+        assert _sent_body(route)["attachments"] == [
+            {"attachmentId": 3},
+            _ref("a.txt"),
+            _ref("b.pdf"),
+        ]
+        urls = [str(call.request.url) for call in respx.calls]
+        assert urls.index(f"{_API_ROOT}/{_CREATE_PATH}") == len(urls) - 1
+
+    # criterio: 04-C12
+    @respx.mock
+    def test_comment_attachments(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _mock_storage()
+        route = mock_json("POST", _COMMENT_PATH, load_payload("create_post_comment_response.json"))
+        (a,) = _files(tmp_path, "a.txt")
+        result = runner.invoke(
+            app, ["posts", "comment", str(_POST_ID), "--text", "c", "--attach", a], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["attachments"] == [_ref("a.txt")]
+
+    # criterio: 04-C12
+    @respx.mock
+    def test_edit_add_attachments(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _mock_storage()
+        mock_json("GET", _FOR_EDIT_PATH, load_payload("post_for_edit_response.json"))
+        route = mock_json("PUT", _EDIT_PATH, load_payload("edit_post_response.json"))
+        (a,) = _files(tmp_path, "a.txt")
+        result = runner.invoke(app, ["posts", "edit", str(_POST_ID), "--attach", a], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["addAttachments"] == [_ref("a.txt")]
+
+    # criterio: 04-C12
+    @respx.mock
+    def test_copy_add_attachments(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _mock_storage()
+        mock_json("GET", _FOR_COPY_PATH, load_payload("post_for_copy_response.json"))
+        route = mock_json("PUT", _COPY_PATH, load_payload("copy_post_response.json"))
+        (a,) = _files(tmp_path, "a.txt")
+        result = runner.invoke(app, ["posts", "copy", str(_POST_ID), "--attach", a], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["addAttachments"] == [_ref("a.txt")]
+
+    # criterio: 04-C14
+    @respx.mock
+    def test_second_upload_fails_exits_11_without_write(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage(httpx.Response(204), httpx.Response(400, text="<Error/>"))
+        route = mock_json("POST", _CREATE_PATH, load_payload("create_post_response.json"))
+        a, b = _files(tmp_path, "a.txt", "b.pdf")
+        result = runner.invoke(
+            app,
+            ["posts", "create", str(_COMMUNITY_ID), "--title", "T", "--attach", a, "--attach", b],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_UPLOAD
+        assert "Upload of b.pdf failed" in result.output
+        assert storage.call_count == 2  # noqa: PLR2004
+        assert route.call_count == 0
+
+    # criterio: 04-C03
+    @respx.mock
+    def test_attach_missing_file_is_usage_error(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        route = mock_json("POST", _CREATE_PATH, load_payload("create_post_response.json"))
+        result = runner.invoke(
+            app,
+            ["posts", "create", str(_COMMUNITY_ID), "--attach", str(tmp_path / "manca.txt")],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert route.call_count == 0
+        assert len(respx.calls) == 0

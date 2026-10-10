@@ -35,9 +35,12 @@ from pynteracta.cli._common import (
 )
 from pynteracta.cli._write import (
     DEFAULT_TIMEZONE,
+    AttachOption,
+    append_attachments,
     merge_body,
     parse_kv_values,
     parse_zoned_datetime,
+    upload_all,
     validate_body,
 )
 from pynteracta.cli.posts import app
@@ -440,6 +443,7 @@ def posts_create(  # noqa: PLR0913
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
     client_uid: ClientUidOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -452,7 +456,9 @@ def posts_create(  # noqa: PLR0913
     Simple fields come from flags; attachments and non-scalar custom values from --json (file
     or '-' for stdin). Flags override the keys of the JSON body; customData is merged field by
     field. Only the fields given are sent, plus 'announcement' (false unless --announcement).
-    Validation errors from the server (e.g. a bad custom value) exit with code 6.
+    --attach uploads files and appends them to the attachments of --json; a failed upload exits
+    with code 11 and the post is not created. Validation errors from the server (e.g. a bad
+    custom value) exit with code 6.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -478,9 +484,11 @@ def posts_create(  # noqa: PLR0913
     merged.setdefault("announcement", False)
     if custom_flags or "customData" in json_part:
         merged["customData"] = merge_custom_data({}, json_part, custom_flags)
-    req = validate_body(merged, CreateCustomPostRequest)
+    validate_body(merged, CreateCustomPostRequest)
     try:
         with build_client(state) as client:
+            append_attachments(merged, "attachments", upload_all(client, attach))
+            req = validate_body(merged, CreateCustomPostRequest)
             result = client.posts.create_raw(community_id, req)
         _render_single(
             state,
@@ -511,6 +519,7 @@ def posts_comment(  # noqa: PLR0913
         int | None, typer.Option("--parent", help="ID of the comment this one replies to.")
     ] = None,
     client_uid: ClientUidOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -521,7 +530,8 @@ def posts_comment(  # noqa: PLR0913
     """Add a comment to a post.
 
     --text sends a plain-text comment; --json takes the full body (e.g. a rich-text delta or
-    attachments). One of the two is required.
+    attachments). One of the two is required. --attach uploads files and attaches them; a
+    failed upload exits with code 11 and the comment is not sent.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -537,9 +547,11 @@ def posts_comment(  # noqa: PLR0913
         parent_comment_id=parent,
         client_uid=client_uid,
     )
-    req = validate_body(merged, CreatePostCommentRequestDTO)
+    validate_body(merged, CreatePostCommentRequestDTO)
     try:
         with build_client(state) as client:
+            append_attachments(merged, "attachments", upload_all(client, attach))
+            req = validate_body(merged, CreatePostCommentRequestDTO)
             comment = client.posts.add_comment_raw(post_id, req)
         _render_single(
             state,
@@ -684,6 +696,7 @@ def posts_edit(  # noqa: PLR0913
     scheduled_publication: ScheduledPublicationOption = None,
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -698,8 +711,9 @@ def posts_edit(  # noqa: PLR0913
     --json over the post as read; customData is merged field by field). --description
     replaces the description with plain text. --watcher-user adds watchers,
     --remove-watcher-user removes them. The concurrency token is the one just read, or
-    --occ-token. If the post changed since it was read the command exits with code 9 and never
-    retries.
+    --occ-token. --attach uploads files and adds them to the post (a failed upload exits with
+    code 11 and the post is not changed). If the post changed since it was read the command
+    exits with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -727,6 +741,8 @@ def posts_edit(  # noqa: PLR0913
                 scheduled_publication=scheduled,
                 workflow_init_state_id=workflow_init_state,
             )
+            validate_body(merged, EditCustomPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
             req = validate_body(merged, EditCustomPostRequestDTO)
             result = client.posts.edit_raw(post_id, token, req)
         _render_single(
@@ -813,6 +829,7 @@ def posts_copy(  # noqa: PLR0913
     scheduled_publication: ScheduledPublicationOption = None,
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -823,8 +840,9 @@ def posts_copy(  # noqa: PLR0913
     """Copy a custom post into a new one, changing the fields you mention.
 
     The post is read first (post-data-for-copy); title, description, custom data, visibility
-    and announcement are copied unless a flag or --json overrides them. The result shows the
-    new post. A 409 exits with code 9 and is never retried.
+    and announcement are copied unless a flag or --json overrides them. --attach uploads files
+    and adds them to the copy (a failed upload exits with code 11 and nothing is copied). The
+    result shows the new post. A 409 exits with code 9 and is never retried.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -852,6 +870,8 @@ def posts_copy(  # noqa: PLR0913
                 scheduled_publication=scheduled,
                 workflow_init_state_id=workflow_init_state,
             )
+            validate_body(merged, CopyCustomPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
             req = validate_body(merged, CopyCustomPostRequestDTO)
             result = client.posts.copy_raw(post_id, token, req)
         _render_single(
