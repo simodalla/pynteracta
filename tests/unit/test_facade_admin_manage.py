@@ -112,9 +112,10 @@ class TestUserCredentialsForEdit:
         assert credentials.custom_username == "m.rossi"
         assert credentials.custom_active is True
 
-    def test_occ_token_only_on_raw(self, credentials: UserCredentialsForEdit) -> None:
-        assert not hasattr(credentials, "occ_token")
-        assert credentials.raw.occToken == _USER_OCC_TOKEN
+    # criterio: 05-C06
+    def test_occ_token_exposed(self, credentials: UserCredentialsForEdit) -> None:
+        assert credentials.occ_token == _USER_OCC_TOKEN
+        assert credentials.occ_token == credentials.raw.occToken
 
     def test_empty_configuration(self) -> None:
         facade = UserCredentialsForEdit.from_dict({"occToken": 1})

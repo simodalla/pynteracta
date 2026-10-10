@@ -2,9 +2,10 @@
 """Facade models for the admin/manage edit (read-form) endpoints.
 
 These four facades wrap the *for-edit* response DTOs returned by the admin/manage surface.
-Each response carries an ``occToken`` (optimistic-concurrency token) intended for the future
-write line (deferred to v1.0+); it is **only** reachable through ``.raw`` — it is never surfaced
-as a narrow property, to keep the read facade free of write-only concerns.
+Each response carries an ``occToken`` (optimistic-concurrency token) for the write surface.
+:class:`UserCredentialsForEdit` exposes it as :attr:`~UserCredentialsForEdit.occ_token` (spec 05,
+``users.edit_credentials``); workspace, catalog and catalog entry keep it on ``.raw`` until their
+write spec.
 
 Field-curation strategy (answer to Q-v0.6-1): narrow properties surface the directly-typed
 scalar fields of each response DTO, plus light convenience accessors that dig one level into the
@@ -198,8 +199,8 @@ class UserCredentialsForEdit:
     The response has no entity id (the user id is the path parameter). The credentials payload
     lives in ``userCredentialsConfiguration``, a ``RootModel[Any]`` stub re-validated into its
     typed sibling. Narrow properties expose which credential kinds are configured plus the custom
-    username/active flags; the full per-provider configuration stays on ``.raw``. ``occToken`` is
-    only on ``.raw``.
+    username/active flags; the full per-provider configuration stays on ``.raw``.
+    :attr:`occ_token` è il token di concorrenza da passare a ``users.edit_credentials`` (spec 05).
 
     Attributes:
         raw: The underlying generated DTO; access additional fields via this escape hatch.
@@ -254,6 +255,11 @@ class UserCredentialsForEdit:
         """Whether the custom credentials are active, if configured."""
         custom = self._typed_custom(self._config)
         return custom.active if custom is not None else None
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza da passare a ``users.edit_credentials`` (spec 05, RF-023a)."""
+        return self.raw.occToken
 
     @classmethod
     def from_dict(cls, data: dict) -> UserCredentialsForEdit:  # type: ignore[type-arg]

@@ -232,8 +232,8 @@ class GroupForEdit:
     """Narrow facade over :class:`~generated.GetGroupForEditResponseDTO`.
 
     The ``members`` list contains ``UserDTO`` (``RootModel[Any]`` stubs); call
-    :meth:`members_typed` to re-validate them. ``occToken`` is only on ``.raw`` — it is the
-    propaedeutic edit token for the future write surface.
+    :meth:`members_typed` to re-validate them. :attr:`occ_token` è il token di concorrenza da
+    passare a ``edit`` ed ``edit_members`` (spec 05).
 
     Attributes:
         raw: The underlying generated DTO; access additional fields via this escape hatch.
@@ -273,6 +273,11 @@ class GroupForEdit:
     @property
     def creation_timestamp(self) -> int | None:
         return self.raw.creationTimestamp
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza da passare a ``edit`` ed ``edit_members`` (spec 05, RF-023a)."""
+        return self.raw.occToken
 
     @property
     def tags_typed(self) -> list[Tag]:

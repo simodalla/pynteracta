@@ -42,7 +42,12 @@ from pynteracta.models.facade.posts_write import (
     WorkflowScreen,
 )
 from pynteracta.models.facade.tasks import Task, TaskWriteResult
-from pynteracta.models.facade.users import SystemUserList, UserForEdit, UserProfile
+from pynteracta.models.facade.users import (
+    SystemUserList,
+    UserForEdit,
+    UserProfile,
+    UserWriteResult,
+)
 from pynteracta.models.generated import external_v2 as generated
 
 from .conftest import load_payload
@@ -1322,3 +1327,16 @@ class TestAdminGroupsWriteDTOs:
         assert members.concurrencyErrorGroups is not None
         conflict = generated.GroupDTOModel.model_validate(members.concurrencyErrorGroups[0].root)
         assert conflict.id == _CONFLICT_GROUP_ID_CONTRACT
+
+    # criterio: 05-C22
+    def test_facade_smoke(self) -> None:
+        created = UserWriteResult.from_create(load_payload("create_user_response.json"))
+        assert created.user_id == _CREATED_USER_ID_CONTRACT
+        assert created.generated_password == ["Xk7-fake-pw"]
+        edited = UserWriteResult.from_edit(load_payload("edit_user_response.json"), _USER_ID)
+        assert edited.user_id == _USER_ID
+        assert edited.next_occ_token is not None
+        credentials = UserWriteResult.from_credentials(
+            load_payload("edit_user_credentials_response.json"), _USER_ID
+        )
+        assert credentials.next_occ_token is not None

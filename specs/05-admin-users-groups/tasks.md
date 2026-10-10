@@ -44,7 +44,7 @@ le costanti qui sopra con la stessa forma.
      `test: fixture e contract test dei DTO di scrittura di utenti e gruppi; riga 0.13.0 in
      ROADMAP (05-T01)`.
 
-### [ ] T02 – `occ_token` sulle façade per-edit e `UserWriteResult`
+### [x] T02 – `occ_token` sulle façade per-edit e `UserWriteResult`
 
 - Criteri: 05-C06 (façade), 05-C01/C02/C04 (campi del risultato), 05-C22 (smoke utenti)
 - Dipende da: T01

@@ -115,13 +115,14 @@ class TestGroupsGetForEdit:
         assert members[0].id == _MEMBER_ID_1
         assert members[1].id == _MEMBER_ID_2
 
+    # criterio: 05-C06
     @respx.mock
-    def test_occ_token_on_raw(self) -> None:
+    def test_get_for_edit_exposes_occ_token(self) -> None:
         payload = load_payload("get_group_for_edit_response.json")
         respx.get(f"{BASE_URL}/admin/manage/groups/{_GROUP_ID_1}/edit").mock(
             return_value=httpx.Response(200, json=payload)
         )
         api = GroupsAPI(make_transport())
         result = api.get_for_edit(_GROUP_ID_1)
-        assert not hasattr(result, "occ_token")
+        assert result.occ_token == _OCC_TOKEN
         assert result.raw.occToken == _OCC_TOKEN

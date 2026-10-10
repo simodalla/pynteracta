@@ -79,9 +79,10 @@ class TestGroupForEdit:
         assert for_edit.name == "Engineering"
         assert for_edit.members_count == _MEMBER_COUNT
 
-    def test_occ_token_only_on_raw(self, for_edit: GroupForEdit) -> None:
-        assert not hasattr(for_edit, "occ_token")
-        assert for_edit.raw.occToken == _OCC_TOKEN
+    # criterio: 05-C06
+    def test_occ_token_exposed(self, for_edit: GroupForEdit) -> None:
+        assert for_edit.occ_token == _OCC_TOKEN
+        assert for_edit.occ_token == for_edit.raw.occToken
 
     def test_members_typed(self, for_edit: GroupForEdit) -> None:
         members = for_edit.members_typed

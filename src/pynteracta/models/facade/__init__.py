@@ -84,6 +84,7 @@ from pynteracta.models.facade.users import (
     SystemUserList,
     UserForEdit,
     UserProfile,
+    UserWriteResult,
 )
 
 __all__ = [
@@ -146,6 +147,7 @@ __all__ = [
     "UserCredentialsForEdit",
     "UserForEdit",
     "UserProfile",
+    "UserWriteResult",
     "VisibilityResult",
     "WorkspaceForEdit",
     "validate_field_filters",
