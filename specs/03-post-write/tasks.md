@@ -330,7 +330,7 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   5. Controlli bloccanti, `uv run mkdocs build --strict`; commit `feat(cli): le patch dei post
      rimandano i riferimenti letti come id (03-T18)`.
 
-### [ ] T16 – Esecuzione sul tenant di prova e prove manuali (manuale)
+### [x] T16 – Esecuzione sul tenant di prova e prove manuali (manuale)
 
 - Criteri: 03-C31 (esecuzione), verifica manuale della spec
 - Chi: maintainer
@@ -363,7 +363,37 @@ community `79`, post `21269`, `occToken: 5`, `screenOccToken: 3`, operazione `12
   - Da qui la revisione della spec del 2026-10-09 e T18. Restano: (b) copia, (c) formato della
     descrizione in modifica, (d) `mark-erasable` contro `delete`, (e) transizione senza screen,
     da eseguire dopo T18 con il ciclo completo.
-- Esito: <compilato a mano>
+  - Dopo T18 (2026-10-09, sera; `PYNTERACTA_TEST_WORKFLOW_POST_ID=23325`):
+    - Ciclo completo dell'integration test **passato** (post creati e cancellati, `404` alla
+      fine); `test_workflow_screen_read_only` sul 23325 **passato**.
+    - (b) `copy-post` con il solo titolo → `400 REQUIRED_FIELD` su `description`: anche la copia
+      è una **sostituzione**, non eredita i campi omessi; rimandando descrizione (delta), campi
+      custom (come id) e visibilità letti la copia riesce. La descrizione copiata torna con
+      `\u200b\n` in fondo (chiusura del delta da parte del server).
+    - (c) `descriptionFormat: 2` in `edit-post` è **accettato** come testo semplice.
+    - (d) `mark-post-as-erasable` sul post di prova 23331 (community 126): dopo la chiamata il
+      post non è più leggibile (`404` su dettaglio, form di modifica, client uid; assente
+      dall'elenco), come dopo `delete`. La risposta ha **`postId: 0`**, non l'id del post:
+      `posts mark-erasable --output json` stampa `{"post_id": 0}`. Da correggere in T17
+      (CLI: stampare l'id richiesto; docs: la libreria restituisce il valore del server).
+    - (e) Sul 23325 tutte le transizioni permesse hanno uno screen (`5476 Sospendi`,
+      `5477 Chiudi`, `5481 Riassegna`): transizione senza screen **non verificata**. Le
+      transizioni restituiscono lo stesso `screenOccToken` dello screen dello stato corrente.
+  - (e) 2026-10-10, post 23324 (community 126), transizione `5483 no_screen` creata dal
+    maintainer da "Da prendere in carico" ad "Aperto", senza screen: `posts workflow-execute
+    23324 5483` ha inviato il corpo `{}` senza leggere lo screen; il server l'ha **accettato**
+    (nuovo stato "Aperto", transizioni permesse `5476 Sospendi, 5477 Chiudi, 5481 Riassegna`,
+    `post_data_has_changed: False`), confermato dalla rilettura.
+- Esito: T16 completo. Il server tratta `edit-post` e `copy-post` come **sostituzioni**
+  (descrizione omessa → `400 REQUIRED_FIELD`); `descriptionFormat: 2` è accettato in modifica;
+  i riferimenti a cataloghi e utenti si scrivono come **id** (con gli oggetti letti `400
+  INVALID_VALUE`); un campo delta in testo semplice richiede `deltaAreaFormat: 2` (senza, `500`);
+  `mark-post-as-erasable` rende il post illeggibile come `delete` ma risponde `postId: 0`; una
+  transizione senza screen accetta il corpo `{}`; la lettura dello screen dello stato corrente
+  risponde `403` quando i dati di screen non sono modificabili. 03-C31 eseguito sul tenant:
+  ciclo completo e lettura dello screen **passati**. Da sistemare in T17: `posts mark-erasable`
+  deve stampare l'id richiesto, la documentazione deve dire che la libreria restituisce il valore
+  del server (`0`).
 
 ### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
