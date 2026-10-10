@@ -2,8 +2,9 @@
 """Admin manage edit (read-form) resource client.
 
 The admin/manage *edit* endpoints return the full entity state plus an ``occToken`` (optimistic
-concurrency control) used by the future write line (deferred to v1.0+). This client exposes the
-four read-form helpers only; the ``occToken`` is carried through each facade's ``.raw``.
+concurrency control) for the write surface. This client exposes the four read-form helpers; the
+user credentials write lives on ``client.users`` (``get_credentials_for_edit``,
+``edit_credentials``, spec 05), the others arrive with their write spec.
 """
 
 from __future__ import annotations
@@ -26,8 +27,9 @@ _USER_CREDENTIALS_FOR_EDIT_PATH = "admin/manage/users/{user_id}/credentials/edit
 class AdminManageAPI(ResourceClient):
     """Client for the admin/manage edit (read-form) endpoints.
 
-    These are admin-only read helpers, propaedeutic to the future write surface. Each returns the
-    entity's editable state and an ``occToken`` (only on the facade ``.raw``).
+    These are admin-only read helpers, propaedeutic to the write surface. Each returns the
+    entity's editable state and an ``occToken`` (``UserCredentialsForEdit.occ_token``; on ``.raw``
+    for the others).
     """
 
     def __init__(self, transport: HttpTransport) -> None:
@@ -63,6 +65,9 @@ class AdminManageAPI(ResourceClient):
 
     def user_credentials_for_edit(self, user_id: int) -> UserCredentialsForEdit:
         """GET ``/admin/manage/users/{userId}/credentials/edit``.
+
+        Stessa richiesta di :meth:`~pynteracta.api.users.UsersAPI.get_credentials_for_edit`;
+        la scrittura è :meth:`~pynteracta.api.users.UsersAPI.edit_credentials` (spec 05).
 
         Args:
             user_id: The user ID whose credentials to fetch.

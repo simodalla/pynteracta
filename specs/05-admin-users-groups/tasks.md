@@ -82,7 +82,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti; commit `feat(groups): façade GroupSummary, GroupWriteResult e
      GroupMembersResult (05-T03)`.
 
-### [ ] T04 – Scritture degli utenti in `UsersAPI`
+### [x] T04 – Scritture degli utenti in `UsersAPI`
 
 - Criteri: 05-C01, 05-C02, 05-C03, 05-C04, 05-C05 (utenti), 05-C06 (alias), 05-C21 (utenti)
 - Dipende da: T02
