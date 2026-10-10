@@ -792,3 +792,51 @@ class TestPostMultipart:
         assert "SIGNED-SECRET" not in hooks.requests[0].url
         assert "SIGNED-SECRET" not in hooks.responses[0].url
         assert "SIGNED-SECRET" not in repr(logs)
+
+
+# criterio: 05-C20
+@respx.mock
+def test_password_keys_redacted_in_audit_and_hooks() -> None:
+    """Le chiavi ``password`` e ``generatedPassword`` delle scritture admin (spec 05) sono redatte
+    nei due canali, audit log con i body e hook, senza modifiche alla regola generale."""
+    plain_request = "S3gret!"
+    plain_response = "Xk7-plain"
+    requests: list[RequestInfo] = []
+    responses: list[ResponseInfo] = []
+
+    class _Capture:
+        def on_request(self, info: RequestInfo) -> None:
+            requests.append(info)
+
+        def on_response(self, info: ResponseInfo) -> None:
+            responses.append(info)
+
+        def on_error(self, err: Exception) -> None: ...
+
+    url = f"{_BASE}/admin/manage/users"
+    respx.post(url).mock(
+        return_value=httpx.Response(
+            200, json={"userId": 1043, "generatedPassword": [plain_response]}
+        )
+    )
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=True, hooks=_Capture()).request(
+            "POST",
+            "admin/manage/users",
+            json={
+                "firstname": "A",
+                "resetUserCustomCredentialsCommand": {"password": [plain_request]},
+            },
+        )
+    audit_request = next(e for e in logs if e.get("event") == "audit.request")
+    audit_response = next(e for e in logs if e.get("event") == "audit.response")
+    assert audit_request["body"]["resetUserCustomCredentialsCommand"]["password"] == _REDACTED
+    assert audit_request["body"]["firstname"] == "A"
+    assert audit_response["body"]["generatedPassword"] == _REDACTED
+    assert requests[0].body is not None
+    assert requests[0].body["resetUserCustomCredentialsCommand"]["password"] == _REDACTED
+    assert responses[0].body is not None
+    assert responses[0].body["generatedPassword"] == _REDACTED
+    everything = repr(logs) + repr(requests[0].body) + repr(responses[0].body)
+    assert plain_request not in everything
+    assert plain_response not in everything

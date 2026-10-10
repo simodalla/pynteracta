@@ -139,7 +139,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti; commit `feat(groups): modifica dei membri di uno o più gruppi, conflitto
      del 200 come ConcurrencyError (05-T06)`.
 
-### [ ] T07 – Prova della redazione delle password nei due canali
+### [x] T07 – Prova della redazione delle password nei due canali
 
 - Criteri: 05-C20
 - Dipende da: nessuno
