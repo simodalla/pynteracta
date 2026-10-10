@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
+
 from pynteracta.models.generated import external_v2 as generated
 
 # Re-exported for use by the users API layer (M5).
@@ -256,8 +258,28 @@ class UserWriteResult:
 
     @classmethod
     def from_create(cls, data: dict[str, Any]) -> UserWriteResult:
-        """Legge la risposta di ``POST admin/manage/users``."""
-        return cls(generated.CreateUserResponseDTO.model_validate(data))
+        """Legge la risposta di ``POST admin/manage/users``.
+
+        Lo swagger dichiara ``generatedPassword`` come lista di stringhe, ma il tenant restituisce
+        una stringa (prova sul tenant, spec 05): la si normalizza in lista di un elemento. Se la
+        risposta non ha la forma attesa l'errore riporta solo i nomi dei campi, mai i valori, e
+        non incatena l'eccezione di pydantic: la password non deve finire in un messaggio di
+        eccezione (RNF-001).
+        """
+        payload = dict(data)
+        password = payload.get("generatedPassword")
+        if isinstance(password, str):
+            payload["generatedPassword"] = [password]
+        try:
+            raw = generated.CreateUserResponseDTO.model_validate(payload)
+        except PydanticValidationError as exc:
+            fields = sorted(
+                {".".join(str(part) for part in err["loc"]) or "<root>" for err in exc.errors()}
+            )
+        else:
+            return cls(raw)
+        msg = f"Unexpected create-user response: invalid field(s) {', '.join(fields)}"
+        raise ValueError(msg)
 
     @classmethod
     def from_edit(cls, data: dict[str, Any], user_id: int) -> UserWriteResult:

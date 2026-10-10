@@ -45,8 +45,10 @@ scritture sono già nei modelli generati dal swagger pinnato: nessuna rigenerazi
   user_settings=None, user_credentials_configuration=None,
   reset_user_custom_credentials_command=None)` invia `POST admin/manage/users` con **solo i campi
   passati**, in camelCase, e restituisce un `UserWriteResult` con `user_id`, `next_occ_token`,
-  `generated_password` (la lista di stringhe che il server restituisce quando ha generato una
-  password custom), `expired_credentials`, `sent_email_notify`, `account_photo_url` e `.raw`.
+  `generated_password` (lista di stringhe: lo swagger la dichiara così, il tenant restituisce
+  una sola stringa, che la façade normalizza in lista di un elemento), `expired_credentials`,
+  `sent_email_notify`, `account_photo_url` e `.raw`. Se la risposta di creazione non ha la forma
+  attesa, l'errore riporta solo i nomi dei campi, mai i valori (RNF-001).
   I blocchi annidati (preferenze, info, impostazioni, configurazione delle credenziali, comando di
   reset delle credenziali custom) si passano come dizionari nella forma del DTO (chiavi camelCase)
   o come DTO generati. `create_raw(req: CreateUserRequestDTO)` fa lo stesso da un DTO già
@@ -247,6 +249,9 @@ dell'utente, entrambi con pulizia garantita.
   con il corpo (05-C09).
 - `edit_members_bulk` con lista vuota → corpo `{"groupMembers": []}` inviato così com'è; decide il
   server (05-C10: solo ciò che è passato).
+- `generatedPassword` stringa nella risposta di `users.create` (è ciò che fa il tenant, contro lo
+  swagger) → `generated_password == [stringa]`; risposta di creazione malformata → `ValueError`
+  con i soli nomi dei campi, senza eccezione incatenata (05-C01, 05-C20).
 - `delete` di un utente o gruppo inesistente → `404 → NotFoundError`, exit `5` in CLI (05-C03;
   mapping esistente).
 - `users edit`, `users edit-credentials`, `groups edit`, `groups edit-members GROUP_ID` su un
@@ -341,6 +346,7 @@ eliminano sempre al termine.
 | Membri solo da `groups edit-members` (`--add`/`--remove`); `groups edit` rimanda la lista letta | `--member` su `groups edit` che sostituisce la lista; solo via `groups edit` | Nessun `groups edit` può svuotare un gruppo per sbaglio; add/remove è l'operazione che gli script fanno davvero |
 | Ritorno = façade sulla risposta (`UserWriteResult`, `GroupWriteResult`, `GroupMembersResult`); `delete` → `None` | Rileggere e restituire il form; solo gli id | Nessuna chiamata in più; `DELETE` non ha corpo, non c'è nulla da restituire |
 | Testi della CLI in inglese | Italiano | Decisione della spec 02, sezione Lingua del `CLAUDE.md` |
+| `generatedPassword` stringa dal tenant normalizzata in lista nella façade; errore di forma senza valori | Cambiare `generated_password` in `str`; modificare il modello generato; rigenerare da uno swagger corretto a mano | Emerso in T15: lo swagger pinnato è sbagliato e non si tocca a mano; la lista resta il contratto dichiarato e la CLI già la unisce; un `ValidationError` di pydantic metterebbe la password nel messaggio |
 
 ## Verifica manuale
 

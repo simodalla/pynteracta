@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pytest
 from api_helpers import load_payload
 
 from pynteracta.models.facade.users import UserForEdit, UserWriteResult
@@ -35,6 +36,32 @@ class TestUserWriteResult:
         assert result.sent_email_notify is False
         assert result.account_photo_url == payload["accountPhotoUrl"]
         assert result.raw.userId == _CREATED_USER_ID
+
+    # criterio: 05-C01
+    # criterio: 05-C26
+    def test_from_create_normalizes_string_generated_password(self) -> None:
+        """Il tenant restituisce ``generatedPassword`` come stringa, non come lista (T15)."""
+        payload = load_payload("create_user_response.json")
+        payload["generatedPassword"] = "Xk7-fake-pw"
+        result = UserWriteResult.from_create(payload)
+        assert result.generated_password == ["Xk7-fake-pw"]
+        assert result.raw.generatedPassword == ["Xk7-fake-pw"]
+        assert result.user_id == _CREATED_USER_ID
+
+    # criterio: 05-C20
+    def test_from_create_invalid_response_hides_values(self) -> None:
+        """Una risposta malformata non porta i valori (la password) nel messaggio d'errore."""
+        payload = load_payload("create_user_response.json")
+        payload["generatedPassword"] = {"nested": "s3cret-value"}
+        payload["userId"] = "not-an-int-value"
+        with pytest.raises(ValueError, match="generatedPassword") as info:
+            UserWriteResult.from_create(payload)
+        text = str(info.value)
+        assert "s3cret-value" not in text
+        assert "not-an-int-value" not in text
+        assert "userId" in text
+        assert info.value.__context__ is None
+        assert info.value.__cause__ is None
 
     # criterio: 05-C02
     def test_from_edit_uses_given_user_id(self) -> None:
