@@ -88,6 +88,14 @@ removes it, and deletes the post at the end (also when a step fails).
 `PYNTERACTA_TEST_WORKFLOW_POST_ID` (optional) points at a post with a workflow:
 the test only reads its workflow screen and never executes a transition.
 
+The **group write** integration test (create → edit → add and remove a member → delete, also
+when a step fails) runs with the variables above and `PYNTERACTA_TEST_USER_ID`, the user it adds
+to the group. The **user write** integration test creates a **real user** on the tenant (a
+licence, possibly notification emails), edits it, changes its credentials and deletes it: it
+runs only with `PYNTERACTA_TEST_WRITE_USERS=1`; `PYNTERACTA_TEST_WRITE_USER_EMAIL_DOMAIN`
+(default `example.com`) is the domain of the created user's email. Both tests print `[05-C26]`
+lines with what the server did with omitted fields and with deletion.
+
 ### Step 3 — export the variables into your shell
 
 pytest does not load `.env` files automatically:

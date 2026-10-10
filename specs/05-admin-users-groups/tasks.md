@@ -259,7 +259,7 @@ le costanti qui sopra con la stessa forma.
   3. Snapshot, controlli bloccanti; commit `feat(cli): groups edit-members per un gruppo o in
      blocco da --json (05-T13)`.
 
-### [ ] T14 – Integration test opt-in dei cicli di gruppo e di utente
+### [x] T14 – Integration test opt-in dei cicli di gruppo e di utente
 
 - Criteri: 05-C24, 05-C25
 - Dipende da: T04, T06
