@@ -51,7 +51,8 @@ Confermato dal maintainer il 2026-10-08.
   `users profile`).
 - RF-005. Utenti: elenco paginato con filtri (stato, provider di login, manager, lingua, prefissi
   di nome ed email…) e ordinamento, iterazione su tutte le pagine, form di modifica
-  (`get_for_edit`).
+  (`get_for_edit`, che espone `occ_token`: RF-023a). *(Confermato dal maintainer il 2026-10-10,
+  spec 05.)*
 - RF-006. Post: dettaglio per id e per client uid, capabilities, storia degli eventi, stream
   globale, elenco in community con filtri su campi standard, custom e di workflow (validazione
   opzionale contro la definizione dei post della community) e ordinamento, controllo di visibilità
@@ -67,10 +68,13 @@ Confermato dal maintainer il 2026-10-08.
 - RF-010. Task: dettaglio per id.
   - RF-022a. La lettura di un task espone `occ_token`, il token di concorrenza da passare alla
     modifica. *(Spec 02, 2026-10-08.)*
-- RF-011. Gruppi: elenco, membri di un gruppo, form di modifica.
+- RF-011. Gruppi: elenco, membri di un gruppo, form di modifica (`get_for_edit`, che espone
+  `occ_token`: RF-023a). *(Confermato dal maintainer il 2026-10-10, spec 05.)*
 - RF-012. Hashtag di una community.
 - RF-013. Form di modifica dell'area admin (sola lettura): workspace, catalogo, voce di catalogo,
-  credenziali utente.
+  credenziali utente (`UserCredentialsForEdit` espone `occ_token`, e `users.get_credentials_for_edit`
+  è l'alias di `admin_manage.user_credentials_for_edit`: RF-023a). *(Confermato dal maintainer il
+  2026-10-10, spec 05.)*
 - RF-014. Paginazione pigra: `PageIterator` e i metodi `iterate*()` seguono `nextPageToken` fino
   all'esaurimento; nella CLI `--all`, `--page-token`, `--count`.
 - RF-015. Output CLI componibile: `table` (default), `json`, `yaml`; `--full` e `--fields` per la
@@ -91,6 +95,9 @@ Confermato dal maintainer il 2026-10-08.
 - RF-019. Errori tipizzati: ogni stato HTTP è mappato su una sottoclasse di `InteractaError`
   (autenticazione, permessi, non trovato, validazione, concorrenza, server, trasporto), con
   stato, metodo, URL, body e `request_id`.
+  - RF-023d. Una `GET` che riceve `204` senza corpo solleva `NotFoundError` (`status_code == 204`):
+    è la risposta del tenant al form di modifica di un utente inesistente. *(Spec 05,
+    2026-10-10.)*
 - RF-020. Deep link web (`WebUrls`) a post, utenti e community a partire da `base_url` e
   `base_path`.
 
@@ -129,8 +136,38 @@ più `*_raw`, comando CLI, test unit e contract).
   add/remove) ed esige assegnatario e scadenza: lo dice la documentazione, la libreria non aggiunge
   nulla da sola. *(Confermato dal maintainer il 2026-10-08, spec 02.)*
 - RF-023. Anagrafiche admin: creazione, modifica, eliminazione e credenziali degli utenti;
-  creazione, modifica, eliminazione e membri dei gruppi; creazione, modifica e flag `deleted` di
-  cataloghi e voci; modifica del workspace.
+  creazione, modifica, eliminazione e membri dei gruppi (spec 05, 0.13.0); creazione, modifica e
+  flag `deleted` di cataloghi e voci; modifica del workspace (seconda metà, spec successiva). La
+  libreria invia solo i campi passati, in una sola richiesta; `edit`, `edit_credentials` ed
+  `edit_members` ricevono l'`occToken` dal chiamante. Semantica del server verificata sul tenant
+  (spec 05): `users.edit` esige `firstname` e `lastname` e azzera `contactEmail`, `privateEmail`
+  ed `externalId` omessi, mentre mantiene preferenze, info e impostazioni omesse; `groups.edit`
+  esige `name` e azzera `email`, `externalId` e `visible` omessi, mentre mantiene i membri; in
+  `edit_credentials` i blocchi omessi sono mantenuti, un blocco con `active`/`enabled` falso e
+  senza account id lo rimuove, con account id è rifiutato (`INVALID_VALUE`), e username e account
+  id devono stare nel dominio del tenant; dopo `delete` utente e gruppo spariscono (il form utente
+  risponde `204` vuoto: RF-023d); la password generata alla creazione arriva come stringa, che la
+  façade espone in lista (`generated_password`), ed è redatta in log, audit log, hook e messaggi
+  di eccezione; l'`occToken` restituito da `edit_members` vale per la chiamata successiva. Lo dice
+  la documentazione, la libreria non aggiunge nulla da sola. *(Confermato dal maintainer il
+  2026-10-10, spec 05.)*
+  - RF-023a. Le letture per la modifica (`UserForEdit`, `GroupForEdit`,
+    `UserCredentialsForEdit`) espongono `occ_token`, il token di concorrenza da passare alla
+    scrittura; `users.get_credentials_for_edit` è l'alias di
+    `admin_manage.user_credentials_for_edit`. *(Spec 05, 2026-10-10.)*
+  - RF-023b. In CLI: `users create|edit|edit-credentials|delete` e
+    `groups create|edit|edit-members|delete`. `users edit` e `groups edit` sono patch che
+    rileggono il form e rimandano i campi non indicati; `groups edit` non tocca i membri, che si
+    cambiano con `groups edit-members` (`--add`/`--remove`, o `--json` per più gruppi con exit `9`
+    se un gruppo è in conflitto); `users edit-credentials` invia solo i blocchi indicati e
+    `--no-google`, `--no-microsoft`, `--no-custom` rimuovono un blocco con conferma, perché il
+    server mantiene i blocchi omessi e non ha credenziali disattivate. La password custom arriva
+    solo da stdin o da prompt nascosto (`--password-stdin`) o è generata dal server
+    (`--generate-password`), mai da un argomento; la password generata compare nell'output di
+    `users create` (anche in `--export`, con avviso nei docs). *(Spec 05, 2026-10-10.)*
+  - RF-023c. `groups.edit_members` su un singolo gruppo solleva `ConcurrencyError` quando il
+    server lo mette in `concurrencyErrorGroups`, anche se lo stato è `200`; `edit_members_bulk`
+    restituisce le due liste senza sollevare. *(Spec 05, 2026-10-10.)*
 - RF-024. Upload di allegati in due passi: `POST core/storage/upload-new-attachment` senza corpo
   restituisce il riferimento (`contentRef`), l'URL dello storage temporaneo e i campi di una
   policy firmata; il file si carica con un form multipart `POST` a quell'URL, con i campi della
@@ -228,7 +265,12 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
   watcher.)* Gli allegati caricati (spec 04) passano dalla libreria allo storage temporaneo del
   tenant così come il chiamante li fornisce, con nome e MIME; la libreria non li conserva né li
   logga, e i file temporanei scadono con la policy del tenant. *(Confermato dal maintainer il
-  2026-10-10, spec 04.)*
+  2026-10-10, spec 04.)* Le anagrafiche admin (spec 05): nome, cognome, email di contatto e
+  privata, riferimento esterno, preferenze, info e impostazioni degli utenti; le credenziali
+  (account Google e Microsoft, username custom, password impostata o generata, che la libreria
+  redige in log, audit log, hook e messaggi di eccezione e mostra solo nell'output di
+  `users create`); nome, email e membri dei gruppi. *(Confermato dal maintainer il 2026-10-10,
+  spec 05.)*
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -264,3 +306,7 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
   precisato con il meccanismo verificato sul tenant (form multipart firmato); nuovi RF-024a e
   RNF-011; RNF-001 precisato (firme e query sensibili); RF-021c aggiornato; RF-024 e la voce
   "Dati scritti sul tenant" di §6 confermati dal maintainer.
+- 2026-10-10: [spec 05](05-admin-users-groups/spec.md) (anagrafiche admin, prima metà: utenti e
+  gruppi, 0.13.0): RF-023 precisato con la semantica verificata sul tenant; nuovi RF-023a,
+  RF-023b, RF-023c, RF-023d; RF-023, RF-005, RF-011, RF-013 e la voce "Dati scritti sul tenant"
+  di §6 confermati dal maintainer.

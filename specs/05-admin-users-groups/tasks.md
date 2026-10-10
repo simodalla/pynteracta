@@ -362,7 +362,7 @@ T15 (2026-10-10), con le decisioni del maintainer registrate nella spec.
   3. `uv run mkdocs build --strict`, controlli bloccanti; commit `docs: scritture admin di utenti
      e gruppi in libreria e CLI (05-T16)`.
 
-### [ ] T17 – Chiusura: PRD
+### [x] T17 – Chiusura: PRD
 
 - Criteri: nessuno nuovo (chiude i "Requisiti nuovi" della spec)
 - Dipende da: T15, T16, T18
