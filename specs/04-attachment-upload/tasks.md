@@ -108,7 +108,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   4. Controlli bloccanti; commit `feat(transport): POST multipart verso lo storage senza token
      né corpo nei log, UploadError (04-T05)`.
 
-### [ ] T06 – Façade dell'upload e protocollo `WriteInput`
+### [x] T06 – Façade dell'upload e protocollo `WriteInput`
 
 - Criteri: 04-C06 (façade), 04-C07 (conversione), 04-C16 (smoke)
 - Dipende da: T01

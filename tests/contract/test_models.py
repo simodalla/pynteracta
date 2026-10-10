@@ -23,6 +23,8 @@ from pynteracta.models.facade.attachments import (
     AttachmentDetail,
     AttachmentVisibility,
     PostAttachmentList,
+    UploadedAttachment,
+    UploadTicket,
 )
 from pynteracta.models.facade.auth import CurrentUserResponse, ServiceAccountTokenResponse
 from pynteracta.models.facade.catalogs import CatalogEntryList, CatalogList
@@ -1179,3 +1181,13 @@ class TestUploadNewAttachment:
             "policy",
             "signature",
         }
+
+    # criterio: 04-C16
+    def test_facade_smoke(self) -> None:
+        payload = load_payload("upload_new_attachment_response.json")
+        ticket = UploadTicket.from_dict(payload)
+        assert ticket.raw is not None
+        assert ticket.content_ref == payload["contentRef"]
+        uploaded = UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
+        assert uploaded.raw is ticket.raw
+        assert uploaded.as_write_input()["contentRef"] == payload["contentRef"]
