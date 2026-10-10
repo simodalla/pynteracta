@@ -14,6 +14,7 @@ from typing import Annotated, Any
 import typer
 
 from pynteracta.cli._common import (
+    EXIT_GENERIC,
     EXIT_SUCCESS,
     CliState,
     ExportFormatOption,
@@ -32,6 +33,7 @@ from pynteracta.cli._common import (
 )
 from pynteracta.cli._write import (
     JsonBodyOption,
+    OccTokenOption,
     merge_body,
     merge_lang_map,
     parse_lang_map,
@@ -39,7 +41,12 @@ from pynteracta.cli._write import (
 )
 from pynteracta.cli.catalogs import app
 from pynteracta.exceptions import InteractaError
-from pynteracta.models.facade.catalogs import CatalogEntryWriteResult, CatalogWriteResult
+from pynteracta.models.facade.admin_manage import CatalogEntryForEdit, CatalogForEdit
+from pynteracta.models.facade.catalogs import (
+    CatalogEntry,
+    CatalogEntryWriteResult,
+    CatalogWriteResult,
+)
 from pynteracta.models.generated.external_v2 import (
     CreateEditCatalogEntryRequestDTO,
     CreateEditCatalogRequestDTO,
@@ -61,6 +68,42 @@ ParentEntryOption = Annotated[
 ExternalIdOption = Annotated[
     str | None, typer.Option("--external-id", help="Unique external identifier of the entry.")
 ]
+
+
+def _catalog_edit_base(form: CatalogForEdit) -> dict[str, Any]:
+    """Corpo di ``edit`` ricavato dal form letto (06-C11): nome e parent si rimandano.
+
+    Le chiavi assenti nel form non si inventano; ``deleted`` non si rimanda mai: si cambia con
+    ``delete`` e ``restore``.
+    """
+    base: dict[str, Any] = {"name": form.name, "parentId": form.parent_catalog_id}
+    return {key: value for key, value in base.items() if value is not None}
+
+
+def _entry_edit_base(form: CatalogEntryForEdit) -> dict[str, Any]:
+    """Corpo di ``edit-entry`` ricavato dal form letto (06-C12).
+
+    ``parentIds`` sono gli id dei ``parents`` letti; la chiave manca se il form non ha
+    ``parents``. ``deleted`` non si rimanda mai.
+    """
+    base: dict[str, Any] = {"label": form.label, "externalId": form.external_id}
+    body = {key: value for key, value in base.items() if value is not None}
+    if form.raw.parents is not None:
+        parents = [CatalogEntry.from_stub(p) for p in form.raw.parents]
+        body["parentIds"] = [p.id for p in parents if p.id is not None]
+    return body
+
+
+def _require_token(resource: str, occ_token: int | None, read_token: int | None) -> int:
+    """Il token da inviare: ``--occ-token`` se dato, altrimenti quello letto; nessuno → exit 1."""
+    token = occ_token if occ_token is not None else read_token
+    if token is None:
+        typer.echo(
+            f"{resource} has no occToken in the server response: pass --occ-token explicitly.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_GENERIC)
+    return token
 
 
 def _catalog_row(obj: object) -> dict[str, object]:
@@ -211,3 +254,118 @@ def catalogs_create_entry(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
+
+
+@app.command("edit")
+def catalogs_edit(  # noqa: PLR0913
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    occ_token: OccTokenOption = None,
+    name: NameOption = None,
+    parent: ParentOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit a catalog, keeping what you do not mention.
+
+    The catalog's edit form is read first and its name map and parent are sent back unless a
+    flag or --json overrides them (flags win over --json, --json over the form as read);
+    --name LANG=TEXT updates one language and keeps the others. The deleted flag is never sent:
+    use 'catalogs delete' and 'catalogs restore'. The concurrency token is the one just read, or
+    --occ-token. A 409 exits with code 9 and never retries.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, CreateEditCatalogRequestDTO)
+    name_map = parse_lang_map(name, option="--name")
+    resource = f"Catalog {catalog_id}"
+    try:
+        with build_client(state) as client:
+            form = client.catalogs.get_for_edit(catalog_id)
+            token = _require_token(resource, occ_token, form.occ_token)
+            merged = merge_body({**_catalog_edit_base(form), **json_part}, parent_id=parent)
+            merge_lang_map(merged, "name", name_map)
+            merged["occToken"] = token
+            req = validate_body(merged, CreateEditCatalogRequestDTO)
+            result = client.catalogs.edit_raw(catalog_id, req)
+        _render(
+            state,
+            output,
+            result,
+            _catalog_row,
+            title=f"Catalog {catalog_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=resource) from exc
+
+
+@app.command("edit-entry")
+def catalogs_edit_entry(  # noqa: PLR0913
+    ctx: typer.Context,
+    catalog_id: Annotated[int, typer.Argument(help="Catalog ID.")],
+    entry_id: Annotated[int, typer.Argument(help="Entry ID.")],
+    occ_token: OccTokenOption = None,
+    label: LabelOption = None,
+    parent_entry: ParentEntryOption = None,
+    external_id: ExternalIdOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit a catalog entry, keeping what you do not mention.
+
+    The entry's edit form is read first and its label map, parent entries and external id are
+    sent back unless a flag or --json overrides them; --label LANG=TEXT updates one language,
+    --parent-entry replaces the whole parent list. The deleted flag is never sent: use
+    'catalogs delete-entry' and 'catalogs restore-entry'. A 409 exits with code 9.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, CreateEditCatalogEntryRequestDTO)
+    label_map = parse_lang_map(label, option="--label")
+    resource = f"Entry {entry_id} of catalog {catalog_id}"
+    try:
+        with build_client(state) as client:
+            form = client.catalogs.get_entry_for_edit(catalog_id, entry_id)
+            token = _require_token(resource, occ_token, form.occ_token)
+            merged = merge_body(
+                {**_entry_edit_base(form), **json_part},
+                parent_ids=parent_entry,
+                external_id=external_id,
+            )
+            merge_lang_map(merged, "label", label_map)
+            merged["occToken"] = token
+            req = validate_body(merged, CreateEditCatalogEntryRequestDTO)
+            result = client.catalogs.edit_entry_raw(catalog_id, entry_id, req)
+        _render(
+            state,
+            output,
+            result,
+            _entry_row,
+            title=f"Entry {entry_id} of catalog {catalog_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=resource) from exc

@@ -15,6 +15,21 @@
   
   '''
 # ---
+# name: TestCatalogEntriesEdit.test_table_output
+  '''
+  Entry 100 of catalog 5 updated 
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value      ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+  │ entry_id       │ 100        │
+  │ catalog_id     │ 5          │
+  │ label          │ Ingegneria │
+  │ external_id    │ BO2        │
+  │ next_occ_token │ 5          │
+  └────────────────┴────────────┘
+  
+  '''
+# ---
 # name: TestCatalogsCreate.test_json_output
   '''
   {

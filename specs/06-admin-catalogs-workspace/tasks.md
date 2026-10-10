@@ -195,7 +195,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. Snapshot, controlli bloccanti (gli snapshot di `catalogs list|entries` restano verdi);
      commit `feat(cli): comandi catalogs create e create-entry con mappe LANG=TESTO (06-T08)`.
 
-### [ ] T09 – `catalogs edit` e `catalogs edit-entry` come patch
+### [x] T09 – `catalogs edit` e `catalogs edit-entry` come patch
 
 - Criteri: 06-C11, 06-C12, 06-C13 (cataloghi e voci)
 - Dipende da: T08
