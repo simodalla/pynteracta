@@ -75,13 +75,24 @@ scritture sono già nei modelli generati dal swagger pinnato: nessuna rigenerazi
   façade.
 - **`occ_token`**: `UserForEdit`, `GroupForEdit` e `UserCredentialsForEdit` espongono
   `occ_token` come proprietà, oltre che su `.raw`.
-- **Campi omessi in `edit` ed `edit_credentials`**: non vengono inviati. La semantica del server
-  (sostituzione come per i task, o aggiornamento parziale; un blocco di credenziali omesso
-  rimosso o mantenuto) si stabilisce con la prova sul tenant (05-C26) e si documenta in
-  `docs/api/users.md`; la libreria non aggiunge nulla da sola.
+- **Campi omessi in `edit` ed `edit_credentials`**: non vengono inviati; la libreria non aggiunge
+  nulla da sola. Esito della prova sul tenant (05-C26, T15 del 2026-10-10): `users.edit` esige
+  `firstname` e `lastname` (`400 REQUIRED_FIELD`) e **azzera** `contactEmail`, `privateEmail` ed
+  `externalId` se omessi, mentre **mantiene** `userPreferences`, `userInfo` e `userSettings`
+  omessi. In `edit_credentials` un blocco omesso è **mantenuto** (senza
+  `userCredentialsConfiguration` nulla cambia); `custom.active` è obbligatorio se il blocco c'è;
+  `custom: {"active": false}` senza `username` **rimuove** le credenziali custom, e
+  `google`/`microsoft: {"enabled": false}` senza account id rimuovono le rispettive; `username`
+  o account id insieme ad `active`/`enabled` falso → `400 INVALID_VALUE` (il server non ha
+  credenziali "disattivate", solo rimosse); username e account id fuori dal dominio del tenant →
+  `400 INVALID_DOMAIN`. `docs/api/users.md` lo dice, con l'avviso sull'azzeramento.
 - **Errori**: come per le letture (`400 → ValidationError`, `403 → PermissionError`,
   `404 → NotFoundError`, `409 → ConcurrencyError`, timeout e rete → `TransportError`). Una
   scrittura che fallisce in modo incerto non si ripete: una sola richiesta per chiamata, sempre.
+  `GET …/admin/manage/users/{id}/edit` di un utente inesistente risponde `204` senza corpo:
+  `ResourceClient._get` mappa ogni `GET` con `204` vuoto in `NotFoundError` (`status_code == 204`)
+  invece di fallire nel parsing del JSON (05-C27; prima della spec crollava con
+  `JSONDecodeError`).
 
 ### Libreria: gruppi
 
@@ -146,14 +157,21 @@ scritture sono già nei modelli generati dal swagger pinnato: nessuna rigenerazi
   read: fetch it again and retry`. Mai un secondo tentativo. Mostra il risultato con
   `render_output` (`user_id`, `next_occ_token`, `account_photo_url`).
 - `pynteracta users edit-credentials USER_ID [--google-account EMAIL | --no-google]
-  [--microsoft-account EMAIL | --no-microsoft] [--username U] [--custom-active/--custom-inactive]
-  [--no-custom] [--json FILE|-] [--occ-token N]` è una **patch** sul form delle credenziali:
-  legge `userCredentialsConfiguration`, vi sovrappone `--json` e i flag (`--google-account` e
-  `--microsoft-account` impostano l'account id e `enabled: true`; `--username` e
-  `--custom-active/--custom-inactive` toccano il blocco `custom`; `--no-google`, `--no-microsoft`,
-  `--no-custom` tolgono il blocco dal corpo) e invia con l'`occToken` letto; i campi di sola
-  lettura del form (`profilePhotoUrl`, `canManageProfilePhoto`) non vengono rimandati. Esito e
-  `409` come per `users edit`.
+  [--microsoft-account EMAIL | --no-microsoft] [--username U | --no-custom|--custom-inactive]
+  [--json FILE|-] [--occ-token N] [--yes|-y]` invia **solo i blocchi indicati**: il server
+  mantiene i blocchi omessi, quindi non c'è nulla da rileggere e rimandare (revisione dopo T15:
+  la patch rimandava `username` e il server la rifiutava). `--google-account E` →
+  `google: {"googleAccountId": E, "enabled": true}`; `--microsoft-account E` idem;
+  `--username U` → `custom: {"username": U, "active": true}`; `--no-google` →
+  `google: {"enabled": false}`, `--no-microsoft` → `microsoft: {"enabled": false}`, `--no-custom`
+  (o il sinonimo `--custom-inactive`) → `custom: {"active": false}`: sono **rimozioni** e
+  chiedono conferma (`Remove the custom credentials of user USER_ID? [y/N]`, una domanda per
+  blocco), saltata con `--yes`; senza terminale interattivo e senza `--yes` exit `2` e nessuna
+  richiesta. `--json` porta `userCredentialsConfiguration` nella forma del DTO; i flag prevalgono
+  blocco per blocco. Un flag di impostazione e uno di rimozione sullo stesso blocco, oppure
+  nessun blocco (né flag né `--json`), sono errori d'uso (exit `2`, nessuna richiesta). Il form
+  delle credenziali si legge solo per l'`occToken`; con `--occ-token N` non si legge nulla.
+  Esito e `409` come per `users edit`.
 - `pynteracta users delete USER_ID [--yes|-y]` legge il form, mostra `Delete user USER_ID
   "<nome cognome>"? [y/N]` e procede solo con `y`; con `--yes` non chiede; senza terminale
   interattivo e senza `--yes` rifiuta con `--yes is required when not running interactively`
@@ -223,7 +241,7 @@ dell'utente, entrambi con pulizia garantita.
 | 05-C11 | Quando si esegue `users create --first-name A --last-name B --contact-email a@b.it --username ab --generate-password --json body.json` con `body.json` = `{"firstname": "X", "userPreferences": {"defaultLanguageId": "it"}}`, il corpo inviato è `{"firstname": "A", "lastname": "B", "contactEmail": "a@b.it", "userPreferences": {"defaultLanguageId": "it"}, "userCredentialsConfiguration": {"custom": {"username": "ab", "active": true}}, "resetUserCustomCredentialsCommand": {"generatePassword": true}}` (i flag prevalgono) e l'output tabella mostra `user_id`, `next_occ_token` e `generated_password` della risposta; `--output json` restituisce la risposta serializzata con `generated_password`. | RF-023, RF-023b, RF-015 |
 | 05-C12 | Quando si esegue `users create --username ab --password-stdin` con stdin non interattivo che contiene `S3gret!\n`, il corpo ha `resetUserCustomCredentialsCommand.password == ["S3gret!"]` e la password non compare in stdout né in stderr; con stdin interattivo la password è chiesta con un prompt nascosto e confermata; `--generate-password --password-stdin` insieme, oppure `--password-stdin --json -`, → exit `2` e nessuna richiesta; `users create --help` non elenca alcuna opzione `--password`. | RF-023b, RNF-001 |
 | 05-C13 | Quando si esegue `users edit 42 --last-name C` e la `GET …/admin/manage/users/42/edit` restituisce un form con `firstname`, `lastname`, `contactEmail`, `privateEmail`, `externalId`, `userPreferences`, `userInfo`, `userSettings` (con `editPrivateEmailEnabled`) e `occToken: 5`, la `PUT …/admin/manage/users/42` ha corpo `{"firstname": <letto>, "lastname": "C", "contactEmail": <letto>, "privateEmail": <letto>, "externalId": <letto>, "userPreferences": <letto>, "userInfo": <letto>, "userSettings": {le quattro chiavi del DTO di richiesta}, "occToken": 5}` e nessun'altra chiave; con `--json body.json` = `{"externalId": "E9"}` e `--external-id E10` vince `E10`; con `--occ-token 6` la `GET` avviene lo stesso e la `PUT` usa `6`; quando il form non ha `privateEmail`, la chiave manca dal corpo. | RF-023, RF-023b, RF-025 |
-| 05-C14 | Quando si esegue `users edit-credentials 42 --google-account a@b.it --no-custom` e la `GET …/admin/manage/users/42/credentials/edit` restituisce `google`, `microsoft` e `custom` (con `profilePhotoUrl` e `canManageProfilePhoto`) e `occToken: 5`, la `PUT …/admin/manage/users/42/credentials` ha corpo `{"userCredentialsConfiguration": {"google": {"googleAccountId": "a@b.it", "enabled": true}, "microsoft": <letto senza i campi di sola lettura>}, "occToken": 5}`: nessun `custom`, nessun `profilePhotoUrl`. | RF-023, RF-023b, RF-025 |
+| 05-C14 | *Sostituito da 05-C28 dopo la prova sul tenant (T15): la patch rimandava `username` e il server la rifiuta con `400 INVALID_VALUE`; l'id non si riusa.* | RF-023b |
 | 05-C15 | Quando la `PUT` di `users edit`, `users edit-credentials` o `groups edit` risponde `409`, il comando termina con exit code `9`, stampa `User 42 changed since it was read: fetch it again and retry` (o `Group 7 …`) e il server ha ricevuto una sola `PUT`. | RF-025, RF-015a, RNF-009 |
 | 05-C16 | Quando si esegue `users delete 42` in un terminale interattivo, il prompt è `Delete user 42 "A B"? [y/N]` (nome e cognome dal form letto); con `y` parte la `DELETE` e il comando stampa `User 42 deleted` (`--output json`: `{"user_id": 42}`); con `n` nessuna `DELETE` parte ed exit `0`; con `--yes` nessun prompt; senza terminale e senza `--yes` nessuna `DELETE`, exit `2` e il messaggio dice che serve `--yes`. `groups delete 7` si comporta allo stesso modo con `Delete group 7 "G"? [y/N]` e `Group 7 deleted`. | RF-025, RF-025a |
 | 05-C17 | Quando si esegue `groups create --name G --member 1 --member 2 --system`, il corpo è `{"name": "G", "memberIds": [1, 2], "visible": false}` e l'output tabella mostra `group_id`, `name`, `members_count`, `next_occ_token`; quando si esegue `groups edit 7 --name G2` e il form letto ha `name`, `email`, `externalId`, `visible`, `members` con id `[1, 2]` e `occToken: 3`, la `PUT …/admin/manage/groups/7` ha corpo `{"name": "G2", "email": <letto>, "externalId": <letto>, "visible": <letto>, "memberIds": [1, 2], "occToken": 3}`. | RF-023, RF-023b, RF-015 |
@@ -236,6 +254,9 @@ dell'utente, entrambi con pulizia garantita.
 | 05-C24 | Quando `PYNTERACTA_TEST_USER_ID` e l'ambiente integration sono impostati (opt-in), il ciclo `groups.create` (nome `pynteracta-it-<timestamp>`, `visible=False`) → `get_for_edit` (`occ_token`) → `edit` → `edit_members` (aggiunta e rimozione dell'utente di prova) → `delete` termina senza errori sul tenant e il gruppo non esiste più al termine, anche se un passo intermedio fallisce; senza le variabili il test è saltato. | RF-023, RF-025 |
 | 05-C25 | Quando, oltre all'ambiente integration, `PYNTERACTA_TEST_WRITE_USERS=1` è impostata (opt-in dedicato), il ciclo `users.create` (nome `pynteracta-it`, cognome `<timestamp>`, email `pynteracta-it-<timestamp>@<PYNTERACTA_TEST_WRITE_USER_EMAIL_DOMAIN, default example.com>`, credenziali custom con password generata) → `get_for_edit` (`occ_token`) → `edit` → `get_credentials_for_edit` → `edit_credentials` → `delete` termina senza errori e l'utente non esiste più al termine, anche se un passo intermedio fallisce; senza la variabile il test è saltato. | RF-023, RF-025 |
 | 05-C26 | L'esecuzione di 05-C24 e 05-C25 stabilisce e registra in `docs/api/users.md`, `docs/api/groups.md` e `verifica.md`: l'effetto dei campi omessi in `users.edit`, `groups.edit` ed `edit_credentials` (azzerati o mantenuti; blocco di credenziali omesso rimosso o mantenuto), l'effetto di `delete` (l'utente o il gruppo sparisce dall'elenco o resta con `deleted: true`), il formato di `generated_password` e il significato dell'`occToken` del gruppo restituito da `edit_members`. | RF-023, RF-025 |
+| 05-C27 | Quando una `GET` fatta tramite `ResourceClient._get` riceve `204` senza corpo (è la risposta di `…/admin/manage/users/{id}/edit` per un utente inesistente), viene sollevata `NotFoundError` con `status_code == 204` e il server ha ricevuto una sola richiesta; `users get-for-edit 42`, `users edit 42 --last-name C` e `users delete 42` terminano con exit `5` senza altre richieste. | RF-019, RF-023 |
+| 05-C28 | Quando si esegue `users edit-credentials 42 --google-account a@b.it --no-custom --yes` e la `GET …/admin/manage/users/42/credentials/edit` restituisce `occToken: 5`, la `PUT …/admin/manage/users/42/credentials` ha corpo esatto `{"userCredentialsConfiguration": {"google": {"googleAccountId": "a@b.it", "enabled": true}, "custom": {"active": false}}, "occToken": 5}`: nessun `microsoft`, nulla del form rimandato. `--username u@b.it` produce `custom: {"username": "u@b.it", "active": true}`; `--no-google --yes` produce `google: {"enabled": false}`; `--json` con `microsoft` più `--google-account` produce entrambi i blocchi; con `--occ-token 6` nessuna `GET`. `--username u --no-custom`, `--google-account a --no-google`, oppure nessun flag e nessun `--json` → exit `2`, nessuna richiesta. | RF-023, RF-023b, RF-025 |
+| 05-C29 | Quando si esegue `users edit-credentials 42 --no-custom` in un terminale interattivo, il prompt è `Remove the custom credentials of user 42? [y/N]`; con `n` nessuna `PUT` ed exit `0`; senza terminale e senza `--yes` exit `2`, messaggio `--yes is required when not running interactively`, nessuna `PUT`. | RF-023b, RF-025 |
 
 ## Casi limite
 
@@ -255,13 +276,16 @@ dell'utente, entrambi con pulizia garantita.
 - `delete` di un utente o gruppo inesistente → `404 → NotFoundError`, exit `5` in CLI (05-C03;
   mapping esistente).
 - `users edit`, `users edit-credentials`, `groups edit`, `groups edit-members GROUP_ID` su un
-  form che la `GET` non trova → exit `5`, nessuna `PUT`, anche con `--occ-token` dove la lettura
-  avviene comunque (05-C13, 05-C14, 05-C17); `groups edit-members GROUP_ID --occ-token N` non
-  legge nulla (05-C18).
+  form che la `GET` non trova (`404`, oppure `204` vuoto: 05-C27) → exit `5`, nessuna `PUT`;
+  `users edit` e `groups edit` leggono anche con `--occ-token`, perché il corpo viene dal form
+  (05-C13, 05-C17); `users edit-credentials --occ-token N` e `groups edit-members GROUP_ID
+  --occ-token N` non leggono nulla (05-C28, 05-C18).
+- `users get-for-edit` di un utente inesistente → `204` vuoto → exit `5` (05-C27); prima della
+  spec crollava con `JSONDecodeError`.
 - `users edit` su un form senza `privateEmail` (o altri campi) → la chiave manca dal corpo, non
   viene inventata (05-C13).
-- `users edit-credentials` con `--no-google` quando il form non ha `google` → nessun errore, il
-  blocco resta assente (05-C14).
+- `users edit-credentials --no-google` quando l'utente non ha credenziali Google → il corpo porta
+  comunque `google: {"enabled": false}`; decide il server (05-C28).
 - `users create --password-stdin` con stdin vuoto → errore d'uso, exit `2`, nessuna richiesta
   (05-C12); con prompt interattivo e conferma diversa → nuovo prompt, come `typer.prompt` con
   conferma.
@@ -305,14 +329,18 @@ eliminano sempre al termine.
   `GroupForEdit`, `UserCredentialsForEdit`) espongono `occ_token`, il token di concorrenza da
   passare alla scrittura; `users.get_credentials_for_edit` è l'alias di
   `admin_manage.user_credentials_for_edit`.
-- RF-023b (precisa RF-023 in CLI). `users edit`, `users edit-credentials` e `groups edit` sono
-  patch che rileggono il form e rimandano i campi non indicati; `groups edit` non tocca i membri,
+- RF-023b (precisa RF-023 in CLI). `users edit` e `groups edit` sono patch che rileggono il form
+  e rimandano i campi non indicati; `users edit-credentials` invia solo i blocchi indicati e
+  `--no-google`, `--no-microsoft`, `--no-custom` rimuovono un blocco con conferma, perché il
+  server mantiene i blocchi omessi e non ha credenziali disattivate; `groups edit` non tocca i membri,
   che si cambiano con `groups edit-members`; la password custom arriva solo da stdin o da prompt
   (`--password-stdin`) o è generata dal server (`--generate-password`), mai da un argomento; la
   password generata compare nell'output di `users create`.
 - RF-023c (precisa RF-025). `groups.edit_members` su un singolo gruppo solleva `ConcurrencyError`
   quando il server lo mette in `concurrencyErrorGroups`, anche se lo stato è `200`;
   `edit_members_bulk` restituisce le due liste senza sollevare.
+- RF-023d (precisa RF-019). Una `GET` che riceve `204` senza corpo solleva `NotFoundError`
+  (`status_code == 204`): è la risposta del tenant per un utente inesistente.
 - La semantica del server sui campi omessi, sull'eliminazione e sulla password generata entra in
   RF-023 alla chiusura, dopo 05-C26, come RF-022 per i task.
 
@@ -346,6 +374,9 @@ eliminano sempre al termine.
 | Membri solo da `groups edit-members` (`--add`/`--remove`); `groups edit` rimanda la lista letta | `--member` su `groups edit` che sostituisce la lista; solo via `groups edit` | Nessun `groups edit` può svuotare un gruppo per sbaglio; add/remove è l'operazione che gli script fanno davvero |
 | Ritorno = façade sulla risposta (`UserWriteResult`, `GroupWriteResult`, `GroupMembersResult`); `delete` → `None` | Rileggere e restituire il form; solo gli id | Nessuna chiamata in più; `DELETE` non ha corpo, non c'è nulla da restituire |
 | Testi della CLI in inglese | Italiano | Decisione della spec 02, sezione Lingua del `CLAUDE.md` |
+| `users edit-credentials` senza patch: solo i blocchi indicati, `--no-*` rimuove con conferma (revisione dopo T15) | Patch mantenuta con i soli casi di rimozione corretti; via `--custom-inactive` | Il server mantiene i blocchi omessi e rifiuta `username` con `active: false`: rimandare il form è inutile e dannoso; la rimozione è distruttiva come `delete` |
+| `users.edit` resta "solo i campi passati"; l'avviso sull'azzeramento va nei docs; l'integration test manda nome, cognome ed email letti (revisione dopo T15) | `firstname` e `lastname` obbligatori nella firma | Stessa forma degli altri edit e dei task (spec 02); la CLI patch è già corretta |
+| `GET` con `204` vuoto → `NotFoundError` in `ResourceClient._get`, per tutte le risorse (revisione dopo T15) | Solo in `users.get_for_edit`; follow-up | Vale per ogni `GET` e non costa nulla; lascia exit `5` in CLI e il controllo post-delete del test |
 | `generatedPassword` stringa dal tenant normalizzata in lista nella façade; errore di forma senza valori | Cambiare `generated_password` in `str`; modificare il modello generato; rigenerare da uno swagger corretto a mano | Emerso in T15: lo swagger pinnato è sbagliato e non si tocca a mano; la lista resta il contratto dichiarato e la CLI già la unisce; un `ValidationError` di pydantic metterebbe la password nel messaggio |
 
 ## Verifica manuale
@@ -358,6 +389,10 @@ eliminano sempre al termine.
   campi omessi o rimuove i blocchi di credenziali omessi, la documentazione lo dice come avviso.
   05-C25 richiede l'opt-in `PYNTERACTA_TEST_WRITE_USERS=1`: fino a quell'esecuzione vale come
   saltato e la semantica dell'edit utente resta dichiarata "non verificata" nei docs.
+- Esito della prima esecuzione (2026-10-10): la semantica è in «Campi omessi» della sezione
+  Libreria; tre divergenze (password generata stringa, `edit-credentials` rifiutato, `204` vuoto)
+  hanno prodotto la correzione di `UserWriteResult.from_create`, i criteri 05-C27, 05-C28 e
+  05-C29 e il task T18, con l'approvazione del maintainer.
 
 ## Domande aperte
 

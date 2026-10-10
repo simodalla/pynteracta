@@ -288,10 +288,38 @@ le costanti qui sopra con la stessa forma.
   l'approvazione del maintainer prima di T16.
 - Esito: *da compilare*.
 
+### [ ] T18 – Correzioni dalla prova sul tenant: `204` vuoto, `edit-credentials` senza patch, ciclo utenti
+
+Numerato dopo T17 per non rinumerare, si esegue prima di T16: nasce dalla prima esecuzione di
+T15 (2026-10-10), con le decisioni del maintainer registrate nella spec.
+
+- Criteri: 05-C27, 05-C28, 05-C29; 05-C25 adeguato; sostituisce 05-C14
+- Dipende da: T15 (prima esecuzione); T16 e T17 dipendono anche da questo
+- Test: `tests/unit/test_api_base.py::TestResourceClientEmptyBodies::test_get_204_raises_not_found`
+  e `tests/unit/test_cli_users.py::TestUsersGetForEdit::test_204_exits_5` (05-C27);
+  `tests/unit/test_cli_users_write.py::TestUsersEditCredentials` riscritta
+  (`test_google_flag_and_no_custom_send_only_those_blocks`, `test_username_sets_custom_active`,
+  `test_no_google_sends_enabled_false`, `test_json_and_flags_merge_per_block`,
+  `test_occ_token_skips_get`, `test_conflicting_flags_exit_2`, `test_nothing_to_change_exits_2`,
+  `test_409_exits_9_without_retry`) e `::TestUsersEditCredentialsConfirm`
+  (`test_prompt_n_does_nothing`, `test_non_interactive_without_yes_refuses`) (05-C28, 05-C29);
+  `TestCredentialsBase` e i test della patch se ne vanno con il codice che fissavano;
+  `tests/integration/test_users_integration.py` adeguato come nel piano (sezione "Revisione").
+- Passi:
+  1. Scrivere i test; eseguirli: rossi (`_get` lascia passare `JSONDecodeError`; la PUT porta i
+     blocchi letti; `--yes` inesistente).
+  2. `api/_base.py`: `_get` con `204` senza corpo → `NotFoundError(status_code=204)`.
+     `cli/users_write.py`: `_credentials_blocks(...)` pura; comando senza patch, `--yes`, conferma
+     per blocco rimosso, lettura solo per il token; via `_credentials_base`,
+     `_apply_credentials_flags`, `_CREDENTIAL_DTOS`, `_READ_ONLY_CREDENTIAL_KEYS`.
+  3. Controlli bloccanti; rieseguire il ciclo utenti di T15 (verde) e completarne l'esito; commit
+     `fix(cli): users edit-credentials invia solo i blocchi indicati; GET 204 vuota è NotFoundError
+     (05-T18)`.
+
 ### [ ] T16 – Documentazione
 
 - Criteri: 05-C23
-- Dipende da: T10, T11, T13, T15
+- Dipende da: T10, T11, T13, T15, T18
 - Test: `tests/unit/test_docs_snippets.py::test_users_groups_pages_document_write_commands`
   (le pagine citano gli otto comandi, `--password-stdin`, `--generate-password`,
   `UserWriteResult`, `GroupMembersResult`, `occ_token`; `index.md` e `README.md` non contengono
@@ -310,7 +338,7 @@ le costanti qui sopra con la stessa forma.
 ### [ ] T17 – Chiusura: PRD
 
 - Criteri: nessuno nuovo (chiude i "Requisiti nuovi" della spec)
-- Dipende da: T15, T16
+- Dipende da: T15, T16, T18
 - Verifica: rilettura del PRD; `uv run pre-commit run --all-files` verde.
 - Passi:
   1. `specs/prd.md`: RF-023 precisato con la semantica verificata in T15 (campi omessi,

@@ -136,10 +136,11 @@ users edit USER_ID            → json_part = load_json_body(--json, EditUserReq
                               → merged["occToken"] = token → req = validate_body(merged, EditUserRequestDTO)
                               → client.users.edit_raw(USER_ID, req) → render_output([result], _edit_row, title="User {id} updated")
                               → ConcurrencyError → handle_error(resource="User {id}") → exit 9
-users edit-credentials USER_ID→ form = client.users.get_credentials_for_edit(USER_ID)
-                              → base = _credentials_base(form); base = {**base, **json_part.get("userCredentialsConfiguration", {})}
-                              → _apply_credentials_flags(base, google_account, microsoft_account, username, custom_active, no_google, no_microsoft, no_custom)
-                              → req = validate_body({"userCredentialsConfiguration": base, "occToken": token}, EditUserCredentialsRequestDTO)
+users edit-credentials USER_ID→ config = _credentials_blocks(json_part, google_account, microsoft_account, username, no_google, no_microsoft, no_custom)
+                              →   (flag contrastanti o config vuota → usage error, exit 2; rivisto dopo T15: niente patch)
+                              → per ogni blocco rimosso: confirm_destructive(f"Remove the {block} credentials of user {id}?", yes=--yes)  False → Exit(0)
+                              → token = --occ-token, altrimenti client.users.get_credentials_for_edit(USER_ID).occ_token (404/204 → exit 5)
+                              → req = validate_body({"userCredentialsConfiguration": config, "occToken": token}, EditUserCredentialsRequestDTO)
                               → client.users.edit_credentials_raw(USER_ID, req) → render_output
 users delete USER_ID          → user = client.users.get_for_edit(USER_ID)
                               → confirm_destructive(f'Delete user {id} "{first} {last}"?', yes=--yes)  False → Exit(0)
@@ -251,6 +252,26 @@ libreria resta com'è (decisione della spec); se rimuove i blocchi di credenzial
 perché `edit-credentials` rimanda i blocchi letti. Se invece il server rifiuta un corpo che la spec
 dà per buono (per esempio `userSettings` con quattro chiavi, o `memberIds` vuota), la correzione
 passa da una revisione della spec, non da un aggiustamento silenzioso.
+
+## Revisione dopo la prova sul tenant (T15, 2026-10-10)
+
+- `api/_base.py`: `_get` con `204` senza corpo solleva `NotFoundError(status_code=204,
+  request_method="GET", request_url=path)`; gli hook non vedono l'errore (non passa dal transport),
+  come per il `TypeError` sul corpo non-oggetto. Caratterizzazione: `test_api_base.py`.
+- `cli/users_write.py`: via `_credentials_base`, `_apply_credentials_flags`, `_CREDENTIAL_DTOS`
+  e `_READ_ONLY_CREDENTIAL_KEYS`; al loro posto `_credentials_blocks(...)`, funzione pura dai
+  flag e da `--json`, e il comando legge il form solo per l'`occToken`. `--yes/-y` e la conferma
+  per blocco rimosso come in `users delete`.
+- `test_users_integration.py`: `edit` con `firstname`, `lastname` e `contact_email` letti dal
+  form; `edit_credentials` prima con `custom={"username", "canUserManageCustomCredentials": True,
+  "active": True}` e poi con `custom={"active": False}` (rimozione); dopo `delete` il form
+  risponde `204` → `NotFoundError`.
+- Strategia di test aggiunta: 05-C27 `test_api_base.py::TestResourceClientEmptyBodies::
+  test_get_204_raises_not_found` e `test_cli_users.py::TestUsersGetForEdit::test_204_exits_5`;
+  05-C28 `test_cli_users_write.py::TestUsersEditCredentials` riscritta (corpo esatto per ogni
+  flag, `--json` per blocco, `--occ-token` senza `GET`, flag contrastanti e corpo vuoto → exit
+  `2`); 05-C29 `::TestUsersEditCredentialsConfirm` con `_stdin_is_interactive` monkeypatchato.
+  05-C14 è sostituito: i test della patch se ne vanno con il codice.
 
 ## Scelte tecniche
 
