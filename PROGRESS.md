@@ -1618,3 +1618,60 @@ correzione M27 (P-01).
   rigenerare i modelli; oggi la libreria non li impone.
 - Prossimi gruppi di scrittura (ADR 0001): post e commenti (RF-021), anagrafiche admin (RF-023),
   upload (RF-024), ciascuno con la propria spec.
+
+## M29 — Scrittura dei post custom, commenti e workflow — completata 2026-10-10
+
+Terza spec del metodo: [`specs/03-post-write/`](specs/03-post-write/) (`spec.md`, `plan.md`,
+`tasks.md`, `verifica.md`). Secondo gruppo della superficie di scrittura aperta da
+[ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md). Minor **0.11.0**.
+
+### Fatto
+
+- Libreria: mixin `PostsWriteAPI` (`api/posts_write.py`) ereditato da `PostsAPI`: letture
+  propedeutiche `get_for_create|edit|copy` con `occ_token`; `create`, `edit`, `edit_custom_data`,
+  `copy`, `edit_watchers`, `edit_attachments`, `delete`, `mark_as_erasable`, `add_comment`,
+  `get_workflow_screen`, `execute_workflow_operation`, `edit_workflow_screen`, con le varianti
+  `*_raw`; otto façade in `models/facade/posts_write.py`; `PostCapabilities` con copia, allegati e
+  operazioni di workflow permesse; `_put` tollera il corpo vuoto (03-T01…T08).
+- CLI: quattordici comandi `posts` di scrittura in `cli/posts_write.py`; helper condivisi con i
+  task in `cli/_write.py`; `handle_error` con il nome della risorsa nel messaggio del `409` e il
+  dettaglio del server negli errori di validazione; patch `posts edit|edit-custom-data|copy` e
+  comandi del workflow che rileggono e rimandano i campi letti, con i riferimenti tradotti in id
+  (03-T09…T13, T18, T19).
+- Modelli: `screenData` e `newScreenData` rigenerati come mappe di valori qualsiasi
+  (`scripts/generate_models.py`, 03-T02).
+- Documentazione: `docs/api/posts.md`, `docs/cli.md`, home, README, `docs/testing.md`,
+  `.env.example` (03-T14, T17); integration test opt-in `test_posts_integration.py` (03-T15),
+  eseguito sul tenant di prova (03-T16); PRD con RF-006a, RF-021a…d (03-T17).
+- 172 unit test e 61 contract test nuovi (826 → 998, 97 → 158); copertura totale 93,66 % →
+  94,32 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant (T16)**, che lo swagger non documenta: `edit-post` e `copy-post` sono
+  sostituzioni (descrizione omessa → `400 REQUIRED_FIELD`); le letture restituiscono i
+  riferimenti a cataloghi e utenti come oggetti, le scritture li accettano solo come id (`400
+  INVALID_VALUE` con gli oggetti); un campo delta in testo semplice richiede `deltaAreaFormat: 2`
+  (senza, `500`); `mark-post-as-erasable` risponde `postId: 0`; una transizione senza screen
+  accetta il corpo `{}`; la lettura dello screen dello stato corrente risponde `403` se i dati di
+  screen non sono modificabili.
+- Di conseguenza due revisioni della spec: dati di screen da rigenerare (T02) e riferimenti letti
+  scritti come id (03-C19…C22, C27 sostituiti da 03-C32…C36, nuovo 03-C37, task T18); più 03-C38
+  e T19 per l'id riportato da `posts delete|mark-erasable`.
+- Le opzioni Typer `--json` e `--timezone` restano per modulo (aiuto proprio della risorsa); si
+  condividono le funzioni.
+- Nelle tabelle dei comandi nuovi i campi custom e di screen sono una riga per campo; la stampa
+  comune delle tabelle non è cambiata.
+- Integration test: variabile `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` per i campi custom obbligatori
+  della community di prova.
+
+### Follow-up
+
+- Release **0.11.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- Valori annidati (riferimenti) mostrati nella forma Python nelle tabelle della CLI: renderli come
+  JSON compatto o solo con le etichette.
+- Prossimi gruppi di scrittura (ADR 0001): post evento, upload di allegati (RF-024) con
+  `posts edit-attachments`, anagrafiche admin (RF-023).
+- Campi delta in testo semplice nelle patch della CLI (oggi solo con `--json` e
+  `deltaAreaFormat: 2`, con avviso).
+- `cli/communities.py` al 53 % di copertura (dalla linea di partenza).

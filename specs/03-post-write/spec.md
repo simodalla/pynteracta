@@ -1,6 +1,6 @@
 # 03 – Scrittura dei post custom, commenti e workflow
 
-Stato: approvata
+Stato: chiusa
 Branch: `m29_post_write`
 Requisiti del PRD: RF-021, RF-025, RNF-009, RNF-010; toccati RF-006, RF-015, RF-015a, RF-019
 Dipende da: spec 02 (chiusa): `_put`/`_delete` del client base, `build_write_body`,
