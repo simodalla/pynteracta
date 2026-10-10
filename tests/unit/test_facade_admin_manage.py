@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import pytest
 from api_helpers import load_payload
 
@@ -31,6 +33,7 @@ _MEMBER_USERS_COUNT = 25
 _MEMBER_GROUPS_COUNT = 4
 _COMMUNITY_ASSOC_COUNT = 2
 _PARENTS_COUNT = 1
+_PARENT_CATALOG_ID = 3
 
 
 @pytest.fixture
@@ -63,9 +66,10 @@ class TestWorkspaceForEdit:
         assert workspace.member_users_count == _MEMBER_USERS_COUNT
         assert workspace.member_groups_count == _MEMBER_GROUPS_COUNT
 
-    def test_occ_token_only_on_raw(self, workspace: WorkspaceForEdit) -> None:
-        assert not hasattr(workspace, "occ_token")
-        assert workspace.raw.occToken == _WORKSPACE_OCC_TOKEN
+    # criterio: 06-C07
+    def test_occ_token_exposed(self, workspace: WorkspaceForEdit) -> None:
+        assert workspace.occ_token == _WORKSPACE_OCC_TOKEN
+        assert workspace.occ_token == workspace.raw.occToken
 
     def test_name_none_without_content_data(self) -> None:
         facade = WorkspaceForEdit.from_dict({"id": 1})
@@ -80,9 +84,24 @@ class TestCatalogForEdit:
         assert catalog.deleted is False
         assert catalog.community_associations_count == _COMMUNITY_ASSOC_COUNT
 
-    def test_occ_token_only_on_raw(self, catalog: CatalogForEdit) -> None:
-        assert not hasattr(catalog, "occ_token")
-        assert catalog.raw.occToken == _CATALOG_OCC_TOKEN
+    # criterio: 06-C07
+    def test_occ_token_exposed(self, catalog: CatalogForEdit) -> None:
+        assert catalog.occ_token == _CATALOG_OCC_TOKEN
+        assert catalog.occ_token == catalog.raw.occToken
+
+    # criterio: 06-C07
+    def test_parent_catalog_id_with_parent(self) -> None:
+        payload = copy.deepcopy(_CATALOG_PAYLOAD)
+        payload["contentData"]["parentCatalog"] = {"id": _PARENT_CATALOG_ID, "name": "Root"}
+        assert CatalogForEdit.from_dict(payload).parent_catalog_id == _PARENT_CATALOG_ID
+
+    # criterio: 06-C07
+    def test_parent_catalog_id_without_parent(self, catalog: CatalogForEdit) -> None:
+        assert catalog.parent_catalog_id is None
+
+    # criterio: 06-C07
+    def test_parent_catalog_id_without_content_data(self) -> None:
+        assert CatalogForEdit.from_dict({"id": 1}).parent_catalog_id is None
 
     def test_empty_content_data(self) -> None:
         facade = CatalogForEdit.from_dict({"id": 1})
@@ -99,9 +118,10 @@ class TestCatalogEntryForEdit:
         assert entry.deleted is False
         assert entry.parents_count == _PARENTS_COUNT
 
-    def test_occ_token_only_on_raw(self, entry: CatalogEntryForEdit) -> None:
-        assert not hasattr(entry, "occ_token")
-        assert entry.raw.occToken == _ENTRY_OCC_TOKEN
+    # criterio: 06-C07
+    def test_occ_token_exposed(self, entry: CatalogEntryForEdit) -> None:
+        assert entry.occ_token == _ENTRY_OCC_TOKEN
+        assert entry.occ_token == entry.raw.occToken
 
 
 class TestUserCredentialsForEdit:

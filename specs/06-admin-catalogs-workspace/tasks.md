@@ -41,7 +41,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      `test: fixture e contract test dei DTO di scrittura di cataloghi, voci e workspace; riga
      0.13.0 in ROADMAP (06-T01)`.
 
-### [ ] T02 – `occ_token` e `parent_catalog_id` sulle façade per-edit
+### [x] T02 – `occ_token` e `parent_catalog_id` sulle façade per-edit
 
 - Criteri: 06-C07 (façade)
 - Dipende da: nessuno

@@ -3,15 +3,14 @@
 
 These four facades wrap the *for-edit* response DTOs returned by the admin/manage surface.
 Each response carries an ``occToken`` (optimistic-concurrency token) for the write surface.
-:class:`UserCredentialsForEdit` exposes it as :attr:`~UserCredentialsForEdit.occ_token` (spec 05,
-``users.edit_credentials``); workspace, catalog and catalog entry keep it on ``.raw`` until their
-write spec.
+Tutte e quattro le façade lo espongono come ``occ_token``: le credenziali per
+``users.edit_credentials`` (spec 05), workspace, catalogo e voce per
+``admin_manage.edit_workspace``, ``catalogs.edit`` e ``catalogs.edit_entry`` (spec 06).
 
 Field-curation strategy (answer to Q-v0.6-1): narrow properties surface the directly-typed
 scalar fields of each response DTO, plus light convenience accessors that dig one level into the
 nested editable-content blocks (which the code generator emits as ``RootModel[Any]`` stubs) for
-the human-facing name/label/credential flags. Complex nested structures and ``occToken`` stay on
-``.raw``.
+the human-facing name/label/credential flags. Complex nested structures stay on ``.raw``.
 """
 
 from __future__ import annotations
@@ -30,8 +29,9 @@ class WorkspaceForEdit:
 
     The editable payload (``name``, ``description``, members, …) lives in ``contentData``, which
     the generator emits as a ``RootModel[Any]`` stub; :attr:`name` and :attr:`description`
-    re-validate it into the typed sibling for convenience. ``occToken`` is only on ``.raw`` — it is
-    the propaedeutic edit token for the future write surface.
+    re-validate it into the typed sibling for convenience. :attr:`occ_token` è il token da passare
+    ad ``admin_manage.edit_workspace``; la stessa façade avvolge la risposta di quella scrittura,
+    il cui ``occ_token`` vale per la modifica successiva (spec 06).
 
     Attributes:
         raw: The underlying generated DTO; access additional fields via this escape hatch.
@@ -65,6 +65,11 @@ class WorkspaceForEdit:
     def description(self) -> dict[str, str] | None:
         """Internationalized description map (from ``contentData``)."""
         return self._content.description if self._content is not None else None
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza per ``admin_manage.edit_workspace`` (spec 06, RF-023e)."""
+        return self.raw.occToken
 
     @property
     def admin_users_count(self) -> int | None:
@@ -102,8 +107,8 @@ class CatalogForEdit:
     The editable payload (``name`` map, ``parentCatalog``, ``deleted``) lives in ``contentData``,
     a ``RootModel[Any]`` stub re-validated into its typed sibling for :attr:`name` and
     :attr:`deleted`. ``communityAssociations`` (the communities using this catalog) is summarized
-    by :attr:`community_associations_count`; the full list stays on ``.raw``. ``occToken`` is only
-    on ``.raw``.
+    by :attr:`community_associations_count`; the full list stays on ``.raw``. :attr:`occ_token` è
+    il token per ``catalogs.edit``; :attr:`parent_catalog_id` l'id del catalogo parent (spec 06).
 
     Attributes:
         raw: The underlying generated DTO; access additional fields via this escape hatch.
@@ -139,6 +144,21 @@ class CatalogForEdit:
         return self._content.deleted if self._content is not None else None
 
     @property
+    def parent_catalog_id(self) -> int | None:
+        """Id del catalogo parent, da ``contentData.parentCatalog``; ``None`` senza parent."""
+        if self._content is None or self._content.parentCatalog is None:
+            return None
+        root = _resolve_root(self._content.parentCatalog)
+        if not isinstance(root, dict):
+            return None
+        return generated.CatalogDTOModel.model_validate(root).id
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza per ``catalogs.edit`` (spec 06, RF-023e)."""
+        return self.raw.occToken
+
+    @property
     def community_associations_count(self) -> int | None:
         """Number of communities that use this catalog."""
         assocs = self.raw.communityAssociations
@@ -155,7 +175,8 @@ class CatalogEntryForEdit:
 
     All surfaced fields are directly typed on the response DTO. ``label`` is an internationalized
     map; ``parents`` (the hierarchical parent chain) is summarized by :attr:`parents_count`, with
-    the full list available on ``.raw``. ``occToken`` is only on ``.raw``.
+    the full list available on ``.raw``. :attr:`occ_token` è il token per ``catalogs.edit_entry``
+    (spec 06).
 
     Attributes:
         raw: The underlying generated DTO; access additional fields via this escape hatch.
@@ -180,6 +201,11 @@ class CatalogEntryForEdit:
     @property
     def deleted(self) -> bool | None:
         return self.raw.deleted
+
+    @property
+    def occ_token(self) -> int | None:
+        """Token di concorrenza per ``catalogs.edit_entry`` (spec 06, RF-023e)."""
+        return self.raw.occToken
 
     @property
     def parents_count(self) -> int | None:
