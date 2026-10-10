@@ -355,6 +355,122 @@ pynteracta users get-for-edit 5225
 pynteracta users get-for-edit 5225 --web-url
 ```
 
+### `users create`
+
+Create a user (admin). Simple fields come from flags; preferences, info, settings and the profile
+photo come from `--json FILE`, or `--json -` to read the body from stdin. Flags override the keys
+of the JSON body. **Only the fields you give are sent.**
+
+```bash
+pynteracta users create --first-name Maria --last-name Rossi \
+    --contact-email m.rossi@tenant.example.com \
+    --username m.rossi@tenant.example.com --generate-password
+pynteracta users create --first-name Maria --last-name Rossi --username m.rossi@tenant.example.com \
+    --password-stdin < password.txt            # the first line of stdin is the password
+pynteracta users create --first-name Maria --last-name Rossi --username m.rossi@tenant.example.com \
+    --password-stdin                           # in a terminal: hidden prompt, asked twice
+pynteracta users create --json body.json --google-account m.rossi@tenant.example.com
+pynteracta users create --first-name M --last-name R --output json --full   # whole response
+```
+
+| Option | Request field |
+|---|---|
+| `--first-name`, `--last-name` | `firstname`, `lastname` |
+| `--contact-email`, `--private-email`, `--external-id` | `contactEmail`, `privateEmail`, `externalId` |
+| `--google-account EMAIL`, `--microsoft-account EMAIL` | `userCredentialsConfiguration.google` / `.microsoft` (`enabled: true`) |
+| `--username U` | `userCredentialsConfiguration.custom` (`active: true`) |
+| `--generate-password`, `--password-stdin` | `resetUserCustomCredentialsCommand.generatePassword` / `.password` |
+| `--force-password-change` | `resetUserCustomCredentialsCommand.forceCredentialsExpiration` |
+| `--notify-email ADDR` (repeatable) | `resetUserCustomCredentialsCommand.emailNotifyRecipients` |
+| `--json FILE\|-` | any field of `CreateUserRequestDTO` (unknown keys are rejected) |
+
+**Password.** There is no `--password VALUE`: an argument ends up in the shell history and in
+`ps`. `--password-stdin` reads the first line of standard input when it is not a terminal, and
+asks with a hidden prompt (repeated for confirmation) when it is; `--generate-password` lets the
+server generate it. The two flags together, or `--password-stdin` with `--json -`, are usage
+errors (exit code 2) and nothing is sent. The password can only be set at creation.
+
+The default table shows `user_id`, `next_occ_token`, `generated_password`, `expired_credentials`,
+`sent_email_notify`. The generated password is shown **in the output** (table and `json`) because
+you have to hand it over; logs, audit log and hooks redact it.
+
+!!! warning "`--export` writes the generated password to the file"
+    `users create --generate-password --export users.csv` stores the password in clear text in
+    that file. Handle it as a secret or export without `--generate-password`.
+
+Usernames and Google/Microsoft account ids must belong to the tenant's domain, otherwise the
+server answers `400` (`INVALID_DOMAIN`, exit code 6).
+
+### `users edit USER_ID`
+
+Edit a user. Same anagraphic flags as `users create` (no credentials: see `users
+edit-credentials`), plus `--json` and `--occ-token`.
+
+The command behaves like a **patch**: the fields you do not mention keep their value. Interacta's
+edit endpoint requires `firstname` and `lastname` and clears the contact email, private email
+and external id that are missing from the request (preferences, info and settings are kept), so
+the command reads the edit form first and sends back its first name, last name, contact email,
+private email, external id, preferences, info and settings (reduced to the keys the edit DTO
+accepts), overridden by `--json` and then by the flags. A field absent from the form is not
+invented.
+
+```bash
+pynteracta users edit 5225 --last-name Rossi-Bianchi
+pynteracta users edit 5225 --json preferences.json          # userPreferences, userInfo, userSettings
+pynteracta users edit 5225 --occ-token 43 --external-id HR-77   # send token 43 instead of the one read
+```
+
+Interacta protects edits with an optimistic concurrency token (`occToken`). The command uses the
+token it reads; `--occ-token N` sends `N` instead (the read still happens, to keep the other
+fields). If the user changed since it was read, the server answers `409` and the command exits
+with code **9** and the message `User 5225 changed since it was read: fetch it again and retry`.
+The command never retries on its own. The default table shows `user_id`, `next_occ_token`,
+`account_photo_url`.
+
+### `users edit-credentials USER_ID`
+
+Edit a user's credentials: **only the blocks you mention are sent**, the server keeps the others.
+
+```bash
+pynteracta users edit-credentials 5225 --google-account m.rossi@tenant.example.com
+pynteracta users edit-credentials 5225 --username m.rossi@tenant.example.com   # custom, active
+pynteracta users edit-credentials 5225 --no-custom          # asks for confirmation, then removes
+pynteracta users edit-credentials 5225 --no-google --yes    # scripts
+pynteracta users edit-credentials 5225 --json creds.json --occ-token 13   # no read at all
+```
+
+| Option | Request block |
+|---|---|
+| `--google-account EMAIL` | `google: {googleAccountId, enabled: true}` |
+| `--microsoft-account EMAIL` | `microsoft: {microsoftAccountId, enabled: true}` |
+| `--username U` | `custom: {username, active: true}` |
+| `--no-google`, `--no-microsoft` | `google` / `microsoft: {enabled: false}` — **removes** the credentials |
+| `--no-custom` (or `--custom-inactive`) | `custom: {active: false}` — **removes** the custom credentials |
+| `--json FILE\|-` | `userCredentialsConfiguration` of `EditUserCredentialsRequestDTO`; flags override it block by block |
+| `--yes`, `-y` | skip the confirmation asked for each removed block |
+| `--occ-token N` | send `N` and skip reading the credentials form |
+
+The server has no "disabled" credentials, only removed ones: a username or account id together
+with `active`/`enabled` false is rejected (`400` `INVALID_VALUE`). Each `--no-*` asks
+`Remove the custom credentials of user 5225? [y/N]`; without an interactive terminal `--yes` is
+required (exit code 2, nothing sent). A setting flag and a removing flag on the same block, or no
+block at all, are usage errors (exit code 2). The password cannot be changed here. `409` → exit
+code **9**, as for `users edit`.
+
+### `users delete USER_ID`
+
+Delete a user. The user is read first and its id and name shown in a confirmation prompt
+(`Delete user 5225 "Maria Rossi"? [y/N]`). `--yes` (`-y`) skips the prompt. Without an
+interactive terminal `--yes` is **required**: the command refuses (exit code 2) and nothing is
+deleted. An unknown user exits with code 5: the tenant answers the edit form with `204` and an
+empty body, which the CLI treats as "not found".
+
+```bash
+pynteracta users delete 5225                 # interactive confirmation
+pynteracta users delete 5225 --yes           # scripts
+pynteracta users delete 5225 -y --output json   # {"user_id": 5225}
+```
+
 ## posts
 
 ### `posts get`
@@ -974,9 +1090,84 @@ pynteracta groups get 201 --web-url     # includes admin group URL
 pynteracta groups get 201 --output json --full
 ```
 
-`occToken` is only accessible via `.raw.occToken` (propaedeutic edit token for future write use).
-`creation_timestamp` renders as a UTC datetime string in table output and as epoch-ms in
+`occ_token` is the concurrency token for `groups edit` and `groups edit-members` (shown with
+`--full` or `--output json`). `creation_timestamp` renders as a UTC datetime string in table output and as epoch-ms in
 JSON/YAML, consistently with `posts get`.
+
+### `groups create`
+
+Create a group. **Only the fields you give are sent.**
+
+```bash
+pynteracta groups create --name QA --email qa@tenant.example.com --member 1042 --member 1099
+pynteracta groups create --name "Service accounts" --system      # visible: false
+pynteracta groups create --json body.json --output json --full
+```
+
+| Option | Request field |
+|---|---|
+| `--name`, `--email`, `--external-id` | `name`, `email`, `externalId` |
+| `--visible` / `--system` | `visible` (`true` = usable in mentions, `false` = system group) |
+| `--member ID` (repeatable) | `memberIds` |
+| `--json FILE\|-` | any field of `CreateGroupRequestDTO` (unknown keys are rejected) |
+
+The default table shows `group_id`, `name`, `email`, `visible`, `members_count`, `next_occ_token`.
+
+### `groups edit GROUP_ID`
+
+Edit a group. Same flags as `groups create` except `--member`: the members are changed with
+`groups edit-members`, never here.
+
+The command behaves like a **patch**: the fields you do not mention keep their value. Interacta's
+edit endpoint requires `name` and clears the email, external id and visibility that are missing
+from the request, so the command reads the edit form first and sends back its name, email,
+external id, visibility **and the member list as read**, overridden by `--json` and then by the
+flags. `--json` with `memberIds` replaces the whole list.
+
+```bash
+pynteracta groups edit 201 --name "QA team"
+pynteracta groups edit 201 --system --occ-token 6     # send token 6 instead of the one read
+```
+
+`409` → exit code **9** with `Group 201 changed since it was read: fetch it again and retry`; the
+command never retries on its own.
+
+### `groups edit-members [GROUP_ID]`
+
+Add and remove members. With a `GROUP_ID`, `--add ID` and `--remove ID` (repeatable, at least one)
+change that group, with the token read from its edit form or the one of `--occ-token` (then
+nothing is read):
+
+```bash
+pynteracta groups edit-members 201 --add 1042 --add 1099 --remove 1007
+pynteracta groups edit-members 201 --add 1042 --occ-token 6
+```
+
+Without a `GROUP_ID`, `--json FILE|-` edits several groups in one request
+(`EditMultipleGroupsMembersRequestDTO`: `groupMembers`, one `{id, occToken, addUserIds,
+deleteUserIds}` per group). The server answers `200` with the groups that succeeded and those
+that were changed in the meantime; the output has one row per group with `result` = `success` or
+`concurrency_error`, and the command exits with code **9** if any group is in conflict. Nothing is
+retried.
+
+```bash
+pynteracta groups edit-members --json members.json
+pynteracta groups edit-members --json members.json --output json
+```
+
+The default table shows `group_id`, `name`, `members_count`, `next_occ_token` (the token returned
+by the server, valid for the next members edit) and, in bulk, `result`.
+
+### `groups delete GROUP_ID`
+
+Delete a group. The group is read first and its id and name shown in a confirmation prompt
+(`Delete group 201 "QA"? [y/N]`). `--yes` (`-y`) skips the prompt; without an interactive
+terminal it is **required** (exit code 2, nothing deleted).
+
+```bash
+pynteracta groups delete 201
+pynteracta groups delete 201 --yes --output json   # {"group_id": 201}
+```
 
 ---
 
@@ -999,8 +1190,9 @@ pynteracta hashtags list 79 --export hashtags.csv
 ## `admin-manage` commands
 
 Admin-only **read-form** helpers: each fetches the editable state of an entity (the
-`GET admin/manage/.../edit` endpoints) together with an `occToken` for future write operations
-(deferred to v1.0+). These are propaedeutic to the write surface; no write commands exist yet.
+`GET admin/manage/.../edit` endpoints) together with an `occToken` for the write operations. The
+user credentials are written with `users edit-credentials`; workspace and catalog writes arrive
+with their own spec.
 
 `occToken` is **not** shown in the default table — it lives on `.raw.occToken` and is reachable
 via `--full`, `--output json`, or `--export` (combined with `--full`). There is no `--web-url`
@@ -1043,7 +1235,8 @@ pynteracta admin-manage user-credentials 1042 --output json
 ```
 
 Default table: `has_google_credentials`, `has_microsoft_credentials`, `has_custom_credentials`,
-`custom_username`, `custom_active`. The full per-provider configuration is on `.raw`.
+`custom_username`, `custom_active`. The full per-provider configuration is on `.raw`; `occ_token`
+is the token for `users edit-credentials --occ-token`.
 
 ---
 

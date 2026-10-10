@@ -343,7 +343,7 @@ T15 (2026-10-10), con le decisioni del maintainer registrate nella spec.
      `fix(cli): users edit-credentials invia solo i blocchi indicati; GET 204 vuota è NotFoundError
      (05-T18)`.
 
-### [ ] T16 – Documentazione
+### [x] T16 – Documentazione
 
 - Criteri: 05-C23
 - Dipende da: T10, T11, T13, T15, T18
@@ -405,3 +405,6 @@ T15 (2026-10-10), con le decisioni del maintainer registrate nella spec.
 | 05-C24 | T14, T15 |
 | 05-C25 | T14, T15 |
 | 05-C26 | T15 |
+| 05-C27 | T18 |
+| 05-C28 | T18 |
+| 05-C29 | T18 |

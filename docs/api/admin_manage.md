@@ -5,14 +5,18 @@ The `AdminManageAPI` client exposes four admin-only **read-form** endpoints adde
 ## Resource grouping
 
 All four endpoints are grouped under `client.admin_manage` (D-v0.6-1), separate from the
-`posts`, `users`, or `catalogs` resource clients. They are admin-only and propaedeutic to the
-future write surface (deferred to v1.0+).
+`posts`, `users`, or `catalogs` resource clients. They are admin-only read forms, propaedeutic to
+the admin write surface: the user credentials write is `client.users.edit_credentials()` (spec 05,
+see [Users](users.md#writing-users)), which also offers `client.users.get_credentials_for_edit()`
+as an alias of `user_credentials_for_edit()`; the workspace and catalog writes arrive with their
+own spec.
 
 ## Endpoint scope
 
 Each endpoint returns the full editable state of an entity plus an `occToken` (optimistic
-concurrency token) for use by future write operations. The `occToken` is carried through each
-facade's `.raw` escape hatch — it is never surfaced as a narrow property (D-v0.6-2).
+concurrency token) for the write operations. `UserCredentialsForEdit` exposes it as `occ_token`
+(the token for `users.edit_credentials()`); the other three facades keep it on `.raw` until their
+write spec (D-v0.6-2).
 
 | Method | Path | Facade |
 |---|---|---|
@@ -30,7 +34,7 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
     # Workspace edit form
     ws = client.admin_manage.workspace_for_edit(88)
     print(ws.id, ws.name, ws.member_users_count)
-    print(ws.raw.occToken)  # occToken only on .raw — for future write use
+    print(ws.raw.occToken)  # occToken only on .raw until the workspace write spec
 
     # Catalog edit form
     catalog = client.admin_manage.catalog_for_edit(5)
@@ -43,6 +47,7 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
     # User credentials edit form
     creds = client.admin_manage.user_credentials_for_edit(1042)
     print(creds.has_google_credentials, creds.has_custom_credentials, creds.custom_username)
+    print(creds.occ_token)  # the token for client.users.edit_credentials()
 ```
 
 ## Field curation (Q-v0.6-1)
@@ -51,7 +56,7 @@ Narrow facade properties surface the directly-typed scalar fields of each respon
 light convenience accessors that dig one level into the nested editable-content blocks (which the
 code generator emits as `RootModel[Any]` stubs) for the human-facing name/label/credential flags.
 Complex nested structures (the full `contentData`, `communityAssociations`, `parents`, per-provider
-credential configs) and `occToken` stay on `.raw`.
+credential configs) stay on `.raw`, as does `occToken` for workspace, catalog and catalog entry.
 
 ## API Reference
 
