@@ -609,7 +609,10 @@ Create, edit, copy, delete and comment **custom posts**, and drive their workflo
 command sends one request and never retries: a `409` (`occToken` mismatch) exits with code **9**
 and the message `Post POST_ID changed since it was read: fetch it again and retry.` Simple fields
 come from flags; the full request body (attachments, non-scalar values) from `--json FILE`, or
-`--json -` for stdin. Flags override the keys of the JSON body.
+`--json -` for stdin. Flags override the keys of the JSON body. `--attach PATH` (repeatable, on
+`create`, `comment`, `edit` and `copy`) uploads a file and attaches it, after the attachments of
+`--json`; the uploads happen in order before the write, and the first one that fails stops the
+command with exit code **11** and nothing is written.
 
 `--custom-data FIELD_ID=VALUE` and `--screen-data FIELD_ID=VALUE` are repeatable; `true`/`false`
 and integers are typed, anything else is a string (use `--json` for lists and objects). They are
@@ -646,6 +649,7 @@ pynteracta posts create 79 --json body.json --announcement
 | `--scheduled-publication`, `--timezone` | `scheduledPublication` (`{datetime, timezone}`) |
 | `--workflow-init-state` | `workflowInitStateId` |
 | `--client-uid` | `clientUid` (find the post again with `posts get-by-client-uid`) |
+| `--attach PATH` (repeatable) | `attachments` (uploaded file, after those of `--json`) |
 | `--json FILE\|-` | any field of `CreateCustomPostRequest` (unknown keys are rejected) |
 
 The table shows `id`, `community_id`, `title`, `visibility`, `current_state`, `next_occ_token`. A
@@ -657,8 +661,9 @@ Same flags as `posts create` except `--announcement` and `--client-uid`, plus
 `--remove-watcher-user` (`--watcher-user` adds watchers) and `--occ-token`. The command is a
 **patch**: it reads the post (`post-data-for-edit`) and sends back its title, rich-text
 description, custom data and visibility, overridden by `--json` and then by the flags.
-`--description` replaces the description with plain text. `--occ-token N` sends `N` instead of the
-token just read (the read still happens, to keep the other fields).
+`--description` replaces the description with plain text. `--attach PATH` uploads a file and
+adds it (`addAttachments`). `--occ-token N` sends `N` instead of the token just read (the read
+still happens, to keep the other fields).
 
 ```bash
 pynteracta posts edit 21269 --title "Safety procedures Q4 (rev. 2)"
@@ -679,7 +684,8 @@ pynteracta posts edit-custom-data 21269 --custom-data 1411=300
 
 Copies a post into a new one: same flags as `posts create` except `--client-uid`, plus
 `--occ-token`. The post is read (`post-data-for-copy`) and its title, description, custom data,
-visibility and announcement flag are copied unless overridden. The table shows the **new** post.
+visibility and announcement flag are copied unless overridden; `--attach PATH` adds an uploaded
+file to the copy (`addAttachments`). The table shows the **new** post.
 
 ```bash
 pynteracta posts copy 21269 --title "Safety procedures Q1"
@@ -692,8 +698,24 @@ pynteracta posts edit-watchers 21269 --add 1099 --remove 1042
 pynteracta posts edit-watchers 21269 --add 1099 --output json   # {"post_id", "added_user_ids", "removed_user_ids"}
 ```
 
-At least one of `--add` and `--remove` is required. Attachments of a post can be changed from the
-library (`edit_attachments`) but not yet from the CLI.
+At least one of `--add` and `--remove` is required.
+
+#### `posts edit-attachments POST_ID`
+
+Adds, replaces or removes the attachments of a post in one request (no `occToken` needed).
+`--add PATH` uploads a file and attaches it; `--update ID=PATH` uploads `PATH` as a **new
+version** of attachment `ID` (the server keeps the id, bumps the version and takes the new file
+name); `--remove ID` removes an attachment. All three are repeatable and at least one is
+required (exit code 2 otherwise). Files are uploaded first, in order: if one is rejected the
+command exits with code **11** and the post is not changed.
+
+```bash
+pynteracta posts edit-attachments 21269 --add minutes.pdf
+pynteracta posts edit-attachments 21269 --update 9466=report-v2.pdf --remove 9470
+```
+
+The table shows `post_id`, `added` and `updated` (as `id name`) and `removed_ids`;
+`--output json --full` returns the whole response.
 
 #### `posts delete POST_ID` and `posts mark-erasable POST_ID`
 
@@ -716,7 +738,12 @@ pynteracta posts comment 21269 --text "Read and approved"
 pynteracta posts comment 21269 --text "Agreed" --parent 5501 --client-uid reply-1
 ```
 
-`--text` or `--json` is required. The table shows `id`, `creator`, `text`, `creation_ts`.
+`--text` or `--json` is required. `--attach PATH` (repeatable) uploads files and attaches them
+to the comment. The table shows `id`, `creator`, `text`, `creation_ts`.
+
+```bash
+pynteracta posts comment 21269 --text "Signed copy attached" --attach signed.pdf
+```
 
 #### `posts get-for-create`, `posts get-for-edit`, `posts get-for-copy`
 
@@ -891,6 +918,22 @@ pynteracta attachments check-visibility 3001 3002
 pynteracta attachments check-visibility 3001 --output json
 ```
 
+### `attachments upload PATH`
+
+Upload a file to the tenant's temporary storage and print its reference: `name`, `content_ref`
+and `temporary_download_url` (a signed link that expires). The reference can be attached with
+`--json` (`{"attachments": [{"name": …, "contentRef": …}]}`); `--attach` on the write commands
+does the upload for you. `--name` uploads the file under another name. A file rejected by the
+storage exits with code **11**; nothing is retried.
+
+```bash
+pynteracta attachments upload report.pdf
+pynteracta attachments upload report.pdf --name "Q4 report.pdf" --output json
+```
+
+`--output json --full` prints the whole server response, including the fields of the signed
+upload policy: they are temporary credentials, keep that output private.
+
 ---
 
 ## `groups` commands
@@ -1059,6 +1102,7 @@ pynteracta tasks create 21269 --title T --output json --full   # whole response,
 | `--assignee-user`, `--assignee-group` | `assigneeUserId`, `assigneeGroupId` |
 | `--watcher-user`, `--watcher-group` (repeatable) | `watcherUserIds`, `watcherGroupIds` |
 | `--client-uid` | `clientUid` |
+| `--attach PATH` (repeatable) | `attachments` (uploaded file, after those of `--json`) |
 | `--json FILE\|-` | any field of `CreateTaskRequestDTO` (unknown keys are rejected) |
 
 `--expiration` is an ISO 8601 date-time. Without an offset it is read in the `--timezone` zone
@@ -1069,7 +1113,8 @@ is sent in UTC. The default table shows `id`, `post_id`, `title`, `state`, `prio
 ### `tasks edit TASK_ID`
 
 Edit a task. Same flags as `tasks create`, plus `--remove-watcher-user` and `--remove-watcher-group`
-(`--watcher-*` add watchers, `--remove-watcher-*` remove them).
+(`--watcher-*` add watchers, `--remove-watcher-*` remove them). `--attach PATH` uploads a file and
+adds it (`addAttachments`); a failed upload exits with code **11** and the task is not changed.
 
 The command behaves like a **patch**: the fields you do not mention keep their value. Interacta's
 edit endpoint replaces the whole task and clears whatever is missing from the request (and rejects
@@ -1121,3 +1166,4 @@ pynteracta tasks delete 7001 -y --output json   # {"task_id": 7001, "post_id": 2
 | 8 | Server error |
 | 9 | Conflict: the resource changed since it was read (`409`, `occToken` mismatch) — fetch it again and retry |
 | 10 | Unexpected internal error |
+| 11 | Upload rejected by the storage (`--attach`, `attachments upload`, `posts edit-attachments`): nothing was written |

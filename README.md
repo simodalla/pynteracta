@@ -10,8 +10,8 @@
 
 An unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`).
 Synchronous and typed: service-account and Google OAuth2 authentication, ten read resources, a
-write surface that grows one resource group at a time (tasks and posts so far), a Typer CLI with
-table/JSON/YAML output and file export. Current version and contents: see
+write surface that grows one resource group at a time (tasks, posts and attachment upload so
+far), a Typer CLI with table/JSON/YAML output and file export. Current version and contents: see
 [`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 ## Installation
@@ -103,7 +103,10 @@ pynteracta --version
   custom data, watchers, attachments, delete, mark-as-erasable, comments, workflow), with explicit
   kwargs and `*_raw` variants in the library and `tasks …` / `posts …` write commands in the CLI
   (confirmation on destructive commands, exit code `9` on `occToken` conflicts, no automatic retry
-  of uncertain writes). Further write groups (event posts, attachment upload, admin) follow.
+  of uncertain writes). Further write groups (event posts, admin) follow.
+- **Attachment upload** — `client.attachments.upload()` and `--attach` / `attachments upload` /
+  `posts edit-attachments` in the CLI; the uploaded file is attached to posts, comments and
+  tasks, with no Interacta token sent to the storage and signed links redacted from logs.
 - **Filtering & sorting** — curated kwargs/flags for posts and users, custom-field and workflow
   screen-field filters with opt-in validation against the community post-definition, generic
   `--filter KEY=VALUE` passthrough.

@@ -108,9 +108,12 @@ is converted to UTC.
 
 ### Attachments
 
-`attachments`, `add_attachments`, `update_attachments` and `edit_attachments()` accept only
-attachments the server already knows (`attachmentId`, or `name` + `contentRef`), as dicts or
-`InputPostAttachmentDTO1` models. Uploading new files is not part of the library yet.
+`attachments`, `add_attachments`, `update_attachments` and `edit_attachments()` accept files
+just uploaded with `client.attachments.upload()` (an `UploadedAttachment`, sent as `name` +
+`contentRef`) and attachments the server already knows (`attachmentId`, or `name` +
+`contentRef`), as dicts or `InputPostAttachmentDTO1` models. For a new version of an attachment
+pass `uploaded.as_version_of(attachment_id)` in `update_attachments` (or `update`). See
+[Uploading files](attachments.md#uploading-files).
 
 ### `edit()` and `copy()` are replacements
 

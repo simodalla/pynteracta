@@ -279,7 +279,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   `main`: `total_items_count` è `None` perché il server lo calcola solo con
   `calculateTotalItemsCount`; è un difetto preesistente del test, da seguire a parte.
 
-### [ ] T16 – Documentazione
+### [x] T16 – Documentazione
 
 - Criteri: 04-C17
 - Dipende da: T10, T11, T12, T13, T15

@@ -21,7 +21,10 @@ that grows one resource group at a time; the current version and its contents ar
   CLI (`tasks create|edit|delete`, `posts create|edit|copy|comment|delete|workflow-execute|…`, with
   confirmation for destructive commands). Optimistic concurrency is surfaced as
   `ConcurrencyError` / exit code `9`; a write that fails with an unknown outcome is never retried
-  automatically. More write groups (event posts, attachment upload, admin) follow.
+  automatically. More write groups (event posts, admin) follow.
+- **Attachment upload** — `client.attachments.upload()` sends a file to the tenant's storage
+  and returns a reference that post, comment and task writes accept; in the CLI `--attach` on
+  the write commands, `attachments upload` and `posts edit-attachments`.
 - **Filtering & sorting** — curated kwargs and CLI flags for posts and users, custom-field and
   workflow screen-field filters, a label-based filter builder, opt-in validation against the
   community post-definition.
@@ -35,7 +38,7 @@ that grows one resource group at a time; the current version and its contents ar
 
 ## What's out of scope for now
 
-- Writes on event posts, attachment upload and the admin area — planned, not yet shipped; see the
+- Writes on event posts and the admin area — planned, not yet shipped; see the
   [roadmap](https://github.com/simodalla/pynteracta/blob/main/ROADMAP.md).
 - Async client, alternate auth methods (Microsoft OAuth2, username/password), automatic
   retry/backoff — tracked under *Deferred / future* in the roadmap, no target version.
