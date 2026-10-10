@@ -14,6 +14,7 @@ from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.tasks import TasksAPI
 from pynteracta.exceptions import ConcurrencyError, TransportError
+from pynteracta.models.facade.attachments import UploadedAttachment, UploadTicket
 from pynteracta.models.generated import external_v2 as generated
 
 _TASK_ID = 7001
@@ -284,3 +285,40 @@ class TestTasksDelete:
         route = respx.delete(_DELETE_PATH).mock(return_value=httpx.Response(200))
         assert TasksAPI(make_transport()).delete(_TASK_ID) is None
         assert route.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: UploadedAttachment nelle scritture dei task
+# ---------------------------------------------------------------------------
+
+
+class TestTasksUploadedAttachments:
+    def _uploaded(self) -> UploadedAttachment:
+        ticket = UploadTicket.from_dict(load_payload("upload_new_attachment_response.json"))
+        return UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
+
+    def _ref(self) -> dict[str, str]:
+        content_ref = load_payload("upload_new_attachment_response.json")["contentRef"]
+        return {"name": "nota.txt", "contentRef": content_ref}
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_create_attachments(self) -> None:
+        route = respx.post(_CREATE_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_task_response.json"))
+        )
+        TasksAPI(make_transport()).create(
+            _POST_ID, title="T", attachments=[{"attachmentId": 3}, self._uploaded()]
+        )
+        body = json.loads(route.calls[0].request.content)
+        assert body["attachments"] == [{"attachmentId": 3}, self._ref()]
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_edit_add_attachments(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_task_response.json"))
+        )
+        TasksAPI(make_transport()).edit(_TASK_ID, 3, add_attachments=[self._uploaded()])
+        body = json.loads(route.calls[0].request.content)
+        assert body["addAttachments"] == [self._ref()]

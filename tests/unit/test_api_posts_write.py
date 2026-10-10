@@ -14,6 +14,7 @@ from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.posts import PostsAPI
 from pynteracta.exceptions import ConcurrencyError, TransportError, ValidationError
+from pynteracta.models.facade.attachments import UploadedAttachment, UploadTicket
 from pynteracta.models.facade.posts_write import (
     PostAttachmentsWriteResult,
     PostComment,
@@ -534,3 +535,79 @@ class TestPostsErrors:
             api.edit_workflow_screen(_POST_ID, _SCREEN_OCC_TOKEN, screen_data={"5": "x"})
         assert execute.call_count == 1
         assert edit.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: UploadedAttachment nelle scritture dei post
+# ---------------------------------------------------------------------------
+
+
+def _uploaded() -> UploadedAttachment:
+    ticket = UploadTicket.from_dict(load_payload("upload_new_attachment_response.json"))
+    return UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
+
+
+def _ref() -> dict[str, str]:
+    return {
+        "name": "nota.txt",
+        "contentRef": load_payload("upload_new_attachment_response.json")["contentRef"],
+    }
+
+
+class TestPostsUploadedAttachments:
+    # criterio: 04-C07
+    @respx.mock
+    def test_create_attachments(self) -> None:
+        route = respx.post(_CREATE_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_post_response.json"))
+        )
+        _api().create(_COMMUNITY_ID, attachments=[{"attachmentId": 3}, _uploaded()])
+        assert _sent(route)["attachments"] == [{"attachmentId": 3}, _ref()]
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_add_comment_attachments(self) -> None:
+        route = respx.post(_COMMENT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_post_comment_response.json"))
+        )
+        _api().add_comment(_POST_ID, comment="c", attachments=[_uploaded()])
+        assert _sent(route)["attachments"] == [_ref()]
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_edit_add_attachments(self) -> None:
+        route = respx.put(_EDIT_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("edit_post_response.json"))
+        )
+        _api().edit(_POST_ID, _OCC_TOKEN, add_attachments=[_uploaded()])
+        assert _sent(route)["addAttachments"] == [_ref()]
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_copy_add_attachments(self) -> None:
+        route = respx.put(_COPY_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("copy_post_response.json"))
+        )
+        _api().copy(_POST_ID, _OCC_TOKEN, add_attachments=[_uploaded()])
+        assert _sent(route)["addAttachments"] == [_ref()]
+
+    # criterio: 04-C07
+    @respx.mock
+    def test_edit_attachments_add_and_update_version(self) -> None:
+        route = respx.put(_ATTACHMENTS_PATH).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("edit_post_attachments_response.json")
+            )
+        )
+        uploaded = _uploaded()
+        _api().edit_attachments(
+            _POST_ID,
+            add=[{"attachmentId": 3}, uploaded],
+            update=[uploaded.as_version_of(7)],
+            remove_ids=[9],
+        )
+        assert _sent(route) == {
+            "addAttachments": [{"attachmentId": 3}, _ref()],
+            "updateAttachments": [{"attachmentId": 7, **_ref()}],
+            "removeAttachmentIds": [9],
+        }

@@ -146,7 +146,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Controlli bloccanti; commit `feat(api): upload degli allegati in due passi su
      client.attachments (04-T07)`.
 
-### [ ] T08 – `UploadedAttachment` nei metodi di scrittura di post e task
+### [x] T08 – `UploadedAttachment` nei metodi di scrittura di post e task
 
 - Criteri: 04-C07
 - Dipende da: T06

@@ -64,7 +64,8 @@ class TasksAPI(ResourceClient):
             sub_tasks: Sub-task, nella forma di ``SubTaskDTO`` (dict o modello).
             assignee_user_id: Utente assegnatario.
             assignee_group_id: Gruppo assegnatario.
-            attachments: Allegati già noti al server, nella forma di ``InputTaskAttachmentDTO``.
+            attachments: Allegati: :class:`~pynteracta.models.facade.attachments.UploadedAttachment`
+                da ``client.attachments.upload``, o ``InputTaskAttachmentDTO`` già noti.
             watcher_user_ids: Utenti osservatori.
             watcher_group_ids: Gruppi osservatori.
             client_uid: Identificativo scelto dal chiamante.
@@ -135,7 +136,8 @@ class TasksAPI(ResourceClient):
             sub_tasks: Sub-task, nella forma di ``SubTaskDTO``.
             assignee_user_id: Utente assegnatario.
             assignee_group_id: Gruppo assegnatario.
-            add_attachments: Allegati da aggiungere (``InputTaskAttachmentDTO``).
+            add_attachments: Allegati da aggiungere: ``UploadedAttachment`` o
+                ``InputTaskAttachmentDTO``.
             remove_attachment_ids: Allegati da togliere.
             add_watcher_user_ids: Utenti osservatori da aggiungere.
             remove_watcher_user_ids: Utenti osservatori da togliere.
