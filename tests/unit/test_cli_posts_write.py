@@ -201,6 +201,25 @@ class TestPostsCreate:
         assert result.exit_code == _EXIT_CONFIG
         assert route.call_count == 0
 
+    # Caratterizzazione (04-T02): un corpo --json non valido esce con 2 prima di ogni richiesta.
+    # criterio: 04-C11
+    @respx.mock
+    def test_invalid_json_body_exits_2_without_requests(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        route = mock_json("POST", _CREATE_PATH, load_payload("create_post_response.json"))
+        body_file = tmp_path / "body.json"
+        body_file.write_text(json.dumps({"bogus": 1}), encoding="utf-8")
+        result = runner.invoke(
+            app,
+            ["posts", "create", str(_COMMUNITY_ID), "--json", str(body_file)],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert "bogus" in result.output
+        assert route.call_count == 0
+        assert len(respx.calls) == 0
+
     # criterio: 03-C16
     @respx.mock
     def test_validation_error_exits_6_with_body(self, runner: CliRunner) -> None:

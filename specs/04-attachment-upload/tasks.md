@@ -35,7 +35,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
      `test: fixture e contract test della risposta di upload-new-attachment; riga 0.12.0 in
      ROADMAP (04-T01)`.
 
-### [ ] T02 – Test di caratterizzazione
+### [x] T02 – Test di caratterizzazione
 
 - Criteri: nessuno nuovo (protegge 04-C08, 04-C11, 04-C12)
 - Dipende da: nessuno
@@ -47,7 +47,10 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
     (corpo `--json` con una chiave sconosciuta → exit `2`, la route di scrittura e quella del token
     non sono chiamate).
 - Passi:
-  1. Scrivere i tre test; eseguirli: verdi. Se uno è rosso, si ferma e si segnala: fissa un
+  - Nota di implementazione: la caratterizzazione di `tasks create` esiste già,
+    `test_cli_tasks.py::TestTasksCreate::test_json_unknown_key_exits_2` (spec 02, exit `2`,
+    nessuna chiamata); si riusa invece di duplicarla.
+  1. Scrivere i test; eseguirli: verdi. Se uno è rosso, si ferma e si segnala: fissa un
      comportamento diverso da quello che il piano assume.
   2. Controlli bloccanti; commit `test: caratterizzazione della redazione delle query e dei corpi
      non validi di posts create e tasks create (04-T02)`.

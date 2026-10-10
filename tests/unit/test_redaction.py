@@ -28,6 +28,12 @@ class TestRedactString:
     def test_empty_string(self) -> None:
         assert redact_string("") == ""
 
+    # Caratterizzazione (04-T02): una query senza nomi sensibili resta identica.
+    # criterio: 04-C08
+    def test_url_query_without_sensitive_names_untouched(self) -> None:
+        url = "https://x.example.com/p?loadViewLink=true&pageSize=10"
+        assert redact_string(url) == url
+
 
 class TestRedactHeaders:
     def test_authorization_always_redacted(self) -> None:
