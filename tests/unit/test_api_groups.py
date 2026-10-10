@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import httpx
 import pytest
@@ -11,7 +12,7 @@ import respx
 from api_helpers import BASE_URL, load_payload, make_transport, mock_json
 
 from pynteracta.api.groups import GroupsAPI
-from pynteracta.exceptions import ConcurrencyError, NotFoundError, TransportError
+from pynteracta.exceptions import ConcurrencyError, InteractaError, NotFoundError, TransportError
 from pynteracta.models.generated import external_v2 as generated
 
 _GROUP_ID_1 = 201
@@ -236,3 +237,118 @@ class TestGroupsDelete:
         with pytest.raises(NotFoundError):
             GroupsAPI(make_transport()).delete(_GROUP_ID_1)
         assert route.call_count == 1
+
+
+def _members_payload(*, conflict: bool = False, missing: bool = False) -> dict:  # type: ignore[type-arg]
+    payload = load_payload("edit_groups_members_response.json")
+    if missing:
+        return {"successGroups": [], "concurrencyErrorGroups": []}
+    if conflict:
+        group = payload["successGroups"][0]
+        return {"successGroups": [], "concurrencyErrorGroups": [group]}
+    return payload
+
+
+class TestGroupsEditMembers:
+    _BODY: ClassVar[dict] = {  # type: ignore[type-arg]
+        "groupMembers": [
+            {
+                "id": _GROUP_ID_1,
+                "occToken": _OCC_TOKEN,
+                "addUserIds": [_MEMBER_ID_1],
+                "deleteUserIds": [_MEMBER_ID_2],
+            }
+        ]
+    }
+
+    # criterio: 05-C09
+    @respx.mock
+    def test_success_returns_group_with_next_occ_token(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload())
+        )
+        result = GroupsAPI(make_transport()).edit_members(
+            _GROUP_ID_1, _OCC_TOKEN, add_user_ids=[_MEMBER_ID_1], remove_user_ids=[_MEMBER_ID_2]
+        )
+        assert route.call_count == 1
+        assert _body(route) == self._BODY
+        assert result.group_id == _GROUP_ID_1
+        assert result.next_occ_token == _MEMBERS_NEXT_OCC_TOKEN
+        assert result.members_count == _MEMBERS_COUNT_AFTER
+        assert result.name == "Engineering"
+
+    # criterio: 05-C09
+    @respx.mock
+    def test_only_given_keys_are_sent(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload())
+        )
+        GroupsAPI(make_transport()).edit_members(_GROUP_ID_1, _OCC_TOKEN, add_user_ids=[1])
+        assert _body(route) == {
+            "groupMembers": [{"id": _GROUP_ID_1, "occToken": _OCC_TOKEN, "addUserIds": [1]}]
+        }
+
+    # criterio: 05-C09
+    @respx.mock
+    def test_conflict_raises_concurrency_error(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload(conflict=True))
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            GroupsAPI(make_transport()).edit_members(_GROUP_ID_1, _OCC_TOKEN, add_user_ids=[1])
+        assert exc_info.value.status_code == 200  # noqa: PLR2004
+        assert exc_info.value.request_method == "PUT"
+        assert exc_info.value.response_body is not None
+        assert route.call_count == 1
+
+    # criterio: 05-C09
+    @respx.mock
+    def test_missing_group_raises_interacta_error(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload(missing=True))
+        )
+        with pytest.raises(InteractaError) as exc_info:
+            GroupsAPI(make_transport()).edit_members(_GROUP_ID_1, _OCC_TOKEN, add_user_ids=[1])
+        assert not isinstance(exc_info.value, ConcurrencyError)
+        assert exc_info.value.status_code == 200  # noqa: PLR2004
+        assert route.call_count == 1
+
+
+class TestGroupsEditMembersBulk:
+    _GROUPS: ClassVar[list[dict]] = [  # type: ignore[type-arg]
+        {"id": _GROUP_ID_1, "occToken": _OCC_TOKEN, "addUserIds": [1]},
+        {"id": _GROUP_ID_2, "occToken": 1, "deleteUserIds": [2]},
+    ]
+
+    # criterio: 05-C10
+    @respx.mock
+    def test_returns_both_lists_without_raising(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload())
+        )
+        result = GroupsAPI(make_transport()).edit_members_bulk(self._GROUPS)
+        assert route.call_count == 1
+        assert _body(route) == {"groupMembers": self._GROUPS}
+        assert [g.id for g in result.success_groups] == [_GROUP_ID_1]
+        assert [g.id for g in result.concurrency_error_groups] == [_GROUP_ID_2]
+
+    # criterio: 05-C10
+    @respx.mock
+    def test_bulk_raw_equivalent(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload())
+        )
+        req = generated.EditMultipleGroupsMembersRequestDTO(groupMembers=self._GROUPS)
+        result = GroupsAPI(make_transport()).edit_members_bulk_raw(req)
+        assert _body(route) == {"groupMembers": self._GROUPS}
+        assert len(result.success_groups) == 1
+
+    # criterio: 05-C10
+    @respx.mock
+    def test_empty_list_is_sent_as_is(self) -> None:
+        route = respx.put(_MEMBERS_URL).mock(
+            return_value=httpx.Response(200, json=_members_payload(missing=True))
+        )
+        result = GroupsAPI(make_transport()).edit_members_bulk([])
+        assert _body(route) == {"groupMembers": []}
+        assert result.success_groups == []

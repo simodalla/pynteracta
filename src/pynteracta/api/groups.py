@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pynteracta.api._base import ResourceClient
 from pynteracta.api._utils import build_paginated_body, build_write_body
+from pynteracta.exceptions import ConcurrencyError, InteractaError
 from pynteracta.models.facade.groups import (
     Group,
     GroupForEdit,
     GroupList,
     GroupMember,
     GroupMemberList,
+    GroupMembersResult,
     GroupWriteResult,
 )
 from pynteracta.models.generated import external_v2 as generated
@@ -22,6 +26,10 @@ _LIST_MEMBERS_PATH = "admin/data/groups/{group_id}/members"
 _GET_FOR_EDIT_PATH = "admin/manage/groups/{group_id}/edit"
 _CREATE_PATH = "admin/manage/groups"
 _EDIT_PATH = "admin/manage/groups/{group_id}"
+_MEMBERS_PATH = "admin/manage/groups/members"
+
+# Elemento di edit_members_bulk: dict nella forma di EditGroupMembersRequestDTO o il DTO.
+MembersEdit = dict[str, Any] | generated.EditGroupMembersRequestDTO
 
 
 class GroupsAPI(ResourceClient):
@@ -223,3 +231,71 @@ class GroupsAPI(ResourceClient):
     def delete(self, group_id: int) -> None:
         """DELETE ``/admin/manage/groups/{groupId}``: elimina un gruppo; la risposta è vuota."""
         self._delete(_EDIT_PATH.format(group_id=group_id))
+
+    def edit_members(
+        self,
+        group_id: int,
+        occ_token: int,
+        *,
+        add_user_ids: list[int] | None = None,
+        remove_user_ids: list[int] | None = None,
+    ) -> GroupWriteResult:
+        """PUT ``/admin/manage/groups/members`` per un solo gruppo.
+
+        Il server risponde ``200`` con due liste: se il gruppo è in ``successGroups`` il risultato
+        porta il suo nuovo ``next_occ_token``; se è in ``concurrencyErrorGroups`` la chiamata
+        solleva ``ConcurrencyError`` (stato ``200``, corpo allegato); se non è in nessuna delle
+        due solleva ``InteractaError``. Una sola richiesta in ogni caso.
+
+        Args:
+            group_id: Il gruppo.
+            occ_token: Token di concorrenza letto da ``GroupForEdit.occ_token``.
+            add_user_ids: Id degli utenti da aggiungere.
+            remove_user_ids: Id degli utenti da togliere.
+        """
+        item = build_write_body(
+            id=group_id,
+            occ_token=occ_token,
+            add_user_ids=add_user_ids,
+            delete_user_ids=remove_user_ids,
+        )
+        body = self._put(_MEMBERS_PATH, json={"groupMembers": [item]})
+        result = GroupMembersResult.from_dict(body)
+        if any(g.id == group_id for g in result.concurrency_error_groups):
+            msg = f"Group {group_id} changed since it was read: members not changed"
+            raise ConcurrencyError(
+                msg,
+                status_code=200,
+                request_method="PUT",
+                request_url=_MEMBERS_PATH,
+                response_body=body,
+            )
+        for summary in result.success_groups:
+            if summary.id == group_id:
+                return GroupWriteResult.from_member_edit(summary)
+        msg = f"Group {group_id} missing from the members edit response"
+        raise InteractaError(
+            msg,
+            status_code=200,
+            request_method="PUT",
+            request_url=_MEMBERS_PATH,
+            response_body=body,
+        )
+
+    def edit_members_bulk(self, groups: list[MembersEdit]) -> GroupMembersResult:
+        """PUT ``/admin/manage/groups/members`` per più gruppi in una sola richiesta.
+
+        Ogni elemento è ``{"id", "occToken", "addUserIds", "deleteUserIds"}`` (dict o DTO). Il
+        risultato riporta ``success_groups`` e ``concurrency_error_groups``; **non solleva** per i
+        conflitti: decide il chiamante.
+        """
+        body = build_write_body(group_members=groups)
+        return GroupMembersResult.from_dict(self._put(_MEMBERS_PATH, json=body))
+
+    def edit_members_bulk_raw(
+        self, req: generated.EditMultipleGroupsMembersRequestDTO
+    ) -> GroupMembersResult:
+        """PUT ``/admin/manage/groups/members`` da un DTO già costruito."""
+        return GroupMembersResult.from_dict(
+            self._put(_MEMBERS_PATH, json=req.model_dump(mode="json", exclude_none=True))
+        )

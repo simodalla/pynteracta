@@ -119,7 +119,7 @@ le costanti qui sopra con la stessa forma.
   3. Controlli bloccanti; commit `feat(groups): creazione, modifica ed eliminazione dei gruppi su
      client.groups (05-T05)`.
 
-### [ ] T06 – Membri dei gruppi: `edit_members` ed `edit_members_bulk`
+### [x] T06 – Membri dei gruppi: `edit_members` ed `edit_members_bulk`
 
 - Criteri: 05-C09, 05-C10
 - Dipende da: T05
