@@ -258,6 +258,34 @@ class PostCapabilities:
     def can_edit_follow(self) -> bool | None:
         return self.raw.canEditFollow
 
+    @property
+    def can_copy(self) -> bool | None:
+        """Se il post si può copiare (spec 03)."""
+        return self.raw.canCopy
+
+    @property
+    def can_edit_attachments(self) -> bool | None:
+        """Se gli allegati del post si possono modificare (spec 03)."""
+        return self.raw.canEditAttachments
+
+    @property
+    def can_edit_workflow_screen_data(self) -> bool | None:
+        """Se i dati di screen del workflow si possono modificare (spec 03)."""
+        return self.raw.canEditWorkflowScreenData
+
+    @property
+    def workflow_permitted_operations(
+        self,
+    ) -> list[generated.PostWorkflowDefinitionTransitionDTO1]:
+        """Transizioni di workflow permesse: i loro ``id`` vanno a
+        ``execute_workflow_operation`` (spec 03)."""
+        typed: list[generated.PostWorkflowDefinitionTransitionDTO1] = []
+        for item in self.raw.workflowPermittedOperations or []:
+            root = getattr(item, "root", item)
+            if isinstance(root, dict):
+                typed.append(generated.PostWorkflowDefinitionTransitionDTO1.model_validate(root))
+        return typed
+
     @classmethod
     def from_dict(cls, data: dict) -> PostCapabilities:  # type: ignore[type-arg]
         # GetPostCapabilitiesResponseDTO is a RootModel[Any] stub; bind to the typed variant.

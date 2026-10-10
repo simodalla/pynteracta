@@ -550,6 +550,14 @@ def posts_capabilities(  # noqa: PLR0913
                 "can_add_comment": getattr(obj, "can_add_comment", None),
                 "can_edit_like": getattr(obj, "can_edit_like", None),
                 "can_edit_follow": getattr(obj, "can_edit_follow", None),
+                "can_copy": getattr(obj, "can_copy", None),
+                "can_edit_attachments": getattr(obj, "can_edit_attachments", None),
+                "can_edit_workflow_screen_data": getattr(
+                    obj, "can_edit_workflow_screen_data", None
+                ),
+                "workflow_operations": ", ".join(
+                    f"{op.id} {op.name}" for op in getattr(obj, "workflow_permitted_operations", [])
+                ),
             }
 
         fmt = resolve_output(state, output)

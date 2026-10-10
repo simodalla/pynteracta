@@ -584,17 +584,28 @@ def _print_vertical_records(
         console.print(table)
 
 
-def handle_error(exc: InteractaError, *, console: Console) -> typer.Exit:
-    """Print a human-friendly error message and return the appropriate Exit."""
+def handle_error(
+    exc: InteractaError, *, console: Console, resource: str | None = None
+) -> typer.Exit:
+    """Print a human-friendly error message and return the appropriate Exit.
+
+    ``resource`` (per esempio ``"Post 21269"``) dà nome alla risorsa nel messaggio del ``409``.
+    """
     _ = console
     code = error_exit_code(exc)
     parts = [f"Error: {exc}"]
     if isinstance(exc, ConcurrencyError):
         # Nessun nuovo tentativo da parte della CLI: decide chi la usa (ADR 0001, RF-025).
-        parts.append(
-            "  The resource changed since it was read (occToken mismatch): "
-            "fetch it again and retry."
-        )
+        if resource is not None:
+            parts.append(f"  {resource} changed since it was read: fetch it again and retry.")
+        else:
+            parts.append(
+                "  The resource changed since it was read (occToken mismatch): "
+                "fetch it again and retry."
+            )
+    if isinstance(exc, ValidationError) and exc.response_body:
+        # Il dettaglio del server (per esempio il campo custom non valido) serve all'operatore.
+        parts.append(f"  Details: {_compact_json(exc.response_body)}")
     if exc.request_id:
         parts.append(f"  Request-ID: {exc.request_id}")
     if exc.status_code:

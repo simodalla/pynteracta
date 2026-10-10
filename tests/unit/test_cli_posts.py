@@ -633,6 +633,20 @@ class TestPostsCapabilities:
         assert result.exit_code == 0
         assert result.output == snapshot
 
+    # criterio: 03-C15
+    @respx.mock
+    def test_table_shows_write_flags_and_operations(self, runner: CliRunner) -> None:
+        mock_json(
+            "GET",
+            "communication/posts/data/post-capabilities/21269",
+            load_payload("get_post_capabilities_response.json"),
+        )
+        result = runner.invoke(app, ["posts", "capabilities", "21269"], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        for needle in ("can_copy", "can_edit_attachments", "can_edit_workflow_screen_data"):
+            assert needle in result.output
+        assert "12 Approva, 13 Rifiuta" in result.output
+
 
 class TestPostsHistory:
     @respx.mock

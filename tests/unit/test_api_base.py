@@ -51,3 +51,12 @@ class TestResourceClientRejectsNonObjectBodies:
         _mock_array("DELETE")
         with pytest.raises(TypeError, match=_EXPECTED_MESSAGE):
             ResourceClient(make_transport())._delete(_PATH)
+
+
+class TestResourceClientEmptyBodies:
+    # criterio: 03-C08
+    @respx.mock
+    def test_put_without_body_returns_empty_dict(self) -> None:
+        route = respx.put(f"{BASE_URL}/{_PATH}").mock(return_value=httpx.Response(200))
+        assert ResourceClient(make_transport())._put(_PATH, json={}) == {}
+        assert route.call_count == 1

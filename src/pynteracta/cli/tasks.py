@@ -4,16 +4,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import Annotated, Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import pydantic
 import typer
 
-from pynteracta.api._utils import snake_to_camel, zoned_datetime_input
 from pynteracta.cli._common import (
-    EXIT_CONFIG,
     EXIT_GENERIC,
     EXIT_SUCCESS,
     CliState,
@@ -33,13 +28,19 @@ from pynteracta.cli._common import (
     validate_export_options,
     validate_full_fields,
 )
+from pynteracta.cli._write import (
+    DEFAULT_TIMEZONE,
+    merge_body,
+    parse_zoned_datetime,
+    validate_body,
+)
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.tasks import Task, TaskWriteResult
 from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO, EditTaskRequestDTO
 
 app = typer.Typer(help="Task commands.", no_args_is_help=True)
 
-_DEFAULT_TIMEZONE = "Europe/Rome"
+_DEFAULT_TIMEZONE = DEFAULT_TIMEZONE
 
 # Opzioni condivise da `create` ed `edit` (spec 02): i campi semplici del DTO; il resto via --json.
 TitleOption = Annotated[str | None, typer.Option("--title", help="Task title.")]
@@ -117,37 +118,7 @@ RemoveWatcherGroupOption = Annotated[
 
 def _parse_expiration(value: str | None, timezone: str) -> dict[str, str] | None:
     """``--expiration`` + ``--timezone`` → la coppia ``{datetime, timezone}`` del DTO."""
-    if value is None:
-        return None
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError as exc:
-        typer.echo(f"--expiration: not an ISO 8601 date-time: {value!r}.", err=True)
-        raise typer.Exit(EXIT_CONFIG) from exc
-    if parsed.tzinfo is None:
-        try:
-            parsed = parsed.replace(tzinfo=ZoneInfo(timezone))
-        except ZoneInfoNotFoundError as exc:
-            typer.echo(f"--timezone: unknown IANA time zone {timezone!r}.", err=True)
-            raise typer.Exit(EXIT_CONFIG) from exc
-    return zoned_datetime_input(parsed)
-
-
-def _merge_body(json_body: dict[str, Any], **flags: Any) -> dict[str, Any]:
-    """Unisce il corpo di ``--json`` con i flag: un flag passato sostituisce la sua chiave."""
-    merged = dict(json_body)
-    for key, value in flags.items():
-        if value is not None:
-            merged[snake_to_camel(key)] = value
-    return merged
-
-
-def _validate_body(merged: dict[str, Any], dto_cls: type[Any]) -> Any:
-    try:
-        return dto_cls.model_validate(merged)
-    except pydantic.ValidationError as exc:
-        typer.echo(f"Invalid request body for {dto_cls.__name__}:\n{exc}", err=True)
-        raise typer.Exit(EXIT_CONFIG) from exc
+    return parse_zoned_datetime(value, timezone, option="--expiration")
 
 
 def _root(value: Any) -> Any:
@@ -238,7 +209,7 @@ def tasks_create(  # noqa: PLR0913
     console = make_console(state)
     validate_full_fields(full, fields)
     validate_export_options(export, export_format)
-    merged = _merge_body(
+    merged = merge_body(
         load_json_body(json_body, CreateTaskRequestDTO),
         title=title,
         description_plain_text=description,
@@ -250,7 +221,7 @@ def tasks_create(  # noqa: PLR0913
         watcher_group_ids=watcher_group,
         client_uid=client_uid,
     )
-    req = _validate_body(merged, CreateTaskRequestDTO)
+    req = validate_body(merged, CreateTaskRequestDTO)
     try:
         with build_client(state) as client:
             result = client.tasks.create_raw(post_id, req)
@@ -322,7 +293,7 @@ def tasks_edit(  # noqa: PLR0913
                     err=True,
                 )
                 raise typer.Exit(EXIT_GENERIC)
-            merged = _merge_body(
+            merged = merge_body(
                 {**_edit_base(task), **json_part},
                 title=title,
                 description_plain_text=description,
@@ -335,7 +306,7 @@ def tasks_edit(  # noqa: PLR0913
                 remove_watcher_user_ids=remove_watcher_user,
                 remove_watcher_group_ids=remove_watcher_group,
             )
-            req = _validate_body(_drop_delta_if_plain(merged), EditTaskRequestDTO)
+            req = validate_body(_drop_delta_if_plain(merged), EditTaskRequestDTO)
             result = client.tasks.edit_raw(task_id, token, req)
         render_output(
             resolve_output(state, output),

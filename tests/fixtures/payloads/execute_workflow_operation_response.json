@@ -1,0 +1,19 @@
+{
+  "newCurrentState": {
+    "id": 33,
+    "initState": false,
+    "name": "Approvato",
+    "metadata": {},
+    "terminal": true,
+    "deleted": false,
+    "externalId": null
+  },
+  "newScreenData": {
+    "5": "x",
+    "6": 1
+  },
+  "newCurrentWorkflowPermittedOperations": [],
+  "newCanEditWorkflowScreenData": false,
+  "newLastModifyTimestamp": 1748003000000,
+  "postDataHasChanged": true
+}

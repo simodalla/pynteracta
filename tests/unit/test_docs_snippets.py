@@ -138,3 +138,60 @@ def test_tasks_pages_document_write_commands() -> None:
     api = (_ROOT / "docs" / "api" / "tasks.md").read_text(encoding="utf-8")
     for needle in ("create(", "edit(", "delete(", "TaskWriteResult", "occ_token", "expiration"):
         assert needle in api, f"'{needle}' missing from docs/api/tasks.md"
+
+
+_POST_WRITE_COMMANDS = (
+    "posts create",
+    "posts edit ",
+    "posts edit-custom-data",
+    "posts copy",
+    "posts edit-watchers",
+    "posts delete",
+    "posts mark-erasable",
+    "posts comment",
+    "posts get-for-create",
+    "posts get-for-edit",
+    "posts get-for-copy",
+    "posts workflow-screen",
+    "posts workflow-execute",
+    "posts workflow-edit-screen",
+)
+
+
+# criterio: 03-C30
+def test_posts_pages_document_write_commands() -> None:
+    """Le pagine CLI, API, home e README documentano le scritture dei post."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in (*_POST_WRITE_COMMANDS, "--custom-data", "--screen-data", "--screen-occ-token"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    api = (_ROOT / "docs" / "api" / "posts.md").read_text(encoding="utf-8")
+    for needle in (
+        "create(",
+        "edit(",
+        "copy(",
+        "add_comment(",
+        "execute_workflow_operation(",
+        "PostWriteResult",
+        "occ_token",
+        "get_for_edit",
+        "scheduled_publication",
+    ):
+        assert needle in api, f"'{needle}' missing from docs/api/posts.md"
+    for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
+        text = page.read_text(encoding="utf-8")
+        write_lines = [line for line in text.splitlines() if "Write operations" in line]
+        assert write_lines, f"no 'Write operations' line in {page.name}"
+        paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
+        assert "posts" in paragraph, f"posts missing from the write operations of {page.name}"
+
+
+# criterio: 03-C37
+def test_posts_pages_document_references_and_replacement() -> None:
+    """Le pagine dicono che edit sostituisce il post, che i riferimenti si scrivono come id e
+    che i valori nuovi dei campi delta sono Quill delta."""
+    api = (_ROOT / "docs" / "api" / "posts.md").read_text(encoding="utf-8")
+    for needle in ("replacement", "as ids", "REQUIRED_FIELD"):
+        assert needle in api, f"'{needle}' missing from docs/api/posts.md"
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in ("as ids", "Quill delta", "deltaAreaFormat"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"

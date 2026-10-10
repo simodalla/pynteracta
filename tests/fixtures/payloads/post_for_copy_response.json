@@ -1,0 +1,82 @@
+{
+  "contentData": {
+    "title": "Procedura di prova",
+    "descriptionDelta": "{\"ops\":[{\"insert\":\"Procedura di prova per i test.\\n\"}]}",
+    "descriptionPlainText": "Procedura di prova per i test.",
+    "visibility": 1,
+    "announcement": false,
+    "customData": {
+      "1411": 226,
+      "1413": true,
+      "2003": [
+        {
+          "id": 89,
+          "catalogId": 12,
+          "label": "3 - Bassa",
+          "externalId": null,
+          "parentIds": [],
+          "deleted": false
+        }
+      ]
+    },
+    "currentWorkflowScreenData": {
+      "5": "a",
+      "6": 1
+    },
+    "attachments": [
+      {
+        "contentRef": "storage/ref/abc",
+        "temporaryContentViewLink": null,
+        "temporaryContentDownloadLink": null,
+        "contentMimeType": "application/pdf",
+        "id": 3,
+        "name": "procedura.pdf",
+        "size": 1024,
+        "type": 1,
+        "deleted": false
+      }
+    ],
+    "mentions": [],
+    "watchers": [
+      {
+        "id": 7,
+        "firstName": "Luca",
+        "lastName": "Bianchi",
+        "caption": "Luca Bianchi",
+        "contactEmail": "l.bianchi@example.it",
+        "serviceAccount": false,
+        "systemAccount": false,
+        "activeDWD": true,
+        "accountPhotoUrl": null,
+        "deleted": false,
+        "blocked": false,
+        "externalId": null,
+        "privateProfile": false
+      }
+    ],
+    "watcherUsers": [
+      {
+        "id": 7,
+        "firstName": "Luca",
+        "lastName": "Bianchi",
+        "caption": "Luca Bianchi",
+        "contactEmail": "l.bianchi@example.it",
+        "serviceAccount": false,
+        "systemAccount": false,
+        "activeDWD": true,
+        "accountPhotoUrl": null,
+        "deleted": false,
+        "blocked": false,
+        "externalId": null,
+        "privateProfile": false
+      }
+    ],
+    "watcherGroups": [],
+    "hashtags": [],
+    "draft": false,
+    "draftData": null,
+    "scheduledPublication": null,
+    "scheduledPublicationResult": null
+  },
+  "occToken": 5
+}

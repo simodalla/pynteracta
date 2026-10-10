@@ -1,0 +1,21 @@
+{
+  "contentData": {
+    "title": null,
+    "descriptionDelta": null,
+    "descriptionPlainText": null,
+    "visibility": 1,
+    "announcement": false,
+    "customData": {},
+    "currentWorkflowScreenData": null,
+    "attachments": [],
+    "mentions": [],
+    "watchers": [],
+    "watcherUsers": [],
+    "watcherGroups": [],
+    "hashtags": [],
+    "draft": false,
+    "draftData": null,
+    "scheduledPublication": null,
+    "scheduledPublicationResult": null
+  }
+}

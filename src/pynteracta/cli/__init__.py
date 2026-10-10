@@ -18,6 +18,9 @@ from pynteracta.cli import config as _config_cli
 from pynteracta.cli import groups as _groups_cli
 from pynteracta.cli import hashtags as _hashtags_cli
 from pynteracta.cli import posts as _posts_cli
+from pynteracta.cli import (
+    posts_write as _posts_write_cli,  # noqa: F401  (registra i comandi di scrittura)
+)
 from pynteracta.cli import tasks as _tasks_cli
 from pynteracta.cli import users as _users_cli
 from pynteracta.cli._common import LOG_LEVELS, CliState, resolve_log_level

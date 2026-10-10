@@ -603,6 +603,151 @@ pynteracta posts comments 21269
 pynteracta posts comments 21269 --all --output json
 ```
 
+### Writing posts
+
+Create, edit, copy, delete and comment **custom posts**, and drive their workflow. Every write
+command sends one request and never retries: a `409` (`occToken` mismatch) exits with code **9**
+and the message `Post POST_ID changed since it was read: fetch it again and retry.` Simple fields
+come from flags; the full request body (attachments, non-scalar values) from `--json FILE`, or
+`--json -` for stdin. Flags override the keys of the JSON body.
+
+`--custom-data FIELD_ID=VALUE` and `--screen-data FIELD_ID=VALUE` are repeatable; `true`/`false`
+and integers are typed, anything else is a string (use `--json` for lists and objects). They are
+merged **field by field**: flags over `--json` over the values read from the server. Values read
+from the server that reference catalog entries, users or groups are sent back **as ids** (the
+server returns them as objects but only accepts ids); values from flags and `--json` are sent as
+given, so write references as ids there too (`--json` with `{"customData": {"2003": [89]}}`).
+Rich-text (delta) fields read from the server are sent back unchanged; a new value for a delta
+field must be a **Quill delta** JSON, because `deltaAreaFormat` applies to every delta field of the
+request. Plain text is possible only with `--json` and `"deltaAreaFormat": 2`, and then every delta
+field sent must be plain text too.
+`--description` (and `--text` for comments) sends plain text (`descriptionFormat` / `commentFormat`
+`2`); use `--json` for a Quill delta. `--scheduled-publication` is an ISO 8601 date-time read in
+the `--timezone` zone (IANA name, default `Europe/Rome`) unless it has an offset.
+
+#### `posts create COMMUNITY_ID`
+
+```bash
+pynteracta posts create 79 --title "Safety procedures Q4" --description "In force from January." \
+    --custom-data 1411=226 --custom-data 1413=true --watcher-user 1042 --visibility 1
+pynteracta posts create 79 --title Draft --draft --scheduled-publication 2026-12-31T18:00
+pynteracta posts create 79 --json body.json --announcement
+```
+
+| Option | Request field |
+|---|---|
+| `--title` | `title` |
+| `--description` | `description` + `descriptionFormat: 2` |
+| `--custom-data ID=VALUE` (repeatable) | `customData` |
+| `--watcher-user` (repeatable) | `watcherUserIds` |
+| `--visibility` | `visibility` (`1` private, `2` public) |
+| `--announcement` | `announcement` (always sent, `false` by default) |
+| `--draft` | `draft` |
+| `--scheduled-publication`, `--timezone` | `scheduledPublication` (`{datetime, timezone}`) |
+| `--workflow-init-state` | `workflowInitStateId` |
+| `--client-uid` | `clientUid` (find the post again with `posts get-by-client-uid`) |
+| `--json FILE\|-` | any field of `CreateCustomPostRequest` (unknown keys are rejected) |
+
+The table shows `id`, `community_id`, `title`, `visibility`, `current_state`, `next_occ_token`. A
+custom value the server rejects exits with code **6** and prints the server's detail.
+
+#### `posts edit POST_ID`
+
+Same flags as `posts create` except `--announcement` and `--client-uid`, plus
+`--remove-watcher-user` (`--watcher-user` adds watchers) and `--occ-token`. The command is a
+**patch**: it reads the post (`post-data-for-edit`) and sends back its title, rich-text
+description, custom data and visibility, overridden by `--json` and then by the flags.
+`--description` replaces the description with plain text. `--occ-token N` sends `N` instead of the
+token just read (the read still happens, to keep the other fields).
+
+```bash
+pynteracta posts edit 21269 --title "Safety procedures Q4 (rev. 2)"
+pynteracta posts edit 21269 --custom-data 1411=300 --remove-watcher-user 1042
+pynteracta posts edit 21269 --occ-token 5 --visibility 2
+```
+
+#### `posts edit-custom-data POST_ID`
+
+Changes only the custom fields: the custom data as read are sent back with the fields given by
+`--custom-data` or `--json` replaced (one of the two is required).
+
+```bash
+pynteracta posts edit-custom-data 21269 --custom-data 1411=300
+```
+
+#### `posts copy POST_ID`
+
+Copies a post into a new one: same flags as `posts create` except `--client-uid`, plus
+`--occ-token`. The post is read (`post-data-for-copy`) and its title, description, custom data,
+visibility and announcement flag are copied unless overridden. The table shows the **new** post.
+
+```bash
+pynteracta posts copy 21269 --title "Safety procedures Q1"
+```
+
+#### `posts edit-watchers POST_ID`
+
+```bash
+pynteracta posts edit-watchers 21269 --add 1099 --remove 1042
+pynteracta posts edit-watchers 21269 --add 1099 --output json   # {"post_id", "added_user_ids", "removed_user_ids"}
+```
+
+At least one of `--add` and `--remove` is required. Attachments of a post can be changed from the
+library (`edit_attachments`) but not yet from the CLI.
+
+#### `posts delete POST_ID` and `posts mark-erasable POST_ID`
+
+`delete` removes the post; `mark-erasable` removes it and marks it for future physical erasure.
+After either command the post is no longer readable (`404`). Both print the id of the post you
+asked for (the server answers `postId: 0` to `mark-erasable`).
+Both read the post first and ask for confirmation with its id and title
+(`Delete post 21269 "Safety procedures Q4"? [y/N]`). `--yes` (`-y`) skips the prompt; without an
+interactive terminal `--yes` is **required** (exit code 2, nothing is deleted).
+
+```bash
+pynteracta posts delete 21269
+pynteracta posts mark-erasable 21269 --yes --output json   # {"post_id": 21269}
+```
+
+#### `posts comment POST_ID`
+
+```bash
+pynteracta posts comment 21269 --text "Read and approved"
+pynteracta posts comment 21269 --text "Agreed" --parent 5501 --client-uid reply-1
+```
+
+`--text` or `--json` is required. The table shows `id`, `creator`, `text`, `creation_ts`.
+
+#### `posts get-for-create`, `posts get-for-edit`, `posts get-for-copy`
+
+Show the data the server prepares for a creation form (`posts get-for-create COMMUNITY_ID`), an
+edit (`posts get-for-edit POST_ID`) or a copy (`posts get-for-copy POST_ID`). The edit and copy
+tables start with `occ_token`, the concurrency token the write needs. `--no-attachments` skips
+the attachments; `--output json --full` returns the whole response.
+
+```bash
+pynteracta posts get-for-edit 21269
+pynteracta posts get-for-copy 21269 --no-attachments --output json --full
+```
+
+#### Workflow: `posts workflow-screen`, `posts workflow-execute`, `posts workflow-edit-screen`
+
+`posts capabilities POST_ID` lists the permitted transitions (`workflow_operations`, as
+`ID name`). `posts workflow-screen POST_ID [--operation ID]` shows the screen of the current state,
+or of a transition, with its `screen_occ_token` and one row per field (`screen_data.<id>`).
+
+```bash
+pynteracta posts workflow-screen 21269 --operation 12
+pynteracta posts workflow-execute 21269 12                         # transition without a screen
+pynteracta posts workflow-execute 21269 12 --screen-data 5=approved
+pynteracta posts workflow-edit-screen 21269 --screen-data 5=reviewed
+```
+
+`workflow-execute` without screen data sends an empty body and reads nothing. With
+`--screen-data` or `--json` it reads the transition's screen first, sends back its data with your
+fields replaced and the `screen_occ_token` just read; `--screen-occ-token N` sends `N` instead.
+`workflow-edit-screen` does the same on the screen of the current state.
+
 ---
 
 ## `communities` commands

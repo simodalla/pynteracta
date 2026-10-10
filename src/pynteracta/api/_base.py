@@ -43,7 +43,10 @@ class ResourceClient:
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Una ``PUT``; una risposta senza corpo vale come oggetto vuoto (edit-post-watchers)."""
         response = self._transport.request("PUT", path, json=json, params=params)
+        if not response.content:
+            return {}
         body: Any = response.json()
         if not isinstance(body, dict):
             msg = f"Expected JSON object response from {path}"

@@ -1,0 +1,80 @@
+# serializer version: 1
+# name: TestPostsComment.test_table_output
+  '''
+      Comment 5601 added to post 21269     
+  ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key         ┃ Value                   ┃
+  ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id          │ 5601                    │
+  │ creator     │ Maria Rossi             │
+  │ text        │ Ciao                    │
+  │ creation_ts │ 2025-05-23 12:06:40 UTC │
+  └─────────────┴─────────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsCreate.test_json_output
+  '''
+  {
+    "id": 21270,
+    "community_id": 79,
+    "title": "Procedura di prova",
+    "visibility": 1,
+    "current_state": "In revisione",
+    "next_occ_token": 1
+  }
+  
+  '''
+# ---
+# name: TestPostsCreate.test_table_output
+  '''
+    Post 21270 created in community 79   
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value              ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 21270              │
+  │ community_id   │ 79                 │
+  │ title          │ Procedura di prova │
+  │ visibility     │ 1                  │
+  │ current_state  │ In revisione       │
+  │ next_occ_token │ 1                  │
+  └────────────────┴────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsPrep.test_get_for_edit_table_starts_with_occ_token
+  '''
+          Post 21269 (for edit)         
+  ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key           ┃ Value              ┃
+  ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+  │ occ_token     │ 5                  │
+  │ community_id  │ 79                 │
+  │ custom_id     │ POST-21269         │
+  │ title         │ Procedura di prova │
+  │ visibility    │ 1                  │
+  │ current_state │ In revisione       │
+  └───────────────┴────────────────────┘
+  
+  '''
+# ---
+# name: TestPostsWorkflow.test_workflow_screen_table
+  '''
+                            Workflow screen (post 21269)                          
+  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key              ┃ Value                                                     ┃
+  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ screen_occ_token │ 3                                                         │
+  │ current_state    │ In revisione                                              │
+  │ screen           │ Approvazione                                              │
+  │ screen_data.5    │ a                                                         │
+  │ screen_data.6    │ 1                                                         │
+  │ screen_data.5233 │ [{'id': 8341, 'catalogId': 22, 'label':                   │
+  │                  │ 'Amministrazione', 'externalId': None, 'parentIds': [],   │
+  │                  │ 'deleted': False}]                                        │
+  │ screen_data.5237 │ [{'id': 3872, 'firstName': 'Alice', 'lastName': 'Rossi',  │
+  │                  │ 'caption': 'Alice Rossi', 'deleted': False}]              │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+  
+  '''
+# ---

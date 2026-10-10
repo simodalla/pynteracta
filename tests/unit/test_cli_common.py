@@ -70,6 +70,16 @@ class TestErrorExitCode:
         assert "changed since it was read" in err
         assert "fetch it again and retry" in err
 
+    # criterio: 03-C28
+    def test_handle_error_concurrency_with_resource(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        exc = ConcurrencyError("Conflict", status_code=_HTTP_409)
+        exit_ = _common.handle_error(exc, console=Console(), resource="Post 21269")
+        assert exit_.exit_code == _EXIT_CONFLICT
+        err = capsys.readouterr().err
+        assert "Post 21269 changed since it was read: fetch it again and retry" in err
+
 
 class TestConfirmDestructive:
     # criterio: 02-C12

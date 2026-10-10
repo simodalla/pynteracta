@@ -55,7 +55,11 @@ Confermato dal maintainer il 2026-10-08.
 - RF-006. Post: dettaglio per id e per client uid, capabilities, storia degli eventi, stream
   globale, elenco in community con filtri su campi standard, custom e di workflow (validazione
   opzionale contro la definizione dei post della community) e ordinamento, controllo di visibilità
-  con e senza commenti, elenco dei commenti.
+  con e senza commenti, elenco dei commenti. *(Confermato dal maintainer il 2026-10-10, spec
+  03.)*
+  - RF-006a. `PostCapabilities` espone `can_copy`, `can_edit_attachments`,
+    `can_edit_workflow_screen_data` e le operazioni di workflow permesse, con cui il chiamante
+    scopre l'`operation_id` delle transizioni. *(Spec 03, 2026-10-10.)*
 - RF-007. Community: elenco, dettagli singoli e in blocco, definizione dei post (singola e
   multipla).
 - RF-008. Cataloghi: elenco dei cataloghi e delle voci, con iterazione.
@@ -91,7 +95,8 @@ Confermato dal maintainer il 2026-10-08.
   `base_path`.
 
 Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): ogni spec
-che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0; le
+che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0;
+RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md); le
 altre non ancora implementate). Stessa forma delle letture (façade con `.raw`, kwargs espliciti
 più `*_raw`, comando CLI, test unit e contract).
 
@@ -99,7 +104,23 @@ più `*_raw`, comando CLI, test unit e contract).
   allegati, watcher, dati di screen del workflow), transizione di workflow, copia, eliminazione e
   marcatura per cancellazione, risposta di partecipazione a un evento, creazione di commenti; con
   gli helper di lettura propedeutici (`post-data-for-create|edit|copy`, `event-post-data-for-*`,
-  `post-workflow-screen-data-for-edit`).
+  `post-workflow-screen-data-for-edit`). La spec 03 realizza i post custom, i commenti e il
+  workflow; i post evento restano da fare. *(Confermato dal maintainer il 2026-10-10, spec 03.)*
+  - RF-021a. Le letture propedeutiche `get_for_create`, `get_for_edit`, `get_for_copy` sono
+    esposte come letture e restituiscono `occ_token` (dove il server lo dà) e i dati editabili;
+    `edit`, `edit_custom_data` e `copy` ricevono l'`occ_token` dal chiamante. *(Spec 03.)*
+  - RF-021b. `posts edit`, `posts edit-custom-data` e `posts copy` in CLI sono patch: rileggono i
+    dati propedeutici e rimandano i campi non indicati; `--custom-data` e `--screen-data`
+    sovrascrivono chiave per chiave; `--occ-token` e `--screen-occ-token` impongono solo il token.
+    *(Spec 03.)*
+  - RF-021c. `edit_attachments` e gli `attachments` di `create`, `edit`, `copy`, `add_comment`
+    accettano solo riferimenti già noti al server; `posts edit-attachments` in CLI è rimandato a
+    dopo l'upload (RF-024). *(Spec 03.)*
+  - RF-021d. In scrittura i riferimenti a voci di catalogo, utenti e gruppi nei campi custom e nei
+    dati di screen si inviano come id, anche se le letture li restituiscono come oggetti; le patch
+    della CLI traducono i valori letti che rimandano. `edit-post` e `copy-post` sostituiscono il
+    post: la descrizione omessa conta come vuota. *(Spec 03, verificato sul tenant il
+    2026-10-09.)*
 - RF-022. Task: creazione, modifica, eliminazione. La libreria invia solo i campi passati, in una
   sola richiesta; `edit` riceve l'`occToken` dal chiamante. Il server tratta la modifica come una
   sostituzione (i campi omessi sono azzerati, tranne watcher e allegati, che hanno coppie
@@ -157,11 +178,11 @@ più `*_raw`, comando CLI, test unit e contract).
 
 ## 5. Integrazioni esterne
 
-*Da confermare.*
+Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `external_v2`.
 
 | Sistema | Uso | Come si collega |
 |---|---|---|
-| Interacta REST API `external_v2` | tutte le letture | HTTPS verso `{base_url}{base_path}/api/external/v{api_version}/`, header `Authorization: Bearer <token>` e `User-Agent: pynteracta/<versione>` |
+| Interacta REST API `external_v2` | letture e scritture | HTTPS verso `{base_url}{base_path}/api/external/v{api_version}/`, header `Authorization: Bearer <token>` e `User-Agent: pynteracta/<versione>` |
 | Interacta auth (`core/auth`) | ottenere l'access token | `create-access-token-by-service-account` con asserzione JWT RS512; `create-access-token-by-google-oauth2-access-token-credentials` con token Google |
 | Google OAuth2 | identità personale | il token lo procura l'utente fuori dalla libreria; la libreria lo inoltra una sola volta per lo scambio |
 | PyPI, GitHub Releases, GitHub Pages | distribuzione e documentazione | solo in CI, su tag `v*` e push su `main`; nessun uso a runtime |
@@ -192,7 +213,7 @@ più `*_raw`, comando CLI, test unit e contract).
 
 ## 7. Fuori ambito
 
-*Da confermare.*
+Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
 
 - Client asincrono.
 - Autenticazione Microsoft OAuth2 e username/password.
@@ -213,3 +234,6 @@ più `*_raw`, comando CLI, test unit e contract).
 - 2026-10-08: [spec 02](02-task-write/spec.md) (scrittura dei task, 0.10.0): RF-022 precisato con
   la semantica del server; nuovi RF-022a, RF-015a, RF-025a, RF-025b, RNF-010; RF-022, RF-025,
   RNF-009 e la voce "Dati scritti sul tenant" di §6 confermati dal maintainer.
+- 2026-10-10: [spec 03](03-post-write/spec.md) (scrittura dei post custom, commenti e workflow,
+  0.11.0): nuovi RF-006a, RF-021a, RF-021b, RF-021c, RF-021d; RF-021, RF-006, §5 (con "letture e
+  scritture") e §7 confermati dal maintainer.

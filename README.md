@@ -10,7 +10,7 @@
 
 An unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`).
 Synchronous and typed: service-account and Google OAuth2 authentication, ten read resources, a
-write surface that grows one resource group at a time (tasks first), a Typer CLI with
+write surface that grows one resource group at a time (tasks and posts so far), a Typer CLI with
 table/JSON/YAML output and file export. Current version and contents: see
 [`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
@@ -99,10 +99,11 @@ pynteracta --version
 - **Read resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). One facade per response with
   a `.raw` escape hatch to the generated DTO.
-- **Write operations** — `tasks` create/edit/delete, with explicit kwargs and `*_raw` variants in
-  the library and `tasks create|edit|delete` in the CLI (confirmation on destructive commands,
-  exit code `9` on `occToken` conflicts, no automatic retry of uncertain writes). Further write
-  groups (posts, comments, attachments, admin) arrive one per minor.
+- **Write operations** — `tasks` create/edit/delete and custom `posts` (create, edit, copy,
+  custom data, watchers, attachments, delete, mark-as-erasable, comments, workflow), with explicit
+  kwargs and `*_raw` variants in the library and `tasks …` / `posts …` write commands in the CLI
+  (confirmation on destructive commands, exit code `9` on `occToken` conflicts, no automatic retry
+  of uncertain writes). Further write groups (event posts, attachment upload, admin) follow.
 - **Filtering & sorting** — curated kwargs/flags for posts and users, custom-field and workflow
   screen-field filters with opt-in validation against the community post-definition, generic
   `--filter KEY=VALUE` passthrough.

@@ -8,25 +8,33 @@
     "can_view_comment": true,
     "can_add_comment": true,
     "can_edit_like": true,
-    "can_edit_follow": true
+    "can_edit_follow": true,
+    "can_copy": true,
+    "can_edit_attachments": false,
+    "can_edit_workflow_screen_data": false,
+    "workflow_operations": "12 Approva, 13 Rifiuta"
   }
   
   '''
 # ---
 # name: TestPostsCapabilities.test_table_output
   '''
-   Capabilities (post 21269)  
-  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
-  ┃ Key              ┃ Value ┃
-  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
-  │ can_view_detail  │ True  │
-  │ can_modify       │ False │
-  │ can_delete       │ False │
-  │ can_view_comment │ True  │
-  │ can_add_comment  │ True  │
-  │ can_edit_like    │ True  │
-  │ can_edit_follow  │ True  │
-  └──────────────────┴───────┘
+                  Capabilities (post 21269)                 
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                           ┃ Value                  ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ can_view_detail               │ True                   │
+  │ can_modify                    │ False                  │
+  │ can_delete                    │ False                  │
+  │ can_view_comment              │ True                   │
+  │ can_add_comment               │ True                   │
+  │ can_edit_like                 │ True                   │
+  │ can_edit_follow               │ True                   │
+  │ can_copy                      │ True                   │
+  │ can_edit_attachments          │ False                  │
+  │ can_edit_workflow_screen_data │ False                  │
+  │ workflow_operations           │ 12 Approva, 13 Rifiuta │
+  └───────────────────────────────┴────────────────────────┘
   
   '''
 # ---
