@@ -1771,7 +1771,11 @@ Minor **0.13.0**.
 
 ### Follow-up
 
-- Release **0.13.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- ~~Release **0.13.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.~~
+  **Nota di release (2026-10-10):** M31 è uscita nella **0.12.0** insieme a M30, non nella
+  0.13.0 annunciata sopra: nessuna delle due spec era stata taggata e semantic-release calcola
+  una sola versione dai commit dopo `v0.11.0`. La riga 0.13.0 di ROADMAP è stata fusa nella
+  0.12.0 (`99bf149`); il numero 0.13.0 resta libero per la prossima minor.
 - Il ciclo gruppi di 05-C24 crea un gruppo vuoto: da solo non dimostra l'azzeramento dei campi
   omessi (verificato con una sonda); crearlo pieno in un `bugfix_` o con la spec 06.
 - `occToken` è redatto nei body dell'audit log (la chiave contiene `token`): innocuo, ma rende
