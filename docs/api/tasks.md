@@ -112,6 +112,10 @@ patch (verified against a tenant, spec 02): `title`, description, `expiration`, 
 assignee and `sub_tasks` that are missing from the request are **cleared**. Watchers and
 attachments are the exception: they are changed only through the `add_*` / `remove_*` arguments.
 
+`attachments` (create) and `add_attachments` (edit) accept files just uploaded with
+`client.attachments.upload()` (an `UploadedAttachment`) as well as references the server already
+knows (`InputTaskAttachmentDTO`). See [Uploading files](attachments.md#uploading-files).
+
 !!! warning "Pass every field you want to keep"
     Read the task first and send back what must survive. The CLI `tasks edit` does this for you;
     the library does not, so that a call stays one explicit request. Sub-tasks sent back with their

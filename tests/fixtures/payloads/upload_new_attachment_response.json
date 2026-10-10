@@ -1,0 +1,11 @@
+{
+  "contentRef": "4af991d23a3e0b5c7d8e9f00112233445566778899aabbccddeeff0011223344",
+  "uploadUrl": "https://storage.example.com/bucket-test",
+  "uploadMultipartRequestBodyParams": {
+    "GoogleAccessId": "fake@test.iam.gserviceaccount.com",
+    "key": "temporary-uploads/4af991d23a3e0b5c7d8e9f00112233445566778899aabbccddeeff0011223344",
+    "policy": "eyJleHBpcmF0aW9uIjogIjIwMjYtMTAtMTBUMTI6MDA6MDBaIiwgImNvbmRpdGlvbnMiOiBbeyJidWNrZXQiOiAiYnVja2V0LXRlc3QifV19",
+    "signature": "FAKE-SIGNATURE"
+  },
+  "temporaryDownloadUrl": "https://storage.example.com/bucket-test/temporary-uploads/4af991d23a3e0b5c7d8e9f00112233445566778899aabbccddeeff0011223344?GoogleAccessId=fake@test.iam.gserviceaccount.com&Expires=1791633600&Signature=FAKE-DOWNLOAD-SIGNATURE"
+}

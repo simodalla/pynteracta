@@ -195,8 +195,11 @@ class TestSensitiveKeyCoverage:
             "password",
             "clientSecret",
             "privateKey",
+            "signature",
+            "policy",
         ],
     )
+    # criterio: 04-C08
     def test_sensitive_keys_are_redacted(self, key: str) -> None:
         assert redact_body({key: _FAKE_JWT}) == {key: _REDACTED}
 

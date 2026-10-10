@@ -11,7 +11,10 @@ from pynteracta.models.facade.attachments import (
     AttachmentVisibility,
     PostAttachment,
     PostAttachmentList,
+    UploadedAttachment,
+    UploadTicket,
 )
+from pynteracta.models.generated import external_v2 as generated
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "payloads"
 
@@ -110,3 +113,55 @@ class TestAttachmentVisibility:
         data = load("check_attachment_visibility_response.json")
         result = AttachmentVisibility.from_dict(data)
         assert result.raw.ids == [3001, 3002]
+
+
+class TestUploadTicket:
+    # criterio: 04-C06
+    def test_properties_from_fixture(self) -> None:
+        data = load("upload_new_attachment_response.json")
+        ticket = UploadTicket.from_dict(data)
+        assert isinstance(ticket.raw, generated.GetTemporaryImageUploadUrlBaseResponseDTO)
+        assert ticket.content_ref == data["contentRef"]
+        assert ticket.upload_url == "https://storage.example.com/bucket-test"
+        assert ticket.form_params == data["uploadMultipartRequestBodyParams"]
+        assert ticket.temporary_download_url == data["temporaryDownloadUrl"]
+
+    # criterio: 04-C06
+    def test_form_params_is_a_copy(self) -> None:
+        ticket = UploadTicket.from_dict(load("upload_new_attachment_response.json"))
+        ticket.form_params["policy"] = "changed"
+        assert ticket.raw.uploadMultipartRequestBodyParams is not None
+        assert ticket.raw.uploadMultipartRequestBodyParams["policy"] != "changed"
+
+    # criterio: 04-C06
+    def test_form_params_empty_without_params(self) -> None:
+        ticket = UploadTicket.from_dict({"contentRef": "abc", "uploadUrl": "https://s"})
+        assert ticket.form_params == {}
+        assert ticket.temporary_download_url is None
+
+
+class TestUploadedAttachment:
+    def _uploaded(self) -> UploadedAttachment:
+        ticket = UploadTicket.from_dict(load("upload_new_attachment_response.json"))
+        return UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
+
+    # criterio: 04-C06
+    def test_properties(self) -> None:
+        data = load("upload_new_attachment_response.json")
+        uploaded = self._uploaded()
+        assert uploaded.raw.contentRef == data["contentRef"]
+        assert uploaded.content_ref == data["contentRef"]
+        assert uploaded.name == "nota.txt"
+        assert uploaded.mime_type == "text/plain"
+        assert uploaded.temporary_download_url == data["temporaryDownloadUrl"]
+
+    # criterio: 04-C07
+    def test_as_write_input_and_as_version_of(self) -> None:
+        uploaded = self._uploaded()
+        ref = uploaded.content_ref
+        assert uploaded.as_write_input() == {"name": "nota.txt", "contentRef": ref}
+        assert uploaded.as_version_of(7) == {
+            "attachmentId": 7,
+            "contentRef": ref,
+            "name": "nota.txt",
+        }

@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Attachments resource client."""
+"""Attachments resource client: letture e upload di nuovi file (spec 04)."""
 
 from __future__ import annotations
+
+import io
+import mimetypes
+from pathlib import Path
+from typing import BinaryIO
 
 from pynteracta.api._base import ResourceClient
 from pynteracta.api._utils import build_paginated_body
@@ -12,6 +17,8 @@ from pynteracta.models.facade.attachments import (
     ListPostAttachmentsByPostIdRequestDTO,
     PostAttachment,
     PostAttachmentList,
+    UploadedAttachment,
+    UploadTicket,
 )
 from pynteracta.pagination import PageIterator
 from pynteracta.transport import HttpTransport
@@ -19,10 +26,41 @@ from pynteracta.transport import HttpTransport
 _LIST_FOR_POST_PATH = "communication/attachments/data/posts/{post_id}/attachments-list"
 _GET_ATTACHMENT_PATH = "communication/posts/data/attachment-detail-by-id/{attachment_id}"
 _CHECK_VISIBILITY_PATH = "communication/attachments/data/check-visibility"
+_UPLOAD_PATH = "core/storage/upload-new-attachment"
+_DEFAULT_MIME = "application/octet-stream"
+
+# Sorgente di un upload: un percorso, dei byte o un file binario già aperto.
+UploadSource = Path | str | bytes | BinaryIO
+
+
+def _open_source(
+    file: UploadSource, name: str | None, mime_type: str | None
+) -> tuple[str, str, BinaryIO, bool]:
+    """Normalizza la sorgente di un upload, prima di qualunque richiesta.
+
+    Restituisce nome, MIME, file binario e se la libreria lo ha aperto (e deve chiuderlo). Un
+    percorso inesistente o una cartella sollevano l'errore del sistema; ``bytes`` o un file già
+    aperto senza ``name`` sollevano :class:`ValueError`. Il MIME, se non è passato, è dedotto
+    dall'estensione del nome (``application/octet-stream`` se ignota).
+    """
+    content: BinaryIO
+    owned = False
+    if isinstance(file, (str, Path)):
+        path = Path(file)
+        content = path.open("rb")
+        owned = True
+        name = name or path.name
+    else:
+        if not name:
+            msg = "name is required when uploading bytes or a file object"
+            raise ValueError(msg)
+        content = io.BytesIO(file) if isinstance(file, bytes) else file
+    mime = mime_type or mimetypes.guess_type(name)[0] or _DEFAULT_MIME
+    return name, mime, content, owned
 
 
 class AttachmentsAPI(ResourceClient):
-    """Client for attachment listing, detail, and visibility endpoints."""
+    """Client degli allegati: elenco, dettaglio e visibilità; upload di nuovi file (spec 04)."""
 
     def __init__(self, transport: HttpTransport) -> None:
         super().__init__(transport)
@@ -125,3 +163,63 @@ class AttachmentsAPI(ResourceClient):
         return AttachmentVisibility.from_dict(
             self._post(_CHECK_VISIBILITY_PATH, json=req.model_dump(mode="json", exclude_none=True))
         )
+
+    # --- upload (spec 04) -------------------------------------------------------------------
+
+    def request_upload_url(self) -> UploadTicket:
+        """POST ``/core/storage/upload-new-attachment``: il primo passo dell'upload.
+
+        Una sola richiesta, senza corpo. Il risultato porta l'URL dello storage, i campi della
+        policy firmata e il ``content_ref``; serve a chi carica il file con altri strumenti,
+        altrimenti :meth:`upload` fa entrambi i passi.
+        """
+        return UploadTicket.from_dict(self._post(_UPLOAD_PATH))
+
+    def upload(
+        self,
+        file: UploadSource,
+        *,
+        name: str | None = None,
+        mime_type: str | None = None,
+    ) -> UploadedAttachment:
+        """Carica un file nello storage temporaneo del tenant, in due passi.
+
+        Prima chiede l'URL con :meth:`request_upload_url`, poi invia il file con un form
+        multipart ``POST`` firmato, senza token Interacta. Il risultato si passa agli allegati
+        dei metodi di scrittura di post, commenti e task. Una sola richiesta per passo: un
+        errore risale al chiamante, mai un nuovo tentativo.
+
+        Args:
+            file: Un percorso (``Path`` o stringa), dei ``bytes`` o un file binario aperto. Un
+                percorso è letto in streaming e chiuso dalla libreria; un file aperto dal
+                chiamante resta aperto.
+            name: Nome del file; da un percorso è il nome del file, con ``bytes`` o un file
+                aperto è obbligatorio.
+            mime_type: MIME del file; se manca è dedotto dall'estensione del nome
+                (``application/octet-stream`` se ignota).
+
+        Returns:
+            Un :class:`UploadedAttachment` con ``content_ref``, ``name``, ``mime_type`` e
+            ``temporary_download_url``.
+
+        Raises:
+            FileNotFoundError: Il percorso non esiste (nessuna richiesta parte).
+            IsADirectoryError: Il percorso è una cartella (nessuna richiesta parte).
+            ValueError: ``bytes`` o file aperto senza ``name`` (nessuna richiesta parte).
+            UploadError: Lo storage ha risposto con un errore.
+            TransportError: Timeout o errore di rete: l'esito è sconosciuto.
+        """
+        file_name, mime, content, owned = _open_source(file, name, mime_type)
+        try:
+            ticket = self.request_upload_url()
+            self._transport.post_multipart(
+                ticket.upload_url or "",
+                fields=ticket.form_params,
+                file_name=file_name,
+                content=content,
+                content_type=mime,
+            )
+        finally:
+            if owned:
+                content.close()
+        return UploadedAttachment(ticket, name=file_name, mime_type=mime)

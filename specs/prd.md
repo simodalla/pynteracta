@@ -96,8 +96,9 @@ Confermato dal maintainer il 2026-10-08.
 
 Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): ogni spec
 che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0;
-RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md); le
-altre non ancora implementate). Stessa forma delle letture (façade con `.raw`, kwargs espliciti
+RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md); RF-024
+dalla [spec 04](04-attachment-upload/spec.md); le altre non ancora implementate). Stessa forma
+delle letture (façade con `.raw`, kwargs espliciti
 più `*_raw`, comando CLI, test unit e contract).
 
 - RF-021. Post e commenti: creazione e modifica di post e post-evento (dati, campi custom,
@@ -114,8 +115,9 @@ più `*_raw`, comando CLI, test unit e contract).
     sovrascrivono chiave per chiave; `--occ-token` e `--screen-occ-token` impongono solo il token.
     *(Spec 03.)*
   - RF-021c. `edit_attachments` e gli `attachments` di `create`, `edit`, `copy`, `add_comment`
-    accettano solo riferimenti già noti al server; `posts edit-attachments` in CLI è rimandato a
-    dopo l'upload (RF-024). *(Spec 03.)*
+    accettano riferimenti già noti al server e, dalla spec 04, i file appena caricati
+    (`UploadedAttachment`, RF-024); `posts edit-attachments` in CLI è arrivato con la spec 04
+    (RF-024a). *(Spec 03, aggiornato dalla spec 04.)*
   - RF-021d. In scrittura i riferimenti a voci di catalogo, utenti e gruppi nei campi custom e nei
     dati di screen si inviano come id, anche se le letture li restituiscono come oggetti; le patch
     della CLI traducono i valori letti che rimandano. `edit-post` e `copy-post` sostituiscono il
@@ -129,8 +131,20 @@ più `*_raw`, comando CLI, test unit e contract).
 - RF-023. Anagrafiche admin: creazione, modifica, eliminazione e credenziali degli utenti;
   creazione, modifica, eliminazione e membri dei gruppi; creazione, modifica e flag `deleted` di
   cataloghi e voci; modifica del workspace.
-- RF-024. Upload di allegati: richiesta di un URL temporaneo di storage e caricamento del file,
-  propedeutico agli allegati dei post.
+- RF-024. Upload di allegati in due passi: `POST core/storage/upload-new-attachment` senza corpo
+  restituisce il riferimento (`contentRef`), l'URL dello storage temporaneo e i campi di una
+  policy firmata; il file si carica con un form multipart `POST` a quell'URL, con i campi della
+  policy prima del file (verificato sul tenant il 2026-10-10: il `PUT` è rifiutato).
+  `client.attachments.upload(file, *, name, mime_type)` esegue entrambi i passi e restituisce
+  `UploadedAttachment`, accettato dagli allegati delle scritture di post, commenti e task (nuova
+  versione con `as_version_of`); `request_upload_url()` espone il primo passo. Una risposta non
+  2xx dello storage è `UploadError`, timeout e rete `TransportError`; nessun nuovo tentativo.
+  *(Confermato dal maintainer il 2026-10-10, spec 04.)*
+  - RF-024a. In CLI: `attachments upload PATH`; `--attach PATH` ripetibile su
+    `posts create|comment|edit|copy` e `tasks create|edit`, accodato agli allegati di `--json`;
+    `posts edit-attachments` con `--add PATH`, `--remove ID`, `--update ID=PATH` (il server
+    mantiene l'id, incrementa la versione e applica il nome nuovo). `UploadError` esce con exit
+    code `11`; al primo upload fallito nessuna scrittura parte verso Interacta. *(Spec 04.)*
 - RF-025. Concorrenza ottimistica: dove l'API richiede un `occToken`, la libreria lo espone al
   chiamante e mappa il `409` su `ConcurrencyError`; non rilegge e non riprova da sola. Le
   operazioni distruttive nella CLI chiedono conferma esplicita. *(Confermato dal maintainer il
@@ -152,7 +166,10 @@ più `*_raw`, comando CLI, test unit e contract).
   valore e conserva nome e attributi (un header cookie non analizzabile con certezza è redatto per
   intero); i JWT sono sostituiti ovunque; i campi `token|password|secret|privatekey|assertion|jwt`
   dei body sono sostituiti da `***REDACTED***`. *(Confermato dal maintainer il 2026-10-08;
-  precisato dalla spec 01, che chiude P-01.)*
+  precisato dalla spec 01, che chiude P-01.)* Dalla spec 04 le chiavi sensibili dei body
+  comprendono anche `signature` e `policy`, e negli URL i parametri di query il cui nome
+  contiene `signature`, `token`, `secret`, `password` o `key` perdono il valore (nome e altri
+  parametri restano), ovunque si applica la redazione.
 - RNF-002. Cache del token su file con permessi POSIX stretti (`0o600` file, `0o700` cartella),
   lettura rifiutata se più larghi; su Windows avviso una tantum e raccomandazione di
   `token_cache = "memory"`.
@@ -175,6 +192,9 @@ più `*_raw`, comando CLI, test unit e contract).
   arrivano al server come data-ora locale più nome IANA del fuso (offset fisso → UTC); la CLI
   interpreta i valori senza offset nel fuso `--timezone` (predefinito `Europe/Rome`). *(Spec 02,
   2026-10-08.)*
+- RNF-011. Il contenuto dei file caricati non compare mai in log, audit log né hook, neppure con
+  `audit_log_bodies`: la richiesta allo storage è registrata con URL e stato, senza corpo, e non
+  porta il token Interacta. *(Spec 04, 2026-10-10.)*
 
 ## 5. Integrazioni esterne
 
@@ -205,7 +225,10 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
   allegati forniti dal chiamante. La libreria li inoltra al tenant così come li riceve; non li
   conserva e non li logga (eccezione: audit log con `audit_log_bodies`, come sopra). *(Confermato
   dal maintainer il 2026-10-08, spec 02: titolo e descrizione dei task, id di assegnatari e
-  watcher.)*
+  watcher.)* Gli allegati caricati (spec 04) passano dalla libreria allo storage temporaneo del
+  tenant così come il chiamante li fornisce, con nome e MIME; la libreria non li conserva né li
+  logga, e i file temporanei scadono con la policy del tenant. *(Confermato dal maintainer il
+  2026-10-10, spec 04.)*
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -237,3 +260,7 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
 - 2026-10-10: [spec 03](03-post-write/spec.md) (scrittura dei post custom, commenti e workflow,
   0.11.0): nuovi RF-006a, RF-021a, RF-021b, RF-021c, RF-021d; RF-021, RF-006, §5 (con "letture e
   scritture") e §7 confermati dal maintainer.
+- 2026-10-10: [spec 04](04-attachment-upload/spec.md) (upload degli allegati, 0.12.0): RF-024
+  precisato con il meccanismo verificato sul tenant (form multipart firmato); nuovi RF-024a e
+  RNF-011; RNF-001 precisato (firme e query sensibili); RF-021c aggiornato; RF-024 e la voce
+  "Dati scritti sul tenant" di §6 confermati dal maintainer.

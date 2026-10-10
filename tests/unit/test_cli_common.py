@@ -35,6 +35,7 @@ from pynteracta.exceptions import PermissionError as InteractaPermissionError
 from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO
 
 _EXIT_CONFLICT = 9
+_EXIT_UPLOAD = 11
 _HTTP_409 = 409
 
 
@@ -79,6 +80,40 @@ class TestErrorExitCode:
         assert exit_.exit_code == _EXIT_CONFLICT
         err = capsys.readouterr().err
         assert "Post 21269 changed since it was read: fetch it again and retry" in err
+
+
+class TestUploadErrorExit:
+    # criterio: 04-C15
+    def test_upload_error_is_11(self) -> None:
+        from pynteracta.exceptions import UploadError  # noqa: PLC0415
+
+        assert _common.EXIT_UPLOAD == _EXIT_UPLOAD
+        assert error_exit_code(UploadError("x", file_name="a.txt")) == _EXIT_UPLOAD
+
+    # criterio: 04-C15
+    def test_transport_error_is_7(self) -> None:
+        assert error_exit_code(TransportError("timed out")) == EXIT_TRANSPORT
+
+    # criterio: 04-C15
+    def test_handle_error_upload_prints_file_name_and_details(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pynteracta.exceptions import UploadError  # noqa: PLC0415
+
+        exc = UploadError(
+            "Upload of b.pdf failed",
+            status_code=400,
+            request_method="POST",
+            request_url="https://storage.example.com/bucket-test",
+            response_body="<Error><Code>InvalidPolicy</Code></Error>",
+            file_name="b.pdf",
+        )
+        exit_ = _common.handle_error(exc, console=Console())
+        assert exit_.exit_code == _EXIT_UPLOAD
+        err = capsys.readouterr().err
+        assert err.startswith("Error: Upload of b.pdf failed")
+        assert "Details: <Error><Code>InvalidPolicy</Code></Error>" in err
+        assert "Status: 400" in err
 
 
 class TestConfirmDestructive:

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -84,7 +84,21 @@ def zoned_datetime_input(value: datetime) -> dict[str, str]:
     return {"datetime": value.replace(tzinfo=None).isoformat(timespec="seconds"), "timezone": key}
 
 
+@runtime_checkable
+class WriteInput(Protocol):
+    """Un oggetto che sa come comparire nel corpo di una scrittura (spec 04).
+
+    :func:`build_write_body` lo sostituisce con il dict di :meth:`as_write_input`, anche dentro
+    le liste: per esempio un :class:`~pynteracta.models.facade.attachments.UploadedAttachment`
+    negli allegati di un post.
+    """
+
+    def as_write_input(self) -> dict[str, Any]: ...
+
+
 def _dump_value(value: Any) -> Any:
+    if isinstance(value, WriteInput):
+        return value.as_write_input()
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json", exclude_none=True)
     if isinstance(value, list):
@@ -95,8 +109,9 @@ def _dump_value(value: Any) -> Any:
 def build_write_body(**kwargs: Any) -> dict[str, Any]:
     """Costruisce il corpo di una scrittura dai kwargs: camelCase, solo i campi non ``None``.
 
-    I modelli pydantic (anche dentro le liste) sono dumpati senza i campi ``None``; dict e valori
-    semplici passano così come sono.
+    I modelli pydantic (anche dentro le liste) sono dumpati senza i campi ``None``; gli oggetti
+    :class:`WriteInput` diventano il loro ``as_write_input()``; dict e valori semplici passano
+    così come sono.
     """
     body: dict[str, Any] = {}
     for key, value in kwargs.items():

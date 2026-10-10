@@ -8,6 +8,7 @@ invia una sola richiesta di scrittura e non riprova mai: un ``409`` esce con il 
 from __future__ import annotations
 
 import json
+import pathlib
 from typing import Annotated, Any
 
 import typer
@@ -35,14 +36,19 @@ from pynteracta.cli._common import (
 )
 from pynteracta.cli._write import (
     DEFAULT_TIMEZONE,
+    AttachOption,
+    append_attachments,
     merge_body,
+    parse_id_path_pairs,
     parse_kv_values,
     parse_zoned_datetime,
+    upload_all,
     validate_body,
 )
 from pynteracta.cli.posts import app
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.posts_write import (
+    PostAttachmentsWriteResult,
     PostComment,
     PostForCopy,
     PostForCreate,
@@ -440,6 +446,7 @@ def posts_create(  # noqa: PLR0913
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
     client_uid: ClientUidOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -452,7 +459,9 @@ def posts_create(  # noqa: PLR0913
     Simple fields come from flags; attachments and non-scalar custom values from --json (file
     or '-' for stdin). Flags override the keys of the JSON body; customData is merged field by
     field. Only the fields given are sent, plus 'announcement' (false unless --announcement).
-    Validation errors from the server (e.g. a bad custom value) exit with code 6.
+    --attach uploads files and appends them to the attachments of --json; a failed upload exits
+    with code 11 and the post is not created. Validation errors from the server (e.g. a bad
+    custom value) exit with code 6.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -478,9 +487,11 @@ def posts_create(  # noqa: PLR0913
     merged.setdefault("announcement", False)
     if custom_flags or "customData" in json_part:
         merged["customData"] = merge_custom_data({}, json_part, custom_flags)
-    req = validate_body(merged, CreateCustomPostRequest)
+    validate_body(merged, CreateCustomPostRequest)
     try:
         with build_client(state) as client:
+            append_attachments(merged, "attachments", upload_all(client, attach))
+            req = validate_body(merged, CreateCustomPostRequest)
             result = client.posts.create_raw(community_id, req)
         _render_single(
             state,
@@ -511,6 +522,7 @@ def posts_comment(  # noqa: PLR0913
         int | None, typer.Option("--parent", help="ID of the comment this one replies to.")
     ] = None,
     client_uid: ClientUidOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -521,7 +533,8 @@ def posts_comment(  # noqa: PLR0913
     """Add a comment to a post.
 
     --text sends a plain-text comment; --json takes the full body (e.g. a rich-text delta or
-    attachments). One of the two is required.
+    attachments). One of the two is required. --attach uploads files and attaches them; a
+    failed upload exits with code 11 and the comment is not sent.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -537,9 +550,11 @@ def posts_comment(  # noqa: PLR0913
         parent_comment_id=parent,
         client_uid=client_uid,
     )
-    req = validate_body(merged, CreatePostCommentRequestDTO)
+    validate_body(merged, CreatePostCommentRequestDTO)
     try:
         with build_client(state) as client:
+            append_attachments(merged, "attachments", upload_all(client, attach))
+            req = validate_body(merged, CreatePostCommentRequestDTO)
             comment = client.posts.add_comment_raw(post_id, req)
         _render_single(
             state,
@@ -684,6 +699,7 @@ def posts_edit(  # noqa: PLR0913
     scheduled_publication: ScheduledPublicationOption = None,
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -698,8 +714,9 @@ def posts_edit(  # noqa: PLR0913
     --json over the post as read; customData is merged field by field). --description
     replaces the description with plain text. --watcher-user adds watchers,
     --remove-watcher-user removes them. The concurrency token is the one just read, or
-    --occ-token. If the post changed since it was read the command exits with code 9 and never
-    retries.
+    --occ-token. --attach uploads files and adds them to the post (a failed upload exits with
+    code 11 and the post is not changed). If the post changed since it was read the command
+    exits with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -727,6 +744,8 @@ def posts_edit(  # noqa: PLR0913
                 scheduled_publication=scheduled,
                 workflow_init_state_id=workflow_init_state,
             )
+            validate_body(merged, EditCustomPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
             req = validate_body(merged, EditCustomPostRequestDTO)
             result = client.posts.edit_raw(post_id, token, req)
         _render_single(
@@ -813,6 +832,7 @@ def posts_copy(  # noqa: PLR0913
     scheduled_publication: ScheduledPublicationOption = None,
     timezone: TimezoneOption = DEFAULT_TIMEZONE,
     workflow_init_state: WorkflowInitStateOption = None,
+    attach: AttachOption = None,
     json_body: JsonBodyOption = None,
     output: OutputOption = None,
     full: FullOption = False,
@@ -823,8 +843,9 @@ def posts_copy(  # noqa: PLR0913
     """Copy a custom post into a new one, changing the fields you mention.
 
     The post is read first (post-data-for-copy); title, description, custom data, visibility
-    and announcement are copied unless a flag or --json overrides them. The result shows the
-    new post. A 409 exits with code 9 and is never retried.
+    and announcement are copied unless a flag or --json overrides them. --attach uploads files
+    and adds them to the copy (a failed upload exits with code 11 and nothing is copied). The
+    result shows the new post. A 409 exits with code 9 and is never retried.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -852,6 +873,8 @@ def posts_copy(  # noqa: PLR0913
                 scheduled_publication=scheduled,
                 workflow_init_state_id=workflow_init_state,
             )
+            validate_body(merged, CopyCustomPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
             req = validate_body(merged, CopyCustomPostRequestDTO)
             result = client.posts.copy_raw(post_id, token, req)
         _render_single(
@@ -905,6 +928,97 @@ def posts_edit_watchers(
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
+
+
+def _attachment_labels(items: list[Any]) -> str:
+    """``"4 allegato.pdf, 5 b.pdf"``: id e nome degli allegati scritti."""
+    return ", ".join(f"{item.id} {item.name}" for item in items)
+
+
+def attachments_write_row(obj: object) -> dict[str, object]:
+    """Riga curata di ``posts edit-attachments``: post, allegati aggiunti, aggiornati e tolti."""
+    result = obj if isinstance(obj, PostAttachmentsWriteResult) else None
+    if result is None:
+        return {}
+    return {
+        "post_id": result.post_id,
+        "added": _attachment_labels(result.added),
+        "updated": _attachment_labels(result.updated),
+        "removed_ids": ", ".join(str(i) for i in result.removed_ids),
+    }
+
+
+@app.command("edit-attachments")
+def posts_edit_attachments(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Post ID.")],
+    add: Annotated[
+        list[pathlib.Path] | None,
+        typer.Option(
+            "--add",
+            help="File to upload and add (repeatable).",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ] = None,
+    update: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--update",
+            help="ID=PATH: upload PATH as a new version of attachment ID (repeatable).",
+        ),
+    ] = None,
+    remove: Annotated[
+        list[int] | None,
+        typer.Option("--remove", help="Attachment ID to remove (repeatable)."),
+    ] = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Add, replace or remove the attachments of a post (no concurrency token needed).
+
+    --add uploads a file and attaches it; --update ID=PATH uploads PATH as a new version of
+    attachment ID; --remove drops an attachment. Files are uploaded first, in order; if one is
+    rejected the command exits with code 11 and the post is not changed. Then one request
+    applies all the changes.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    if not add and not update and not remove:
+        typer.echo("--add, --remove or --update is required.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    pairs = parse_id_path_pairs(update, option="--update")
+    for _, path in pairs:
+        if not path.is_file():
+            raise typer.BadParameter(f"--update: file not found: {path}")
+    try:
+        with build_client(state) as client:
+            added = upload_all(client, add)
+            updated = [client.attachments.upload(path).as_version_of(i) for i, path in pairs]
+            result = client.posts.edit_attachments(
+                post_id, add=added or None, update=updated or None, remove_ids=remove or None
+            )
+        _render_single(
+            state,
+            output,
+            result,
+            attachments_write_row,
+            title=f"Attachments of post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
 
 
 YesOption = Annotated[bool, typer.Option("--yes", "-y", help="Do not ask for confirmation.")]

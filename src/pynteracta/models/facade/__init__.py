@@ -12,6 +12,8 @@ from pynteracta.models.facade.attachments import (
     AttachmentVisibility,
     PostAttachment,
     PostAttachmentList,
+    UploadedAttachment,
+    UploadTicket,
 )
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
@@ -139,6 +141,8 @@ __all__ = [
     "Task",
     "TaskCapabilities",
     "TaskReminder",
+    "UploadTicket",
+    "UploadedAttachment",
     "UserCredentialsForEdit",
     "UserForEdit",
     "UserProfile",

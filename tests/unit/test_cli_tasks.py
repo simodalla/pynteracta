@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import pathlib
 
+import httpx
 import pytest
 import respx
 from api_helpers import load_payload, mock_json
@@ -622,3 +623,48 @@ class TestTasksDelete:
         result = runner.invoke(app, ["tasks", "delete", str(_TASK_ID), "--yes"], env=BASE_ENV)
         assert result.exit_code == 5  # noqa: PLR2004
         assert delete_route.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: --attach sui comandi dei task
+# ---------------------------------------------------------------------------
+
+_UPLOAD_PATH = "core/storage/upload-new-attachment"
+_STORAGE_URL = "https://storage.example.com/bucket-test"
+
+
+class TestTasksAttach:
+    def _attach(self, tmp_path: pathlib.Path) -> tuple[str, dict[str, str]]:
+        payload = load_payload("upload_new_attachment_response.json")
+        mock_json("POST", _UPLOAD_PATH, payload)
+        respx.post(_STORAGE_URL).mock(return_value=httpx.Response(204))
+        path = tmp_path / "a.txt"
+        path.write_bytes(b"contenuto")
+        return str(path), {"name": "a.txt", "contentRef": payload["contentRef"]}
+
+    # criterio: 04-C12
+    @respx.mock
+    def test_create_attachments(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        path, ref = self._attach(tmp_path)
+        route = mock_json("POST", _TASKS_CREATE_PATH, load_payload("create_task_response.json"))
+        result = runner.invoke(
+            app,
+            ["tasks", "create", str(_POST_ID), "--title", "T", "--attach", path],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["attachments"] == [ref]
+
+    # criterio: 04-C12
+    @respx.mock
+    def test_edit_add_attachments(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        path, ref = self._attach(tmp_path)
+        mock_json("GET", _TASKS_GET_PATH, load_payload("get_task_detail_response.json"))
+        route = mock_json(
+            "PUT", _edit_path(_FIXTURE_OCC_TOKEN), load_payload("edit_task_response.json")
+        )
+        result = runner.invoke(
+            app, ["tasks", "edit", str(_TASK_ID), "--attach", path], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["addAttachments"] == [ref]

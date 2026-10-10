@@ -28,6 +28,42 @@ class TestRedactString:
     def test_empty_string(self) -> None:
         assert redact_string("") == ""
 
+    # Caratterizzazione (04-T02): una query senza nomi sensibili resta identica.
+    # criterio: 04-C08
+    def test_url_query_without_sensitive_names_untouched(self) -> None:
+        url = "https://x.example.com/p?loadViewLink=true&pageSize=10"
+        assert redact_string(url) == url
+
+    # criterio: 04-C08
+    def test_signed_query_params_redacted(self) -> None:
+        url = (
+            "https://storage.example.com/bucket-test/temporary-uploads/abc"
+            "?GoogleAccessId=fake@test.iam.gserviceaccount.com&Expires=1791633600"
+            "&Signature=FAKE-DOWNLOAD-SIGNATURE"
+        )
+        result = redact_string(url)
+        assert "FAKE-DOWNLOAD-SIGNATURE" not in result
+        assert result == (
+            "https://storage.example.com/bucket-test/temporary-uploads/abc"
+            "?GoogleAccessId=fake@test.iam.gserviceaccount.com&Expires=1791633600"
+            f"&Signature={_REDACTED}"
+        )
+
+    # criterio: 04-C08
+    @pytest.mark.parametrize(
+        "name", ["Signature", "X-Goog-Signature", "access_token", "apiKey", "secret", "password"]
+    )
+    def test_sensitive_query_names_redacted(self, name: str) -> None:
+        result = redact_string(f"https://x.example.com/p?a=1&{name}=VALUE123&b=2")
+        assert result == f"https://x.example.com/p?a=1&{name}={_REDACTED}&b=2"
+
+    # criterio: 04-C08
+    def test_sensitive_query_inside_text(self) -> None:
+        text = "GET https://x.example.com/f?Signature=ABC%2Fdef failed (403)"
+        assert (
+            redact_string(text) == f"GET https://x.example.com/f?Signature={_REDACTED} failed (403)"
+        )
+
 
 class TestRedactHeaders:
     def test_authorization_always_redacted(self) -> None:
@@ -190,6 +226,32 @@ class TestRedactBody:
         assert isinstance(result, dict)
         assert fake_jwt not in result["description"]
         assert _REDACTED in result["description"]
+
+    # criterio: 04-C08
+    def test_signature_and_policy_keys_redacted(self) -> None:
+        body = {
+            "contentRef": "abc",
+            "uploadMultipartRequestBodyParams": {
+                "GoogleAccessId": "fake@test.iam.gserviceaccount.com",
+                "key": "temporary-uploads/abc",
+                "policy": "eyJleHBpcmF0aW9uIjoiMjAyNiJ9",
+                "signature": "FAKE-SIGNATURE",
+            },
+        }
+        result = redact_body(body)
+        params = result["uploadMultipartRequestBodyParams"]
+        assert params["policy"] == _REDACTED
+        assert params["signature"] == _REDACTED
+        assert params["key"] == "temporary-uploads/abc"
+        assert result["contentRef"] == "abc"
+
+    # criterio: 04-C08
+    def test_download_url_leaf_string_redacted(self) -> None:
+        body = {"temporaryDownloadUrl": "https://s.example.com/f?Expires=1&Signature=SIG"}
+        result = redact_body(body)
+        assert result == {
+            "temporaryDownloadUrl": f"https://s.example.com/f?Expires=1&Signature={_REDACTED}"
+        }
 
     def test_deeply_nested_sensitive_key(self) -> None:
         body = {"outer": {"inner": {"secret": "xyz"}}}

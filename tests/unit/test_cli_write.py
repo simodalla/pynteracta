@@ -8,11 +8,22 @@ spostati in ``cli/_write.py``.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import typer
 
-from pynteracta.cli._write import merge_body, parse_kv_values, validate_body
+from pynteracta.cli._write import (
+    append_attachments,
+    merge_body,
+    parse_id_path_pairs,
+    parse_kv_values,
+    upload_all,
+    validate_body,
+)
 from pynteracta.cli._write import parse_zoned_datetime as _parse_zoned_datetime
+from pynteracta.exceptions import UploadError
 from pynteracta.models.generated.external_v2 import CreateTaskRequestDTO
 
 _EXIT_CONFIG = 2
@@ -90,3 +101,95 @@ class TestParseKvValues:
     def test_missing_eq_raises(self) -> None:
         with pytest.raises(typer.BadParameter, match="--screen-data"):
             parse_kv_values(["5"], option="--screen-data")
+
+
+# ---------------------------------------------------------------------------
+# Spec 04: helper per --attach e posts edit-attachments
+# ---------------------------------------------------------------------------
+
+
+class _FakeUploaded:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def as_write_input(self) -> dict[str, str]:
+        return {"name": self.name, "contentRef": f"ref-{self.name}"}
+
+
+class _FakeAttachments:
+    def __init__(self, fail_on: str | None = None) -> None:
+        self.calls: list[str] = []
+        self.fail_on = fail_on
+
+    def upload(self, path: Path) -> _FakeUploaded:
+        self.calls.append(path.name)
+        if path.name == self.fail_on:
+            raise UploadError(f"Upload of {path.name} failed", file_name=path.name)
+        return _FakeUploaded(path.name)
+
+
+class _FakeClient:
+    def __init__(self, fail_on: str | None = None) -> None:
+        self.attachments = _FakeAttachments(fail_on)
+
+
+class TestUploadAll:
+    # criterio: 04-C11
+    def test_uploads_in_order(self) -> None:
+        client = _FakeClient()
+        items = upload_all(client, [Path("a.txt"), Path("b.pdf")])  # type: ignore[arg-type]
+        assert client.attachments.calls == ["a.txt", "b.pdf"]
+        assert items == [
+            {"name": "a.txt", "contentRef": "ref-a.txt"},
+            {"name": "b.pdf", "contentRef": "ref-b.pdf"},
+        ]
+
+    # criterio: 04-C14
+    def test_first_error_propagates_and_stops(self) -> None:
+        client = _FakeClient(fail_on="b.pdf")
+        with pytest.raises(UploadError):
+            upload_all(client, [Path("a.txt"), Path("b.pdf"), Path("c.txt")])  # type: ignore[arg-type]
+        assert client.attachments.calls == ["a.txt", "b.pdf"]
+
+    # criterio: 04-C11
+    def test_none_gives_empty_list(self) -> None:
+        assert upload_all(_FakeClient(), None) == []  # type: ignore[arg-type]
+
+
+class TestAppendAttachments:
+    # criterio: 04-C11
+    def test_key_absent(self) -> None:
+        merged: dict[str, Any] = {"title": "T"}
+        append_attachments(merged, "attachments", [{"name": "a"}])
+        assert merged == {"title": "T", "attachments": [{"name": "a"}]}
+
+    # criterio: 04-C11
+    def test_key_present_items_appended(self) -> None:
+        merged: dict[str, Any] = {"attachments": [{"attachmentId": 3}]}
+        append_attachments(merged, "attachments", [{"name": "a"}])
+        assert merged == {"attachments": [{"attachmentId": 3}, {"name": "a"}]}
+
+    # criterio: 04-C11
+    def test_empty_items_leave_body_unchanged(self) -> None:
+        merged: dict[str, Any] = {"title": "T"}
+        append_attachments(merged, "addAttachments", [])
+        assert merged == {"title": "T"}
+
+
+class TestParseIdPathPairs:
+    # criterio: 04-C13
+    def test_valid(self) -> None:
+        assert parse_id_path_pairs(["5=b.pdf", "6=dir/c=d.txt"], option="--update") == [
+            (5, Path("b.pdf")),
+            (6, Path("dir/c=d.txt")),
+        ]
+
+    # criterio: 04-C13
+    def test_none_is_empty(self) -> None:
+        assert parse_id_path_pairs(None, option="--update") == []
+
+    # criterio: 04-C13
+    @pytest.mark.parametrize("value", ["b.pdf", "x=b.pdf", "=b.pdf", "5="])
+    def test_malformed_raises_bad_parameter(self, value: str) -> None:
+        with pytest.raises(typer.BadParameter, match="--update"):
+            parse_id_path_pairs([value], option="--update")

@@ -157,7 +157,9 @@ class PostsWriteAPI(ResourceClient):
             description_format: ``1`` = Quill delta (default del server), ``2`` = testo semplice.
             custom_data: Campi custom, per id del campo (per esempio ``{"1411": 226}``).
             delta_area_format: Formato dei campi custom di tipo delta (``1`` delta, ``2`` testo).
-            attachments: Allegati già noti al server, nella forma di ``InputPostAttachmentDTO``.
+            attachments: Allegati: :class:`~pynteracta.models.facade.attachments.UploadedAttachment`
+                appena caricati con ``client.attachments.upload``, oppure riferimenti già noti al
+                server nella forma di ``InputPostAttachmentDTO`` (dict o modello).
             watcher_user_ids: Utenti osservatori.
             workflow_init_state_id: Stato iniziale del workflow, se la community lo permette.
             visibility: ``1`` privato, ``2`` pubblico.
@@ -231,9 +233,10 @@ class PostsWriteAPI(ResourceClient):
             description_format: ``1`` = Quill delta, ``2`` = testo semplice.
             custom_data: Campi custom, per id del campo.
             delta_area_format: Formato dei campi custom di tipo delta.
-            add_attachments: Allegati da aggiungere (``InputPostAttachmentDTO``, già noti al
-                server).
-            update_attachments: Allegati da aggiornare (con ``contentRef`` = nuova versione).
+            add_attachments: Allegati da aggiungere: ``UploadedAttachment`` o
+                ``InputPostAttachmentDTO``.
+            update_attachments: Allegati da aggiornare (con ``contentRef`` = nuova versione,
+                per esempio ``uploaded.as_version_of(attachment_id)``).
             remove_attachment_ids: Allegati da togliere.
             add_watcher_user_ids: Utenti osservatori da aggiungere.
             remove_watcher_user_ids: Utenti osservatori da togliere.
@@ -409,13 +412,16 @@ class PostsWriteAPI(ResourceClient):
     ) -> PostAttachmentsWriteResult:
         """PUT ``/communication/posts/manage/edit-post-attachments/{postId}``.
 
-        Accetta solo allegati già noti al server (``attachmentId``, oppure ``name`` +
-        ``contentRef``): l'upload di file nuovi non fa parte di questa libreria (RF-024).
+        Accetta allegati appena caricati
+        (:class:`~pynteracta.models.facade.attachments.UploadedAttachment`, da
+        ``client.attachments.upload``) e riferimenti già noti al server (``attachmentId``,
+        oppure ``name`` + ``contentRef``).
 
         Args:
             post_id: Il post.
-            add: Allegati da aggiungere, nella forma di ``InputPostAttachmentDTO``.
-            update: Allegati da aggiornare (con ``contentRef`` = nuova versione).
+            add: Allegati da aggiungere: ``UploadedAttachment`` o ``InputPostAttachmentDTO``.
+            update: Allegati da aggiornare (con ``contentRef`` = nuova versione, per esempio
+                ``uploaded.as_version_of(attachment_id)``).
             remove_ids: Id degli allegati da togliere.
 
         Returns:
@@ -477,7 +483,7 @@ class PostsWriteAPI(ResourceClient):
             comment: Testo, nel formato di ``comment_format``.
             comment_format: ``1`` = Quill delta (default del server), ``2`` = testo semplice.
             client_uid: Identificativo scelto dal chiamante.
-            attachments: Allegati già noti al server (``InputPostCommentAttachmentDTO``).
+            attachments: Allegati: ``UploadedAttachment`` o ``InputPostCommentAttachmentDTO``.
             parent_comment_id: Commento a cui si risponde.
 
         Returns:

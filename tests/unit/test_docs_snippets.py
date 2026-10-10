@@ -195,3 +195,39 @@ def test_posts_pages_document_references_and_replacement() -> None:
     cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
     for needle in ("as ids", "Quill delta", "deltaAreaFormat"):
         assert needle in cli, f"'{needle}' missing from docs/cli.md"
+
+
+# criterio: 04-C17
+def test_attachments_pages_document_upload() -> None:
+    """Le pagine documentano l'upload, --attach, posts edit-attachments, l'exit code 11 e la
+    redazione dei link firmati; home e README non mettono più l'upload tra ciò che manca."""
+    api = (_ROOT / "docs" / "api" / "attachments.md").read_text(encoding="utf-8")
+    for needle in (
+        "upload(",
+        "request_upload_url",
+        "UploadedAttachment",
+        "as_version_of",
+        "UploadError",
+        "timeout_seconds",
+    ):
+        assert needle in api, f"'{needle}' missing from docs/api/attachments.md"
+    for name in ("posts.md", "tasks.md"):
+        text = (_ROOT / "docs" / "api" / name).read_text(encoding="utf-8")
+        assert "UploadedAttachment" in text, f"'UploadedAttachment' missing from docs/api/{name}"
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in ("attachments upload", "--attach", "posts edit-attachments", "--update"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    assert "| 11 |" in cli, "exit code 11 missing from the exit-code table in docs/cli.md"
+    assert "not yet from the CLI" not in cli
+    logging_page = (_ROOT / "docs" / "logging.md").read_text(encoding="utf-8")
+    guarantees = logging_page.split("## Redaction guarantees", 1)[1].split("\n## ", 1)[0]
+    for needle in ("signature", "policy", "Signature="):
+        assert needle in guarantees, f"'{needle}' missing from the redaction guarantees"
+    for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
+        text = page.read_text(encoding="utf-8")
+        assert "attachment upload" in text.lower(), f"attachment upload missing from {page.name}"
+        for line in text.splitlines():
+            lowered = line.lower()
+            if "attachment upload" in lowered:
+                assert "follow" not in lowered, f"{page.name} still lists upload as future"
+                assert "planned" not in lowered, f"{page.name} still lists upload as planned"

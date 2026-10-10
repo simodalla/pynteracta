@@ -52,8 +52,9 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 | **0.9.4** | PyPI publication: trusted-publishing job + rewrite compatibility note (patch) | M26 | ✅ Shipped 2026-09-12 | [specs/legacy/v0.9.4-pypi-publication.md](specs/legacy/v0.9.4-pypi-publication.md) |
 | **0.10.0** | Task write: create, edit, delete (first write group, ADR 0001); ships with the M27 audit-log redaction fix (P-01) | M27–M28 | ✅ Shipped 2026-10-09 | [specs/02-task-write/spec.md](specs/02-task-write/spec.md), [specs/01-redazione-cookie-header/spec.md](specs/01-redazione-cookie-header/spec.md) |
 | **0.11.0** | Post write: custom posts, comments and workflow (second write group, ADR 0001) | M29 | ✅ Shipped 2026-10-10 | [specs/03-post-write/spec.md](specs/03-post-write/spec.md) |
+| **0.12.0** | Attachment upload: temporary storage URL, signed multipart upload, `--attach` and `posts edit-attachments` (third write group, ADR 0001) | M30 | ⏳ In progress | [specs/04-attachment-upload/spec.md](specs/04-attachment-upload/spec.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M29). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M30). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line)

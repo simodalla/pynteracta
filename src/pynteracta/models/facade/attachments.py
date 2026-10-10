@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Facade models for the attachments endpoints."""
+"""Facade models for the attachments endpoints: letture e upload (spec 04)."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from pynteracta.models.generated import external_v2 as generated
 
@@ -285,3 +287,95 @@ class AttachmentVisibility:
         """
         raw = generated.CheckVisibilityResponseDTO.model_validate(data)
         return cls(raw)
+
+
+class UploadTicket:
+    """Façade sulla risposta di ``core/storage/upload-new-attachment`` (spec 04).
+
+    È il primo passo dell'upload: il riferimento del file nello storage temporaneo, l'URL a cui
+    caricarlo e i campi della policy firmata da inviare nel form multipart.
+
+    Attributes:
+        raw: Il ``GetTemporaryImageUploadUrlBaseResponseDTO`` generato.
+    """
+
+    def __init__(self, raw: generated.GetTemporaryImageUploadUrlBaseResponseDTO) -> None:
+        self.raw = raw
+        self._form_params = dict(raw.uploadMultipartRequestBodyParams or {})
+
+    @property
+    def content_ref(self) -> str | None:
+        """Riferimento del file nello storage, da passare nelle scritture come ``contentRef``."""
+        return self.raw.contentRef
+
+    @property
+    def upload_url(self) -> str | None:
+        """URL dello storage a cui inviare il form multipart."""
+        return self.raw.uploadUrl
+
+    @property
+    def form_params(self) -> dict[str, str]:
+        """Campi della policy firmata, da inviare prima del file (una copia: ``{}`` se assenti).
+
+        Contengono credenziali temporanee: non vanno loggati.
+        """
+        return self._form_params
+
+    @property
+    def temporary_download_url(self) -> str | None:
+        """URL firmato da cui rileggere il file caricato, finché la firma non scade."""
+        return self.raw.temporaryDownloadUrl
+
+    @classmethod
+    def from_dict(cls, data: dict) -> UploadTicket:  # type: ignore[type-arg]
+        """Legge la risposta di ``upload-new-attachment``."""
+        return cls(generated.GetTemporaryImageUploadUrlBaseResponseDTO.model_validate(data))
+
+
+class UploadedAttachment:
+    """Un file caricato nello storage temporaneo, pronto da allegare (spec 04).
+
+    Si passa direttamente agli ``attachments`` (o ``add_attachments``, ``add``) dei metodi di
+    scrittura di post, commenti e task, che lo inviano come ``{name, contentRef}``; per caricare
+    una nuova versione di un allegato esistente si usa :meth:`as_version_of`.
+
+    Attributes:
+        raw: Il ``GetTemporaryImageUploadUrlBaseResponseDTO`` del primo passo.
+    """
+
+    def __init__(self, ticket: UploadTicket, *, name: str, mime_type: str) -> None:
+        self.raw = ticket.raw
+        self._ticket = ticket
+        self._name = name
+        self._mime_type = mime_type
+
+    @property
+    def content_ref(self) -> str | None:
+        """Riferimento del file nello storage."""
+        return self._ticket.content_ref
+
+    @property
+    def name(self) -> str:
+        """Nome con cui il file è stato caricato."""
+        return self._name
+
+    @property
+    def mime_type(self) -> str:
+        """MIME con cui il file è stato caricato."""
+        return self._mime_type
+
+    @property
+    def temporary_download_url(self) -> str | None:
+        """URL firmato da cui rileggere il file caricato."""
+        return self._ticket.temporary_download_url
+
+    def as_write_input(self) -> dict[str, Any]:
+        """Il riferimento da allegare: ``{"name", "contentRef"}``."""
+        return {"name": self._name, "contentRef": self.content_ref}
+
+    def as_version_of(self, attachment_id: int) -> dict[str, Any]:
+        """Il riferimento come nuova versione dell'allegato ``attachment_id``.
+
+        Va in ``update_attachments`` (o ``update`` di ``edit_attachments``).
+        """
+        return {"attachmentId": attachment_id, "contentRef": self.content_ref, "name": self._name}

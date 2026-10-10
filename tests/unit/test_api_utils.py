@@ -62,3 +62,36 @@ class TestBuildWriteBody:
             "subTasks": [{"description": "x"}, {"description": "y", "state": 1}],
             "expiration": {"datetime": "2026-12-31T18:00:00", "timezone": "Europe/Rome"},
         }
+
+
+class _Ref:
+    """Oggetto qualsiasi che implementa il protocollo ``WriteInput``."""
+
+    def as_write_input(self) -> dict[str, str]:
+        return {"name": "a.txt", "contentRef": "abc"}
+
+
+class TestWriteInput:
+    # criterio: 04-C07
+    def test_write_input_objects_are_converted(self) -> None:
+        body = build_write_body(
+            attachments=[
+                {"attachmentId": 3},
+                _Ref(),
+                generated.InputPostAttachmentDTO1(attachmentId=4),
+            ]
+        )
+        assert body == {
+            "attachments": [
+                {"attachmentId": 3},
+                {"name": "a.txt", "contentRef": "abc"},
+                {"attachmentId": 4},
+            ]
+        }
+
+    # criterio: 04-C07
+    def test_protocol_is_runtime_checkable(self) -> None:
+        from pynteracta.api._utils import WriteInput  # noqa: PLC0415
+
+        assert isinstance(_Ref(), WriteInput)
+        assert not isinstance({"a": 1}, WriteInput)

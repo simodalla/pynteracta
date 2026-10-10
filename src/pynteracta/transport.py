@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import sys
 import time
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, BinaryIO
 
 import httpx
 import structlog
@@ -20,6 +20,7 @@ from pynteracta.exceptions import (
     NotFoundError,
     ServerError,
     TransportError,
+    UploadError,
     ValidationError,
 )
 
@@ -115,17 +116,93 @@ class HttpTransport:
         """
         url = f"{self._base_url}/{path.lstrip('/')}"
         headers = self._build_headers()
-
-        redacted_headers = redact_headers(headers)
         redacted_url = redact_string(url)
-        req_body = redact_body(json) if (self._audit and self._audit_bodies) else None
+        capture_body = self._audit and self._audit_bodies
+        req_body = redact_body(json) if capture_body else None
 
-        req_info = RequestInfo(
-            method=method,
-            url=redacted_url,
-            headers=redacted_headers,
-            body=req_body,
+        self._emit_request(method, redacted_url, headers, req_body)
+        response, elapsed_ms = self._send(
+            method, url, redacted_url=redacted_url, headers=headers, params=params, json=json
         )
+        self._emit_response(response, redacted_url, elapsed_ms, capture_body=capture_body)
+
+        if response.is_success:
+            return response
+
+        mapped = self._map_error(response, redacted_url)
+        if self._hooks is not None:
+            self._hooks.on_error(mapped)
+        raise mapped
+
+    def post_multipart(
+        self,
+        url: str,
+        *,
+        fields: Mapping[str, str],
+        file_name: str,
+        content: BinaryIO,
+        content_type: str,
+    ) -> httpx.Response:
+        """Carica un file con un form multipart ``POST`` su un URL assoluto (spec 04).
+
+        Serve al secondo passo dell'upload: lo storage del tenant accetta i campi della policy
+        firmata seguiti dal campo ``file``. La richiesta porta solo lo ``User-Agent``, mai il
+        token Interacta. Passa da log, audit e hook come le altre, con l'URL redatto e il corpo
+        sempre assente: né i byte del file né i campi del form vi compaiono, neppure con
+        ``audit_bodies``. Una sola richiesta: una risposta non 2xx diventa :class:`UploadError`,
+        timeout ed errori di rete :class:`TransportError`.
+        """
+        headers = {"User-Agent": self._user_agent}
+        redacted_url = redact_string(url)
+        self._emit_request("POST", redacted_url, headers, None)
+        response, elapsed_ms = self._send(
+            "POST",
+            url,
+            redacted_url=redacted_url,
+            headers=headers,
+            data=dict(fields),
+            files={"file": (file_name, content, content_type)},
+        )
+        self._emit_response(response, redacted_url, elapsed_ms, capture_body=False)
+        if response.is_success:
+            return response
+        _log.warning(
+            "http.error", status=response.status_code, error_type="upload_error", url=redacted_url
+        )
+        err = UploadError(
+            f"Upload of {file_name} failed",
+            status_code=response.status_code,
+            request_method="POST",
+            request_url=redacted_url,
+            response_body=response.text or None,
+            file_name=file_name,
+        )
+        if self._hooks is not None:
+            self._hooks.on_error(err)
+        raise err
+
+    def close(self) -> None:
+        """Close the underlying ``httpx.Client``."""
+        self._client.close()
+
+    def __enter__(self) -> HttpTransport:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _emit_request(
+        self, method: str, redacted_url: str, headers: dict[str, str], body: Any
+    ) -> None:
+        """Log di debug, evento ``audit.request`` e hook ``on_request`` di una richiesta.
+
+        ``redacted_url`` e ``body`` arrivano già redatti; gli header si redigono qui.
+        """
+        redacted_headers = redact_headers(headers)
         _log.debug("http.request", method=method, url=redacted_url)
         if self._audit:
             _audit_log.debug(
@@ -133,14 +210,31 @@ class HttpTransport:
                 method=method,
                 url=redacted_url,
                 headers=redacted_headers,
-                body=req_body,
+                body=body,
             )
         if self._hooks is not None:
-            self._hooks.on_request(req_info)
+            self._hooks.on_request(
+                RequestInfo(method=method, url=redacted_url, headers=redacted_headers, body=body)
+            )
 
+    def _send(  # noqa: PLR0913
+        self,
+        method: str,
+        url: str,
+        *,
+        redacted_url: str,
+        headers: dict[str, str],
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+        data: dict[str, str] | None = None,
+        files: Any = None,
+    ) -> tuple[httpx.Response, float]:
+        """Invia la richiesta una sola volta; timeout e rete diventano :class:`TransportError`."""
         try:
             start = time.perf_counter()
-            response = self._client.request(method, url, headers=headers, params=params, json=json)
+            response = self._client.request(
+                method, url, headers=headers, params=params, json=json, data=data, files=files
+            )
             elapsed_ms = (time.perf_counter() - start) * 1000.0
         except httpx.TimeoutException as exc:
             _log.warning("http.error", error_type="timeout", message=str(exc))
@@ -154,23 +248,24 @@ class HttpTransport:
             if self._hooks is not None:
                 self._hooks.on_error(err)
             raise err from exc
+        return response, elapsed_ms
 
+    def _emit_response(
+        self,
+        response: httpx.Response,
+        redacted_url: str,
+        elapsed_ms: float,
+        *,
+        capture_body: bool,
+    ) -> None:
+        """Log di debug, evento ``audit.response`` e hook ``on_response`` di una risposta."""
         request_id = response.headers.get("x-request-id")
-        capture_body = self._audit and self._audit_bodies
         resp_body = self._capture_response_body(response) if capture_body else None
         # Redact before either consumer sees the values: the hooks channel cannot be scrubbed by
         # any logging configuration, and the library never configures logging on the caller's
         # behalf, so the transport is the only place that can hold the guarantee.
         redacted_resp_headers = redact_headers(response.headers)
         redacted_resp_body = redact_body(resp_body) if resp_body is not None else None
-        resp_info = ResponseInfo(
-            status_code=response.status_code,
-            url=redacted_url,
-            headers=redacted_resp_headers,
-            elapsed_ms=elapsed_ms,
-            request_id=request_id,
-            body=redacted_resp_body,
-        )
         _log.debug(
             "http.response",
             status=response.status_code,
@@ -187,29 +282,16 @@ class HttpTransport:
                 body=redacted_resp_body,
             )
         if self._hooks is not None:
-            self._hooks.on_response(resp_info)
-
-        if response.is_success:
-            return response
-
-        mapped = self._map_error(response, redacted_url)
-        if self._hooks is not None:
-            self._hooks.on_error(mapped)
-        raise mapped
-
-    def close(self) -> None:
-        """Close the underlying ``httpx.Client``."""
-        self._client.close()
-
-    def __enter__(self) -> HttpTransport:
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        self.close()
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
+            self._hooks.on_response(
+                ResponseInfo(
+                    status_code=response.status_code,
+                    url=redacted_url,
+                    headers=redacted_resp_headers,
+                    elapsed_ms=elapsed_ms,
+                    request_id=request_id,
+                    body=redacted_resp_body,
+                )
+            )
 
     def _build_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {"User-Agent": self._user_agent}

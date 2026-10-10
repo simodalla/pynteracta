@@ -67,3 +67,16 @@ class ServerError(InteractaError):
 
 class TransportError(InteractaError):
     """Network failures, timeouts, DNS, TLS."""
+
+
+class UploadError(InteractaError):
+    """Lo storage ha rifiutato il caricamento di un file (risposta non 2xx, spec 04).
+
+    ``response_body`` è il corpo della risposta dello storage così com'è (di solito XML);
+    ``request_url`` è l'URL di storage redatto; ``request_id`` è assente. ``file_name`` è il nome
+    del file che non è stato caricato. Timeout ed errori di rete restano :class:`TransportError`.
+    """
+
+    def __init__(self, message: str = "", *, file_name: str | None = None, **kwargs: Any) -> None:
+        super().__init__(message, **kwargs)
+        self.file_name = file_name

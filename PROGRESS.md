@@ -1675,3 +1675,49 @@ Terza spec del metodo: [`specs/03-post-write/`](specs/03-post-write/) (`spec.md`
 - Campi delta in testo semplice nelle patch della CLI (oggi solo con `--json` e
   `deltaAreaFormat: 2`, con avviso).
 - `cli/communities.py` al 53 % di copertura (dalla linea di partenza).
+
+## M30 — Upload degli allegati — completata 2026-10-10
+
+Quarta spec del metodo: [`specs/04-attachment-upload/`](specs/04-attachment-upload/) (`spec.md`,
+`plan.md`, `tasks.md`, `verifica.md`). Terzo gruppo della superficie di scrittura aperta da
+[ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md). Minor **0.12.0**.
+
+### Fatto
+
+- Libreria: `client.attachments.upload(file, *, name, mime_type)` in due passi
+  (`upload-new-attachment`, poi form multipart firmato verso lo storage) e
+  `request_upload_url()`; façade `UploadTicket` e `UploadedAttachment` (`as_write_input`,
+  `as_version_of`); protocollo `WriteInput` in `build_write_body`, così le scritture di post,
+  commenti e task accettano i file caricati senza cambiare firma; `UploadError` (04-T05…T08).
+- Transport: `request()` scomposta in helper condivisi; `post_multipart` verso un URL assoluto,
+  senza token Interacta, con hook e audit ma senza corpo (04-T04, T05).
+- Redazione: chiavi `signature` e `policy` nei body; parametri di query sensibili negli URL
+  (`Signature=` dei link firmati, anche quelli già restituiti dalle letture) (04-T03).
+- CLI: exit code `11`; `attachments upload`; `--attach` su `posts create|comment|edit|copy` e
+  `tasks create|edit`; `posts edit-attachments` con `--add`, `--update ID=PATH`, `--remove`
+  (04-T09…T13).
+- Documentazione: `docs/api/attachments.md` ("Uploading files"), pagine API di post e task,
+  `docs/cli.md`, `docs/logging.md`, `docs/testing.md`, home e README; PRD con RF-024 precisato,
+  RF-024a, RNF-001, RNF-011 (04-T16, T17). Integration test opt-in eseguito sul tenant di prova
+  (04-T14, T15).
+- 92 unit test e 3 contract test nuovi (998 → 1090, 158 → 161); copertura totale 94,32 % →
+  94,51 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant**: lo storage accetta solo il form multipart con la policy firmata (il
+  `PUT` risponde `400 MissingSecurityHeader`); la policy dura circa due ore e ammette fino a
+  2 GiB; con `updateAttachments` il server tiene l'id, porta la versione a 2 e applica il nome
+  nuovo.
+- In CLI il corpo si valida prima e dopo gli upload: un `--json` non valido esce con `2` senza
+  caricare file.
+- Con `name` esplicito il MIME è dedotto dal nome dato.
+
+### Follow-up
+
+- Release **0.12.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- `test_attachments_integration.py::test_list_for_post` (v0.3) fallisce anche su `main`: il
+  server dà `totalItemsCount` solo con `calculateTotalItemsCount` (branch `bugfix_`).
+- `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` nel `.env` va quotata: né `source` né `uv run --env-file`
+  leggono il JSON nudo; dirlo in `docs/testing.md` e `.env.example`.
+- Prossimi gruppi di scrittura (ADR 0001): post evento, anagrafiche admin (RF-023).
