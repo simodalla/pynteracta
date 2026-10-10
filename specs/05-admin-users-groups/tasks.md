@@ -274,7 +274,7 @@ le costanti qui sopra con la stessa forma.
   2. `uv run pytest -m integration -q` senza ambiente → tutti saltati; controlli bloccanti;
      commit `test: integration test opt-in dei cicli di scrittura di gruppi e utenti (05-T14)`.
 
-### [ ] T15 – Esecuzione degli integration test sul tenant di prova (manuale)
+### [x] T15 – Esecuzione degli integration test sul tenant di prova (manuale)
 
 - Criteri: 05-C26
 - Chi: maintainer
@@ -286,7 +286,34 @@ le costanti qui sopra con la stessa forma.
   `generated_password` (lunghezza e tipo), `occToken` restituito da `edit_members` e se vale per
   l'edit successivo. Se il server rifiuta un corpo che la spec dà per buono, si rivede la spec con
   l'approvazione del maintainer prima di T16.
-- Esito: *da compilare*.
+- Esito (2026-10-10; eseguito da Claude su richiesta del maintainer, con sonde aggiuntive su
+  utenti e gruppi di prova, tutti creati e cancellati): entrambi i cicli verdi dopo la correzione
+  di `UserWriteResult.from_create` (`41dfd76`) e T18. Righe `[05-C26]`:
+  - Gruppi: `groups.edit(name=...)` con email, visible e memberIds omessi: email=None
+    visible=False members_count=0. Sonda su un gruppo con email, externalId, visible=True e un
+    membro: dopo `edit(name=...)` email=None, visible=False, externalId=None, **membri
+    mantenuti**; `edit` senza `name` → 400 `REQUIRED_FIELD` (il server sostituisce i campi
+    scalari omessi; `groups edit` in CLI è già una patch). `edit_members`: occToken
+    restituito=1791648378482 (letto prima: 1791648378320), members_count=None; **il token
+    restituito vale per la chiamata successiva**. Dopo delete: NotFoundError (404), il gruppo non
+    esiste più.
+  - Utenti: `users.create`: generated_password tipo=list elementi=1 lunghezze=[16]
+    (il server manda una **stringa**, la façade la normalizza in lista) expired_credentials=False
+    sent_email_notify=False. `users.edit(firstname, lastname, contactEmail)` con gli altri
+    campi omessi: external_id=None, userSettings e userInfo presenti; sonde: senza `firstname` o
+    `lastname` 400 `REQUIRED_FIELD`; `contactEmail`, `privateEmail` ed `externalId` **azzerati**
+    se omessi; `userPreferences`, `userInfo`, `userSettings` **mantenuti**.
+    `edit_credentials(custom=...)` con google e microsoft omessi: has_google=False
+    has_custom=True custom_active=True (**blocchi omessi mantenuti**; senza
+    `userCredentialsConfiguration` nessuna modifica). `edit_credentials(custom={'active':
+    False})` senza username: has_custom=False (**rimozione**); con username e `active: false`
+    400 `INVALID_VALUE`; `custom` senza `active` 400 `REQUIRED_FIELD`; username e account id
+    fuori dal dominio del tenant 400 `INVALID_DOMAIN`; `google`/`microsoft: {"enabled": false}`
+    senza id rimuovono il blocco. Dopo delete: NotFoundError — il tenant risponde **204 senza
+    corpo** al form (anche per id mai esistiti) e 404 alle credenziali.
+  - Divergenze trattate: password generata stringa (`41dfd76`), `edit-credentials` e `204`
+    (T18, criteri 05-C27..05-C29). Per T16: avvisi su `users edit` e `groups edit` in libreria
+    (campi scalari omessi azzerati), semantica dei blocchi di credenziali, `204`.
 
 ### [x] T18 – Correzioni dalla prova sul tenant: `204` vuoto, `edit-credentials` senza patch, ciclo utenti
 

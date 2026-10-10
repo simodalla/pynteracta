@@ -85,7 +85,10 @@ scritture sono già nei modelli generati dal swagger pinnato: nessuna rigenerazi
   `google`/`microsoft: {"enabled": false}` senza account id rimuovono le rispettive; `username`
   o account id insieme ad `active`/`enabled` falso → `400 INVALID_VALUE` (il server non ha
   credenziali "disattivate", solo rimosse); username e account id fuori dal dominio del tenant →
-  `400 INVALID_DOMAIN`. `docs/api/users.md` lo dice, con l'avviso sull'azzeramento.
+  `400 INVALID_DOMAIN`. `groups.edit` esige `name` (`400 REQUIRED_FIELD`) e **azzera** `email`,
+  `externalId` e `visible` se omessi, mentre mantiene i membri (`memberIds` omesso); dopo
+  `delete` gruppo e utente non esistono più (`404`; il form utente risponde `204` vuoto).
+  `docs/api/users.md` e `docs/api/groups.md` lo dicono, con l'avviso sull'azzeramento.
 - **Errori**: come per le letture (`400 → ValidationError`, `403 → PermissionError`,
   `404 → NotFoundError`, `409 → ConcurrencyError`, timeout e rete → `TransportError`). Una
   scrittura che fallisce in modo incerto non si ripete: una sola richiesta per chiamata, sempre.
