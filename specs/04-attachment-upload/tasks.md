@@ -243,7 +243,7 @@ del commit. Costanti dei test: community `79`, post `21269`, task `9001`, allega
   3. Generare e leggere lo snapshot; controlli bloccanti; commit `feat(cli): comando posts
      edit-attachments con upload, nuove versioni e rimozioni (04-T13)`.
 
-### [ ] T14 – Integration test opt-in del ciclo degli allegati
+### [x] T14 – Integration test opt-in del ciclo degli allegati
 
 - Criteri: 04-C18 (codice del test)
 - Dipende da: T07, T08

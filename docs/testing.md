@@ -82,6 +82,9 @@ end (also when a step fails). It needs `PYNTERACTA_TEST_USER_ID` too (the watche
 community** only. If that community has required custom fields, put them in
 `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` as a JSON object; catalog and user references are written as
 lists of ids (`{"2003": [89]}`), not as the objects the server returns when reading.
+The same two variables enable the **attachment upload** integration test: it uploads a small
+generated file, creates a post with it, uploads a second file as a new version of the attachment,
+removes it, and deletes the post at the end (also when a step fails).
 `PYNTERACTA_TEST_WORKFLOW_POST_ID` (optional) points at a post with a workflow:
 the test only reads its workflow screen and never executes a transition.
 
