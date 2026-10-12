@@ -326,7 +326,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
 ### [ ] T15 – Documentazione
 
 - Criteri: 06-C20
-- Dipende da: T10, T12, T14, T17
+- Dipende da: T10, T12, T14, T17, T18
 - Test: `tests/unit/test_docs_snippets.py::test_catalogs_workspace_pages_document_write_commands`
   (`docs/cli.md` cita i nove comandi, `LANG=TEXT`, `USER_ID=ROLE_ID`, `--cover`, `restore`,
   `| 9 |` e non dice più "workspace and catalog writes arrive with their own spec" né "it lives
@@ -380,6 +380,28 @@ T14 (2026-10-12), con la decisione del maintainer registrata nella spec.
   3. Controlli bloccanti; commit `fix(admin-manage): le façade dei form scartano le lingue null
      (06-T17)`.
 
+### [ ] T18 – `edit-workspace` come patch sul form letto
+
+Numerato dopo T17, si esegue prima di T14: nasce dal secondo rilancio di T14 (2026-10-12),
+`400` `REQUIRED_FIELD` su `name`, con la decisione del maintainer registrata nella spec.
+
+- Criteri: 06-C24; 06-C17 adeguato; 06-C22 (test adeguato)
+- Dipende da: T12, T17; T14, T15 e T16 dipendono anche da questo
+- Test: `tests/unit/test_cli_admin_manage_write.py`: `TestEditWorkspacePatch`
+  (`test_add_user_resends_form_fields` con il corpo esatto di 06-C24, `test_name_flag_wins`,
+  `test_description_flag_merged_with_form`, `test_json_maps_merged_with_form`,
+  `test_occ_token_still_reads_form`, `test_form_without_maps_adds_nothing`), `test_workspace_edit_base_*`,
+  `test_apply_form_*`; i test esistenti di T11 e T12 adeguati ai corpi con la base del form;
+  `tests/unit/test_facade_admin_manage.py::TestWorkspaceForEdit::test_translations`.
+- Passi:
+  1. Scrivere e adeguare i test; eseguirli: rossi (corpo senza la base, `GET` assente con
+     `--occ-token`).
+  2. `models/facade/admin_manage.py`: `WorkspaceForEdit.translations`.
+     `cli/admin_manage_write.py`: `_workspace_edit_base`, `_apply_form`, lettura sempre del
+     form, help del comando. `tests/integration/test_admin_manage_integration.py` come nel piano.
+  3. Controlli bloccanti; commit `fix(cli): admin-manage edit-workspace come patch sul form letto
+     (06-T18)`.
+
 ## Copertura dei criteri
 
 | Criterio | Task |
@@ -400,10 +422,11 @@ T14 (2026-10-12), con la decisione del maintainer registrata nella spec.
 | 06-C14 | T10 |
 | 06-C15 | T10 |
 | 06-C16 | T08 |
-| 06-C17 | T07, T11 |
+| 06-C17 | T07, T11, T18 |
 | 06-C18 | T12 |
 | 06-C19 | T01, T03 |
 | 06-C20 | T15 |
 | 06-C21 | T13, T14, T17 |
 | 06-C22 | T13, T14 |
 | 06-C23 | T17 |
+| 06-C24 | T18 |

@@ -194,6 +194,7 @@ I testi della CLI restano in inglese (decisione della spec 02). Tutti i comandi 
 | 06-C21 | Quando l'ambiente integration è impostato (opt-in), il ciclo `catalogs.create` (nome `{"it": "pynteracta-it-<timestamp>"}`) → `get_for_edit` (`occ_token`, `parent_catalog_id`) → `edit` → `create_entry` → `get_entry_for_edit` → `edit_entry` → `set_entry_deleted(True)` → `set_deleted(True)` termina senza errori sul tenant e al termine il catalogo è `deleted: true`, anche se un passo intermedio fallisce; senza le variabili il test è saltato. L'esecuzione stabilisce e registra in `docs/api/catalogs.md` e `verifica.md`: l'effetto dei campi omessi in `edit` ed `edit_entry` (mappa del nome sostituita o unita, parent ed external id azzerati o mantenuti), quale id arriva nella risposta di `…/entries/{id}/deleted`, e se un catalogo disabilitato compare ancora in `catalogs.list`. | RF-023, RF-025 |
 | 06-C22 | Quando, oltre all'ambiente integration, `PYNTERACTA_TEST_WRITE_WORKSPACE=1` è impostata (opt-in dedicato), il ciclo `workspace_for_edit(PYNTERACTA_TEST_WORKSPACE_ID)` → `edit_workspace(add_user_ids=[PYNTERACTA_TEST_USER_ID])` → `edit_workspace(remove_user_ids=[…])` termina senza errori, il conteggio dei membri torna quello iniziale e il nome del workspace è invariato al termine; senza la variabile il test è saltato. L'esecuzione stabilisce e registra in `docs/api/admin_manage.md` e `verifica.md` se il nome e la descrizione omessi sono mantenuti o azzerati; se azzerati, `edit-workspace` diventa una patch e la spec si rivede prima della chiusura. | RF-023, RF-025 |
 | 06-C23 | Quando le risposte di `admin_manage.workspace_for_edit` ed `edit_workspace` hanno valori `null` nelle mappe per lingua di `contentData` (`translations`, `description`), e quelle di `catalog_for_edit` e `catalog_entry_for_edit` in `contentData.name` e `label`, la façade si costruisce senza errori e le lingue con valore `null` sono scartate (`{"it": null}` → `{}`); i valori stringa restano; `admin-manage workspace` esce `0`. | RF-023e, RF-008, RF-013 |
+| 06-C24 | Quando si esegue `admin-manage edit-workspace 88 --add-user 1` e la `GET …/workspaces/88/edit` restituisce `occToken: 17` e `contentData` con `name: "Operations"`, `translations: {"en": "Operations", "it": "Operazioni"}` e `description: {"en": "Operations workspace", "it": "Spazio operazioni"}`, parte una sola `PUT …/admin/manage/workspaces/88/17` con corpo esatto `{"name": "Operations", "translations": {"en": "Operations", "it": "Operazioni"}, "description": {"en": "Operations workspace", "it": "Spazio operazioni"}, "addUserIds": [1]}`; con `--name WS` vince `WS`; con `--description it=Desc` la descrizione letta è aggiornata per lingua; con `--json` le mappe `translations` e `description` aggiornano quelle lette per lingua; con `--occ-token 10` la `GET` avviene lo stesso e il path usa `10`; le chiavi assenti nel form non si inventano. Sostituisce, in 06-C17, il corpo "nulla del form rimandato" e la frase "con `--occ-token 10` nessuna `GET`". | RF-023, RF-023f, RF-025 |
 
 ## Casi limite
 
@@ -322,6 +323,18 @@ Prima esecuzione degli integration test sul tenant di prova, su richiesta del ma
 - **Decisione del maintainer (2026-10-12)**: le façade dei form scartano le lingue con valore
   `null` prima di validare (06-C23), per il workspace e, a parità di forma, per nome del catalogo
   e label della voce; poi si rilancia il ciclo del workspace. Task T17, eseguito prima di T14.
+
+- **Secondo rilancio del workspace (dopo T17)**: la lettura del form funziona; la `PUT` di
+  `edit_workspace(add_user_ids=[…])` riceve `400` `REQUIRED_FIELD` sul campo `name`: il server
+  vuole il nome in ogni modifica, anche quando si toccano solo i membri. Nessuna modifica è
+  avvenuta. Come previsto da 06-C22, **`edit-workspace` in CLI diventa una patch** (decisione del
+  maintainer, 2026-10-12): rilegge sempre il form, anche con `--occ-token`, e rimanda `name`,
+  `translations` e `description` letti, aggiornati dai flag e da `--json` (mappe per lingua),
+  insieme ai soli add/remove indicati (06-C24, task T18). La libreria resta esplicita:
+  `edit_workspace` invia i campi passati e i docs dicono che `name` è obbligatorio e che
+  traduzioni e descrizione conviene ripassarle. Il test integration invia nome, traduzioni e
+  descrizione letti; se traduzioni e descrizione omesse vengano azzerate non si prova, per non
+  rischiare di cancellare le traduzioni del workspace condiviso.
 
 ## Domande aperte
 

@@ -266,6 +266,7 @@ esempi: i test usano le costanti qui sopra con la stessa forma.
 | 06-C20 | `test_docs_snippets.py::test_catalogs_workspace_pages_document_write_commands`; `uv run mkdocs build --strict` nei controlli di verifica; gli snippet Python delle pagine passano da `test_doc_snippet_is_consistent_with_the_api` | unitario + verifica |
 | 06-C21 | `test_catalogs_integration.py::TestCatalogsWriteIntegration::test_create_edit_entry_delete_cycle`: skip senza le variabili di base; `set_deleted(True)` in `finally`; dopo il ciclo `get_for_edit(...).deleted is True`; righe `[06-C21]` con la semantica dei campi omessi, l'id della risposta di `…/entries/{id}/deleted` e la visibilità in `catalogs.list`; esecuzione sul tenant in un task manuale dedicato (come 05-T15), esito in `docs/api/catalogs.md` e `verifica.md` | integrazione (opt-in) + manuale |
 | 06-C23 | `test_facade_admin_manage.py::TestNullLanguageValues`, `test_cli_admin_manage.py::TestAdminManageWorkspace::test_null_description_exits_0`, `test_api_admin_manage.py::TestEditWorkspace::test_response_with_null_description` | unitario |
+| 06-C24 | `test_cli_admin_manage_write.py::TestEditWorkspacePatch`, `test_workspace_edit_base_*`, `test_apply_form_*` | unitario |
 | 06-C22 | `test_admin_manage_integration.py::TestWorkspaceWriteIntegration::test_add_remove_member_cycle`: skip senza `PYNTERACTA_TEST_WRITE_WORKSPACE=1`; rimozione e ripristino in `finally`; assert su `member_users_count` e nome; righe `[06-C22]` su nome e descrizione dopo la `PUT`; esecuzione nello stesso task manuale, esito in `docs/api/admin_manage.md` e `verifica.md`; se nome o descrizione risultano azzerati, la spec si rivede prima della chiusura | integrazione (opt-in dedicato) + manuale |
 
 Verifica manuale (dalla spec): nessuna oltre all'esecuzione opt-in di 06-C21 e 06-C22 sul tenant
@@ -291,6 +292,21 @@ una revisione della spec, non da un aggiustamento silenzioso.
 - `tests/integration/test_catalogs_integration.py`: testi diversi per lingua, così la prova
   distingue sostituzione e unione; il `400` di `catalogs.list([id])` si registra invece di far
   fallire il test; via la riga su `catalogs.list()` senza id, che non dimostra nulla.
+
+### Seconda revisione: `edit-workspace` come patch (2026-10-12)
+
+- `cli/admin_manage_write.py`: `_workspace_body` resta la parte dei flag e di `--json` (serve
+  al controllo "Nothing to send", che avviene prima di ogni richiesta). Funzioni pure nuove:
+  `_workspace_edit_base(form: WorkspaceForEdit) -> dict` (`name`, `translations`, `description`
+  dal contenuto tipizzato, se non `None`) e `_apply_form(base, body) -> dict` (`{**base,
+  **body}`, con `translations` e `description` unite per lingua: lette, poi `--json` e flag). Il
+  comando legge sempre `workspace_for_edit`; il token è `--occ-token` o quello letto.
+  `WorkspaceForEdit` guadagna `translations` (dal contenuto tipizzato), che serve alla base.
+- Test: `test_cli_admin_manage_write.py` adeguato (corpi con la base del form, `--occ-token` con
+  la `GET`, 06-C24) più `test_workspace_edit_base_*` e `test_apply_form_*`;
+  `test_facade_admin_manage.py::TestWorkspaceForEdit::test_translations`.
+- `tests/integration/test_admin_manage_integration.py`: le due `edit_workspace` passano
+  `name`, `translations` e `description` letti dal form; il ripristino finale resta.
 
 ## Scelte tecniche
 
