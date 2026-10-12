@@ -1,6 +1,49 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.13.0] - 2026-10-12
+
+### Chores
+
+- Fixture e contract test dei DTO di scrittura di cataloghi, voci e workspace; riga 0.13.0 in ROADMAP (06-T01)
+- Integration test opt-in dei cicli di scrittura di cataloghi e workspace (06-T13)
+- Ciclo integration del workspace con rilettura del form, esito della prova sul tenant (06-T14)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.12.0
+- Nota di release in PROGRESS, M31 uscita nella 0.12.0 con M30
+- Spec 06, anagrafiche admin: cataloghi, voci di catalogo e workspace
+- Piano 06, anagrafiche admin: cataloghi, voci di catalogo e workspace
+- Task 06, anagrafiche admin: cataloghi, voci di catalogo e workspace
+- Revisione della spec 06 dopo la prova sul tenant, criterio 06-C23 e task T17
+- Seconda revisione della spec 06, edit-workspace come patch (06-C24, task T18)
+- Terza revisione della spec 06, rilettura dopo edit-workspace (06-C25, task T19)
+- Scritture admin di cataloghi, voci e workspace in libreria e CLI (06-T15)
+- PRD con RF-023 precisato, RF-023e e RF-023f (06-T16)
+- Verifica 06, anagrafiche admin: cataloghi, voci di catalogo e workspace
+- Release v0.13.0, riga di ROADMAP a shipped
+
+### Features
+
+- **admin-manage**: Occ_token sulle façade per-edit e parent_catalog_id del catalogo (06-T02)
+- **catalogs**: Façade CatalogWriteResult, CatalogEntryWriteResult e CatalogDeletedResult; etag, voci, catalog_id e deleted su Catalog e CatalogEntry (06-T03)
+- **catalogs**: Creazione, modifica e disabilitazione dei cataloghi su client.catalogs, alias get_for_edit e get_entry_for_edit (06-T04)
+- **catalogs**: Creazione, modifica e disabilitazione delle voci di catalogo su client.catalogs (06-T05)
+- **admin-manage**: Modifica del workspace con occToken nel path (06-T06)
+- **cli**: Helper per mappe LANG=TESTO e coppie di id in cli/_write.py (06-T07)
+- **cli**: Comandi catalogs create e create-entry con mappe LANG=TESTO (06-T08)
+- **cli**: Catalogs edit ed edit-entry come patch con occToken letto o imposto (06-T09)
+- **cli**: Cancellazione logica e ripristino di cataloghi e voci con conferma su delete (06-T10)
+- **cli**: Admin-manage edit-workspace con i soli campi indicati e occToken letto o imposto (06-T11)
+- **cli**: Copertina e logo del workspace da file con l'upload della spec 04 (06-T12)
+
+### Fixes
+
+- **admin-manage**: Le façade dei form scartano le lingue null (06-T17)
+- **cli**: Admin-manage edit-workspace come patch sul form letto (06-T18)
+- **cli**: Admin-manage edit-workspace mostra il form riletto dopo la modifica (06-T19)
+
 ## [0.12.0] - 2026-10-10
 
 ### Chores
