@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
@@ -82,6 +82,48 @@ def zoned_datetime_input(value: datetime) -> dict[str, str]:
         value = value.astimezone(UTC)
         key = "UTC"
     return {"datetime": value.replace(tzinfo=None).isoformat(timespec="seconds"), "timezone": key}
+
+
+def _require_aware(value: datetime, name: str) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        msg = f"{name} must be a timezone-aware datetime"
+        raise ValueError(msg)
+
+
+def event_datetime_block(start_at: datetime | None, end_at: datetime | None) -> dict[str, Any]:
+    """Traduce inizio e fine di un evento nelle chiavi ``startAt``, ``endAt`` e ``timezone``.
+
+    Il fuso dell'evento è quello di ``start_at`` (di ``end_at`` se ``start_at`` manca): con un
+    fuso IANA (``ZoneInfo``) si invia il suo nome, con un offset fisso, che non ha un nome IANA,
+    si converte in UTC e si invia ``"UTC"``. L'altra data è convertita in quel fuso. Ogni data
+    viaggia come ``{"localDatetime": ...}`` senza offset. Compaiono solo le chiavi delle date
+    passate; senza date il risultato è ``{}``.
+
+    Raises:
+        ValueError: se una delle date passate non ha fuso, prima di qualunque chiamata.
+    """
+    if start_at is not None:
+        _require_aware(start_at, "start_at")
+    if end_at is not None:
+        _require_aware(end_at, "end_at")
+    reference = start_at if start_at is not None else end_at
+    if reference is None:
+        return {}
+    key = getattr(reference.tzinfo, "key", None)
+    zone: tzinfo = (reference.tzinfo or UTC) if key is not None else UTC
+    if key is None:
+        key = "UTC"
+    block: dict[str, Any] = {}
+    if start_at is not None:
+        block["startAt"] = {"localDatetime": _local_iso(start_at, zone)}
+    if end_at is not None:
+        block["endAt"] = {"localDatetime": _local_iso(end_at, zone)}
+    block["timezone"] = key
+    return block
+
+
+def _local_iso(value: datetime, zone: tzinfo) -> str:
+    return value.astimezone(zone).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
 @runtime_checkable

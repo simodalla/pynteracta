@@ -14,7 +14,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
 
 ## Elenco
 
-### [ ] T01 – `event_datetime_block` e riga di ROADMAP
+### [x] T01 – `event_datetime_block` e riga di ROADMAP
 
 - Criteri: 08-C02 (regola delle date), 08-C03 (helper)
 - Dipende da: nessuno
