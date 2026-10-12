@@ -193,6 +193,7 @@ I testi della CLI restano in inglese (decisione della spec 02). Tutti i comandi 
 | 06-C20 | `docs/cli.md` documenta i nove comandi, la forma `LANG=TESTO`, la cancellazione logica e l'exit `9`; `docs/api/catalogs.md` e `docs/api/admin_manage.md` documentano i metodi, le façade di risultato, `occ_token`, `parent_catalog_id` e la semantica dei campi omessi verificata sul tenant; `docs/testing.md` le nuove variabili; `docs/index.md` e `README.md` non dicono più che le scritture su cataloghi e workspace sono da fare; `uv run mkdocs build --strict` e `test_docs_snippets` sono verdi. | RF-015 |
 | 06-C21 | Quando l'ambiente integration è impostato (opt-in), il ciclo `catalogs.create` (nome `{"it": "pynteracta-it-<timestamp>"}`) → `get_for_edit` (`occ_token`, `parent_catalog_id`) → `edit` → `create_entry` → `get_entry_for_edit` → `edit_entry` → `set_entry_deleted(True)` → `set_deleted(True)` termina senza errori sul tenant e al termine il catalogo è `deleted: true`, anche se un passo intermedio fallisce; senza le variabili il test è saltato. L'esecuzione stabilisce e registra in `docs/api/catalogs.md` e `verifica.md`: l'effetto dei campi omessi in `edit` ed `edit_entry` (mappa del nome sostituita o unita, parent ed external id azzerati o mantenuti), quale id arriva nella risposta di `…/entries/{id}/deleted`, e se un catalogo disabilitato compare ancora in `catalogs.list`. | RF-023, RF-025 |
 | 06-C22 | Quando, oltre all'ambiente integration, `PYNTERACTA_TEST_WRITE_WORKSPACE=1` è impostata (opt-in dedicato), il ciclo `workspace_for_edit(PYNTERACTA_TEST_WORKSPACE_ID)` → `edit_workspace(add_user_ids=[PYNTERACTA_TEST_USER_ID])` → `edit_workspace(remove_user_ids=[…])` termina senza errori, il conteggio dei membri torna quello iniziale e il nome del workspace è invariato al termine; senza la variabile il test è saltato. L'esecuzione stabilisce e registra in `docs/api/admin_manage.md` e `verifica.md` se il nome e la descrizione omessi sono mantenuti o azzerati; se azzerati, `edit-workspace` diventa una patch e la spec si rivede prima della chiusura. | RF-023, RF-025 |
+| 06-C23 | Quando le risposte di `admin_manage.workspace_for_edit` ed `edit_workspace` hanno valori `null` nelle mappe per lingua di `contentData` (`translations`, `description`), e quelle di `catalog_for_edit` e `catalog_entry_for_edit` in `contentData.name` e `label`, la façade si costruisce senza errori e le lingue con valore `null` sono scartate (`{"it": null}` → `{}`); i valori stringa restano; `admin-manage workspace` esce `0`. | RF-023e, RF-008, RF-013 |
 
 ## Casi limite
 
@@ -299,6 +300,28 @@ prova dal workspace di prova senza toccarne nome e descrizione.
 
 Nessuna: 06-C21 e 06-C22 sono test automatici opt-in contro il tenant di prova; gli altri
 criteri sono unit, contract o snapshot test.
+
+## Revisione dopo la prova sul tenant (T14, 2026-10-12)
+
+Prima esecuzione degli integration test sul tenant di prova, su richiesta del maintainer.
+
+- **Cataloghi e voci (06-C21)**: ciclo verde. Un `edit` o `edit_entry` con la sola lingua `en`
+  **sostituisce** la mappa del nome o della label: le altre lingue perdono il loro testo e la
+  lingua `it` riceve quello passato. `externalId` e parent omessi in `edit_entry` sono
+  **azzerati**. `…/entries/{id}/deleted` risponde con `entryId`. Un catalogo disabilitato chiesto
+  per id a `catalogs.list` dà `400` `NOT_EXISTS` sul campo `catalogIds`; `catalogs.list()` senza
+  id restituisce una lista vuota su questo tenant, quindi non dice nulla sulla visibilità. La
+  `GET` del form di una voce risponde con qualunque `catalogId` nel path. Le patch di
+  `catalogs edit` ed `edit-entry` in CLI proteggono già dalla sostituzione; in libreria
+  `edit`/`edit_entry` restano espliciti e i docs dicono di passare la mappa completa.
+- **Workspace (06-C22)**: il ciclo non parte. Il form reale ha `contentData.description:
+  {"it": null}` e la façade `WorkspaceForEdit` solleva la `ValidationError` di pydantic, perché il
+  modello generato accetta solo stringhe. Il difetto è della lettura (v0.6) ma blocca
+  `edit-workspace` e soprattutto `edit_workspace`, la cui risposta ha la stessa forma: la `PUT`
+  riuscirebbe e il chiamante vedrebbe un errore, con esito apparentemente sconosciuto.
+- **Decisione del maintainer (2026-10-12)**: le façade dei form scartano le lingue con valore
+  `null` prima di validare (06-C23), per il workspace e, a parità di forma, per nome del catalogo
+  e label della voce; poi si rilancia il ciclo del workspace. Task T17, eseguito prima di T14.
 
 ## Domande aperte
 

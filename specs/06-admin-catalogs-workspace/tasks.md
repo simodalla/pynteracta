@@ -326,7 +326,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
 ### [ ] T15 – Documentazione
 
 - Criteri: 06-C20
-- Dipende da: T10, T12, T14
+- Dipende da: T10, T12, T14, T17
 - Test: `tests/unit/test_docs_snippets.py::test_catalogs_workspace_pages_document_write_commands`
   (`docs/cli.md` cita i nove comandi, `LANG=TEXT`, `USER_ID=ROLE_ID`, `--cover`, `restore`,
   `| 9 |` e non dice più "workspace and catalog writes arrive with their own spec" né "it lives
@@ -360,6 +360,26 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      di §6 (cataloghi, voci, workspace, immagini); riga nella "Storia del documento".
   2. Commit `docs: PRD con RF-023 precisato, RF-023e e RF-023f (06-T16)`.
 
+### [ ] T17 – Lingue `null` nei form admin; correzione del test dei cataloghi
+
+Numerato dopo T16 per non rinumerare, si esegue prima di T14: nasce dalla prima esecuzione di
+T14 (2026-10-12), con la decisione del maintainer registrata nella spec.
+
+- Criteri: 06-C23; 06-C21 (test adeguato)
+- Dipende da: T13; T14, T15 e T16 dipendono anche da questo
+- Test: `tests/unit/test_facade_admin_manage.py::TestNullLanguageValues` (workspace con
+  `description: {"it": null, "en": "Ops"}` e `translations: {"it": null}`; catalogo con
+  `name: {"it": null, "en": "X"}`; voce con `label: {"it": null}`: le façade si costruiscono e le
+  lingue `null` mancano), `tests/unit/test_cli_admin_manage.py::TestAdminManageWorkspace::
+  test_null_description_exits_0`, `tests/unit/test_api_admin_manage.py::TestEditWorkspace::
+  test_response_with_null_description`; rossi prima della correzione (`ValidationError`).
+- Passi:
+  1. Scrivere i test; eseguirli: rossi.
+  2. `models/facade/admin_manage.py`: `_drop_null_values` e pulizia delle tre mappe come nel
+     piano. `tests/integration/test_catalogs_integration.py` come nel piano.
+  3. Controlli bloccanti; commit `fix(admin-manage): le façade dei form scartano le lingue null
+     (06-T17)`.
+
 ## Copertura dei criteri
 
 | Criterio | Task |
@@ -384,5 +404,6 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
 | 06-C18 | T12 |
 | 06-C19 | T01, T03 |
 | 06-C20 | T15 |
-| 06-C21 | T13, T14 |
+| 06-C21 | T13, T14, T17 |
 | 06-C22 | T13, T14 |
+| 06-C23 | T17 |

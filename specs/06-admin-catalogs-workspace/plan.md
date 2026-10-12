@@ -265,6 +265,7 @@ esempi: i test usano le costanti qui sopra con la stessa forma.
 | 06-C19 | `tests/contract/test_models.py::TestAdminCatalogsWorkspaceWriteDTOs::test_schema_superset` (`assert_superset` sui 10 DTO della spec e sui gemelli tipizzati), `::test_fixtures_parse` (le sette fixture nuove nelle façade `CatalogWriteResult`, `CatalogEntryWriteResult`, `CatalogDeletedResult`, `WorkspaceForEdit`) | contract |
 | 06-C20 | `test_docs_snippets.py::test_catalogs_workspace_pages_document_write_commands`; `uv run mkdocs build --strict` nei controlli di verifica; gli snippet Python delle pagine passano da `test_doc_snippet_is_consistent_with_the_api` | unitario + verifica |
 | 06-C21 | `test_catalogs_integration.py::TestCatalogsWriteIntegration::test_create_edit_entry_delete_cycle`: skip senza le variabili di base; `set_deleted(True)` in `finally`; dopo il ciclo `get_for_edit(...).deleted is True`; righe `[06-C21]` con la semantica dei campi omessi, l'id della risposta di `…/entries/{id}/deleted` e la visibilità in `catalogs.list`; esecuzione sul tenant in un task manuale dedicato (come 05-T15), esito in `docs/api/catalogs.md` e `verifica.md` | integrazione (opt-in) + manuale |
+| 06-C23 | `test_facade_admin_manage.py::TestNullLanguageValues`, `test_cli_admin_manage.py::TestAdminManageWorkspace::test_null_description_exits_0`, `test_api_admin_manage.py::TestEditWorkspace::test_response_with_null_description` | unitario |
 | 06-C22 | `test_admin_manage_integration.py::TestWorkspaceWriteIntegration::test_add_remove_member_cycle`: skip senza `PYNTERACTA_TEST_WRITE_WORKSPACE=1`; rimozione e ripristino in `finally`; assert su `member_users_count` e nome; righe `[06-C22]` su nome e descrizione dopo la `PUT`; esecuzione nello stesso task manuale, esito in `docs/api/admin_manage.md` e `verifica.md`; se nome o descrizione risultano azzerati, la spec si rivede prima della chiusura | integrazione (opt-in dedicato) + manuale |
 
 Verifica manuale (dalla spec): nessuna oltre all'esecuzione opt-in di 06-C21 e 06-C22 sul tenant
@@ -272,6 +273,24 @@ di prova. Se il tenant sostituisce la mappa del nome per intero, la CLI è già 
 libreria resta esplicita: cambia solo la documentazione. Se il server rifiuta un corpo che la spec
 dà per buono (per esempio `parentIds` vuota o `name` con una sola lingua), la correzione passa da
 una revisione della spec, non da un aggiustamento silenzioso.
+
+## Revisione dopo la prova sul tenant (T14, 2026-10-12)
+
+- `models/facade/admin_manage.py`: helper `_drop_null_values(mapping)` che toglie le chiavi con
+  valore `None` da un dict (ogni altro valore passa com'è). `WorkspaceForEdit._typed_content`
+  copia il `root` di `contentData` e pulisce `translations` e `description` prima di validare in
+  `WorkspaceEditableContentDataDTO1`; `CatalogForEdit._typed_content` pulisce `name`;
+  `CatalogEntryForEdit.from_dict` pulisce `label` su una copia di `data` prima di validare la
+  risposta, perché lì la mappa è tipizzata al primo livello (`.raw` non ha le lingue `null`).
+  Gli altri campi non cambiano.
+- Test: `test_facade_admin_manage.py::TestNullLanguageValues` (06-C23) con le tre forme e una
+  lingua stringa accanto alla `null`; `test_cli_admin_manage.py::TestAdminManageWorkspace::
+  test_null_description_exits_0` sulla CLI di lettura; `test_api_admin_manage.py::TestEditWorkspace::
+  test_response_with_null_description` sulla scrittura. Fixture costruite nei test con
+  `copy.deepcopy`, senza toccare quelle esistenti.
+- `tests/integration/test_catalogs_integration.py`: testi diversi per lingua, così la prova
+  distingue sostituzione e unione; il `400` di `catalogs.list([id])` si registra invece di far
+  fallire il test; via la riga su `catalogs.list()` senza id, che non dimostra nulla.
 
 ## Scelte tecniche
 
