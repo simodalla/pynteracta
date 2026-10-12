@@ -1,4 +1,23 @@
 # serializer version: 1
+# name: TestCopyEvent.test_copy_table_shows_new_post
+  '''
+     Event post 21269 copied into post 21271    
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value                     ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id             │ 21271                     │
+  │ community_id   │ 79                        │
+  │ title          │ Copia della riunione      │
+  │ start_at       │ 2026-11-05T10:00:00+01:00 │
+  │ end_at         │ 2026-11-05T12:00:00+01:00 │
+  │ timezone       │ Europe/Rome               │
+  │ location       │ Sala A                    │
+  │ visibility     │ 2                         │
+  │ next_occ_token │ 1                         │
+  └────────────────┴───────────────────────────┘
+  
+  '''
+# ---
 # name: TestCreateEvent.test_json_output
   '''
   {

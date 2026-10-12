@@ -40,6 +40,7 @@ from pynteracta.cli._write import (
 )
 from pynteracta.cli.posts import app
 from pynteracta.cli.posts_write import (
+    _DELTA,
     _PLAIN_TEXT,
     AnnouncementOption,
     ClientUidOption,
@@ -47,12 +48,15 @@ from pynteracta.cli.posts_write import (
     DraftOption,
     JsonBodyOption,
     NoAttachmentsOption,
+    OccTokenOption,
+    RemoveWatcherUserOption,
     ScheduledPublicationOption,
     TitleOption,
     VisibilityOption,
     WatcherUserOption,
     _render_single,
     _root,
+    _token_or_exit,
 )
 from pynteracta.exceptions import InteractaError
 from pynteracta.models.facade.posts_event import (
@@ -62,7 +66,11 @@ from pynteracta.models.facade.posts_event import (
     EventPostForEdit,
 )
 from pynteracta.models.facade.posts_write import PostWriteResult
-from pynteracta.models.generated.external_v2 import CreateEventPostRequestDTO
+from pynteracta.models.generated.external_v2 import (
+    CopyEventPostRequestDTO,
+    CreateEventPostRequestDTO,
+    EditEventPostRequestDTO,
+)
 
 # --- opzioni ------------------------------------------------------------------------------
 
@@ -112,6 +120,18 @@ WatcherGroupOption = Annotated[
     list[int] | None, typer.Option("--watcher-group", help="Watcher group ID (repeatable).")
 ]
 PinnedOption = Annotated[bool, typer.Option("--pinned", help="Pin the post.")]
+RemoveWatcherGroupOption = Annotated[
+    list[int] | None,
+    typer.Option("--remove-watcher-group", help="Watcher group ID to remove (repeatable)."),
+]
+EditTimezoneOption = Annotated[
+    str | None,
+    typer.Option(
+        "--timezone",
+        help="IANA time zone of the event and of dates without an offset (default: the zone "
+        f"of the event as read, else {DEFAULT_TIMEZONE}). Changes the zone of the event.",
+    ),
+]
 
 # --- funzioni pure ------------------------------------------------------------------------
 
@@ -142,6 +162,93 @@ def event_flags_block(  # noqa: PLR0913
         invitation_type_id=invite_type,
         send_edit_post_notifications=True if notify_on_edit else None,
     )
+
+
+def _write_datetime(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict) and value.get("localDatetime") is not None:
+        return {"localDatetime": value["localDatetime"]}
+    return None
+
+
+def _write_invitees(items: Any) -> list[dict[str, Any]] | None:
+    if not isinstance(items, list):
+        return None
+    result = []
+    for item in items:
+        if isinstance(item, dict) and item.get("id") is not None:
+            invitee = {"id": item["id"]}
+            if item.get("typeId") is not None:
+                invitee["typeId"] = item["typeId"]
+            result.append(invitee)
+    return result
+
+
+def event_write_block(event: dict[str, Any] | None) -> dict[str, Any]:
+    """Il blocco ``event`` da scrivere, ricavato da un evento letto (08-C21, RF-021d).
+
+    ``startAt`` ed ``endAt`` si riducono al solo ``localDatetime``; restano ``timezone``,
+    ``allDay``, ``location`` e ``invitations`` con utenti e gruppi ridotti a ``{id, typeId}``
+    e ``sendEditPostNotifications``. Le chiavi di sola lettura (``zonedDatetime``,
+    ``utcDatetime``, ``participantsCount``, ``participate``, ``participateTypeId``) e quelle
+    lette come ``null`` mancano.
+    """
+    if not isinstance(event, dict):
+        return {}
+    block: dict[str, Any] = {}
+    for key in ("startAt", "endAt"):
+        value = _write_datetime(event.get(key))
+        if value is not None:
+            block[key] = value
+    for key in ("timezone", "allDay", "location"):
+        if event.get(key) is not None:
+            block[key] = event[key]
+    read = event.get("invitations")
+    if isinstance(read, dict):
+        invitations: dict[str, Any] = {}
+        for key in ("users", "groups"):
+            invitees = _write_invitees(read.get(key))
+            if invitees is not None:
+                invitations[key] = invitees
+        if read.get("sendEditPostNotifications") is not None:
+            invitations["sendEditPostNotifications"] = read["sendEditPostNotifications"]
+        if invitations:
+            block["invitations"] = invitations
+    return block
+
+
+def _event_content_base(content: Any) -> dict[str, Any]:
+    """Corpo ricavato dai dati editabili letti: le chiavi assenti non si inventano."""
+    if content is None:
+        return {}
+    delta = content.descriptionDelta
+    base: dict[str, Any] = {
+        "title": content.title,
+        "description": delta,
+        "descriptionFormat": _DELTA if delta is not None else None,
+        "visibility": content.visibility,
+        "coverImageContentRef": content.coverImageContentRef,
+        "event": event_write_block(_root(content.event)) or None,
+    }
+    return {key: value for key, value in base.items() if value is not None}
+
+
+def event_edit_base(form: EventPostForEdit) -> dict[str, Any]:
+    """Corpo di ``edit-event-post`` dai dati letti con ``event-post-data-for-edit`` (08-C14).
+
+    Titolo, descrizione (il delta letto, con ``descriptionFormat: 1``), visibilità, copertina e
+    blocco ``event`` ripulito si rimandano come letti. ``pinned``, bozza, pubblicazione
+    programmata, watcher e allegati non ci sono: hanno flag propri.
+    """
+    return _event_content_base(form.content_data)
+
+
+def event_copy_base(form: EventPostForCopy) -> dict[str, Any]:
+    """Corpo di ``copy-event-post`` dai dati letti con ``event-post-data-for-copy`` (08-C16)."""
+    base = _event_content_base(form.content_data)
+    content = form.content_data
+    if content is not None and content.announcement is not None:
+        base["announcement"] = content.announcement
+    return base
 
 
 def merge_event(
@@ -498,3 +605,228 @@ def posts_create_event(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
+
+
+def _patch_merge(  # noqa: PLR0913
+    base: dict[str, Any],
+    json_part: dict[str, Any],
+    flags_event: dict[str, Any],
+    *,
+    description: str | None,
+    scheduled_publication: str | None,
+    timezone: str,
+    **flags: Any,
+) -> dict[str, Any]:
+    """Letto < ``--json`` < flag; ``event`` unito chiave per chiave e omesso se vuoto."""
+    merged = merge_body(
+        {**base, **json_part},
+        description=description,
+        description_format=_PLAIN_TEXT if description is not None else None,
+        scheduled_publication=parse_zoned_datetime(
+            scheduled_publication, timezone, option="--scheduled-publication"
+        ),
+        **flags,
+    )
+    event = merge_event(base.get("event") or {}, _json_event(json_part), flags_event)
+    if event:
+        merged["event"] = event
+    else:
+        merged.pop("event", None)
+    return merged
+
+
+@app.command("edit-event")
+def posts_edit_event(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Event post ID.")],
+    occ_token: OccTokenOption = None,
+    start: StartOption = None,
+    end: EndOption = None,
+    timezone: EditTimezoneOption = None,
+    all_day: AllDayOption = False,
+    location: LocationOption = None,
+    invite_user: InviteUserOption = None,
+    invite_group: InviteGroupOption = None,
+    invite_type: InviteTypeOption = None,
+    notify_on_edit: NotifyOnEditOption = False,
+    title: TitleOption = None,
+    description: DescriptionOption = None,
+    attach: AttachOption = None,
+    watcher_user: WatcherUserOption = None,
+    remove_watcher_user: RemoveWatcherUserOption = None,
+    watcher_group: WatcherGroupOption = None,
+    remove_watcher_group: RemoveWatcherGroupOption = None,
+    visibility: VisibilityOption = None,
+    pinned: PinnedOption = False,
+    draft: DraftOption = False,
+    scheduled_publication: ScheduledPublicationOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Edit an event post, keeping the fields you do not mention.
+
+    The post is read first (event-post-data-for-edit) and its title, description, visibility,
+    cover and event (dates, time zone, all-day, location, invitees) are sent back unless a
+    flag or --json overrides them (flags win over --json, --json over the post as read; inside
+    'event' key by key). Without --timezone, --start and --end are read in the zone of the
+    event. --watcher-user/--watcher-group add watchers, --remove-watcher-user/-group remove
+    them. The concurrency token is the one just read, or --occ-token. --attach uploads files
+    and adds them (a failed upload exits with code 11 and the post is not changed). If the
+    post changed since it was read the command exits with code 9 and never retries.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, EditEventPostRequestDTO)
+    try:
+        with build_client(state) as client:
+            form = client.posts.get_event_for_edit(post_id)
+            token = _token_or_exit(occ_token if occ_token is not None else form.occ_token, post_id)
+            zone = timezone if timezone is not None else read_timezone(form)
+            flags_event = event_flags_block(
+                start=start,
+                end=end,
+                timezone=zone,
+                all_day=all_day,
+                location=location,
+                invite_user=invite_user,
+                invite_group=invite_group,
+                invite_type=invite_type,
+                notify_on_edit=notify_on_edit,
+            )
+            merged = _patch_merge(
+                event_edit_base(form),
+                json_part,
+                flags_event,
+                description=description,
+                scheduled_publication=scheduled_publication,
+                timezone=zone,
+                title=title,
+                add_watcher_user_ids=watcher_user,
+                remove_watcher_user_ids=remove_watcher_user,
+                add_watcher_group_ids=watcher_group,
+                remove_watcher_group_ids=remove_watcher_group,
+                visibility=visibility,
+                pinned=True if pinned else None,
+                draft=True if draft else None,
+            )
+            validate_body(merged, EditEventPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
+            req = validate_body(merged, EditEventPostRequestDTO)
+            result = client.posts.edit_event_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            event_write_result_row,
+            title=f"Event post {post_id} updated",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("copy-event")
+def posts_copy_event(  # noqa: PLR0913
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="ID of the event post to copy.")],
+    occ_token: OccTokenOption = None,
+    start: StartOption = None,
+    end: EndOption = None,
+    timezone: EventTimezoneOption = DEFAULT_TIMEZONE,
+    all_day: AllDayOption = False,
+    location: LocationOption = None,
+    invite_user: InviteUserOption = None,
+    invite_group: InviteGroupOption = None,
+    invite_type: InviteTypeOption = None,
+    notify_on_edit: NotifyOnEditOption = False,
+    title: TitleOption = None,
+    description: DescriptionOption = None,
+    attach: AttachOption = None,
+    watcher_user: WatcherUserOption = None,
+    watcher_group: WatcherGroupOption = None,
+    visibility: VisibilityOption = None,
+    announcement: AnnouncementOption = False,
+    pinned: PinnedOption = False,
+    draft: DraftOption = False,
+    scheduled_publication: ScheduledPublicationOption = None,
+    client_uid: ClientUidOption = None,
+    json_body: JsonBodyOption = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Copy an event post into a new one, starting from the data of the original.
+
+    The post is read first (event-post-data-for-copy); its title, description, visibility,
+    announcement, cover and event are sent back unless a flag or --json overrides them, as in
+    edit-event. The concurrency token is the one just read, or --occ-token. A failed upload
+    exits with code 11; a 409 exits with code 9 and is never retried. Shows the new post.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    json_part = load_json_body(json_body, CopyEventPostRequestDTO)
+    try:
+        with build_client(state) as client:
+            form = client.posts.get_event_for_copy(post_id)
+            token = _token_or_exit(occ_token if occ_token is not None else form.occ_token, post_id)
+            flags_event = event_flags_block(
+                start=start,
+                end=end,
+                timezone=timezone,
+                all_day=all_day,
+                location=location,
+                invite_user=invite_user,
+                invite_group=invite_group,
+                invite_type=invite_type,
+                notify_on_edit=notify_on_edit,
+            )
+            merged = _patch_merge(
+                event_copy_base(form),
+                json_part,
+                flags_event,
+                description=description,
+                scheduled_publication=scheduled_publication,
+                timezone=timezone,
+                title=title,
+                add_watcher_user_ids=watcher_user,
+                add_watcher_group_ids=watcher_group,
+                visibility=visibility,
+                announcement=True if announcement else None,
+                pinned=True if pinned else None,
+                draft=True if draft else None,
+                client_uid=client_uid,
+            )
+            validate_body(merged, CopyEventPostRequestDTO)
+            append_attachments(merged, "addAttachments", upload_all(client, attach))
+            req = validate_body(merged, CopyEventPostRequestDTO)
+            result = client.posts.copy_event_raw(post_id, token, req)
+        _render_single(
+            state,
+            output,
+            result,
+            event_write_result_row,
+            title=f"Event post {post_id} copied into post {result.post_id}",
+            full=full,
+            fields=fields,
+            export=export,
+            export_format=export_format,
+            console=console,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc

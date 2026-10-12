@@ -13,7 +13,13 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli.posts_event import merge_event
+from pynteracta.cli.posts_event import (
+    event_copy_base,
+    event_edit_base,
+    event_write_block,
+    merge_event,
+)
+from pynteracta.models.facade.posts_event import EventPostForCopy, EventPostForEdit
 
 _COMMUNITY_ID = 79
 _POST_ID = 21269
@@ -26,7 +32,15 @@ _FOR_CREATE_PATH = f"{_MANAGE}/event-post-data-for-create/{_COMMUNITY_ID}"
 _FOR_EDIT_PATH = f"{_MANAGE}/event-post-data-for-edit/{_POST_ID}"
 _FOR_COPY_PATH = f"{_MANAGE}/event-post-data-for-copy/{_POST_ID}"
 _CREATE_PATH = f"{_MANAGE}/create-event-post/{_COMMUNITY_ID}"
+_EDIT_PATH = f"{_MANAGE}/edit-event-post/{_POST_ID}/{_OCC_TOKEN}"
+_COPY_PATH = f"{_MANAGE}/copy-event-post/{_POST_ID}/{_OCC_TOKEN}"
 _EXIT_CONFIG = 2
+_EXIT_GENERIC = 1
+_EXIT_NOT_FOUND = 5
+_EXIT_CONFLICT = 9
+_HTTP_404 = 404
+_HTTP_409 = 409
+_CONFLICT_MESSAGE = f"Post {_POST_ID} changed since it was read: fetch it again and retry"
 _EXIT_VALIDATION = 6
 _HTTP_400 = 400
 _START_BLOCK = {"localDatetime": "2026-11-05T10:00:00"}
@@ -49,7 +63,14 @@ def _table_lines(output: str) -> list[str]:
 # criterio: 08-C20
 @pytest.mark.parametrize(
     "command",
-    ["get-event-for-create", "get-event-for-edit", "get-event-for-copy", "create-event"],
+    [
+        "get-event-for-create",
+        "get-event-for-edit",
+        "get-event-for-copy",
+        "create-event",
+        "edit-event",
+        "copy-event",
+    ],
 )
 def test_posts_help_lists_event_commands(runner: CliRunner, command: str) -> None:
     result = runner.invoke(app, ["posts", "--help"], env=BASE_ENV)
@@ -420,3 +441,326 @@ class TestExitCodes:
         result = _create(runner, "--start", "2026-11-05T10:00:00")
         assert result.exit_code == _EXIT_VALIDATION
         assert route.call_count == 1
+
+
+_EDIT_FORM = load_payload("event_post_for_edit_response.json")
+_COPY_FORM = load_payload("event_post_for_copy_response.json")
+_DELTA = _EDIT_FORM["contentData"]["descriptionDelta"]
+_CLEAN_EVENT: dict[str, Any] = {
+    "startAt": _START_BLOCK,
+    "endAt": _END_BLOCK,
+    "timezone": "Europe/Rome",
+    "allDay": False,
+    "location": "Sala A",
+    "invitations": {
+        "users": [{"id": 7, "typeId": 2}],
+        "groups": [{"id": 3, "typeId": 0}],
+        "sendEditPostNotifications": False,
+    },
+}
+_EDIT_BASE: dict[str, Any] = {
+    "title": "Riunione di prova",
+    "description": _DELTA,
+    "descriptionFormat": 1,
+    "visibility": 2,
+    "coverImageContentRef": "ref-1",
+    "event": _CLEAN_EVENT,
+}
+
+
+def _mock_edit_flow(form: dict[str, Any] | None = None) -> tuple[respx.Route, respx.Route]:
+    read = mock_json("GET", _FOR_EDIT_PATH, form or _EDIT_FORM)
+    write = mock_json("PUT", _EDIT_PATH, load_payload("edit_event_post_response.json"))
+    return read, write
+
+
+def _mock_copy_flow() -> tuple[respx.Route, respx.Route]:
+    read = mock_json("GET", _FOR_COPY_PATH, _COPY_FORM)
+    write = mock_json("PUT", _COPY_PATH, load_payload("copy_event_post_response.json"))
+    return read, write
+
+
+def _edit(runner: CliRunner, *args: str) -> Any:
+    return runner.invoke(app, ["posts", "edit-event", str(_POST_ID), *args], env=BASE_ENV)
+
+
+def _copy(runner: CliRunner, *args: str) -> Any:
+    return runner.invoke(app, ["posts", "copy-event", str(_POST_ID), *args], env=BASE_ENV)
+
+
+class TestEventWriteBlock:
+    # criterio: 08-C21
+    @pytest.mark.parametrize(
+        ("event", "expected"),
+        [
+            (_EDIT_FORM["contentData"]["event"], _CLEAN_EVENT),
+            (
+                {"startAt": _START_BLOCK, "timezone": "Europe/Rome"},
+                {"startAt": _START_BLOCK, "timezone": "Europe/Rome"},
+            ),
+            ({"invitations": {"users": [{"id": 7}]}}, {"invitations": {"users": [{"id": 7}]}}),
+            (None, {}),
+        ],
+    )
+    def test_event_write_block(self, event: dict[str, Any] | None, expected: dict) -> None:  # type: ignore[type-arg]
+        assert event_write_block(event) == expected
+
+    # criterio: 08-C21
+    def test_null_keys_and_empty_dates_dropped(self) -> None:
+        event = {
+            "startAt": {"zonedDatetime": "x"},
+            "endAt": None,
+            "timezone": None,
+            "location": "L",
+            "invitations": {"users": None, "groups": [], "sendEditPostNotifications": None},
+        }
+        assert event_write_block(event) == {"location": "L", "invitations": {"groups": []}}
+        assert event_write_block({"invitations": {}}) == {}
+
+
+class TestEventBases:
+    # criterio: 08-C14
+    def test_edit_base(self) -> None:
+        assert event_edit_base(EventPostForEdit.from_dict(_EDIT_FORM)) == _EDIT_BASE
+
+    # criterio: 08-C16
+    def test_copy_base(self) -> None:
+        assert event_copy_base(EventPostForCopy.from_dict(_COPY_FORM)) == {
+            **_EDIT_BASE,
+            "announcement": True,
+        }
+
+    # criterio: 08-C14
+    def test_bases_without_content(self) -> None:
+        assert event_edit_base(EventPostForEdit.from_dict({"occToken": 1})) == {}
+        assert event_copy_base(EventPostForCopy.from_dict({"occToken": 1})) == {}
+
+
+class TestEditEvent:
+    # criterio: 08-C14
+    @respx.mock
+    def test_edit_reads_form_then_puts_patched_body(self, runner: CliRunner) -> None:
+        read, write = _mock_edit_flow()
+        result = _edit(runner, "--title", "T2", "--location", "Sala B")
+        assert result.exit_code == 0, result.output
+        assert read.call_count == 1
+        assert write.call_count == 1
+        assert _sent_body(write) == {
+            **_EDIT_BASE,
+            "title": "T2",
+            "event": {**_CLEAN_EVENT, "location": "Sala B"},
+        }
+
+    # criterio: 08-C14
+    @respx.mock
+    def test_edit_with_occ_token_still_reads_base(self, runner: CliRunner) -> None:
+        read = mock_json("GET", _FOR_EDIT_PATH, _EDIT_FORM)
+        write = mock_json(
+            "PUT",
+            f"{_MANAGE}/edit-event-post/{_POST_ID}/3",
+            load_payload("edit_event_post_response.json"),
+        )
+        result = _edit(runner, "--occ-token", "3", "--title", "T2")
+        assert result.exit_code == 0, result.output
+        assert read.call_count == 1
+        assert write.call_count == 1
+
+    # criterio: 08-C14
+    @respx.mock
+    def test_edit_base_skips_missing_fields(self, runner: CliRunner) -> None:
+        form = json.loads(json.dumps(_EDIT_FORM))
+        del form["contentData"]["descriptionDelta"]
+        del form["contentData"]["coverImageContentRef"]
+        del form["contentData"]["event"]["endAt"]
+        _read, write = _mock_edit_flow(form)
+        result = _edit(runner, "--title", "T2")
+        assert result.exit_code == 0, result.output
+        body = _sent_body(write)
+        assert "description" not in body
+        assert "descriptionFormat" not in body
+        assert "coverImageContentRef" not in body
+        assert "endAt" not in body["event"]
+
+    # criterio: 08-C14
+    @respx.mock
+    def test_edit_without_occ_token_in_response_exits_1(self, runner: CliRunner) -> None:
+        form = {k: v for k, v in _EDIT_FORM.items() if k != "occToken"}
+        _read, write = _mock_edit_flow(form)
+        result = _edit(runner, "--title", "T2")
+        assert result.exit_code == _EXIT_GENERIC
+        assert write.call_count == 0
+
+    # criterio: 08-C14
+    @respx.mock
+    def test_edit_post_not_found_exits_5_without_put(self, runner: CliRunner) -> None:
+        mock_json("GET", _FOR_EDIT_PATH, {"message": "not found"}, status=_HTTP_404)
+        write = mock_json("PUT", _EDIT_PATH, load_payload("edit_event_post_response.json"))
+        result = _edit(runner, "--occ-token", "5", "--title", "T2")
+        assert result.exit_code == _EXIT_NOT_FOUND
+        assert write.call_count == 0
+
+    # criterio: 08-C15
+    @respx.mock
+    def test_start_without_timezone_uses_read_zone(self, runner: CliRunner) -> None:
+        _read, write = _mock_edit_flow()
+        result = _edit(runner, "--start", "2026-11-06T09:00:00")
+        assert result.exit_code == 0, result.output
+        event = _sent_body(write)["event"]
+        assert event["startAt"] == {"localDatetime": "2026-11-06T09:00:00"}
+        assert event["timezone"] == "Europe/Rome"
+        assert event["endAt"] == _END_BLOCK
+
+    # criterio: 08-C15
+    @respx.mock
+    def test_read_zone_used_when_not_default(self, runner: CliRunner) -> None:
+        form = json.loads(json.dumps(_EDIT_FORM))
+        form["contentData"]["event"]["timezone"] = "America/New_York"
+        del form["contentData"]["event"]["startAt"]["zonedDatetime"]
+        _read, write = _mock_edit_flow(form)
+        result = _edit(runner, "--start", "2026-11-06T09:00:00")
+        assert result.exit_code == 0, result.output
+        event = _sent_body(write)["event"]
+        assert event["startAt"] == {"localDatetime": "2026-11-06T09:00:00"}
+        assert event["timezone"] == "America/New_York"
+
+    # criterio: 08-C15
+    @respx.mock
+    def test_timezone_flag_changes_event_zone(self, runner: CliRunner) -> None:
+        _read, write = _mock_edit_flow()
+        result = _edit(runner, "--start", "2026-11-06T09:00:00", "--timezone", "America/New_York")
+        assert result.exit_code == 0, result.output
+        assert _sent_body(write)["event"]["timezone"] == "America/New_York"
+
+    # criterio: 08-C15
+    @respx.mock
+    def test_invite_user_replaces_users_keeps_groups(self, runner: CliRunner) -> None:
+        _read, write = _mock_edit_flow()
+        result = _edit(runner, "--invite-user", "9")
+        assert result.exit_code == 0, result.output
+        assert _sent_body(write)["event"]["invitations"] == {
+            "users": [{"id": 9}],
+            "groups": [{"id": 3, "typeId": 0}],
+            "sendEditPostNotifications": False,
+        }
+
+    # criterio: 08-C15
+    @respx.mock
+    def test_json_event_over_read_flags_over_json(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        body_file = tmp_path / "body.json"
+        body_file.write_text(
+            json.dumps({"event": {"location": "Sala C"}, "pinned": True}), encoding="utf-8"
+        )
+        _read, write = _mock_edit_flow()
+        result = _edit(runner, "--json", str(body_file))
+        assert result.exit_code == 0, result.output
+        body = _sent_body(write)
+        assert body["event"]["location"] == "Sala C"
+        assert body["event"]["startAt"] == _START_BLOCK
+        assert body["pinned"] is True
+        _read, write = _mock_edit_flow()
+        result = _edit(runner, "--json", str(body_file), "--location", "Sala D")
+        assert result.exit_code == 0, result.output
+        assert _sent_body(write, -1)["event"]["location"] == "Sala D"
+
+    @respx.mock
+    def test_other_flags(self, runner: CliRunner) -> None:
+        _read, write = _mock_edit_flow()
+        result = _edit(
+            runner,
+            "--description", "D",
+            "--watcher-user", "7",
+            "--remove-watcher-user", "8",
+            "--watcher-group", "4",
+            "--remove-watcher-group", "5",
+            "--visibility", "1",
+            "--pinned",
+            "--draft",
+            "--scheduled-publication", "2026-11-01T09:00",
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        body = _sent_body(write)
+        assert body["description"] == "D"
+        assert body["descriptionFormat"] == 2  # noqa: PLR2004
+        assert body["addWatcherUserIds"] == [7]
+        assert body["removeWatcherUserIds"] == [8]
+        assert body["addWatcherGroupIds"] == [4]
+        assert body["removeWatcherGroupIds"] == [5]
+        assert body["visibility"] == 1
+        assert body["pinned"] is True
+        assert body["draft"] is True
+        assert body["scheduledPublication"]["timezone"] == "Europe/Rome"
+
+    @respx.mock
+    def test_without_event_in_form_and_flags_no_event_key(self, runner: CliRunner) -> None:
+        form = json.loads(json.dumps(_EDIT_FORM))
+        del form["contentData"]["event"]
+        _read, write = _mock_edit_flow(form)
+        result = _edit(runner, "--title", "T2")
+        assert result.exit_code == 0, result.output
+        assert "event" not in _sent_body(write)
+
+
+class TestCopyEvent:
+    # criterio: 08-C16
+    @respx.mock
+    def test_copy_reads_form_then_puts_base_with_title(self, runner: CliRunner) -> None:
+        read, write = _mock_copy_flow()
+        result = _copy(runner, "--title", "Copia")
+        assert result.exit_code == 0, result.output
+        assert read.call_count == 1
+        assert write.call_count == 1
+        assert _sent_body(write) == {**_EDIT_BASE, "title": "Copia", "announcement": True}
+
+    # criterio: 08-C16
+    @respx.mock
+    def test_copy_table_shows_new_post(self, runner: CliRunner, snapshot: object) -> None:
+        _mock_copy_flow()
+        result = _copy(runner, "--title", "Copia")
+        assert result.exit_code == 0, result.output
+        assert "21271" in result.output
+        assert result.output == snapshot
+
+    @respx.mock
+    def test_copy_flags(self, runner: CliRunner) -> None:
+        _read, write = _mock_copy_flow()
+        result = _copy(
+            runner,
+            "--start", "2026-11-12T10:00",
+            "--client-uid", "uid-2",
+            "--watcher-user", "7",
+            "--watcher-group", "4",
+            "--announcement",
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        body = _sent_body(write)
+        assert body["clientUid"] == "uid-2"
+        assert body["addWatcherUserIds"] == [7]
+        assert body["addWatcherGroupIds"] == [4]
+        assert body["announcement"] is True
+        assert body["event"]["startAt"] == {"localDatetime": "2026-11-12T10:00:00"}
+        assert body["event"]["endAt"] == _END_BLOCK
+
+
+class TestConflicts:
+    # criterio: 08-C19
+    @pytest.mark.parametrize(
+        ("command", "read_path", "fixture", "write_path"),
+        [
+            ("edit-event", _FOR_EDIT_PATH, "event_post_for_edit_response.json", _EDIT_PATH),
+            ("copy-event", _FOR_COPY_PATH, "event_post_for_copy_response.json", _COPY_PATH),
+        ],
+    )
+    @respx.mock
+    def test_conflict_exits_9_without_retry(
+        self, runner: CliRunner, command: str, read_path: str, fixture: str, write_path: str
+    ) -> None:
+        mock_json("GET", read_path, load_payload(fixture))
+        write = mock_json("PUT", write_path, {"message": "occToken mismatch"}, status=_HTTP_409)
+        result = runner.invoke(
+            app, ["posts", command, str(_POST_ID), "--title", "T2"], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFLICT
+        assert _CONFLICT_MESSAGE in " ".join(result.output.split())
+        assert write.call_count == 1

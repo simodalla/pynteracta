@@ -189,7 +189,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
      `event_write_result_row`, comando `create-event` (senza `--cover`, che arriva in T13).
   3. Snapshot letti, controlli bloccanti; commit `feat(cli): creazione dei post evento`.
 
-### [ ] T11 – `posts edit-event` e `posts copy-event`
+### [x] T11 – `posts edit-event` e `posts copy-event`
 
 - Criteri: 08-C14, 08-C15, 08-C16, 08-C19, 08-C21
 - Dipende da: T06, T10
