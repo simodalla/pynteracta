@@ -18,12 +18,16 @@ that grows one resource group at a time; the current version and its contents ar
 - **Write operations** — `tasks` create, edit and delete; custom `posts` create, edit, copy,
   custom data, watchers, attachments, delete and mark-as-erasable, comments and workflow
   transitions and screen data; admin `users` create, edit, delete and credentials; admin `groups`
-  create, edit, delete and members. In the library (explicit kwargs plus `*_raw` variants) and in
+  create, edit, delete and members; admin `catalogs` and catalog entries create, edit, logical
+  delete and restore; the admin workspace edit (name, description, members, roles, cover and
+  logo). In the library (explicit kwargs plus `*_raw` variants) and in
   the CLI (`tasks create|edit|delete`, `posts create|edit|copy|comment|delete|workflow-execute|…`,
-  `users create|edit|edit-credentials|delete`, `groups create|edit|edit-members|delete`, with
+  `users create|edit|edit-credentials|delete`, `groups create|edit|edit-members|delete`,
+  `catalogs create|edit|delete|restore` and their `*-entry` variants, `admin-manage
+  edit-workspace`, with
   confirmation for destructive commands). Optimistic concurrency is surfaced as
   `ConcurrencyError` / exit code `9`; a write that fails with an unknown outcome is never retried
-  automatically. Event posts and the admin catalogs and workspace follow.
+  automatically. Event posts follow.
 - **Attachment upload** — `client.attachments.upload()` sends a file to the tenant's storage
   and returns a reference that post, comment and task writes accept; in the CLI `--attach` on
   the write commands, `attachments upload` and `posts edit-attachments`.
@@ -40,7 +44,7 @@ that grows one resource group at a time; the current version and its contents ar
 
 ## What's out of scope for now
 
-- Writes on event posts, catalogs, catalog entries and workspaces — planned, not yet shipped;
+- Writes on event posts — planned, not yet shipped;
   see the [roadmap](https://github.com/simodalla/pynteracta/blob/main/ROADMAP.md).
 - Async client, alternate auth methods (Microsoft OAuth2, username/password), automatic
   retry/backoff — tracked under *Deferred / future* in the roadmap, no target version.

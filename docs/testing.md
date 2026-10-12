@@ -96,6 +96,15 @@ runs only with `PYNTERACTA_TEST_WRITE_USERS=1`; `PYNTERACTA_TEST_WRITE_USER_EMAI
 (default `example.com`) is the domain of the created user's email. Both tests print `[05-C26]`
 lines with what the server did with omitted fields and with deletion.
 
+The **catalog write** integration test creates a catalog and an entry named
+`pynteracta-it-<timestamp>`, edits both, and disables them at the end (also when a step fails):
+the API has no physical deletion, so disabled test catalogs stay on the tenant. It runs with the
+base variables above. The **workspace write** integration test adds `PYNTERACTA_TEST_USER_ID` to
+the workspace `PYNTERACTA_TEST_WORKSPACE_ID` and removes it again, restoring name and
+description if the server cleared them; that workspace is shared with real users, so the test
+runs only with `PYNTERACTA_TEST_WRITE_WORKSPACE=1`. Both tests print `[06-C21]` and `[06-C22]`
+lines with what the server did with omitted fields, deletion and listing.
+
 ### Step 3 — export the variables into your shell
 
 pytest does not load `.env` files automatically:

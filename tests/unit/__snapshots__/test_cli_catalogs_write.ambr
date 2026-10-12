@@ -1,0 +1,57 @@
+# serializer version: 1
+# name: TestCatalogEntriesCreate.test_flags_body_and_table
+  '''
+     Entry 101 of catalog 5   
+            created           
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+  ┃ Key            ┃ Value   ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+  │ entry_id       │ 101     │
+  │ catalog_id     │ 5       │
+  │ label          │ Bologna │
+  │ external_id    │ BO      │
+  │ next_occ_token │ 1       │
+  └────────────────┴─────────┘
+  
+  '''
+# ---
+# name: TestCatalogEntriesEdit.test_table_output
+  '''
+  Entry 100 of catalog 5 updated 
+  ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+  ┃ Key            ┃ Value      ┃
+  ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+  │ entry_id       │ 100        │
+  │ catalog_id     │ 5          │
+  │ label          │ Ingegneria │
+  │ external_id    │ BO2        │
+  │ next_occ_token │ 5          │
+  └────────────────┴────────────┘
+  
+  '''
+# ---
+# name: TestCatalogsCreate.test_json_output
+  '''
+  {
+    "catalog_id": 6,
+    "name": "Sedi",
+    "parent_catalog_id": 3,
+    "next_occ_token": 1
+  }
+  
+  '''
+# ---
+# name: TestCatalogsCreate.test_table_output
+  '''
+        Catalog 6 created      
+  ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+  ┃ Key               ┃ Value ┃
+  ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+  │ catalog_id        │ 6     │
+  │ name              │ Sedi  │
+  │ parent_catalog_id │ 3     │
+  │ next_occ_token    │ 1     │
+  └───────────────────┴───────┘
+  
+  '''
+# ---

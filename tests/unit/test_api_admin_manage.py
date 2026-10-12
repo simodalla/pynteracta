@@ -3,11 +3,17 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
+import pytest
 import respx
-from api_helpers import BASE_URL, load_payload, make_transport
+from api_helpers import BASE_URL, load_payload, make_transport, mock_json
 
 from pynteracta.api.admin_manage import AdminManageAPI
+from pynteracta.exceptions import ConcurrencyError, TransportError
+from pynteracta.models.facade.admin_manage import WorkspaceForEdit
+from pynteracta.models.generated import external_v2 as generated
 
 _WORKSPACE_ID = 88
 _CATALOG_ID = 5
@@ -101,3 +107,86 @@ class TestUserCredentialsForEdit:
         assert result.custom_username == "m.rossi"
         assert result.custom_active is True
         assert result.raw.occToken == _USER_OCC_TOKEN
+
+
+# --- scrittura del workspace (spec 06) -----------------------------------------------------
+
+_WS_OCC_TOKEN = 17
+_WS_NEXT_OCC_TOKEN = 18
+_WS_EDIT_PATH = f"admin/manage/workspaces/{_WORKSPACE_ID}/{_WS_OCC_TOKEN}"
+_WS_EXPECTED_BODY = {
+    "name": "WS",
+    "addUserIds": [1],
+    "removeGroupIds": [2],
+    "addUserRoleAssociations": [{"userId": 1, "roleId": 4}],
+    "newCoverImageContentRef": "ref-1",
+}
+_HTTP_CONFLICT = 409
+
+
+class TestEditWorkspace:
+    # criterio: 06-C08
+    @respx.mock
+    def test_edit_sends_given_fields_with_token_in_path(self) -> None:
+        route = mock_json("PUT", _WS_EDIT_PATH, load_payload("edit_workspace_response.json"))
+        result = AdminManageAPI(make_transport()).edit_workspace(
+            _WORKSPACE_ID,
+            _WS_OCC_TOKEN,
+            name="WS",
+            add_user_ids=[1],
+            remove_group_ids=[2],
+            add_user_role_associations=[{"userId": 1, "roleId": 4}],
+            new_cover_image_content_ref="ref-1",
+        )
+        assert route.call_count == 1
+        body = json.loads(route.calls[0].request.content)
+        assert body == _WS_EXPECTED_BODY
+        assert "occToken" not in body
+        assert isinstance(result, WorkspaceForEdit)
+        assert result.id == _WORKSPACE_ID
+        assert result.name == "Operations"
+        assert result.occ_token == _WS_NEXT_OCC_TOKEN
+
+    # criterio: 06-C08
+    @respx.mock
+    def test_edit_raw_equivalent(self) -> None:
+        route = mock_json("PUT", _WS_EDIT_PATH, load_payload("edit_workspace_response.json"))
+        req = generated.EditWorkspaceRequestDTO.model_validate(_WS_EXPECTED_BODY)
+        result = AdminManageAPI(make_transport()).edit_workspace_raw(
+            _WORKSPACE_ID, _WS_OCC_TOKEN, req
+        )
+        assert json.loads(route.calls[0].request.content) == _WS_EXPECTED_BODY
+        assert result.occ_token == _WS_NEXT_OCC_TOKEN
+
+    # criterio: 06-C23
+    @respx.mock
+    def test_response_with_null_description(self) -> None:
+        payload = load_payload("edit_workspace_response.json")
+        payload["contentData"]["description"] = {"it": None}
+        mock_json("PUT", _WS_EDIT_PATH, payload)
+        result = AdminManageAPI(make_transport()).edit_workspace(
+            _WORKSPACE_ID, _WS_OCC_TOKEN, add_user_ids=[1]
+        )
+        assert result.description == {}
+        assert result.occ_token == _WS_NEXT_OCC_TOKEN
+
+    # criterio: 06-C09
+    @respx.mock
+    def test_409_raises_concurrency_error_once(self) -> None:
+        route = mock_json("PUT", _WS_EDIT_PATH, {}, status=_HTTP_CONFLICT)
+        with pytest.raises(ConcurrencyError) as exc_info:
+            AdminManageAPI(make_transport()).edit_workspace(_WORKSPACE_ID, _WS_OCC_TOKEN, name="WS")
+        assert exc_info.value.status_code == _HTTP_CONFLICT
+        assert route.call_count == 1
+
+    # criterio: 06-C09
+    @respx.mock
+    def test_timeout_raises_transport_error_once(self) -> None:
+        route = respx.put(f"{BASE_URL}/{_WS_EDIT_PATH}").mock(
+            side_effect=httpx.ReadTimeout("timed out")
+        )
+        with pytest.raises(TransportError):
+            AdminManageAPI(make_transport()).edit_workspace(
+                _WORKSPACE_ID, _WS_OCC_TOKEN, add_user_ids=[1]
+            )
+        assert route.call_count == 1

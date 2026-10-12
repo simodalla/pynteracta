@@ -304,3 +304,65 @@ def test_users_groups_pages_document_write_commands() -> None:
         assert not re.search(r"\b0\.1[0-9]\.[0-9]\b", paragraph), (
             f"{page.name} cites a version number in the write operations paragraph"
         )
+
+
+_CATALOGS_WORKSPACE_WRITE_COMMANDS = (
+    "catalogs create",
+    "catalogs edit ",
+    "catalogs delete ",
+    "catalogs restore ",
+    "catalogs create-entry",
+    "catalogs edit-entry",
+    "catalogs delete-entry",
+    "catalogs restore-entry",
+    "admin-manage edit-workspace",
+)
+
+
+# criterio: 06-C20
+def test_catalogs_workspace_pages_document_write_commands() -> None:
+    """Le pagine CLI, API, home e README documentano le scritture di cataloghi e workspace."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in (
+        *_CATALOGS_WORKSPACE_WRITE_COMMANDS,
+        "LANG=TEXT",
+        "USER_ID=ROLE_ID",
+        "--cover",
+        "--logo",
+        "| 9 |",
+        "| 11 |",
+    ):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    assert "workspace and catalog writes arrive with their own spec" not in cli
+    assert ".raw.occToken" not in cli
+    catalogs = (_ROOT / "docs" / "api" / "catalogs.md").read_text(encoding="utf-8")
+    for needle in (
+        "create(",
+        "edit(",
+        "set_deleted(",
+        "create_entry(",
+        "edit_entry(",
+        "set_entry_deleted(",
+        "get_for_edit",
+        "get_entry_for_edit",
+        "CatalogWriteResult",
+        "CatalogEntryWriteResult",
+        "CatalogDeletedResult",
+        "occ_token",
+        "parent_catalog_id",
+        "NOT_EXISTS",
+    ):
+        assert needle in catalogs, f"'{needle}' missing from docs/api/catalogs.md"
+    admin = (_ROOT / "docs" / "api" / "admin_manage.md").read_text(encoding="utf-8")
+    for needle in ("edit_workspace(", "occ_token", "new_cover_image_content_ref", "REQUIRED_FIELD"):
+        assert needle in admin, f"'{needle}' missing from docs/api/admin_manage.md"
+    assert "keep it on `.raw`" not in admin
+    assert "occToken only on .raw" not in admin
+    for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
+        text = page.read_text(encoding="utf-8")
+        assert "catalogs and workspace follow" not in text, f"{page.name} lists them as future"
+        assert "admin catalogs and workspace follow" not in text
+        write_lines = [line for line in text.splitlines() if "Write operations" in line]
+        paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
+        for needle in ("catalog", "workspace"):
+            assert needle in paragraph, f"{needle} missing from the write operations of {page.name}"

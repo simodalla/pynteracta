@@ -2,8 +2,9 @@
 """admin-manage sub-commands: workspace, catalog, catalog-entry, user-credentials.
 
 These are admin-only read-form helpers (the GET admin/manage ``…/edit`` endpoints). They fetch
-the editable entity state plus an ``occToken`` for the future write line. ``occToken`` is not in
-the default table; reach it via ``--full``, ``--export``, or JSON output (it lives on ``.raw``).
+the editable entity state plus an ``occToken`` for the write commands. ``occToken`` is not in
+the default table; reach it via ``--full``, ``--export``, or JSON output. La scrittura
+``edit-workspace`` sta in ``cli/admin_manage_write.py`` e si registra su questo gruppo (spec 06).
 """
 
 from __future__ import annotations
@@ -85,8 +86,8 @@ def admin_manage_workspace(  # noqa: PLR0913
 ) -> None:
     """Fetch a workspace edit form by ID.
 
-    Uses GET admin/manage/workspaces/{workspaceId}/edit. occToken is only on .raw
-    (available via --full / --export / json) — the propaedeutic edit token for future writes.
+    Uses GET admin/manage/workspaces/{workspaceId}/edit. occToken is not in the
+    default table (available via --full / --export / json): it is the token for edit-workspace.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -127,8 +128,8 @@ def admin_manage_catalog(  # noqa: PLR0913
 ) -> None:
     """Fetch a catalog edit form by ID.
 
-    Uses GET admin/manage/catalogs/{catalogId}/edit. occToken is only on .raw
-    (available via --full / --export / json).
+    Uses GET admin/manage/catalogs/{catalogId}/edit. occToken is not in the
+    default table (available via --full / --export / json).
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -170,8 +171,8 @@ def admin_manage_catalog_entry(  # noqa: PLR0913
 ) -> None:
     """Fetch a catalog entry edit form by catalog and entry ID.
 
-    Uses GET admin/manage/catalogs/{catalogId}/entries/{entryId}/edit. occToken is only on .raw
-    (available via --full / --export / json).
+    Uses GET admin/manage/catalogs/{catalogId}/entries/{entryId}/edit. occToken is not in the
+    default table (available via --full / --export / json).
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -212,8 +213,8 @@ def admin_manage_user_credentials(  # noqa: PLR0913
 ) -> None:
     """Fetch a user's credentials edit form by user ID.
 
-    Uses GET admin/manage/users/{userId}/credentials/edit. occToken is only on .raw
-    (available via --full / --export / json).
+    Uses GET admin/manage/users/{userId}/credentials/edit. occToken is not in the
+    default table (available via --full / --export / json).
     """
     state: CliState = ctx.obj
     console = make_console(state)

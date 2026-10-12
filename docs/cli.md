@@ -967,6 +967,80 @@ pynteracta catalogs entries 5 --label "Eng" --order-by label --order-asc
 pynteracta catalogs entries 5 --output json
 ```
 
+### Writing catalogs and entries
+
+The write commands need admin permissions. Names and labels are maps by language: pass them as
+repeatable `LANG=TEXT` pairs (`--name it=Sedi --name en=Sites` → `{"it": "Sedi", "en":
+"Sites"}`); a value without `=` or with an empty language exits with code **2** and sends
+nothing. `--json FILE|-` gives the full request body; flags win over its keys, and the language
+maps are merged one language at a time. Every command sends **one** write and never retries: a
+`409` exits with code **9** (`Catalog 5 changed since it was read: fetch it again and retry`).
+
+Catalogs and entries are never removed: `delete` sets the logical `deleted` flag and `restore`
+clears it. A disabled catalog disappears from `catalogs list`: asked for by id, the server
+answers `400` (`NOT_EXISTS`).
+
+#### `catalogs create`
+
+```bash
+pynteracta catalogs create --name it=Sedi --name en=Sites
+pynteracta catalogs create --name it=Province --parent 3
+```
+
+Table: `catalog_id`, `name`, `parent_catalog_id`, `next_occ_token`.
+
+#### `catalogs edit CATALOG_ID`
+
+A **patch**: Interacta replaces the whole name map on every edit (the languages you omit lose
+their text), so the command reads the edit form first and sends back the name map, updated one
+language at a time by `--name`, and the parent, replaced by `--parent`. The `deleted` flag is
+never sent: use `delete` and `restore`. The concurrency token is the one just read, or
+`--occ-token` (the form is read anyway, for the patch).
+
+```bash
+pynteracta catalogs edit 5 --name en=Sites          # keeps the other languages
+pynteracta catalogs edit 5 --parent 4 --occ-token 8
+```
+
+#### `catalogs delete CATALOG_ID` and `catalogs restore CATALOG_ID`
+
+`delete` reads the catalog and asks `Delete catalog 5 "Sedi"? [y/N]` (the `it` name, or the
+first language); `--yes` skips the prompt and is required without an interactive terminal (exit
+code **2** otherwise). `restore` asks nothing.
+
+```bash
+pynteracta catalogs delete 5            # → Catalog 5 deleted
+pynteracta catalogs restore 5           # → Catalog 5 restored
+pynteracta --output json catalogs delete 5 --yes   # {"catalog_id": 5, "deleted": true}
+```
+
+#### `catalogs create-entry CATALOG_ID`
+
+```bash
+pynteracta catalogs create-entry 5 --label it=Bologna --external-id BO
+pynteracta catalogs create-entry 5 --label it=Imola --parent-entry 10 --parent-entry 11
+```
+
+Table: `entry_id`, `catalog_id`, `label`, `external_id`, `next_occ_token`.
+
+#### `catalogs edit-entry CATALOG_ID ENTRY_ID`
+
+A **patch** like `catalogs edit`: Interacta replaces the label map and clears the external id
+and the parent entries missing from the request, so the command sends back the label map
+(updated by `--label`), the parent entries (replaced as a whole by `--parent-entry`) and the
+external id (replaced by `--external-id`).
+
+```bash
+pynteracta catalogs edit-entry 5 100 --label en=Bologna
+pynteracta catalogs edit-entry 5 100 --external-id BO2
+```
+
+#### `catalogs delete-entry CATALOG_ID ENTRY_ID` and `catalogs restore-entry CATALOG_ID ENTRY_ID`
+
+As `delete` and `restore`, with the prompt `Delete entry 100 "Bologna" of catalog 5? [y/N]` and
+the messages `Entry 100 of catalog 5 deleted|restored` (`--output json`: `{"catalog_id": 5,
+"entry_id": 100, "deleted": …}`).
+
 ---
 
 ## `attachments` commands
@@ -1191,11 +1265,11 @@ pynteracta hashtags list 79 --export hashtags.csv
 
 Admin-only **read-form** helpers: each fetches the editable state of an entity (the
 `GET admin/manage/.../edit` endpoints) together with an `occToken` for the write operations. The
-user credentials are written with `users edit-credentials`; workspace and catalog writes arrive
-with their own spec.
+user credentials are written with `users edit-credentials`, catalogs and entries with the
+`catalogs` write commands, the workspace with `admin-manage edit-workspace`.
 
-`occToken` is **not** shown in the default table — it lives on `.raw.occToken` and is reachable
-via `--full`, `--output json`, or `--export` (combined with `--full`). There is no `--web-url`
+`occToken` is **not** shown in the default table of the read commands; it is reachable via
+`--full`, `--output json`, or `--export` (combined with `--full`). There is no `--web-url`
 flag on these commands (they are admin forms, not user-facing pages).
 
 ### `admin-manage workspace WORKSPACE_ID`
@@ -1237,6 +1311,35 @@ pynteracta admin-manage user-credentials 1042 --output json
 Default table: `has_google_credentials`, `has_microsoft_credentials`, `has_custom_credentials`,
 `custom_username`, `custom_active`. The full per-provider configuration is on `.raw`; `occ_token`
 is the token for `users edit-credentials --occ-token`.
+
+### `admin-manage edit-workspace WORKSPACE_ID`
+
+Edit a workspace: name, description, members, roles, cover image and logo.
+
+```bash
+pynteracta admin-manage edit-workspace 88 --add-user 1042 --remove-group 7
+pynteracta admin-manage edit-workspace 88 --name "Operations" --description it="Spazio operazioni"
+pynteracta admin-manage edit-workspace 88 --add-user-role 1042=4 --remove-role-association 9
+pynteracta admin-manage edit-workspace 88 --cover cover.png --logo logo.png
+```
+
+The command is a **patch**: Interacta requires the name on every edit (`400 REQUIRED_FIELD`
+otherwise), so it reads the edit form first and sends back the name, the translations and the
+description as read, updated by `--name`, `--description LANG=TEXT` (repeatable) and `--json`
+(maps merged one language at a time), together with the members and roles you add or remove.
+`--add-user-role USER_ID=ROLE_ID` and `--add-group-role GROUP_ID=ROLE_ID` are repeatable; a
+malformed pair exits with code **2**. Translations of the name go through `--json`. Without any
+option and without `--json` the command exits with code **2** and sends nothing.
+
+`--cover PATH` and `--logo PATH` upload the files first (in this order, with the mechanism of
+`attachments upload`) and stop at the first failed upload with exit code **11**, before the edit
+is sent. The concurrency token is the one just read, or `--occ-token`. After the edit the form
+is read again and shown, because the edit response has no member counts (if that read fails,
+the edit stays done: a warning, the edit response and exit code 0).
+
+Table: `id`, `name`, `admin_users_count`, `member_users_count`, `admin_groups_count`,
+`member_groups_count`, `occ_token`. `409` → exit code **9** with `Workspace 88 changed since it
+was read: fetch it again and retry`; nothing is retried.
 
 ---
 
@@ -1359,4 +1462,4 @@ pynteracta tasks delete 7001 -y --output json   # {"task_id": 7001, "post_id": 2
 | 8 | Server error |
 | 9 | Conflict: the resource changed since it was read (`409`, `occToken` mismatch) — fetch it again and retry |
 | 10 | Unexpected internal error |
-| 11 | Upload rejected by the storage (`--attach`, `attachments upload`, `posts edit-attachments`): nothing was written |
+| 11 | Upload rejected by the storage (`--attach`, `attachments upload`, `posts edit-attachments`, `admin-manage edit-workspace --cover/--logo`): nothing was written |

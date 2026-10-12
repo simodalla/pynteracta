@@ -18,8 +18,11 @@ import typer
 from pynteracta.cli._write import (
     append_attachments,
     merge_body,
+    merge_lang_map,
     parse_id_path_pairs,
+    parse_int_pairs,
     parse_kv_values,
+    parse_lang_map,
     read_password,
     upload_all,
     validate_body,
@@ -237,3 +240,72 @@ class TestReadPassword:
             read_password()
         assert exc_info.value.exit_code == _EXIT_CONFIG
         assert "--password-stdin: no password read from stdin." in capsys.readouterr().err
+
+
+class TestParseLangMap:
+    # criterio: 06-C10
+    def test_pairs(self) -> None:
+        assert parse_lang_map(["it=Sedi", "en=Sites"], option="--name") == {
+            "it": "Sedi",
+            "en": "Sites",
+        }
+
+    # criterio: 06-C10
+    def test_text_keeps_equals_and_is_not_coerced(self) -> None:
+        assert parse_lang_map(["it=a=b", "en=12", "de=true"], option="--name") == {
+            "it": "a=b",
+            "en": "12",
+            "de": "true",
+        }
+
+    # criterio: 06-C10
+    def test_none_is_empty(self) -> None:
+        assert parse_lang_map(None, option="--name") == {}
+
+    # criterio: 06-C10
+    @pytest.mark.parametrize("value", ["Sedi", "=Sedi", " =Sedi"])
+    def test_malformed_raises_bad_parameter(self, value: str) -> None:
+        with pytest.raises(typer.BadParameter, match=r"--name must be LANG=TEXT"):
+            parse_lang_map([value], option="--name")
+
+
+class TestParseIntPairs:
+    # criterio: 06-C17
+    def test_pairs(self) -> None:
+        assert parse_int_pairs(["1=4", "2=5"], option="--add-user-role") == [(1, 4), (2, 5)]
+
+    # criterio: 06-C17
+    def test_none_is_empty(self) -> None:
+        assert parse_int_pairs(None, option="--add-user-role") == []
+
+    # criterio: 06-C17
+    @pytest.mark.parametrize("value", ["1", "a=4", "1=", "=4", "1=b"])
+    def test_malformed_raises_bad_parameter(self, value: str) -> None:
+        with pytest.raises(typer.BadParameter, match=r"--add-group-role must be GROUP_ID=ROLE_ID"):
+            parse_int_pairs([value], option="--add-group-role", form="GROUP_ID=ROLE_ID")
+
+
+class TestMergeLangMap:
+    # criterio: 06-C10
+    def test_key_absent(self) -> None:
+        body: dict[str, Any] = {"parentId": 3}
+        merge_lang_map(body, "name", {"it": "Sedi"})
+        assert body == {"parentId": 3, "name": {"it": "Sedi"}}
+
+    # criterio: 06-C10
+    def test_key_present_merged_flags_win(self) -> None:
+        body: dict[str, Any] = {"name": {"it": "X", "de": "Standorte"}}
+        merge_lang_map(body, "name", {"it": "Sedi", "en": "Sites"})
+        assert body == {"name": {"it": "Sedi", "de": "Standorte", "en": "Sites"}}
+
+    # criterio: 06-C10
+    def test_none_value_replaced(self) -> None:
+        body: dict[str, Any] = {"name": None}
+        merge_lang_map(body, "name", {"it": "Sedi"})
+        assert body == {"name": {"it": "Sedi"}}
+
+    # criterio: 06-C10
+    def test_empty_flags_leave_body_unchanged(self) -> None:
+        body: dict[str, Any] = {"name": {"it": "X"}}
+        merge_lang_map(body, "name", {})
+        assert body == {"name": {"it": "X"}}

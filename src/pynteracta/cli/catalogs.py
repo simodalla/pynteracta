@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""catalogs sub-commands: list, entries."""
+"""catalogs sub-commands: list, entries.
+
+I comandi di scrittura (create, edit, delete, restore e i corrispondenti ``*-entry``) stanno in
+``cli/catalogs_write.py`` e si registrano su questo stesso gruppo (spec 06).
+"""
 
 from __future__ import annotations
 

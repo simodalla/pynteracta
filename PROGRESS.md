@@ -1783,3 +1783,56 @@ Minor **0.13.0**.
 - `docs/testing.md`: suggerire `chmod 600 tests/integration/.env` e `set -a; source …; set +a`
   al posto di `export $(… | xargs)`.
 - Seconda metà di RF-023 (cataloghi, voci di catalogo, workspace): spec 06. Poi i post evento.
+
+## M32 — Anagrafiche admin, seconda metà: cataloghi, voci di catalogo e workspace — completata 2026-10-12
+
+Sesta spec del metodo: [`specs/06-admin-catalogs-workspace/`](specs/06-admin-catalogs-workspace/)
+(`spec.md`, `plan.md`, `tasks.md`, `verifica.md`). Quinto gruppo della superficie di scrittura
+aperta da [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md), seconda metà di
+RF-023, che così è completo. Minor **0.13.0**.
+
+### Fatto
+
+- Libreria: `client.catalogs.create|edit|set_deleted|create_entry|edit_entry|set_entry_deleted`
+  (+ `_raw`), alias `get_for_edit` e `get_entry_for_edit`; `client.admin_manage.edit_workspace`
+  (+ `_raw`, `occToken` nel path); façade `CatalogWriteResult`, `CatalogEntryWriteResult`,
+  `CatalogDeletedResult`; `etag`, voci, `catalog_id`, `deleted` su `Catalog`/`CatalogEntry`;
+  `occ_token` su tutte le façade dei form, `parent_catalog_id`, `translations`; le lingue `null`
+  sono scartate dalle mappe (06-T01…T06, T17).
+- CLI: `catalogs create|edit|delete|restore` e `*-entry` (mappe `LANG=TEXT`, patch su `edit` ed
+  `edit-entry`, cancellazione logica con conferma, ripristino senza); `admin-manage
+  edit-workspace` (patch sul form, add/remove di membri e ruoli, `--cover`/`--logo` con upload,
+  rilettura del form dopo la modifica); helper `parse_lang_map`, `parse_int_pairs`,
+  `merge_lang_map` in `cli/_write.py` (06-T07…T12, T18, T19).
+- Documentazione: `docs/api/catalogs.md` (riscritta), `docs/api/admin_manage.md`, `docs/cli.md`,
+  `docs/testing.md`, home e README; PRD con RF-023 precisato, RF-023e, RF-023f (06-T15, T16).
+  Integration test opt-in dei due cicli eseguiti sul tenant di prova (06-T13, T14).
+- 142 unit test e 16 contract test nuovi (1208 → 1350, 185 → 201); copertura totale 94,94 % →
+  95,18 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant** (T14): `catalogs.edit` ed `edit_entry` sostituiscono per intero la
+  mappa del nome o della label (le lingue omesse perdono il testo, `it` riceve quello passato);
+  `edit_entry` azzera external id e parent omessi; `…/entries/{id}/deleted` risponde con
+  `entryId`; un catalogo disabilitato chiesto per id dà `400` `NOT_EXISTS`; il form del
+  workspace può avere lingue `null`; `edit_workspace` esige `name` e la sua risposta ha i conteggi
+  a `0`.
+- Con l'approvazione del maintainer: façade tolleranti alle lingue `null` (06-C23);
+  `edit-workspace` patch sul form letto (06-C24); rilettura del form dopo `edit-workspace`, con
+  avviso ed exit `0` se fallisce (06-C25). Revisioni della spec in `24b98dc`, `9447bb5`,
+  `1197bd9`; task T17, T18, T19.
+- Il ciclo integration del workspace salta se l'utente di prova è già membro e decide sempre su
+  una lettura nuova del form.
+
+### Follow-up
+
+- Release **0.13.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- Le prove sul tenant hanno lasciato i cataloghi 33, 34, 35 e le voci 8490-8492, disabilitati:
+  l'API non li elimina.
+- `catalogs.list()` senza id restituisce una lista vuota sul tenant di prova: capire se dipende
+  dal service account e dirlo nei docs.
+- Non si è provato se traduzioni e descrizione omesse dal `PUT` del workspace vengano azzerate.
+- Restano aperti i follow-up di M31 su `docs/testing.md` e sulla redazione di `occToken` nei body
+  dell'audit log.
+- Prossimo gruppo: i post evento (RF-021).
