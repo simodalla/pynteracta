@@ -1,0 +1,72 @@
+{
+  "coverImage": {
+    "contentRef": "ref-1",
+    "contentMimeType": "image/png",
+    "size": 2048
+  },
+  "occToken": 5,
+  "contentData": {
+    "title": "Riunione di prova",
+    "descriptionDelta": "{\"ops\":[{\"insert\":\"Riunione di prova per i test.\\n\"}]}",
+    "descriptionPlainText": "Riunione di prova per i test.",
+    "coverImageContentRef": "ref-1",
+    "visibility": 2,
+    "announcement": true,
+    "attachments": [],
+    "mentions": [],
+    "watchers": [],
+    "watcherUsers": [],
+    "watcherGroups": [],
+    "hashtags": [],
+    "pinned": false,
+    "draft": false,
+    "scheduledPublication": null,
+    "scheduledPublicationResult": null,
+    "event": {
+      "startAt": {
+        "zonedDatetime": "2026-11-05T10:00:00+01:00",
+        "localDatetime": "2026-11-05T10:00:00",
+        "utcDatetime": "2026-11-05T09:00:00Z"
+      },
+      "endAt": {
+        "zonedDatetime": "2026-11-05T12:00:00+01:00",
+        "localDatetime": "2026-11-05T12:00:00",
+        "utcDatetime": "2026-11-05T11:00:00Z"
+      },
+      "timezone": "Europe/Rome",
+      "allDay": false,
+      "location": "Sala A",
+      "participantsCount": 3,
+      "participate": true,
+      "participateTypeId": 1,
+      "invitations": {
+        "users": [
+          {
+            "id": 7,
+            "firstName": "Alice",
+            "lastName": "Rossi",
+            "caption": "Alice Rossi",
+            "contactEmail": "a.rossi@example.it",
+            "serviceAccount": false,
+            "systemAccount": false,
+            "deleted": false,
+            "blocked": false,
+            "privateProfile": false,
+            "typeId": 2
+          }
+        ],
+        "groups": [
+          {
+            "id": 3,
+            "name": "G",
+            "visible": true,
+            "deleted": false,
+            "membersCount": 4,
+            "typeId": 0
+          }
+        ],
+        "sendEditPostNotifications": false
+      }
+    }
+  }
+}

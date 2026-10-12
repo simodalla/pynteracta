@@ -32,7 +32,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   4. Controlli bloccanti; commit `feat(api): blocco data-ora degli eventi con fuso IANA; riga
      0.14.0 in ROADMAP`.
 
-### [ ] T02 – Fixture JSON e contract test dei DTO evento
+### [x] T02 – Fixture JSON e contract test dei DTO evento
 
 - Criteri: 08-C22 (DTO)
 - Dipende da: nessuno
