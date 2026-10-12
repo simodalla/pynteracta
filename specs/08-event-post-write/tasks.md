@@ -256,7 +256,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   5. Controlli bloccanti e `mkdocs build --strict`; commit `docs: scrittura dei post evento nella
      libreria e nella CLI`.
 
-### [ ] T15 – Integration test del ciclo completo
+### [x] T15 – Integration test del ciclo completo
 
 - Criteri: 08-C24 (parte automatica)
 - Dipende da: T07
