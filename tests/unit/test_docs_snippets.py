@@ -118,11 +118,13 @@ def test_snippets_were_collected() -> None:
 
 
 # criterio: 01-C11
+# criterio: 07-C08
 def test_logging_page_states_redaction_guarantees() -> None:
-    """La pagina Audit Logging dichiara le garanzie di redazione di cookie e header per nome."""
+    """La pagina Audit Logging dichiara le garanzie di redazione di cookie e header per nome, e
+    l'eccezione dei token di concorrenza ottimistica (spec 07)."""
     text = (_ROOT / "docs" / "logging.md").read_text(encoding="utf-8")
     guarantees = text.split("## Redaction guarantees", 1)[1].split("\n## ", 1)[0]
-    for needle in ("Proxy-Authorization", "Set-Cookie", "api-key"):
+    for needle in ("Proxy-Authorization", "Set-Cookie", "api-key", "occToken", "nextOccToken"):
         assert needle in guarantees, f"'{needle}' missing from the redaction guarantees"
     example = text.split("## Log format", 1)[1].split("\n## ", 1)[0]
     assert "interacta_auth_refresh_token=***REDACTED***" in example

@@ -48,7 +48,7 @@ Valori finti dei test (dal piano): `occToken` `3` e `7`, `nextOccToken` `4`, `sc
   4. Commit `fix(audit): occToken e varianti in chiaro nei body redatti di audit log e hook
      (07-T02)`.
 
-### [ ] T03 – Chiusura: sito, PRD
+### [x] T03 – Chiusura: sito, PRD
 
 - Criteri: 07-C08
 - Dipende da: T02
