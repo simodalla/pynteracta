@@ -29,6 +29,24 @@ _SENSITIVE_KEY_RE = re.compile(
     r"(?i)token|password|secret|privatekey|assertion|jwt|signature|policy"
 )
 
+# Chiavi dei body che contengono ``token`` ma non sono segreti: i token di concorrenza
+# ottimistica (``occToken`` e varianti), contatori di versione dell'entità che non autenticano
+# nessuno. Restano in chiaro perché l'audit delle scritture deve mostrare quale token è stato letto
+# e quale inviato. Confronto per nome esatto, in minuscolo: ogni altra chiave con ``token`` resta
+# redatta (in dubbio si redige, spec 07).
+_OCC_TOKEN_KEYS = frozenset(
+    {
+        "occtoken",
+        "nextocctoken",
+        "screenocctoken",
+        "nextscreenocctoken",
+        "occ_token",
+        "next_occ_token",
+        "screen_occ_token",
+        "next_screen_occ_token",
+    }
+)
+
 # Parametro di query di un URL il cui nome contiene una parola sensibile (``Signature`` dei link
 # firmati, ``access_token``, ``apiKey``…): resta il nome, il valore è redatto. Il nome deve seguire
 # ``?`` o ``&``, così il testo ordinario non è toccato (spec 04).
@@ -122,16 +140,27 @@ def _redact_cookie_header(name: str, value: str) -> str:
     return _COOKIE_PAIR_RE.sub(_sub, value)
 
 
-def redact_body(body: Any) -> Any:
-    """Recursively redact sensitive keys in a body; returns non-dicts/lists unchanged.
+def _is_sensitive_key(name: str) -> bool:
+    """Dice se il valore della chiave ``name`` di un body va redatto.
 
-    Walks nested ``dict`` and ``list`` structures, redacting any value whose key
-    matches the sensitive-key pattern and applying JWT scrubbing to leaf strings.
+    Le chiavi dei token di concorrenza ottimistica (``_OCC_TOKEN_KEYS``) non sono sensibili;
+    ogni altra chiave lo è se il nome contiene una parola di ``_SENSITIVE_KEY_RE``.
+    """
+    if name.lower() in _OCC_TOKEN_KEYS:
+        return False
+    return _SENSITIVE_KEY_RE.search(name) is not None
+
+
+def redact_body(body: Any) -> Any:
+    """Redige ricorsivamente le chiavi sensibili di un body; il resto passa invariato.
+
+    Percorre ``dict`` e ``list`` annidati: il valore di una chiave sensibile diventa
+    ``***REDACTED***``, le stringhe passano da :func:`redact_string`. I token di concorrenza
+    ottimistica (``occToken``, ``nextOccToken``, ``screenOccToken``, ``nextScreenOccToken`` e le
+    grafie snake_case) restano in chiaro: sono contatori di versione, non segreti.
     """
     if isinstance(body, dict):
-        return {
-            k: _REDACTED if _SENSITIVE_KEY_RE.search(k) else redact_body(v) for k, v in body.items()
-        }
+        return {k: _REDACTED if _is_sensitive_key(k) else redact_body(v) for k, v in body.items()}
     if isinstance(body, list):
         return [redact_body(item) for item in body]
     if isinstance(body, str):

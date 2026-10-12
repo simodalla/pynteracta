@@ -23,7 +23,7 @@ Valori finti dei test (dal piano): `occToken` `3` e `7`, `nextOccToken` `4`, `sc
      specs/07-occtoken-audit/spec.md`; nota "last used: M33".
   2. Commit `docs: riga 0.13.1 in ROADMAP per la spec 07 (07-T01)`.
 
-### [ ] T02 – Eccezione della famiglia occ in `redact_body`
+### [x] T02 – Eccezione della famiglia occ in `redact_body`
 
 - Criteri: 07-C01, 07-C02, 07-C03, 07-C04, 07-C05, 07-C06, 07-C07
 - Dipende da: T01
