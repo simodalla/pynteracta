@@ -1,6 +1,6 @@
 # 07 – I token di concorrenza ottimistica passano in chiaro nei body redatti
 
-Stato: approvata
+Stato: chiusa
 Branch: `m33_occtoken_audit`
 Requisiti del PRD: RNF-001, RF-017, RF-018, RF-025
 Dipende da: 01 (redazione per nome di header e cookie), 04 (chiavi `signature` e `policy`, query firmate)
