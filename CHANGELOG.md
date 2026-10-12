@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.13.1] - 2026-10-12
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.13.0
+- Spec 07, token di concorrenza in chiaro nei body redatti
+- Piano 07, token di concorrenza in chiaro nei body redatti
+- Task 07, token di concorrenza in chiaro nei body redatti
+- Riga 0.13.1 in ROADMAP per la spec 07 (07-T01)
+- Garanzie di redazione e PRD per i token di concorrenza (07-T03)
+- Verifica 07, token di concorrenza in chiaro nei body redatti
+- Release v0.13.1, riga di ROADMAP a shipped
+
+### Fixes
+
+- **audit**: OccToken e varianti in chiaro nei body redatti di audit log e hook (07-T02)
+
 ## [0.13.0] - 2026-10-12
 
 ### Chores
