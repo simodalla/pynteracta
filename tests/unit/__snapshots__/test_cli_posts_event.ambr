@@ -1,0 +1,56 @@
+# serializer version: 1
+# name: TestPrepCommands.test_get_event_for_copy_table
+  '''
+          Event post 21269 (for copy)         
+  ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key          ┃ Value                     ┃
+  ┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ occ_token    │ 5                         │
+  │ title        │ Riunione di prova         │
+  │ start_at     │ 2026-11-05T10:00:00+01:00 │
+  │ end_at       │ 2026-11-05T12:00:00+01:00 │
+  │ timezone     │ Europe/Rome               │
+  │ all_day      │ False                     │
+  │ location     │ Sala A                    │
+  │ visibility   │ 2                         │
+  │ announcement │ True                      │
+  └──────────────┴───────────────────────────┘
+  
+  '''
+# ---
+# name: TestPrepCommands.test_get_event_for_create_table
+  '''
+     New event post in    
+        community 79      
+  ┏━━━━━━━━━━━━━━┳━━━━━━━┓
+  ┃ Key          ┃ Value ┃
+  ┡━━━━━━━━━━━━━━╇━━━━━━━┩
+  │ title        │       │
+  │ visibility   │ 1     │
+  │ announcement │ False │
+  │ draft        │ False │
+  └──────────────┴───────┘
+  
+  '''
+# ---
+# name: TestPrepCommands.test_get_event_for_edit_table_starts_with_occ_token
+  '''
+             Event post 21269 (for edit)            
+  ┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                ┃ Value                     ┃
+  ┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ occ_token          │ 5                         │
+  │ community_id       │ 79                        │
+  │ custom_id          │ POST-21269                │
+  │ title              │ Riunione di prova         │
+  │ start_at           │ 2026-11-05T10:00:00+01:00 │
+  │ end_at             │ 2026-11-05T12:00:00+01:00 │
+  │ timezone           │ Europe/Rome               │
+  │ all_day            │ False                     │
+  │ location           │ Sala A                    │
+  │ participants_count │ 3                         │
+  │ visibility         │ 2                         │
+  └────────────────────┴───────────────────────────┘
+  
+  '''
+# ---

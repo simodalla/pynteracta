@@ -153,7 +153,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   2. `cli/_write.py`: `parse_event_datetime(value, timezone, *, option)` come nel piano.
   3. Controlli bloccanti; commit `feat(cli): lettura delle date degli eventi da data o data-ora`.
 
-### [ ] T09 – Modulo `cli/posts_event.py` e comandi `get-event-for-*`
+### [x] T09 – Modulo `cli/posts_event.py` e comandi `get-event-for-*`
 
 - Criteri: 08-C20
 - Dipende da: T05

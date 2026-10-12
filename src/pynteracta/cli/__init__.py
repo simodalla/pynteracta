@@ -28,6 +28,9 @@ from pynteracta.cli import (
 from pynteracta.cli import hashtags as _hashtags_cli
 from pynteracta.cli import posts as _posts_cli
 from pynteracta.cli import (
+    posts_event as _posts_event_cli,  # noqa: F401  (registra i comandi dei post evento)
+)
+from pynteracta.cli import (
     posts_write as _posts_write_cli,  # noqa: F401  (registra i comandi di scrittura)
 )
 from pynteracta.cli import tasks as _tasks_cli
