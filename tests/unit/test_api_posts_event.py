@@ -17,7 +17,7 @@ from api_helpers import BASE_URL, load_payload, make_transport
 from pynteracta.api.posts import PostsAPI
 from pynteracta.api.posts_event import PostsEventAPI, build_event_block
 from pynteracta.api.posts_write import PostsWriteAPI
-from pynteracta.exceptions import TransportError, ValidationError
+from pynteracta.exceptions import ConcurrencyError, TransportError, ValidationError
 from pynteracta.models.facade.posts_event import (
     EventPostForCopy,
     EventPostForCreate,
@@ -40,6 +40,11 @@ _START_BLOCK = {"localDatetime": "2026-11-05T10:00:00"}
 _END_BLOCK = {"localDatetime": "2026-11-05T12:00:00"}
 
 _CREATE_PATH = f"{_MANAGE}/create-event-post/{_COMMUNITY_ID}"
+_EDIT_PATH = f"{_MANAGE}/edit-event-post/{_POST_ID}/{_OCC_TOKEN}"
+_COPY_PATH = f"{_MANAGE}/copy-event-post/{_POST_ID}/{_OCC_TOKEN}"
+_COPY_POST_ID = 21271
+_NEXT_OCC_TOKEN_EDIT = 6
+_HTTP_409 = 409
 
 
 def _api() -> PostsAPI:
@@ -302,6 +307,130 @@ class TestEventCreate:
         assert body["attachments"] == [{"attachmentId": 3}]
 
 
+def _mock_edit() -> respx.Route:
+    return respx.put(_EDIT_PATH).mock(
+        return_value=httpx.Response(200, json=load_payload("edit_event_post_response.json"))
+    )
+
+
+def _mock_copy() -> respx.Route:
+    return respx.put(_COPY_PATH).mock(
+        return_value=httpx.Response(200, json=load_payload("copy_event_post_response.json"))
+    )
+
+
+class TestEventEdit:
+    # criterio: 08-C05
+    @respx.mock
+    def test_edit_event_sends_only_given_fields(self) -> None:
+        route = _mock_edit()
+        result = _api().edit_event(
+            _POST_ID,
+            _OCC_TOKEN,
+            location="Sala B",
+            add_watcher_group_ids=[4],
+            remove_watcher_user_ids=[8],
+            pinned=False,
+            cover_image_content_ref="ref-2",
+        )
+        assert route.call_count == 1
+        assert _sent(route) == {
+            "coverImageContentRef": "ref-2",
+            "addWatcherGroupIds": [4],
+            "removeWatcherUserIds": [8],
+            "pinned": False,
+            "event": {"location": "Sala B"},
+        }
+        assert isinstance(result.raw, generated.EditPostResponseDTO)
+        assert result.next_occ_token == _NEXT_OCC_TOKEN_EDIT
+        assert result.post_id == _POST_ID
+        assert result.post is not None
+        assert result.post.title == "Riunione di prova (rev. 2)"
+
+    # criterio: 08-C05
+    @respx.mock
+    def test_edit_event_end_only_sends_end_and_timezone(self) -> None:
+        route = _mock_edit()
+        _api().edit_event(_POST_ID, _OCC_TOKEN, end_at=_END)
+        assert _sent(route) == {"event": {"endAt": _END_BLOCK, "timezone": "Europe/Rome"}}
+
+    # criterio: 08-C05
+    @respx.mock
+    def test_edit_event_without_fields_sends_empty_body(self) -> None:
+        route = _mock_edit()
+        _api().edit_event(_POST_ID, _OCC_TOKEN)
+        assert _sent(route) == {}
+
+    @respx.mock
+    def test_edit_event_other_fields(self) -> None:
+        route = _mock_edit()
+        _api().edit_event(
+            _POST_ID,
+            _OCC_TOKEN,
+            title="T2",
+            description="D",
+            description_format=2,
+            add_attachments=[{"attachmentId": 4}],
+            update_attachments=[{"attachmentId": 5, "contentRef": "r"}],
+            remove_attachment_ids=[3],
+            add_watcher_user_ids=[7],
+            remove_watcher_group_ids=[5],
+            visibility=1,
+            link_preview={"url": "https://example.org"},
+            draft=False,
+            scheduled_publication=_END,
+            invited_user_ids=[9],
+        )
+        body = _sent(route)
+        assert body["addAttachments"] == [{"attachmentId": 4}]
+        assert body["removeWatcherGroupIds"] == [5]
+        assert body["scheduledPublication"]["timezone"] == "Europe/Rome"
+        assert body["event"] == {"invitations": {"users": [{"id": 9}]}}
+
+    # criterio: 08-C04
+    @respx.mock
+    def test_raw_equivalent(self) -> None:
+        route = _mock_edit()
+        req = generated.EditEventPostRequestDTO(event={"location": "Sala B"})  # type: ignore[arg-type]
+        result = _api().edit_event_raw(_POST_ID, _OCC_TOKEN, req)
+        assert _sent(route) == {"event": {"location": "Sala B"}}
+        assert result.next_occ_token == _NEXT_OCC_TOKEN_EDIT
+
+
+class TestEventCopy:
+    # criterio: 08-C06
+    @respx.mock
+    def test_copy_event_body_and_result(self) -> None:
+        route = _mock_copy()
+        result = _api().copy_event(
+            _POST_ID,
+            _OCC_TOKEN,
+            title="Copia",
+            announcement=True,
+            client_uid="uid-2",
+            start_at=_START,
+        )
+        assert route.call_count == 1
+        assert _sent(route) == {
+            "title": "Copia",
+            "announcement": True,
+            "clientUid": "uid-2",
+            "event": {"startAt": _START_BLOCK, "timezone": "Europe/Rome"},
+        }
+        assert isinstance(result.raw, generated.CopyPostResponseDTO)
+        assert result.post_id == _COPY_POST_ID
+        assert result.next_occ_token == 1
+
+    # criterio: 08-C04
+    @respx.mock
+    def test_raw_equivalent(self) -> None:
+        route = _mock_copy()
+        req = generated.CopyEventPostRequestDTO(title="Copia", announcement=True)
+        result = _api().copy_event_raw(_POST_ID, _OCC_TOKEN, req)
+        assert _sent(route) == {"title": "Copia", "announcement": True}
+        assert result.post_id == _COPY_POST_ID
+
+
 class TestEventErrors:
     # criterio: 08-C03
     @pytest.mark.parametrize("field", ["start_at", "end_at"])
@@ -331,4 +460,32 @@ class TestEventErrors:
         route = respx.post(_CREATE_PATH).mock(side_effect=httpx.ReadTimeout("timed out"))
         with pytest.raises(TransportError):
             _api().create_event(_COMMUNITY_ID, start_at=_START)
+        assert route.call_count == 1
+
+    # criterio: 08-C03
+    @pytest.mark.parametrize("method", ["edit_event", "copy_event"])
+    @pytest.mark.parametrize("field", ["start_at", "end_at"])
+    @respx.mock
+    def test_naive_datetime_raises_before_request_on_edit_and_copy(
+        self, method: str, field: str
+    ) -> None:
+        edit = _mock_edit()
+        copy = _mock_copy()
+        with pytest.raises(ValueError, match=f"{field} must be a timezone-aware datetime"):
+            getattr(_api(), method)(_POST_ID, _OCC_TOKEN, **{field: datetime(2026, 11, 5, 10)})
+        assert edit.call_count == 0
+        assert copy.call_count == 0
+
+    # criterio: 08-C08
+    @pytest.mark.parametrize(
+        ("method", "path"), [("edit_event", _EDIT_PATH), ("copy_event", _COPY_PATH)]
+    )
+    @respx.mock
+    def test_409_raises_concurrency_error_once(self, method: str, path: str) -> None:
+        route = respx.put(path).mock(
+            return_value=httpx.Response(_HTTP_409, json={"message": "occToken mismatch"})
+        )
+        with pytest.raises(ConcurrencyError) as exc_info:
+            getattr(_api(), method)(_POST_ID, _OCC_TOKEN, location="Sala B")
+        assert exc_info.value.status_code == _HTTP_409
         assert route.call_count == 1

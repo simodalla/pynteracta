@@ -33,13 +33,19 @@ from pynteracta.models.facade.posts_event import (
     EventPostForEdit,
 )
 from pynteracta.models.facade.posts_write import PostWriteResult
-from pynteracta.models.generated.external_v2 import CreateEventPostRequestDTO
+from pynteracta.models.generated.external_v2 import (
+    CopyEventPostRequestDTO,
+    CreateEventPostRequestDTO,
+    EditEventPostRequestDTO,
+)
 
 _MANAGE = "communication/posts/manage"
 _FOR_CREATE_PATH = _MANAGE + "/event-post-data-for-create/{community_id}"
 _FOR_EDIT_PATH = _MANAGE + "/event-post-data-for-edit/{post_id}"
 _FOR_COPY_PATH = _MANAGE + "/event-post-data-for-copy/{post_id}"
 _CREATE_PATH = _MANAGE + "/create-event-post/{community_id}"
+_EDIT_PATH = _MANAGE + "/edit-event-post/{post_id}/{occ_token}"
+_COPY_PATH = _MANAGE + "/copy-event-post/{post_id}/{occ_token}"
 
 # Allegati: UploadedAttachment o dict/modello nella forma di InputPostAttachmentDTO.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -264,3 +270,235 @@ class PostsEventAPI(ResourceClient):
     def _send_create_event(self, community_id: int, body: dict[str, Any]) -> PostWriteResult:
         path = _CREATE_PATH.format(community_id=community_id)
         return PostWriteResult.from_create(self._post(path, json=body))
+
+    # --- modifica e copia -----------------------------------------------------------------
+
+    def edit_event(  # noqa: PLR0913
+        self,
+        post_id: int,
+        occ_token: int,
+        *,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+        all_day: bool | None = None,
+        location: str | None = None,
+        invited_user_ids: list[int] | None = None,
+        invited_group_ids: list[int] | None = None,
+        invitation_type_id: int | None = None,
+        send_edit_post_notifications: bool | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        description_format: int | None = None,
+        cover_image_content_ref: str | None = None,
+        add_attachments: WriteItems = None,
+        update_attachments: WriteItems = None,
+        remove_attachment_ids: list[int] | None = None,
+        add_watcher_user_ids: list[int] | None = None,
+        remove_watcher_user_ids: list[int] | None = None,
+        add_watcher_group_ids: list[int] | None = None,
+        remove_watcher_group_ids: list[int] | None = None,
+        visibility: int | None = None,
+        link_preview: dict[str, Any] | BaseModel | None = None,
+        pinned: bool | None = None,
+        draft: bool | None = None,
+        scheduled_publication: datetime | None = None,
+    ) -> PostWriteResult:
+        """PUT ``/communication/posts/manage/edit-event-post/{postId}/{occToken}``.
+
+        ``occ_token`` è quello letto con :meth:`get_event_for_edit`: se il post è cambiato nel
+        frattempo il server risponde ``409`` (:class:`~pynteracta.exceptions.ConcurrencyError`)
+        e la libreria non rilegge né riprova. Il corpo contiene solo i campi passati; il blocco
+        ``event`` compare solo se almeno un argomento dell'evento è passato, con il fuso di
+        ``start_at`` o, se manca, di ``end_at``. L'effetto sui campi omessi lo decide il server
+        (vedi la documentazione).
+
+        Args:
+            post_id: Il post evento da modificare.
+            occ_token: Token di concorrenza ottimistica letto.
+            start_at: Nuovo inizio, ``datetime`` con fuso.
+            end_at: Nuova fine, ``datetime`` con fuso.
+            all_day: Evento di tutto il giorno.
+            location: Luogo.
+            invited_user_ids: Utenti invitati.
+            invited_group_ids: Gruppi invitati.
+            invitation_type_id: Tipo di invito per tutti gli invitati (``0`` ospite, ``2``
+                collaboratore).
+            send_edit_post_notifications: Notifica agli invitati le modifiche del post.
+            title: Titolo.
+            description: Descrizione, nel formato di ``description_format``.
+            description_format: ``1`` = Quill delta, ``2`` = testo semplice.
+            cover_image_content_ref: ``contentRef`` della nuova immagine di copertina.
+            add_attachments: Allegati da aggiungere.
+            update_attachments: Allegati da aggiornare.
+            remove_attachment_ids: Allegati da togliere.
+            add_watcher_user_ids: Utenti osservatori da aggiungere.
+            remove_watcher_user_ids: Utenti osservatori da togliere.
+            add_watcher_group_ids: Gruppi osservatori da aggiungere.
+            remove_watcher_group_ids: Gruppi osservatori da togliere.
+            visibility: ``1`` privato, ``2`` pubblico.
+            link_preview: Anteprima di un link, nella forma di ``LinkPreviewDTO``.
+            pinned: Post fissato in testa; ``None`` lo lascia com'è.
+            draft: Bozza o pubblicato.
+            scheduled_publication: Pubblicazione programmata, ``datetime`` con fuso.
+
+        Returns:
+            Un :class:`PostWriteResult`; ``next_occ_token`` è il token per la modifica
+            successiva.
+
+        Raises:
+            ValueError: se una data passata non ha fuso, prima della chiamata.
+        """
+        body = self._edit_body(
+            start_at=start_at,
+            end_at=end_at,
+            all_day=all_day,
+            location=location,
+            invited_user_ids=invited_user_ids,
+            invited_group_ids=invited_group_ids,
+            invitation_type_id=invitation_type_id,
+            send_edit_post_notifications=send_edit_post_notifications,
+            title=title,
+            description=description,
+            description_format=description_format,
+            cover_image_content_ref=cover_image_content_ref,
+            add_attachments=add_attachments,
+            update_attachments=update_attachments,
+            remove_attachment_ids=remove_attachment_ids,
+            add_watcher_user_ids=add_watcher_user_ids,
+            remove_watcher_user_ids=remove_watcher_user_ids,
+            add_watcher_group_ids=add_watcher_group_ids,
+            remove_watcher_group_ids=remove_watcher_group_ids,
+            visibility=visibility,
+            link_preview=link_preview,
+            pinned=pinned,
+            draft=draft,
+            scheduled_publication=scheduled_publication,
+        )
+        return self._send_edit_event(post_id, occ_token, body)
+
+    def edit_event_raw(
+        self, post_id: int, occ_token: int, req: EditEventPostRequestDTO
+    ) -> PostWriteResult:
+        """Come :meth:`edit_event`, da un ``EditEventPostRequestDTO`` già costruito."""
+        return self._send_edit_event(post_id, occ_token, _dump(req))
+
+    def _send_edit_event(
+        self, post_id: int, occ_token: int, body: dict[str, Any]
+    ) -> PostWriteResult:
+        path = _EDIT_PATH.format(post_id=post_id, occ_token=occ_token)
+        return PostWriteResult.from_edit(self._put(path, json=body))
+
+    def copy_event(  # noqa: PLR0913
+        self,
+        post_id: int,
+        occ_token: int,
+        *,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+        all_day: bool | None = None,
+        location: str | None = None,
+        invited_user_ids: list[int] | None = None,
+        invited_group_ids: list[int] | None = None,
+        invitation_type_id: int | None = None,
+        send_edit_post_notifications: bool | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        description_format: int | None = None,
+        cover_image_content_ref: str | None = None,
+        add_attachments: WriteItems = None,
+        update_attachments: WriteItems = None,
+        remove_attachment_ids: list[int] | None = None,
+        add_watcher_user_ids: list[int] | None = None,
+        remove_watcher_user_ids: list[int] | None = None,
+        add_watcher_group_ids: list[int] | None = None,
+        remove_watcher_group_ids: list[int] | None = None,
+        visibility: int | None = None,
+        link_preview: dict[str, Any] | BaseModel | None = None,
+        pinned: bool | None = None,
+        draft: bool | None = None,
+        scheduled_publication: datetime | None = None,
+        announcement: bool | None = None,
+        client_uid: str | None = None,
+    ) -> PostWriteResult:
+        """PUT ``/communication/posts/manage/copy-event-post/{postId}/{occToken}``.
+
+        Crea un post evento nuovo copiando ``post_id``; ``occ_token`` è quello letto con
+        :meth:`get_event_for_copy`. Gli argomenti sono quelli di :meth:`edit_event` più
+        ``announcement`` e ``client_uid``.
+
+        Returns:
+            Un :class:`PostWriteResult` con il ``post_id`` del post **nuovo**.
+
+        Raises:
+            ValueError: se una data passata non ha fuso, prima della chiamata.
+        """
+        body = self._edit_body(
+            start_at=start_at,
+            end_at=end_at,
+            all_day=all_day,
+            location=location,
+            invited_user_ids=invited_user_ids,
+            invited_group_ids=invited_group_ids,
+            invitation_type_id=invitation_type_id,
+            send_edit_post_notifications=send_edit_post_notifications,
+            title=title,
+            description=description,
+            description_format=description_format,
+            cover_image_content_ref=cover_image_content_ref,
+            add_attachments=add_attachments,
+            update_attachments=update_attachments,
+            remove_attachment_ids=remove_attachment_ids,
+            add_watcher_user_ids=add_watcher_user_ids,
+            remove_watcher_user_ids=remove_watcher_user_ids,
+            add_watcher_group_ids=add_watcher_group_ids,
+            remove_watcher_group_ids=remove_watcher_group_ids,
+            visibility=visibility,
+            link_preview=link_preview,
+            pinned=pinned,
+            draft=draft,
+            scheduled_publication=scheduled_publication,
+            announcement=announcement,
+            client_uid=client_uid,
+        )
+        return self._send_copy_event(post_id, occ_token, body)
+
+    def copy_event_raw(
+        self, post_id: int, occ_token: int, req: CopyEventPostRequestDTO
+    ) -> PostWriteResult:
+        """Come :meth:`copy_event`, da un ``CopyEventPostRequestDTO`` già costruito."""
+        return self._send_copy_event(post_id, occ_token, _dump(req))
+
+    def _send_copy_event(
+        self, post_id: int, occ_token: int, body: dict[str, Any]
+    ) -> PostWriteResult:
+        path = _COPY_PATH.format(post_id=post_id, occ_token=occ_token)
+        return PostWriteResult.from_copy(self._put(path, json=body))
+
+    @staticmethod
+    def _edit_body(  # noqa: PLR0913
+        *,
+        start_at: datetime | None,
+        end_at: datetime | None,
+        all_day: bool | None,
+        location: str | None,
+        invited_user_ids: list[int] | None,
+        invited_group_ids: list[int] | None,
+        invitation_type_id: int | None,
+        send_edit_post_notifications: bool | None,
+        scheduled_publication: datetime | None,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Corpo di modifica e copia: i campi del post più il blocco ``event`` se non vuoto."""
+        event = build_event_block(
+            start_at=start_at,
+            end_at=end_at,
+            all_day=all_day,
+            location=location,
+            invited_user_ids=invited_user_ids,
+            invited_group_ids=invited_group_ids,
+            invitation_type_id=invitation_type_id,
+            send_edit_post_notifications=send_edit_post_notifications,
+        )
+        return build_write_body(
+            **fields, scheduled_publication=_zoned(scheduled_publication), event=event or None
+        )

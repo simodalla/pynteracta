@@ -109,7 +109,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
      PostsEventAPI)`.
   3. Controlli bloccanti; commit `feat(posts): letture propedeutiche e creazione dei post evento`.
 
-### [ ] T06 – `edit_event`, `copy_event` e il `409`
+### [x] T06 – `edit_event`, `copy_event` e il `409`
 
 - Criteri: 08-C03 (edit, copy), 08-C04 (edit, copy), 08-C05, 08-C06, 08-C08
 - Dipende da: T05
