@@ -948,13 +948,17 @@ Retrieve post-definition catalogs and their entries.
 
 ### `catalogs list`
 
-List all post-definition catalogs (optionally filtered by ID).
+List post-definition catalogs by ID.
 
 ```bash
-pynteracta catalogs list
 pynteracta catalogs list --id 5 --id 8
-pynteracta catalogs list --load-entries
+pynteracta catalogs list --id 5 --load-entries
 ```
+
+Pass the IDs you need: without `--id` the server answers an empty list, whether you log in with a
+service account or with Google OAuth2 (verified on the test tenant). The catalog IDs used by a
+community's fields are in the `catalog_id` key of the field metadata in
+`communities post-definition ID --full --output json`.
 
 ### `catalogs entries CATALOG_ID`
 
