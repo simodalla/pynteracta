@@ -7,6 +7,7 @@ import json
 import pathlib
 from typing import Any
 
+import httpx
 import pytest
 import respx
 from api_helpers import load_payload, mock_json
@@ -40,6 +41,9 @@ _EXIT_NOT_FOUND = 5
 _EXIT_CONFLICT = 9
 _HTTP_404 = 404
 _HTTP_409 = 409
+_PARTICIPATE_PATH = f"{_MANAGE}/post-event/{_POST_ID}/partecipate"
+_EXIT_PERMISSION = 4
+_HTTP_403 = 403
 _CONFLICT_MESSAGE = f"Post {_POST_ID} changed since it was read: fetch it again and retry"
 _EXIT_VALIDATION = 6
 _HTTP_400 = 400
@@ -70,6 +74,7 @@ def _table_lines(output: str) -> list[str]:
         "create-event",
         "edit-event",
         "copy-event",
+        "participate",
     ],
 )
 def test_posts_help_lists_event_commands(runner: CliRunner, command: str) -> None:
@@ -764,3 +769,83 @@ class TestConflicts:
         assert result.exit_code == _EXIT_CONFLICT
         assert _CONFLICT_MESSAGE in " ".join(result.output.split())
         assert write.call_count == 1
+
+
+def _mock_participate(status: int = 200) -> respx.Route:
+    return respx.put(f"https://api.example.com/portal/api/external/v2/{_PARTICIPATE_PATH}").mock(
+        return_value=httpx.Response(status)
+    )
+
+
+class TestParticipate:
+    # criterio: 08-C17
+    @respx.mock
+    def test_yes_with_notes_body_and_message(self, runner: CliRunner) -> None:
+        route = _mock_participate()
+        result = runner.invoke(
+            app,
+            ["posts", "participate", str(_POST_ID), "yes", "--notes", "Arrivo tardi"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert route.call_count == 1
+        assert _sent_body(route) == {"typeId": 1, "notes": "Arrivo tardi"}
+        assert f"Participation to post {_POST_ID} recorded: yes" in result.output
+
+    # criterio: 08-C17
+    @pytest.mark.parametrize(("choice", "type_id"), [("maybe", 2), ("no", 3)])
+    @respx.mock
+    def test_maybe_and_no_type_ids(self, runner: CliRunner, choice: str, type_id: int) -> None:
+        route = _mock_participate()
+        result = runner.invoke(app, ["posts", "participate", str(_POST_ID), choice], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route) == {"typeId": type_id}
+
+    # criterio: 08-C17
+    @respx.mock
+    def test_json_output(self, runner: CliRunner) -> None:
+        _mock_participate()
+        result = runner.invoke(
+            app,
+            ["--output", "json", "posts", "participate", str(_POST_ID), "yes"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {"post_id": _POST_ID, "answer": "yes", "type_id": 1}
+
+    # criterio: 08-C17
+    @respx.mock
+    def test_invalid_choice_exits_2_without_requests(self, runner: CliRunner) -> None:
+        route = _mock_participate()
+        result = runner.invoke(
+            app, ["posts", "participate", str(_POST_ID), "perhaps"], env=BASE_ENV
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert route.call_count == 0
+
+    @respx.mock
+    def test_quiet_prints_nothing(self, runner: CliRunner) -> None:
+        _mock_participate()
+        result = runner.invoke(
+            app, ["--quiet", "posts", "participate", str(_POST_ID), "no"], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == ""
+
+
+class TestParticipateExitCodes:
+    # criterio: 08-C09
+    @respx.mock
+    def test_participate_not_found_exits_5(self, runner: CliRunner) -> None:
+        route = _mock_participate(_HTTP_404)
+        result = runner.invoke(app, ["posts", "participate", str(_POST_ID), "yes"], env=BASE_ENV)
+        assert result.exit_code == _EXIT_NOT_FOUND
+        assert route.call_count == 1
+
+    # criterio: 08-C09
+    @respx.mock
+    def test_participate_forbidden_exits_4(self, runner: CliRunner) -> None:
+        route = _mock_participate(_HTTP_403)
+        result = runner.invoke(app, ["posts", "participate", str(_POST_ID), "yes"], env=BASE_ENV)
+        assert result.exit_code == _EXIT_PERMISSION
+        assert route.call_count == 1

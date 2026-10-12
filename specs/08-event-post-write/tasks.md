@@ -211,7 +211,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   3. Snapshot letti, controlli bloccanti; commit `feat(cli): modifica e copia dei post evento a
      partire dal form letto`.
 
-### [ ] T12 – `posts participate`
+### [x] T12 – `posts participate`
 
 - Criteri: 08-C09 (exit 5, 4), 08-C17
 - Dipende da: T07, T09

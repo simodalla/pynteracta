@@ -7,6 +7,8 @@ di scrittura invia una sola richiesta e non riprova mai: un ``409`` esce con il 
 
 from __future__ import annotations
 
+import json
+from enum import StrEnum
 from typing import Annotated, Any
 
 import typer
@@ -25,6 +27,7 @@ from pynteracta.cli._common import (
     handle_error,
     load_json_body,
     make_console,
+    resolve_output,
     validate_export_options,
     validate_full_fields,
 )
@@ -64,6 +67,7 @@ from pynteracta.models.facade.posts_event import (
     EventPostForCopy,
     EventPostForCreate,
     EventPostForEdit,
+    ParticipationAnswer,
 )
 from pynteracta.models.facade.posts_write import PostWriteResult
 from pynteracta.models.generated.external_v2 import (
@@ -132,6 +136,15 @@ EditTimezoneOption = Annotated[
         f"of the event as read, else {DEFAULT_TIMEZONE}). Changes the zone of the event.",
     ),
 ]
+
+
+class ParticipationChoice(StrEnum):
+    """Risposta all'invito come argomento della CLI."""
+
+    YES = "yes"
+    MAYBE = "maybe"
+    NO = "no"
+
 
 # --- funzioni pure ------------------------------------------------------------------------
 
@@ -830,3 +843,35 @@ def posts_copy_event(  # noqa: PLR0913
         raise typer.Exit(EXIT_SUCCESS)
     except InteractaError as exc:
         raise handle_error(exc, console=console, resource=f"Post {post_id}") from exc
+
+
+@app.command("participate")
+def posts_participate(
+    ctx: typer.Context,
+    post_id: Annotated[int, typer.Argument(help="Event post ID.")],
+    answer: Annotated[
+        ParticipationChoice, typer.Argument(help="Answer to the invitation: yes, maybe or no.")
+    ],
+    notes: Annotated[str | None, typer.Option("--notes", help="Notes for the organizer.")] = None,
+    output: OutputOption = None,
+) -> None:
+    """Answer the invitation to an event post as the authenticated identity.
+
+    With a service account the answer is recorded for the technical identity, with Google
+    OAuth2 for the linked user. One request, never retried.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    type_id = ParticipationAnswer[answer.name]
+    try:
+        with build_client(state) as client:
+            client.posts.participate(post_id, type_id, notes=notes)
+        if resolve_output(state, output) == "json":
+            typer.echo(
+                json.dumps({"post_id": post_id, "answer": answer.value, "type_id": int(type_id)})
+            )
+        elif not state.quiet:
+            console.print(f"Participation to post {post_id} recorded: {answer.value}")
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
