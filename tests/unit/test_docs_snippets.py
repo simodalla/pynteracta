@@ -368,3 +368,48 @@ def test_catalogs_workspace_pages_document_write_commands() -> None:
         paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
         for needle in ("catalog", "workspace"):
             assert needle in paragraph, f"{needle} missing from the write operations of {page.name}"
+
+
+_EVENT_POST_COMMANDS = (
+    "posts create-event",
+    "posts edit-event",
+    "posts copy-event",
+    "posts participate",
+    "posts get-event-for-create",
+    "posts get-event-for-edit",
+    "posts get-event-for-copy",
+)
+
+
+# criterio: 08-C23
+def test_event_posts_pages_document_write_commands() -> None:
+    """Le pagine CLI, API, home, README e testing documentano le scritture dei post evento."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in (*_EVENT_POST_COMMANDS, "--cover", "--invite-user", "--start"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    api = (_ROOT / "docs" / "api" / "posts.md").read_text(encoding="utf-8")
+    for needle in (
+        "## Event posts",
+        "create_event(",
+        "edit_event(",
+        "copy_event(",
+        "participate(",
+        "get_event_for_edit",
+        "EventData",
+        "ParticipationAnswer",
+        "pynteracta.api.posts_event.PostsEventAPI",
+        "pynteracta.models.facade.posts_event",
+    ):
+        assert needle in api, f"'{needle}' missing from docs/api/posts.md"
+    assert "read-only for now" not in api
+    for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
+        text = page.read_text(encoding="utf-8")
+        assert "Event posts follow" not in text, f"stale 'Event posts follow' in {page.name}"
+        assert "Writes on event posts" not in text, f"stale out-of-scope line in {page.name}"
+        write_lines = [line for line in text.splitlines() if "Write operations" in line]
+        paragraph = text[text.index(write_lines[0]) :].split("\n- ")[0]
+        assert "event posts" in paragraph, f"event posts missing from {page.name}"
+    testing = (_ROOT / "docs" / "testing.md").read_text(encoding="utf-8")
+    env_example = (_ROOT / "tests" / "integration" / ".env.example").read_text(encoding="utf-8")
+    for text in (testing, env_example):
+        assert "PYNTERACTA_TEST_EVENT_COMMUNITY_ID" in text

@@ -238,7 +238,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
      la prima `validate_body` e prima di `--attach`.
   3. Controlli bloccanti; commit `feat(cli): copertina dei post evento caricata dallo storage`.
 
-### [ ] T14 – Documentazione
+### [x] T14 – Documentazione
 
 - Criteri: 08-C23
 - Dipende da: T07, T13
