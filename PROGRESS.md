@@ -1863,3 +1863,22 @@ nell'audit log. Patch **0.13.1**.
 - I cursori di paginazione (`pageToken`, `nextPageToken`, `nextSyncToken`) restano redatti:
   spec a parte se si vuole renderli leggibili.
 - Resta aperto il follow-up di M31 su `docs/testing.md`.
+
+## Fuori milestone — Lista dei cataloghi senza id — 2026-10-12
+
+Chiude il follow-up di M32 su `catalogs.list()` senza id. Solo documentazione, branch
+`bugfix_catalogs_list_docs`.
+
+### Fatto
+
+- Provato sul tenant, in sola lettura: `catalogs.list()` senza id restituisce una lista vuota sia
+  con il service account sia con Google OAuth2, quindi non dipende dal service account; gli stessi
+  cataloghi si leggono per id (4, 7, 12; 9, 11, 27 dalla definizione di post della community 21).
+- `docs/api/catalogs.md`: il comportamento e un esempio che ricava gli id da
+  `metadata["catalog_id"]` dei campi della definizione di post; `docs/cli.md`: `catalogs list`
+  "by ID", via l'esempio senza `--id`.
+
+### Follow-up
+
+- La docstring di `CatalogsAPI.list` e l'help di `catalogs list` parlano ancora di filtro per id:
+  da allineare alla prossima modifica del codice.

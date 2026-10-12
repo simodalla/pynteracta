@@ -17,6 +17,24 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
         print(entry.id, entry.label, entry.external_id)
 ```
 
+Pass the catalog IDs: `list()` without IDs answers an empty `CatalogList`, whether the client
+logs in with a service account or with Google OAuth2 (verified on the test tenant), even when the
+same catalogs are readable by ID. The IDs used by a community's fields are in the field metadata
+of its post definition, as strings:
+
+```python
+with InteractaClient(base_url="https://tenant.example.com", credentials=...) as client:
+    definition = client.communities.post_definition(21)
+    catalog_ids = sorted(
+        {
+            int(field.metadata["catalog_id"])
+            for field in definition.field_definitions
+            if field.metadata and "catalog_id" in field.metadata
+        }
+    )
+    catalogs = client.catalogs.list(catalog_ids)
+```
+
 A disabled catalog is no longer returned: `list([id])` with a disabled catalog answers `400` with
 `NOT_EXISTS` on `catalogIds`.
 
