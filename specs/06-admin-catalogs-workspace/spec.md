@@ -195,6 +195,7 @@ I testi della CLI restano in inglese (decisione della spec 02). Tutti i comandi 
 | 06-C22 | Quando, oltre all'ambiente integration, `PYNTERACTA_TEST_WRITE_WORKSPACE=1` è impostata (opt-in dedicato), il ciclo `workspace_for_edit(PYNTERACTA_TEST_WORKSPACE_ID)` → `edit_workspace(add_user_ids=[PYNTERACTA_TEST_USER_ID])` → `edit_workspace(remove_user_ids=[…])` termina senza errori, il conteggio dei membri torna quello iniziale e il nome del workspace è invariato al termine; senza la variabile il test è saltato. L'esecuzione stabilisce e registra in `docs/api/admin_manage.md` e `verifica.md` se il nome e la descrizione omessi sono mantenuti o azzerati; se azzerati, `edit-workspace` diventa una patch e la spec si rivede prima della chiusura. | RF-023, RF-025 |
 | 06-C23 | Quando le risposte di `admin_manage.workspace_for_edit` ed `edit_workspace` hanno valori `null` nelle mappe per lingua di `contentData` (`translations`, `description`), e quelle di `catalog_for_edit` e `catalog_entry_for_edit` in `contentData.name` e `label`, la façade si costruisce senza errori e le lingue con valore `null` sono scartate (`{"it": null}` → `{}`); i valori stringa restano; `admin-manage workspace` esce `0`. | RF-023e, RF-008, RF-013 |
 | 06-C24 | Quando si esegue `admin-manage edit-workspace 88 --add-user 1` e la `GET …/workspaces/88/edit` restituisce `occToken: 17` e `contentData` con `name: "Operations"`, `translations: {"en": "Operations", "it": "Operazioni"}` e `description: {"en": "Operations workspace", "it": "Spazio operazioni"}`, parte una sola `PUT …/admin/manage/workspaces/88/17` con corpo esatto `{"name": "Operations", "translations": {"en": "Operations", "it": "Operazioni"}, "description": {"en": "Operations workspace", "it": "Spazio operazioni"}, "addUserIds": [1]}`; con `--name WS` vince `WS`; con `--description it=Desc` la descrizione letta è aggiornata per lingua; con `--json` le mappe `translations` e `description` aggiornano quelle lette per lingua; con `--occ-token 10` la `GET` avviene lo stesso e il path usa `10`; le chiavi assenti nel form non si inventano. Sostituisce, in 06-C17, il corpo "nulla del form rimandato" e la frase "con `--occ-token 10` nessuna `GET`". | RF-023, RF-023f, RF-025 |
+| 06-C25 | Quando `admin-manage edit-workspace 88 --add-user 1` riesce, il comando rilegge il form con una seconda `GET …/workspaces/88/edit` dopo la `PUT` e la tabella mostra `id`, `name`, i quattro conteggi e `occ_token` della rilettura (non i conteggi a `0` della risposta della `PUT`); se la rilettura fallisce, il comando avvisa su stderr che la modifica è avvenuta ma la rilettura no, mostra la risposta della `PUT` ed esce `0`; con `409` sulla `PUT` nessuna rilettura. | RF-023f, RF-015 |
 
 ## Casi limite
 
@@ -335,6 +336,13 @@ Prima esecuzione degli integration test sul tenant di prova, su richiesta del ma
   traduzioni e descrizione conviene ripassarle. Il test integration invia nome, traduzioni e
   descrizione letti; se traduzioni e descrizione omesse vengano azzerate non si prova, per non
   rischiare di cancellare le traduzioni del workspace condiviso.
+
+- **Terzo rilancio (dopo T18)**: ciclo verde. La risposta della `PUT` del workspace ha i
+  conteggi di utenti e gruppi a `0`, mentre l'`occ_token` è quello successivo. **Decisione del
+  maintainer (2026-10-12)**: `edit-workspace` in CLI rilegge il form dopo la modifica e mostra
+  la rilettura (06-C25, task T19); se la rilettura fallisce, la modifica resta riuscita: avviso
+  ed exit `0`. La libreria non cambia: `edit_workspace` restituisce la risposta e i docs dicono
+  che i conteggi lì non valgono.
 
 ## Domande aperte
 

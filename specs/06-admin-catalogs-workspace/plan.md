@@ -267,6 +267,7 @@ esempi: i test usano le costanti qui sopra con la stessa forma.
 | 06-C21 | `test_catalogs_integration.py::TestCatalogsWriteIntegration::test_create_edit_entry_delete_cycle`: skip senza le variabili di base; `set_deleted(True)` in `finally`; dopo il ciclo `get_for_edit(...).deleted is True`; righe `[06-C21]` con la semantica dei campi omessi, l'id della risposta di `…/entries/{id}/deleted` e la visibilità in `catalogs.list`; esecuzione sul tenant in un task manuale dedicato (come 05-T15), esito in `docs/api/catalogs.md` e `verifica.md` | integrazione (opt-in) + manuale |
 | 06-C23 | `test_facade_admin_manage.py::TestNullLanguageValues`, `test_cli_admin_manage.py::TestAdminManageWorkspace::test_null_description_exits_0`, `test_api_admin_manage.py::TestEditWorkspace::test_response_with_null_description` | unitario |
 | 06-C24 | `test_cli_admin_manage_write.py::TestEditWorkspacePatch`, `test_workspace_edit_base_*`, `test_apply_form_*` | unitario |
+| 06-C25 | `test_cli_admin_manage_write.py::TestEditWorkspaceReread` | unitario |
 | 06-C22 | `test_admin_manage_integration.py::TestWorkspaceWriteIntegration::test_add_remove_member_cycle`: skip senza `PYNTERACTA_TEST_WRITE_WORKSPACE=1`; rimozione e ripristino in `finally`; assert su `member_users_count` e nome; righe `[06-C22]` su nome e descrizione dopo la `PUT`; esecuzione nello stesso task manuale, esito in `docs/api/admin_manage.md` e `verifica.md`; se nome o descrizione risultano azzerati, la spec si rivede prima della chiusura | integrazione (opt-in dedicato) + manuale |
 
 Verifica manuale (dalla spec): nessuna oltre all'esecuzione opt-in di 06-C21 e 06-C22 sul tenant
@@ -307,6 +308,18 @@ una revisione della spec, non da un aggiustamento silenzioso.
   `test_facade_admin_manage.py::TestWorkspaceForEdit::test_translations`.
 - `tests/integration/test_admin_manage_integration.py`: le due `edit_workspace` passano
   `name`, `translations` e `description` letti dal form; il ripristino finale resta.
+
+### Terza revisione: rilettura dopo `edit-workspace` (2026-10-12)
+
+- `cli/admin_manage_write.py`: dopo `edit_workspace_raw`, `client.admin_manage.workspace_for_edit`
+  nello stesso `with`; un `InteractaError` della sola rilettura → `typer.echo("Workspace {id}
+  updated, but re-reading it failed: …; the counts below come from the edit response.",
+  err=True)` e si mostra la risposta della `PUT`. Il `409` e gli altri errori della `PUT`
+  restano a `handle_error`.
+- Test: `test_cli_admin_manage_write.py::TestEditWorkspaceReread` (due `GET` in sequenza con
+  `side_effect`, tabella con i conteggi della rilettura; rilettura `500` → avviso ed exit `0`;
+  `409` → una sola `GET`). I mock esistenti restano validi: la stessa route risponde a entrambe
+  le `GET`; gli snapshot cambiano perché i conteggi vengono dal form (`member_users_count` 25).
 
 ## Scelte tecniche
 

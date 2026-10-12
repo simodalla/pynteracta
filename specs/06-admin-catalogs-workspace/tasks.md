@@ -340,7 +340,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
 ### [ ] T15 – Documentazione
 
 - Criteri: 06-C20
-- Dipende da: T10, T12, T14, T17, T18
+- Dipende da: T10, T12, T14, T17, T18, T19
 - Test: `tests/unit/test_docs_snippets.py::test_catalogs_workspace_pages_document_write_commands`
   (`docs/cli.md` cita i nove comandi, `LANG=TEXT`, `USER_ID=ROLE_ID`, `--cover`, `restore`,
   `| 9 |` e non dice più "workspace and catalog writes arrive with their own spec" né "it lives
@@ -416,6 +416,23 @@ Numerato dopo T17, si esegue prima di T14: nasce dal secondo rilancio di T14 (20
   3. Controlli bloccanti; commit `fix(cli): admin-manage edit-workspace come patch sul form letto
      (06-T18)`.
 
+### [ ] T19 – `edit-workspace` rilegge il form dopo la modifica
+
+Nasce dal terzo rilancio di T14 (2026-10-12): la risposta della `PUT` ha i conteggi a `0`.
+
+- Criteri: 06-C25
+- Dipende da: T18; T15 dipende anche da questo
+- Test: `tests/unit/test_cli_admin_manage_write.py::TestEditWorkspaceReread`
+  (`test_table_shows_reread_counts`: risposta della `PUT` con conteggi a `0`, seconda `GET` con
+  i conteggi veri, tabella con quelli e due `GET`; `test_reread_failure_warns_and_exits_0`;
+  `test_409_does_not_reread`); snapshot di T11 rigenerati e riletti.
+- Passi:
+  1. Scrivere i test; eseguirli: rossi (una sola `GET`, conteggi della `PUT`).
+  2. `cli/admin_manage_write.py`: rilettura dopo la `PUT`, avviso sul fallimento; help del
+     comando.
+  3. Controlli bloccanti; commit `fix(cli): admin-manage edit-workspace mostra il form riletto
+     dopo la modifica (06-T19)`.
+
 ## Copertura dei criteri
 
 | Criterio | Task |
@@ -444,3 +461,4 @@ Numerato dopo T17, si esegue prima di T14: nasce dal secondo rilancio di T14 (20
 | 06-C22 | T13, T14 |
 | 06-C23 | T17 |
 | 06-C24 | T18 |
+| 06-C25 | T19 |
