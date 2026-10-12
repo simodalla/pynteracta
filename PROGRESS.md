@@ -1778,8 +1778,8 @@ Minor **0.13.0**.
   0.12.0 (`99bf149`); il numero 0.13.0 resta libero per la prossima minor.
 - Il ciclo gruppi di 05-C24 crea un gruppo vuoto: da solo non dimostra l'azzeramento dei campi
   omessi (verificato con una sonda); crearlo pieno in un `bugfix_` o con la spec 06.
-- `occToken` è redatto nei body dell'audit log (la chiave contiene `token`): innocuo, ma rende
-  meno leggibile l'audit delle scritture.
+- ~~`occToken` è redatto nei body dell'audit log (la chiave contiene `token`): innocuo, ma rende
+  meno leggibile l'audit delle scritture.~~ Risolto dalla spec 07 (M33).
 - `docs/testing.md`: suggerire `chmod 600 tests/integration/.env` e `set -a; source …; set +a`
   al posto di `export $(… | xargs)`.
 - Seconda metà di RF-023 (cataloghi, voci di catalogo, workspace): spec 06. Poi i post evento.
@@ -1836,3 +1836,30 @@ RF-023, che così è completo. Minor **0.13.0**.
 - Restano aperti i follow-up di M31 su `docs/testing.md` e sulla redazione di `occToken` nei body
   dell'audit log.
 - Prossimo gruppo: i post evento (RF-021).
+
+## M33 — Token di concorrenza ottimistica in chiaro nei body redatti — completata 2026-10-12
+
+Settima spec del metodo: [`specs/07-occtoken-audit/`](specs/07-occtoken-audit/) (`spec.md`,
+`plan.md`, `tasks.md`, `verifica.md`). Chiude il follow-up di M31 sull'`occToken` redatto
+nell'audit log. Patch **0.13.1**.
+
+### Fatto
+
+- `redact_body` lascia in chiaro `occToken`, `nextOccToken`, `screenOccToken`,
+  `nextScreenOccToken` e le grafie snake_case, per nome esatto e senza maiuscole; vale per audit
+  log su console e file, hook e processore structlog (07-T02).
+- `docs/logging.md` ("Redaction guarantees") e PRD (RNF-001b dentro RNF-001, §6 confermata per
+  la parte sull'audit log) (07-T03).
+- 33 unit test nuovi (1350 → 1383); copertura di `logging.py` 94,50 % → 94,74 %.
+
+### Decisioni oltre la spec
+
+- Nessuna. Nei test, 07-C05 è diviso in due (eventi e hook con `capture_logs`, file con
+  `setup_default_logging`), perché `capture_logs` sostituisce i processori structlog.
+
+### Follow-up
+
+- Release **0.13.1** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- I cursori di paginazione (`pageToken`, `nextPageToken`, `nextSyncToken`) restano redatti:
+  spec a parte se si vuole renderli leggibili.
+- Resta aperto il follow-up di M31 su `docs/testing.md`.

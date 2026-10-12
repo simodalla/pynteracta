@@ -54,8 +54,9 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 | **0.11.0** | Post write: custom posts, comments and workflow (second write group, ADR 0001) | M29 | ✅ Shipped 2026-10-10 | [specs/03-post-write/spec.md](specs/03-post-write/spec.md) |
 | **0.12.0** | Attachment upload: temporary storage URL, signed multipart upload, `--attach` and `posts edit-attachments` (third write group, ADR 0001); ships with the admin write, first half: users and groups (create, edit, delete, credentials, members; fourth write group, ADR 0001) | M30–M31 | ✅ Shipped 2026-10-10 | [specs/04-attachment-upload/spec.md](specs/04-attachment-upload/spec.md), [specs/05-admin-users-groups/spec.md](specs/05-admin-users-groups/spec.md) |
 | **0.13.0** | Admin write, second half: catalogs, catalog entries and workspace (create, edit, logical delete and restore, workspace members and images; fifth write group, ADR 0001) | M32 | ✅ Shipped 2026-10-12 | [specs/06-admin-catalogs-workspace/spec.md](specs/06-admin-catalogs-workspace/spec.md) |
+| **0.13.1** | Audit readability: optimistic-concurrency tokens (`occToken` family) stay in clear in redacted bodies (patch) | M33 | ⏳ In progress | [specs/07-occtoken-audit/spec.md](specs/07-occtoken-audit/spec.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M32). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M33). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line)

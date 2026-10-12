@@ -234,7 +234,10 @@ più `*_raw`, comando CLI, test unit e contract).
   precisato dalla spec 01, che chiude P-01.)* Dalla spec 04 le chiavi sensibili dei body
   comprendono anche `signature` e `policy`, e negli URL i parametri di query il cui nome
   contiene `signature`, `token`, `secret`, `password` o `key` perdono il valore (nome e altri
-  parametri restano), ovunque si applica la redazione.
+  parametri restano), ovunque si applica la redazione. Dalla spec 07 i campi di concorrenza
+  ottimistica `occToken`, `nextOccToken`, `screenOccToken`, `nextScreenOccToken` (e le grafie
+  snake_case) non sono segreti e passano in chiaro nei body redatti, per nome esatto e senza
+  distinzione di maiuscole; ogni altra chiave che contiene `token` resta redatta (RNF-001b).
 - RNF-002. Cache del token su file con permessi POSIX stretti (`0o600` file, `0o700` cartella),
   lettura rifiutata se più larghi; su Windows avviso una tantum e raccomandazione di
   `token_cache = "memory"`.
@@ -284,7 +287,9 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
   cartella utente); il file di configurazione (URL del tenant, percorso della chiave, profili);
   l'audit log, solo se abilitato, che contiene URL, header redatti e, con `audit_log_bodies`, i
   body delle risposte e quindi i dati personali sopra elencati (eccezione documentata nelle
-  Regole non negoziabili del `CLAUDE.md`).
+  Regole non negoziabili del `CLAUDE.md`); i token di concorrenza ottimistica vi compaiono in
+  chiaro (RNF-001b). *(Confermato dal maintainer il 2026-10-12, spec 07, per la parte
+  sull'audit log.)*
 - **Dati scritti sul tenant** (dalle spec di scrittura, ADR 0001): anagrafiche di utenti
   (compresi i dati di credenziale), appartenenze ai gruppi, contenuti di post, commenti, task e
   allegati forniti dal chiamante. La libreria li inoltra al tenant così come li riceve; non li

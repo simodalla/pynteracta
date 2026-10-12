@@ -262,3 +262,53 @@ class TestRedactBody:
         fake_jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signature"
         assert fake_jwt not in redact_body(fake_jwt)
         assert _REDACTED in redact_body(fake_jwt)
+
+
+class TestRedactBodyOccTokens:
+    """I token di concorrenza ottimistica non sono segreti: passano in chiaro (spec 07)."""
+
+    # criterio: 07-C01
+    def test_occ_token_kept_password_redacted(self) -> None:
+        assert redact_body({"occToken": 7, "password": "x"}) == {
+            "occToken": 7,
+            "password": _REDACTED,
+        }
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "occToken",
+            "nextOccToken",
+            "screenOccToken",
+            "nextScreenOccToken",
+            "occ_token",
+            "next_occ_token",
+            "screen_occ_token",
+            "next_screen_occ_token",
+            "OCCTOKEN",
+            "OccToken",
+        ],
+    )
+    @pytest.mark.parametrize("value", [12, "12"], ids=["int", "str"])
+    # criterio: 07-C02
+    def test_occ_token_family_kept(self, key: str, value: int | str) -> None:
+        assert redact_body({key: value}) == {key: value}
+
+    @pytest.mark.parametrize(
+        "key", ["userOccToken", "myToken", "accessToken", "nextPageToken", "token", "TOKEN"]
+    )
+    # criterio: 07-C03
+    def test_other_token_keys_still_redacted(self, key: str) -> None:
+        assert redact_body({key: "12"}) == {key: _REDACTED}
+
+    # criterio: 07-C04
+    def test_occ_token_kept_in_edit_members_and_form_shapes(self) -> None:
+        members = [
+            {"id": 1, "occToken": 3, "addUserIds": [5]},
+            {"id": 2, "occToken": 4, "deleteUserIds": [6]},
+        ]
+        assert redact_body(members) == members
+        form = {"data": {"occToken": 3, "screenOccToken": 2, "password": "x"}}
+        assert redact_body(form) == {
+            "data": {"occToken": 3, "screenOccToken": 2, "password": _REDACTED}
+        }

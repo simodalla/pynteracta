@@ -116,6 +116,42 @@ class TestRedactionProcessorHeaders:
         assert parsed["headers"] == {"Set-Cookie": f"a={_REDACTED}; Secure", "X-Api-Key": _REDACTED}
 
 
+class TestRedactionProcessorBodies:
+    """Il processore structlog e l'handler di file lasciano in chiaro l'``occToken`` (spec 07)."""
+
+    _BODY: ClassVar[dict[str, object]] = {"occToken": 3, "token": "x"}
+    _EXPECTED: ClassVar[dict[str, object]] = {"occToken": 3, "token": _REDACTED}
+
+    # criterio: 07-C06
+    def test_processor_keeps_occ_token_redacts_token(self) -> None:
+        event = redaction_processor(None, "info", {"event": "x", "body": dict(self._BODY)})
+        assert event["body"] == self._EXPECTED
+
+    # criterio: 07-C06
+    def test_file_handler_keeps_occ_token_redacts_token(self, tmp_path: Path) -> None:
+        log_file = tmp_path / "audit.log"
+        handler = build_audit_file_handler(log_file)
+
+        stdlib_logger = logging.getLogger("pynteracta.audit.test_bodies_file")
+        stdlib_logger.setLevel(logging.DEBUG)
+        stdlib_logger.propagate = False
+        stdlib_logger.addHandler(handler)
+        wrap_for_formatter = structlog.stdlib.ProcessorFormatter.wrap_for_formatter
+        audit_logger = structlog.wrap_logger(
+            stdlib_logger,
+            processors=[redaction_processor, wrap_for_formatter],
+            wrapper_class=structlog.stdlib.BoundLogger,
+        )
+        audit_logger.info("audit.request", body=dict(self._BODY))
+        handler.flush()
+        handler.close()
+        stdlib_logger.removeHandler(handler)
+
+        parsed = json.loads(log_file.read_text().splitlines()[0])
+        assert parsed["event"] == "audit.request"
+        assert parsed["body"] == self._EXPECTED
+
+
 class TestSetupDefaultLoggingAudit:
     def test_audit_false_no_audit_logger_handlers(self) -> None:
         # Remove any leftover handlers from previous tests

@@ -33,14 +33,14 @@ sotto `src/pynteracta/`.
 
 | Ambito | Copertura |
 |---|---|
-| Totale | 95,18 % (5998/6302 righe; 93,15 % all'adozione) |
+| Totale | 95,18 % (6003/6307 righe; 93,15 % all'adozione) |
 | `api` | 98,19 % (96,02 % all'adozione) |
 | `cli` | 93,11 % (89,31 % all'adozione) |
 | `models/facade` | 96,33 % (94,74 % all'adozione) |
 | `auth.py` | 94,01 % |
 | `client.py` | 96,70 % |
 | `config.py` | 98,86 % |
-| `logging.py` | 94,50 % (103/109; 93,41 % all'adozione) |
+| `logging.py` | 94,74 % (108/114; 93,41 % all'adozione) |
 | `pagination.py` | 93,02 % |
 | `transport.py` | 98,73 % |
 | `exceptions.py`, `hooks.py`, `urls.py`, `__init__.py` | 100 % |
@@ -94,3 +94,4 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 | 2026-10-10 | 04 | Copertura totale 94,32 % → 94,51 %, `api` 97,72 % → 97,83 %, `cli` 91,49 % → 91,75 %, `models/facade` 95,66 % → 95,77 %, `logging.py` 94,39 % → 94,50 %, `transport.py` 97,84 % → 98,73 %; unit test 998 → 1090, contract 158 → 161 |
 | 2026-10-10 | 05 | Copertura totale 94,51 % → 94,94 %, `api` 97,83 % → 98,04 %, `cli` 91,75 % → 92,59 %, `models/facade` 95,77 % → 96,18 %; unit test 1090 → 1208, contract 161 → 185 |
 | 2026-10-12 | 06 | Copertura totale 94,94 % → 95,18 %, `api` 98,04 % → 98,19 %, `cli` 92,59 % → 93,11 %, `models/facade` 96,18 % → 96,33 %; unit test 1208 → 1350, contract 185 → 201 |
+| 2026-10-12 | 07 | Copertura totale 95,18 % stabile (5998/6302 → 6003/6307 righe), `logging.py` 94,50 % → 94,74 %; unit test 1350 → 1383 |

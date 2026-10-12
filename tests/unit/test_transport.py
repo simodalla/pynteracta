@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -840,3 +841,94 @@ def test_password_keys_redacted_in_audit_and_hooks() -> None:
     everything = repr(logs) + repr(requests[0].body) + repr(responses[0].body)
     assert plain_request not in everything
     assert plain_response not in everything
+
+
+# ---------------------------------------------------------------------------
+# Spec 07: i token di concorrenza ottimistica passano in chiaro in tutti i canali
+# ---------------------------------------------------------------------------
+
+_OCC_PATH = "admin/manage/users/5"
+_OCC = 3
+_NEXT_OCC = 4
+_OCC_PASSWORD = "s3cret"
+_OCC_ACCESS = "fake-access-token"
+_OCC_REQUEST = {"occToken": _OCC, "firstname": "A", "password": _OCC_PASSWORD}
+_OCC_RESPONSE = {"userId": 5, "nextOccToken": _NEXT_OCC, "accessToken": _OCC_ACCESS}
+
+
+def _mock_occ_write() -> None:
+    respx.put(f"{_BASE}/{_OCC_PATH}").mock(
+        return_value=httpx.Response(_HTTP_200, json=_OCC_RESPONSE)
+    )
+
+
+# criterio: 07-C05
+@respx.mock
+def test_occ_token_in_clear_in_audit_and_hooks() -> None:
+    _mock_occ_write()
+    hooks = _RecordingHooks()
+    with capture_logs() as logs:
+        _make_transport(audit=True, audit_bodies=True, hooks=hooks).request(
+            "PUT", _OCC_PATH, json=dict(_OCC_REQUEST)
+        )
+    audit_request = next(e for e in logs if e.get("event") == "audit.request")
+    audit_response = next(e for e in logs if e.get("event") == "audit.response")
+    assert audit_request["body"]["occToken"] == _OCC
+    assert audit_response["body"]["nextOccToken"] == _NEXT_OCC
+    assert hooks.requests[0].body["occToken"] == _OCC
+    assert hooks.responses[0].body["nextOccToken"] == _NEXT_OCC
+    everything = repr(logs) + repr(hooks.requests[0].body) + repr(hooks.responses[0].body)
+    assert _OCC_PASSWORD not in everything
+    assert _OCC_ACCESS not in everything
+
+
+# criterio: 07-C05
+@respx.mock
+@pytest.mark.usefixtures("_stdlib_audit_logging")
+def test_occ_token_in_clear_in_audit_file(tmp_path: Path) -> None:
+    _mock_occ_write()
+    log_file = tmp_path / "audit.log"
+    _setup_audit_logging(audit_file=log_file, audit_bodies=True)
+
+    _make_transport(audit=True, audit_bodies=True).request(
+        "PUT", _OCC_PATH, json=dict(_OCC_REQUEST)
+    )
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        h.flush()
+
+    events = {e["event"]: e for e in map(json.loads, log_file.read_text().splitlines())}
+    assert events["audit.request"]["body"]["occToken"] == _OCC
+    assert events["audit.response"]["body"]["nextOccToken"] == _NEXT_OCC
+    content = log_file.read_text()
+    assert _OCC_PASSWORD not in content
+    assert _OCC_ACCESS not in content
+
+
+# criterio: 07-C07
+@respx.mock
+@pytest.mark.usefixtures("_stdlib_audit_logging")
+def test_occ_token_in_clear_with_audit_raw(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import pynteracta.logging as plog  # noqa: PLC0415
+
+    _mock_occ_write()
+    monkeypatch.setattr(plog, "_AUDIT_RAW_WARNED", False)
+    with caplog.at_level(logging.WARNING, logger="pynteracta"):
+        _setup_audit_logging(audit_raw=True, audit_bodies=True)
+    assert "audit.redaction_disabled" in caplog.text
+    stream = io.StringIO()
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        if isinstance(h, logging.StreamHandler):
+            h.setStream(stream)
+
+    _make_transport(audit=True, audit_bodies=True).request(
+        "PUT", _OCC_PATH, json=dict(_OCC_REQUEST)
+    )
+    for h in logging.getLogger(_AUDIT_LOGGER_NAME).handlers:
+        h.flush()
+
+    raw_output = stream.getvalue()
+    assert "audit.request" in raw_output
+    assert f'"occToken": {_OCC}' in raw_output
+    assert f'"nextOccToken": {_NEXT_OCC}' in raw_output
