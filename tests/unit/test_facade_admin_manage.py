@@ -75,6 +75,11 @@ class TestWorkspaceForEdit:
         facade = WorkspaceForEdit.from_dict({"id": 1})
         assert facade.name is None
         assert facade.description is None
+        assert facade.translations is None
+
+    # criterio: 06-C24
+    def test_translations(self, workspace: WorkspaceForEdit) -> None:
+        assert workspace.translations == {"en": "Operations", "it": "Operazioni"}
 
 
 class TestCatalogForEdit:

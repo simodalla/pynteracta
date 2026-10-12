@@ -380,7 +380,7 @@ T14 (2026-10-12), con la decisione del maintainer registrata nella spec.
   3. Controlli bloccanti; commit `fix(admin-manage): le façade dei form scartano le lingue null
      (06-T17)`.
 
-### [ ] T18 – `edit-workspace` come patch sul form letto
+### [x] T18 – `edit-workspace` come patch sul form letto
 
 Numerato dopo T17, si esegue prima di T14: nasce dal secondo rilancio di T14 (2026-10-12),
 `400` `REQUIRED_FIELD` su `name`, con la decisione del maintainer registrata nella spec.

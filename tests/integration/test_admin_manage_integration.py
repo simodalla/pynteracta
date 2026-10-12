@@ -77,8 +77,9 @@ class TestWorkspaceWriteIntegration:
 
     Il workspace è condiviso con utenti reali: parte solo con
     ``PYNTERACTA_TEST_WRITE_WORKSPACE=1``, aggiunge e toglie l'utente di prova e, se la ``PUT``
-    avesse azzerato nome o descrizione, li rimette come li ha letti. Le stampe ``[06-C22]``
-    servono al maintainer (task T14).
+    avesse cambiato nome o descrizione, li rimette come li ha letti. Ogni ``PUT`` ripassa nome,
+    traduzioni e descrizione letti, perché il server vuole il nome in ogni modifica (T14). Le
+    stampe ``[06-C22]`` servono al maintainer (task T14).
     """
 
     # criterio: 06-C22
@@ -90,15 +91,22 @@ class TestWorkspaceWriteIntegration:
             before = client.admin_manage.workspace_for_edit(workspace_id)
             assert before.occ_token is not None
             token = before.occ_token
+            # Il server vuole il nome in ogni modifica (T14): si ripassano i campi letti.
+            keep = {
+                "name": before.name,
+                "translations": before.translations,
+                "description": before.description,
+            }
             added = None
             try:
                 added = client.admin_manage.edit_workspace(
-                    workspace_id, token, add_user_ids=[user_id]
+                    workspace_id, token, add_user_ids=[user_id], **keep
                 )
                 assert added.occ_token is not None
                 token = added.occ_token
                 print(
-                    f"\n[06-C22] edit_workspace(add_user_ids) con nome e descrizione omessi: "
+                    f"\n[06-C22] edit_workspace(add_user_ids) con nome, traduzioni e descrizione "
+                    "letti: "
                     f"name invariato={added.name == before.name} "
                     f"description invariata={added.description == before.description} "
                     f"member_users_count {before.member_users_count} -> "
@@ -109,15 +117,12 @@ class TestWorkspaceWriteIntegration:
                 # Se l'utente di prova era già membro il conteggio non cresce: non lo si toglie.
                 if added is not None and added.member_users_count != before.member_users_count:
                     final = client.admin_manage.edit_workspace(
-                        workspace_id, token, remove_user_ids=[user_id]
+                        workspace_id, token, remove_user_ids=[user_id], **keep
                     )
                 if final.name != before.name or final.description != before.description:
                     assert final.occ_token is not None
                     final = client.admin_manage.edit_workspace(
-                        workspace_id,
-                        final.occ_token,
-                        name=before.name,
-                        description=before.description,
+                        workspace_id, final.occ_token, **keep
                     )
         assert final.member_users_count == before.member_users_count
         assert final.name == before.name

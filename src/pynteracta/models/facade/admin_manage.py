@@ -84,6 +84,11 @@ class WorkspaceForEdit:
         return self._content.name if self._content is not None else None
 
     @property
+    def translations(self) -> dict[str, str] | None:
+        """Traduzioni del nome per lingua (da ``contentData``)."""
+        return self._content.translations if self._content is not None else None
+
+    @property
     def description(self) -> dict[str, str] | None:
         """Internationalized description map (from ``contentData``)."""
         return self._content.description if self._content is not None else None

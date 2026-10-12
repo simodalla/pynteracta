@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Comando ``admin-manage edit-workspace`` (spec 06), registrato sul gruppo ``admin-manage``.
 
-I testi della CLI sono in inglese, come il resto della CLI. Il comando non è una patch: legge il
-form del workspace solo per l'``occToken`` (nessuna lettura con ``--occ-token``) e invia i soli
-campi indicati, in una sola richiesta mai ripetuta; un ``409`` esce con il codice ``9``.
+I testi della CLI sono in inglese, come il resto della CLI. Il comando è una patch (06-C24): il
+server vuole il nome in ogni modifica, quindi il form si rilegge sempre e nome, traduzioni e
+descrizione letti si rimandano, aggiornati da flag e ``--json``, insieme ai soli add/remove
+indicati. Una sola richiesta di scrittura, mai ripetuta; un ``409`` esce con il codice ``9``.
 """
 
 from __future__ import annotations
@@ -62,7 +63,7 @@ def _workspace_body(  # noqa: PLR0913
     group_roles: list[tuple[int, int]],
     remove_role_association: IdsOption,
 ) -> dict[str, Any]:
-    """Corpo di ``edit-workspace`` da ``--json`` e dai flag (06-C17): nulla del form.
+    """Parte del corpo che viene da ``--json`` e dai flag (06-C17), senza il form.
 
     I flag prevalgono sulle chiavi di ``--json``; ``description`` si unisce per lingua; le liste
     vuote non si inviano.
@@ -82,6 +83,32 @@ def _workspace_body(  # noqa: PLR0913
     return merged
 
 
+_LANG_MAPS = ("translations", "description")
+
+
+def _workspace_edit_base(form: WorkspaceForEdit) -> dict[str, Any]:
+    """Base della patch dal form letto (06-C24): nome, traduzioni e descrizione, se presenti."""
+    base: dict[str, Any] = {
+        "name": form.name,
+        "translations": form.translations,
+        "description": form.description,
+    }
+    return {key: value for key, value in base.items() if value is not None}
+
+
+def _apply_form(base: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    """Unisce la base letta e il corpo di flag e ``--json``: il corpo vince.
+
+    ``translations`` e ``description`` si uniscono per lingua: la mappa letta, aggiornata da
+    quella del corpo.
+    """
+    merged = {**base, **body}
+    for key in _LANG_MAPS:
+        if key in base and key in body:
+            merged[key] = {**(base[key] or {}), **(body[key] or {})}
+    return merged
+
+
 def _workspace_write_row(obj: object) -> dict[str, object]:
     """Tabella di ``edit-workspace``: la riga della lettura più il token successivo."""
     ws = obj if isinstance(obj, WorkspaceForEdit) else None
@@ -96,8 +123,10 @@ def _workspace_write_row(obj: object) -> dict[str, object]:
     }
 
 
-def _require_token(workspace_id: int, read_token: int | None) -> int:
-    """Il token letto dal form; assente → messaggio ed exit 1."""
+def _require_token(workspace_id: int, occ_token: int | None, read_token: int | None) -> int:
+    """``--occ-token`` se dato, altrimenti il token letto; nessuno dei due → messaggio ed exit 1."""
+    if occ_token is not None:
+        return occ_token
     if read_token is None:
         typer.echo(
             f"Workspace {workspace_id} has no occToken in the server response: "
@@ -171,11 +200,13 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
 ) -> None:
     """Edit a workspace: name, description, members, roles and images (requires admin).
 
-    Only the fields you give are sent; nothing of the current form is sent back. The
-    concurrency token is read from the workspace's edit form, or given with --occ-token (then
-    nothing is read). --cover and --logo upload the files first (in this order) and stop at the
-    first failed upload with exit code 11, before the edit is sent. Translations of the name go
-    through --json. A 409 exits with code 9 and never retries.
+    The workspace's edit form is read first: its name, translations and description are sent
+    back (the server requires the name on every edit), updated by --name, --description
+    LANG=TEXT and --json one key or language at a time, together with the members and roles you
+    add or remove. The concurrency token is the one just read, or --occ-token. --cover and
+    --logo upload the files first (in this order) and stop at the first failed upload with exit
+    code 11, before the edit is sent. Translations of the name go through --json. A 409 exits
+    with code 9 and never retries.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -198,13 +229,14 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
     if not merged and cover is None and logo is None:
         typer.echo("Nothing to send: pass at least one option or --json.", err=True)
         raise typer.Exit(EXIT_CONFIG)
-    req = validate_body(merged, EditWorkspaceRequestDTO)
+    validate_body(merged, EditWorkspaceRequestDTO)
     try:
         with build_client(state) as client:
-            token = occ_token
-            if token is None:
-                form = client.admin_manage.workspace_for_edit(workspace_id)
-                token = _require_token(workspace_id, form.occ_token)
+            form = client.admin_manage.workspace_for_edit(workspace_id)
+            token = _require_token(workspace_id, occ_token, form.occ_token)
+            req = validate_body(
+                _apply_form(_workspace_edit_base(form), merged), EditWorkspaceRequestDTO
+            )
             images: dict[str, str | None] = {}
             if cover is not None:
                 images["newCoverImageContentRef"] = client.attachments.upload(cover).content_ref

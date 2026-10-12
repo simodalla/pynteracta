@@ -14,7 +14,8 @@ from api_helpers import full_url, load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli.admin_manage_write import _workspace_body
+from pynteracta.cli.admin_manage_write import _apply_form, _workspace_body, _workspace_edit_base
+from pynteracta.models.facade.admin_manage import WorkspaceForEdit
 
 BASE_ENV = {"PYNTERACTA_BASE_URL": "https://api.example.com"}
 _WORKSPACE_ID = 88
@@ -42,9 +43,18 @@ _ARGS = [
     "--remove-role-association",
     "9",
 ]
+_FORM_TRANSLATIONS = {"en": "Operations", "it": "Operazioni"}
+_FORM_DESCRIPTION = {"en": "Operations workspace", "it": "Spazio operazioni"}
+# Base della patch (06-C24): nome, traduzioni e descrizione letti dal form.
+_BASE = {
+    "name": "Operations",
+    "translations": _FORM_TRANSLATIONS,
+    "description": _FORM_DESCRIPTION,
+}
 _EXPECTED_BODY = {
     "name": "WS",
-    "description": {"it": "Desc"},
+    "translations": _FORM_TRANSLATIONS,
+    "description": {"en": "Operations workspace", "it": "Desc"},
     "addUserIds": [1],
     "removeGroupIds": [2],
     "addUserRoleAssociations": [{"userId": 1, "roleId": 4}],
@@ -143,7 +153,7 @@ class TestEditWorkspace:
 
     # criterio: 06-C17
     @respx.mock
-    def test_occ_token_skips_get(self, runner: CliRunner) -> None:
+    def test_occ_token_still_reads_form(self, runner: CliRunner) -> None:
         get_route = mock_json("GET", _FORM_PATH, _FORM)
         put_route = mock_json(
             "PUT",
@@ -152,7 +162,7 @@ class TestEditWorkspace:
         )
         result = runner.invoke(app, [*_ARGS, "--occ-token", "10"], env=BASE_ENV)
         assert result.exit_code == 0, result.output
-        assert not get_route.called
+        assert get_route.call_count == 1
         assert put_route.call_count == 1
 
     # criterio: 06-C17
@@ -203,7 +213,11 @@ class TestEditWorkspace:
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
-        assert _sent_body(put_route) == {"description": {"it": "Desc", "en": "Ops"}}
+        assert _sent_body(put_route) == {
+            "name": "Operations",
+            "translations": _FORM_TRANSLATIONS,
+            "description": {"en": "Ops", "it": "Desc"},
+        }
 
     @respx.mock
     def test_missing_occ_token_exits_1(self, runner: CliRunner) -> None:
@@ -284,6 +298,7 @@ class TestEditWorkspaceUploads:
         assert b'filename="cover.png"' in storage.calls[0].request.content
         assert b'filename="logo.png"' in storage.calls[1].request.content
         assert _sent_body(put_route) == {
+            **_BASE,
             "newCoverImageContentRef": "ref-cover",
             "newLogoContentRef": "ref-logo",
         }
@@ -332,4 +347,110 @@ class TestEditWorkspaceUploads:
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
-        assert _sent_body(put_route) == {"newCoverImageContentRef": "ref-cover"}
+        assert _sent_body(put_route) == {**_BASE, "newCoverImageContentRef": "ref-cover"}
+
+
+# criterio: 06-C24
+def test_workspace_edit_base_reads_name_and_maps() -> None:
+    assert _workspace_edit_base(WorkspaceForEdit.from_dict(_FORM)) == _BASE
+
+
+# criterio: 06-C24
+def test_workspace_edit_base_skips_missing_keys() -> None:
+    form = WorkspaceForEdit.from_dict({"id": _WORKSPACE_ID, "contentData": {"name": "N"}})
+    assert _workspace_edit_base(form) == {"name": "N"}
+    assert _workspace_edit_base(WorkspaceForEdit.from_dict({"id": _WORKSPACE_ID})) == {}
+
+
+# criterio: 06-C24
+def test_apply_form_body_wins_and_maps_merge_per_language() -> None:
+    body = {"name": "WS", "description": {"it": "Desc"}, "translations": {"de": "Betrieb"}}
+    assert _apply_form(_BASE, body) == {
+        "name": "WS",
+        "translations": {"en": "Operations", "it": "Operazioni", "de": "Betrieb"},
+        "description": {"en": "Operations workspace", "it": "Desc"},
+    }
+
+
+# criterio: 06-C24
+def test_apply_form_without_base_maps() -> None:
+    assert _apply_form({"name": "N"}, {"description": {"it": "D"}}) == {
+        "name": "N",
+        "description": {"it": "D"},
+    }
+
+
+class TestEditWorkspacePatch:
+    # criterio: 06-C24
+    @respx.mock
+    def test_add_user_resends_form_fields(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--add-user", "1"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 1
+        assert put_route.call_count == 1
+        assert _sent_body(put_route) == {**_BASE, "addUserIds": [1]}
+
+    # criterio: 06-C24
+    @respx.mock
+    def test_name_flag_wins(self, runner: CliRunner) -> None:
+        _, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--name", "WS"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route) == {**_BASE, "name": "WS"}
+
+    # criterio: 06-C24
+    @respx.mock
+    def test_description_flag_merged_with_form(self, runner: CliRunner) -> None:
+        _, put_route = _mock_flow()
+        result = runner.invoke(
+            app,
+            ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--description", "it=Desc"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["description"] == {
+            "en": "Operations workspace",
+            "it": "Desc",
+        }
+
+    # criterio: 06-C24
+    @respx.mock
+    def test_json_maps_merged_with_form(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _, put_route = _mock_flow()
+        body = tmp_path / "body.json"
+        body.write_text(json.dumps({"translations": {"de": "Betrieb"}}), "utf-8")
+        result = runner.invoke(
+            app,
+            ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--json", str(body)],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route)["translations"] == {
+            "en": "Operations",
+            "it": "Operazioni",
+            "de": "Betrieb",
+        }
+
+    # criterio: 06-C24
+    @respx.mock
+    def test_form_without_maps_adds_nothing(self, runner: CliRunner) -> None:
+        form = copy.deepcopy(_FORM)
+        form["contentData"] = {"name": "Operations"}
+        mock_json("GET", _FORM_PATH, form)
+        put_route = mock_json("PUT", _PUT_PATH, load_payload("edit_workspace_response.json"))
+        result = runner.invoke(
+            app,
+            ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--add-user", "1"],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(put_route) == {"name": "Operations", "addUserIds": [1]}
