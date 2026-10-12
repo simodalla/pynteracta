@@ -123,6 +123,24 @@ def _workspace_write_row(obj: object) -> dict[str, object]:
     }
 
 
+def _reread(client: Any, workspace_id: int, result: WorkspaceForEdit) -> WorkspaceForEdit:
+    """Il form riletto dopo la modifica (06-C25): la risposta della ``PUT`` ha i conteggi a 0.
+
+    Se la sola rilettura fallisce la modifica resta riuscita: avviso su stderr e risposta della
+    ``PUT``, senza cambiare l'exit code.
+    """
+    try:
+        reread: WorkspaceForEdit = client.admin_manage.workspace_for_edit(workspace_id)
+    except InteractaError as exc:
+        typer.echo(
+            f"Workspace {workspace_id} updated, but re-reading it failed ({exc}); "
+            "the counts below come from the edit response and may be 0.",
+            err=True,
+        )
+        return result
+    return reread
+
+
 def _require_token(workspace_id: int, occ_token: int | None, read_token: int | None) -> int:
     """``--occ-token`` se dato, altrimenti il token letto; nessuno dei due → messaggio ed exit 1."""
     if occ_token is not None:
@@ -203,7 +221,8 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
     The workspace's edit form is read first: its name, translations and description are sent
     back (the server requires the name on every edit), updated by --name, --description
     LANG=TEXT and --json one key or language at a time, together with the members and roles you
-    add or remove. The concurrency token is the one just read, or --occ-token. --cover and
+    add or remove. The concurrency token is the one just read, or --occ-token. After the edit
+    the form is read again and shown (the edit response has no member counts). --cover and
     --logo upload the files first (in this order) and stop at the first failed upload with exit
     code 11, before the edit is sent. Translations of the name go through --json. A 409 exits
     with code 9 and never retries.
@@ -245,6 +264,7 @@ def admin_manage_edit_workspace(  # noqa: PLR0913
             if images:
                 req = req.model_copy(update=images)
             result = client.admin_manage.edit_workspace_raw(workspace_id, token, req)
+            result = _reread(client, workspace_id, result)
         render_output(
             resolve_output(state, output),
             [result],

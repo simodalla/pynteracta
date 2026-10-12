@@ -416,7 +416,7 @@ Numerato dopo T17, si esegue prima di T14: nasce dal secondo rilancio di T14 (20
   3. Controlli bloccanti; commit `fix(cli): admin-manage edit-workspace come patch sul form letto
      (06-T18)`.
 
-### [ ] T19 – `edit-workspace` rilegge il form dopo la modifica
+### [x] T19 – `edit-workspace` rilegge il form dopo la modifica
 
 Nasce dal terzo rilancio di T14 (2026-10-12): la risposta della `PUT` ha i conteggi a `0`.
 

@@ -72,7 +72,13 @@ def _sent_body(route: respx.Route) -> dict:  # type: ignore[type-arg]
 
 
 def _mock_flow(*, status: int = 200) -> tuple[respx.Route, respx.Route]:
-    get_route = mock_json("GET", _FORM_PATH, _FORM)
+    # Prima GET: il form; seconda (rilettura dopo la PUT, 06-C25): il form aggiornato.
+    get_route = respx.get(full_url(_FORM_PATH)).mock(
+        side_effect=[
+            httpx.Response(200, json=_FORM),
+            httpx.Response(200, json=load_payload("edit_workspace_response.json")),
+        ]
+    )
     put_route = mock_json(
         "PUT",
         _PUT_PATH,
@@ -138,7 +144,7 @@ class TestEditWorkspace:
         get_route, put_route = _mock_flow()
         result = runner.invoke(app, _ARGS, env=BASE_ENV)
         assert result.exit_code == 0, result.output
-        assert get_route.call_count == 1
+        assert get_route.call_count == 2  # noqa: PLR2004  (lettura e rilettura, 06-C25)
         assert put_route.call_count == 1
         assert _sent_body(put_route) == _EXPECTED_BODY
         assert result.output == snapshot
@@ -162,7 +168,7 @@ class TestEditWorkspace:
         )
         result = runner.invoke(app, [*_ARGS, "--occ-token", "10"], env=BASE_ENV)
         assert result.exit_code == 0, result.output
-        assert get_route.call_count == 1
+        assert get_route.call_count == 2  # noqa: PLR2004  (lettura e rilettura, 06-C25)
         assert put_route.call_count == 1
 
     # criterio: 06-C17
@@ -303,7 +309,7 @@ class TestEditWorkspaceUploads:
             "newLogoContentRef": "ref-logo",
         }
         urls = [str(call.request.url) for call in respx.calls]
-        assert urls[-1] == full_url(_PUT_PATH)
+        assert urls[-2:] == [full_url(_PUT_PATH), full_url(_FORM_PATH)]
 
     # criterio: 06-C18
     @respx.mock
@@ -391,7 +397,7 @@ class TestEditWorkspacePatch:
             env=BASE_ENV,
         )
         assert result.exit_code == 0, result.output
-        assert get_route.call_count == 1
+        assert get_route.call_count == 2  # noqa: PLR2004  (lettura e rilettura, 06-C25)
         assert put_route.call_count == 1
         assert _sent_body(put_route) == {**_BASE, "addUserIds": [1]}
 
@@ -454,3 +460,55 @@ class TestEditWorkspacePatch:
         )
         assert result.exit_code == 0, result.output
         assert _sent_body(put_route) == {"name": "Operations", "addUserIds": [1]}
+
+
+def _zero_counts_response() -> dict:  # type: ignore[type-arg]
+    payload = load_payload("edit_workspace_response.json")
+    for key in ("adminUsersCount", "adminGroupsCount", "memberUsersCount", "memberGroupsCount"):
+        payload[key] = 0
+    return payload
+
+
+_ADD_USER_ARGS = ["admin-manage", "edit-workspace", str(_WORKSPACE_ID), "--add-user", "1"]
+
+
+class TestEditWorkspaceReread:
+    # criterio: 06-C25
+    @respx.mock
+    def test_table_shows_reread_counts(self, runner: CliRunner) -> None:
+        reread = copy.deepcopy(_FORM)
+        reread["memberUsersCount"] = 26
+        reread["occToken"] = 18
+        get_route = respx.get(full_url(_FORM_PATH)).mock(
+            side_effect=[httpx.Response(200, json=_FORM), httpx.Response(200, json=reread)]
+        )
+        mock_json("PUT", _PUT_PATH, _zero_counts_response())
+        result = runner.invoke(app, ["--output", "json", *_ADD_USER_ARGS], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert get_route.call_count == 2  # noqa: PLR2004
+        row = json.loads(result.stdout)
+        assert row["member_users_count"] == 26  # noqa: PLR2004
+        assert row["admin_users_count"] == 3  # noqa: PLR2004
+        assert row["occ_token"] == 18  # noqa: PLR2004
+
+    # criterio: 06-C25
+    @respx.mock
+    def test_reread_failure_warns_and_exits_0(self, runner: CliRunner) -> None:
+        respx.get(full_url(_FORM_PATH)).mock(
+            side_effect=[httpx.Response(200, json=_FORM), httpx.Response(500, json={})]
+        )
+        put_route = mock_json("PUT", _PUT_PATH, _zero_counts_response())
+        result = runner.invoke(app, ["--output", "json", *_ADD_USER_ARGS], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert put_route.call_count == 1
+        assert "updated, but re-reading it failed" in result.stderr
+        assert json.loads(result.stdout)["member_users_count"] == 0
+
+    # criterio: 06-C25
+    @respx.mock
+    def test_409_does_not_reread(self, runner: CliRunner) -> None:
+        get_route, put_route = _mock_flow(status=409)
+        result = runner.invoke(app, _ADD_USER_ARGS, env=BASE_ENV)
+        assert result.exit_code == _EXIT_CONFLICT
+        assert get_route.call_count == 1
+        assert put_route.call_count == 1
