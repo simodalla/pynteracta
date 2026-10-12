@@ -8,8 +8,9 @@ di scrittura invia una sola richiesta e non riprova mai: un ``409`` esce con il 
 from __future__ import annotations
 
 import json
+import pathlib
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -76,6 +77,9 @@ from pynteracta.models.generated.external_v2 import (
     EditEventPostRequestDTO,
 )
 
+if TYPE_CHECKING:
+    from pynteracta.client import InteractaClient
+
 # --- opzioni ------------------------------------------------------------------------------
 
 _DATE_HELP = (
@@ -122,6 +126,17 @@ NotifyOnEditOption = Annotated[
 ]
 WatcherGroupOption = Annotated[
     list[int] | None, typer.Option("--watcher-group", help="Watcher group ID (repeatable).")
+]
+CoverOption = Annotated[
+    pathlib.Path | None,
+    typer.Option(
+        "--cover",
+        help="Image file to upload as the cover of the post (uploaded before --attach; a "
+        "failed upload exits with code 11 and nothing is written).",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
 ]
 PinnedOption = Annotated[bool, typer.Option("--pinned", help="Pin the post.")]
 RemoveWatcherGroupOption = Annotated[
@@ -512,6 +527,28 @@ def posts_get_event_for_copy(  # noqa: PLR0913
         raise handle_error(exc, console=console) from exc
 
 
+def _cover_ref(client: InteractaClient, cover: pathlib.Path | None) -> str | None:
+    """Carica la copertina con l'upload della spec 04 e ne restituisce il ``contentRef``."""
+    if cover is None:
+        return None
+    return str(upload_all(client, [cover])[0]["contentRef"])
+
+
+def _add_uploads(
+    client: InteractaClient,
+    merged: dict[str, Any],
+    *,
+    cover: pathlib.Path | None,
+    attach: list[pathlib.Path] | None,
+    attachments_key: str,
+) -> None:
+    """Copertina prima, allegati poi; il primo upload fallito risale e nulla si scrive."""
+    ref = _cover_ref(client, cover)
+    if ref is not None:
+        merged["coverImageContentRef"] = ref
+    append_attachments(merged, attachments_key, upload_all(client, attach))
+
+
 # --- comandi di scrittura -----------------------------------------------------------------
 
 
@@ -535,6 +572,7 @@ def posts_create_event(  # noqa: PLR0913
     notify_on_edit: NotifyOnEditOption = False,
     title: TitleOption = None,
     description: DescriptionOption = None,
+    cover: CoverOption = None,
     attach: AttachOption = None,
     watcher_user: WatcherUserOption = None,
     watcher_group: WatcherGroupOption = None,
@@ -557,8 +595,8 @@ def posts_create_event(  # noqa: PLR0913
     else (e.g. linkPreview, invitees with different types) from --json (file or '-' for
     stdin). Flags override the keys of the JSON body, and inside 'event' key by key;
     --invite-user and --invite-group replace the invited users and groups. Only the fields
-    given are sent. --attach uploads files and appends them to the attachments; a failed upload
-    exits with code 11 and the post is not created.
+    given are sent. --cover uploads the cover image, then --attach uploads files and appends
+    them to the attachments; a failed upload exits with code 11 and the post is not created.
     """
     state: CliState = ctx.obj
     console = make_console(state)
@@ -600,7 +638,7 @@ def posts_create_event(  # noqa: PLR0913
     validate_body(merged, CreateEventPostRequestDTO)
     try:
         with build_client(state) as client:
-            append_attachments(merged, "attachments", upload_all(client, attach))
+            _add_uploads(client, merged, cover=cover, attach=attach, attachments_key="attachments")
             req = validate_body(merged, CreateEventPostRequestDTO)
             result = client.posts.create_event_raw(community_id, req)
         _render_single(
@@ -664,6 +702,7 @@ def posts_edit_event(  # noqa: PLR0913
     notify_on_edit: NotifyOnEditOption = False,
     title: TitleOption = None,
     description: DescriptionOption = None,
+    cover: CoverOption = None,
     attach: AttachOption = None,
     watcher_user: WatcherUserOption = None,
     remove_watcher_user: RemoveWatcherUserOption = None,
@@ -687,8 +726,9 @@ def posts_edit_event(  # noqa: PLR0913
     flag or --json overrides them (flags win over --json, --json over the post as read; inside
     'event' key by key). Without --timezone, --start and --end are read in the zone of the
     event. --watcher-user/--watcher-group add watchers, --remove-watcher-user/-group remove
-    them. The concurrency token is the one just read, or --occ-token. --attach uploads files
-    and adds them (a failed upload exits with code 11 and the post is not changed). If the
+    them. The concurrency token is the one just read, or --occ-token. --cover replaces the
+    cover image, --attach adds files (a failed upload exits with code 11 and the post is not
+    changed). If the
     post changed since it was read the command exits with code 9 and never retries.
     """
     state: CliState = ctx.obj
@@ -729,7 +769,9 @@ def posts_edit_event(  # noqa: PLR0913
                 draft=True if draft else None,
             )
             validate_body(merged, EditEventPostRequestDTO)
-            append_attachments(merged, "addAttachments", upload_all(client, attach))
+            _add_uploads(
+                client, merged, cover=cover, attach=attach, attachments_key="addAttachments"
+            )
             req = validate_body(merged, EditEventPostRequestDTO)
             result = client.posts.edit_event_raw(post_id, token, req)
         _render_single(
@@ -765,6 +807,7 @@ def posts_copy_event(  # noqa: PLR0913
     notify_on_edit: NotifyOnEditOption = False,
     title: TitleOption = None,
     description: DescriptionOption = None,
+    cover: CoverOption = None,
     attach: AttachOption = None,
     watcher_user: WatcherUserOption = None,
     watcher_group: WatcherGroupOption = None,
@@ -825,7 +868,9 @@ def posts_copy_event(  # noqa: PLR0913
                 client_uid=client_uid,
             )
             validate_body(merged, CopyEventPostRequestDTO)
-            append_attachments(merged, "addAttachments", upload_all(client, attach))
+            _add_uploads(
+                client, merged, cover=cover, attach=attach, attachments_key="addAttachments"
+            )
             req = validate_body(merged, CopyEventPostRequestDTO)
             result = client.posts.copy_event_raw(post_id, token, req)
         _render_single(

@@ -849,3 +849,107 @@ class TestParticipateExitCodes:
         result = runner.invoke(app, ["posts", "participate", str(_POST_ID), "yes"], env=BASE_ENV)
         assert result.exit_code == _EXIT_PERMISSION
         assert route.call_count == 1
+
+
+_UPLOAD_PATH = "core/storage/upload-new-attachment"
+_STORAGE_URL = "https://storage.example.com/bucket-test"
+_CONTENT_REF = load_payload("upload_new_attachment_response.json")["contentRef"]
+_EXIT_UPLOAD = 11
+
+
+def _mock_storage(*responses: httpx.Response) -> respx.Route:
+    """Il primo passo risponde sempre con la fixture; lo storage con ``responses`` in ordine."""
+    mock_json("POST", _UPLOAD_PATH, load_payload("upload_new_attachment_response.json"))
+    route = respx.post(_STORAGE_URL)
+    if len(responses) > 1:
+        route.mock(side_effect=list(responses))
+    else:
+        route.mock(return_value=responses[0] if responses else httpx.Response(204))
+    return route
+
+
+def _files(tmp_path: pathlib.Path, *names: str) -> list[str]:
+    paths = []
+    for name in names:
+        path = tmp_path / name
+        path.write_bytes(b"contenuto di " + name.encode())
+        paths.append(str(path))
+    return paths
+
+
+class TestCoverAndAttach:
+    # criterio: 08-C18
+    @respx.mock
+    def test_cover_then_attach_uploaded_in_order(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage()
+        route = _mock_create()
+        cover, doc = _files(tmp_path, "cover.png", "doc.pdf")
+        result = _create(
+            runner, "--start", "2026-11-05T10:00:00", "--cover", cover, "--attach", doc
+        )
+        assert result.exit_code == 0, result.output
+        assert storage.call_count == 2  # noqa: PLR2004
+        assert b'filename="cover.png"' in storage.calls[0].request.content
+        assert b'filename="doc.pdf"' in storage.calls[1].request.content
+        body = _sent_body(route)
+        assert body["coverImageContentRef"] == _CONTENT_REF
+        assert body["attachments"] == [{"name": "doc.pdf", "contentRef": _CONTENT_REF}]
+        urls = [str(call.request.url) for call in respx.calls]
+        assert urls[-1].endswith(_CREATE_PATH)
+
+    # criterio: 08-C18
+    @respx.mock
+    def test_cover_upload_failure_exits_11_without_write(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage(httpx.Response(400, text="<Error/>"))
+        route = _mock_create()
+        cover, doc = _files(tmp_path, "cover.png", "doc.pdf")
+        result = _create(
+            runner, "--start", "2026-11-05T10:00:00", "--cover", cover, "--attach", doc
+        )
+        assert result.exit_code == _EXIT_UPLOAD
+        assert "Upload of cover.png failed" in result.output
+        assert storage.call_count == 1
+        assert route.call_count == 0
+
+    # criterio: 08-C18
+    @respx.mock
+    def test_edit_event_cover_wins_over_read(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        _mock_storage()
+        _read, write = _mock_edit_flow()
+        (cover,) = _files(tmp_path, "cover.png")
+        result = _edit(runner, "--cover", cover)
+        assert result.exit_code == 0, result.output
+        assert _sent_body(write)["coverImageContentRef"] == _CONTENT_REF
+
+    # criterio: 08-C18
+    @respx.mock
+    def test_copy_event_cover(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        _mock_storage()
+        _read, write = _mock_copy_flow()
+        cover, doc = _files(tmp_path, "cover.png", "doc.pdf")
+        result = _copy(runner, "--cover", cover, "--attach", doc)
+        assert result.exit_code == 0, result.output
+        body = _sent_body(write)
+        assert body["coverImageContentRef"] == _CONTENT_REF
+        assert body["addAttachments"] == [{"name": "doc.pdf", "contentRef": _CONTENT_REF}]
+
+    # criterio: 08-C18
+    @respx.mock
+    def test_invalid_body_exits_2_before_cover_upload(
+        self, runner: CliRunner, tmp_path: pathlib.Path
+    ) -> None:
+        storage = _mock_storage()
+        route = _mock_create()
+        (cover,) = _files(tmp_path, "cover.png")
+        result = _create(
+            runner, "--start", "2026-11-05T10:00:00", "--visibility", "x", "--cover", cover
+        )
+        assert result.exit_code == _EXIT_CONFIG
+        assert storage.call_count == 0
+        assert route.call_count == 0

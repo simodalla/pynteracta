@@ -225,7 +225,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   2. `cli/posts_event.py`: `ParticipationChoice`, comando `participate` con `--notes`.
   3. Controlli bloccanti; commit `feat(cli): risposta all'invito di un post evento`.
 
-### [ ] T13 – Copertina con `--cover`
+### [x] T13 – Copertina con `--cover`
 
 - Criteri: 08-C18
 - Dipende da: T10, T11
