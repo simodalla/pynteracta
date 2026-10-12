@@ -63,7 +63,8 @@ Confermato dal maintainer il 2026-10-08.
     scopre l'`operation_id` delle transizioni. *(Spec 03, 2026-10-10.)*
 - RF-007. Community: elenco, dettagli singoli e in blocco, definizione dei post (singola e
   multipla).
-- RF-008. Cataloghi: elenco dei cataloghi e delle voci, con iterazione.
+- RF-008. Cataloghi: elenco dei cataloghi e delle voci, con iterazione; le scritture di
+  cataloghi e voci stanno su `client.catalogs` (RF-023, RF-023e). *(Confermato dal maintainer il 2026-10-12, spec 06.)*
 - RF-009. Allegati: elenco per post, dettaglio per id, controllo di visibilità.
 - RF-010. Task: dettaglio per id.
   - RF-022a. La lettura di un task espone `occ_token`, il token di concorrenza da passare alla
@@ -74,7 +75,8 @@ Confermato dal maintainer il 2026-10-08.
 - RF-013. Form di modifica dell'area admin (sola lettura): workspace, catalogo, voce di catalogo,
   credenziali utente (`UserCredentialsForEdit` espone `occ_token`, e `users.get_credentials_for_edit`
   è l'alias di `admin_manage.user_credentials_for_edit`: RF-023a). *(Confermato dal maintainer il
-  2026-10-10, spec 05.)*
+  2026-10-10, spec 05.)* Tutte le façade dei form espongono `occ_token`, `CatalogForEdit` anche
+  `parent_catalog_id` (RF-023e). *(Confermato dal maintainer il 2026-10-12, spec 06.)*
 - RF-014. Paginazione pigra: `PageIterator` e i metodi `iterate*()` seguono `nextPageToken` fino
   all'esaurimento; nella CLI `--all`, `--page-token`, `--count`.
 - RF-015. Output CLI componibile: `table` (default), `json`, `yaml`; `--full` e `--fields` per la
@@ -94,7 +96,8 @@ Confermato dal maintainer il 2026-10-08.
   `ResponseInfo`, senza tipi `httpx`. *(Confermato dal maintainer il 2026-10-08, spec 01.)*
 - RF-019. Errori tipizzati: ogni stato HTTP è mappato su una sottoclasse di `InteractaError`
   (autenticazione, permessi, non trovato, validazione, concorrenza, server, trasporto), con
-  stato, metodo, URL, body e `request_id`.
+  stato, metodo, URL, body e `request_id`. Vale anche per le scritture di cataloghi, voci e
+  workspace (`409` → `ConcurrencyError`, nessun nuovo tentativo). *(Confermato dal maintainer il 2026-10-12, spec 06.)*
   - RF-023d. Una `GET` che riceve `204` senza corpo solleva `NotFoundError` (`status_code == 204`):
     è la risposta del tenant al form di modifica di un utente inesistente. *(Spec 05,
     2026-10-10.)*
@@ -136,10 +139,12 @@ più `*_raw`, comando CLI, test unit e contract).
   add/remove) ed esige assegnatario e scadenza: lo dice la documentazione, la libreria non aggiunge
   nulla da sola. *(Confermato dal maintainer il 2026-10-08, spec 02.)*
 - RF-023. Anagrafiche admin: creazione, modifica, eliminazione e credenziali degli utenti;
-  creazione, modifica, eliminazione e membri dei gruppi (spec 05, 0.13.0); creazione, modifica e
-  flag `deleted` di cataloghi e voci; modifica del workspace (seconda metà, spec successiva). La
-  libreria invia solo i campi passati, in una sola richiesta; `edit`, `edit_credentials` ed
-  `edit_members` ricevono l'`occToken` dal chiamante. Semantica del server verificata sul tenant
+  creazione, modifica, eliminazione e membri dei gruppi (spec 05, 0.12.0); creazione, modifica e
+  flag `deleted` (cancellazione logica, reversibile: l'API non elimina) di cataloghi e voci;
+  modifica del workspace: nome, traduzioni, descrizione, membri, ruoli, copertina e logo
+  (spec 06, 0.13.0). La libreria invia solo i campi passati, in una sola richiesta; `edit`,
+  `edit_entry`, `edit_credentials`, `edit_members` ed `edit_workspace` ricevono l'`occToken` dal
+  chiamante (per il workspace nel path). Semantica del server verificata sul tenant
   (spec 05): `users.edit` esige `firstname` e `lastname` e azzera `contactEmail`, `privateEmail`
   ed `externalId` omessi, mentre mantiene preferenze, info e impostazioni omesse; `groups.edit`
   esige `name` e azzera `email`, `externalId` e `visible` omessi, mentre mantiene i membri; in
@@ -150,7 +155,14 @@ più `*_raw`, comando CLI, test unit e contract).
   façade espone in lista (`generated_password`), ed è redatta in log, audit log, hook e messaggi
   di eccezione; l'`occToken` restituito da `edit_members` vale per la chiamata successiva. Lo dice
   la documentazione, la libreria non aggiunge nulla da sola. *(Confermato dal maintainer il
-  2026-10-10, spec 05.)*
+  2026-10-10, spec 05.)* Semantica verificata sul tenant (spec 06): `catalogs.edit` ed
+  `edit_entry` sostituiscono per intero la mappa del nome o della label (le lingue omesse perdono
+  il testo e `it` riceve quello passato) ed `edit_entry` azzera `externalId` e parent omessi;
+  `…/entries/{id}/deleted` risponde con `entryId`; un catalogo disabilitato non compare più e
+  `catalogs.list([id])` risponde `400` `NOT_EXISTS`; la `GET` del form di una voce risponde con
+  qualunque `catalogId` nel path; `edit_workspace` esige `name` (`400` `REQUIRED_FIELD`) e la sua
+  risposta ha l'`occ_token` successivo ma i conteggi di utenti e gruppi a `0`; il tenant può
+  rispondere mappe per lingua con valori `null`. *(Confermato dal maintainer il 2026-10-12, spec 06.)*
   - RF-023a. Le letture per la modifica (`UserForEdit`, `GroupForEdit`,
     `UserCredentialsForEdit`) espongono `occ_token`, il token di concorrenza da passare alla
     scrittura; `users.get_credentials_for_edit` è l'alias di
@@ -168,6 +180,22 @@ più `*_raw`, comando CLI, test unit e contract).
   - RF-023c. `groups.edit_members` su un singolo gruppo solleva `ConcurrencyError` quando il
     server lo mette in `concurrencyErrorGroups`, anche se lo stato è `200`; `edit_members_bulk`
     restituisce le due liste senza sollevare. *(Spec 05, 2026-10-10.)*
+  - RF-023e. Le letture per la modifica di catalogo, voce e workspace (`CatalogForEdit`,
+    `CatalogEntryForEdit`, `WorkspaceForEdit`) espongono `occ_token`; `CatalogForEdit` espone
+    `parent_catalog_id` e `WorkspaceForEdit` `translations`; le lingue con valore `null` sono
+    scartate dalle mappe; `catalogs.get_for_edit` e `catalogs.get_entry_for_edit` sono alias di
+    `admin_manage.catalog_for_edit` e `catalog_entry_for_edit`. *(Spec 06, 2026-10-12.)*
+  - RF-023f. In CLI: `catalogs create|edit|delete|restore`,
+    `catalogs create-entry|edit-entry|delete-entry|restore-entry` e `admin-manage edit-workspace`.
+    Le mappe per lingua si passano con `--name|--label|--description LANG=TESTO` ripetibili e si
+    uniscono per lingua alla mappa letta o di `--json`. `catalogs edit`, `edit-entry` ed
+    `edit-workspace` sono patch che rileggono il form (anche con `--occ-token`) e rimandano nome o
+    label, parent ed external id, o nome, traduzioni e descrizione; `edit-workspace` rilegge il
+    form dopo la modifica per mostrare i conteggi e, se la rilettura fallisce, avvisa ed esce `0`;
+    `--cover` e `--logo` caricano i file (RF-024a) e al primo upload fallito escono `11` senza
+    modifica. `delete` e `delete-entry` sono cancellazioni logiche con conferma (RF-025a),
+    reversibili con `restore` e `restore-entry`, che non chiedono conferma; il flag `deleted` non
+    passa da `edit`. *(Spec 06, 2026-10-12.)*
 - RF-024. Upload di allegati in due passi: `POST core/storage/upload-new-attachment` senza corpo
   restituisce il riferimento (`contentRef`), l'URL dello storage temporaneo e i campi di una
   policy firmata; il file si carica con un form multipart `POST` a quell'URL, con i campi della
@@ -270,7 +298,10 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
   (account Google e Microsoft, username custom, password impostata o generata, che la libreria
   redige in log, audit log, hook e messaggi di eccezione e mostra solo nell'output di
   `users create`); nome, email e membri dei gruppi. *(Confermato dal maintainer il 2026-10-10,
-  spec 05.)*
+  spec 05.)* Cataloghi e voci (spec 06): nomi e label per lingua, external id e
+  parent, dati non personali; il workspace: nome, traduzioni, descrizione, id di utenti, gruppi
+  e ruoli aggiunti o tolti, e i file di copertina e logo, che passano dallo storage temporaneo
+  come gli allegati. *(Confermato dal maintainer il 2026-10-12, spec 06.)*
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -310,3 +341,7 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
   gruppi, 0.13.0): RF-023 precisato con la semantica verificata sul tenant; nuovi RF-023a,
   RF-023b, RF-023c, RF-023d; RF-023, RF-005, RF-011, RF-013 e la voce "Dati scritti sul tenant"
   di §6 confermati dal maintainer.
+- 2026-10-12: [spec 06](06-admin-catalogs-workspace/spec.md) (anagrafiche admin, seconda metà:
+  cataloghi, voci e workspace, 0.13.0): RF-023 precisato con la semantica verificata sul tenant
+  e con la versione della spec 05 corretta in 0.12.0; nuovi RF-023e e RF-023f; RF-023, RF-008,
+  RF-013, RF-019 e la voce "Dati scritti sul tenant" di §6 confermati dal maintainer.

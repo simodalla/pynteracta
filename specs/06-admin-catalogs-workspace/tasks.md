@@ -361,7 +361,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   3. `uv run mkdocs build --strict`, controlli bloccanti; commit `docs: scritture admin di
      cataloghi, voci e workspace in libreria e CLI (06-T15)`.
 
-### [ ] T16 – Chiusura: PRD
+### [x] T16 – Chiusura: PRD
 
 - Criteri: nessuno nuovo (chiude i "Requisiti nuovi" della spec)
 - Dipende da: T14, T15
