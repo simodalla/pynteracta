@@ -12,6 +12,7 @@ from pynteracta.api._utils import (
     snake_to_camel,
     to_epoch_millis,
 )
+from pynteracta.api.posts_event import PostsEventAPI
 from pynteracta.api.posts_write import PostsWriteAPI
 from pynteracta.exceptions import ValidationError
 from pynteracta.models.facade.post_filters import PostFieldFilter, validate_field_filters
@@ -118,11 +119,12 @@ _CHECK_VISIBILITY_WITH_COMMENTS_PATH = "communication/posts/data/check-visibilit
 _COMMENTS_PATH = "communication/posts/data/comments-list/{post_id}"
 
 
-class PostsAPI(PostsWriteAPI):
+class PostsAPI(PostsWriteAPI, PostsEventAPI):
     """Client for post detail, community listing, and comments endpoints.
 
     Le scritture dei post custom, dei commenti e del workflow (spec 03) arrivano da
-    :class:`~pynteracta.api.posts_write.PostsWriteAPI`.
+    :class:`~pynteracta.api.posts_write.PostsWriteAPI`; quelle dei post evento e la
+    partecipazione (spec 08) da :class:`~pynteracta.api.posts_event.PostsEventAPI`.
     """
 
     def __init__(self, transport: HttpTransport) -> None:

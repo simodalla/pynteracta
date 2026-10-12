@@ -86,7 +86,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   3. Controlli bloccanti (anche `-m contract`); commit `feat(posts): façade dei dati evento,
      delle letture propedeutiche e risposta di partecipazione`.
 
-### [ ] T05 – `PostsEventAPI`: blocco evento, letture propedeutiche e `create_event`
+### [x] T05 – `PostsEventAPI`: blocco evento, letture propedeutiche e `create_event`
 
 - Criteri: 08-C01, 08-C02, 08-C03 (create), 08-C04 (create), 08-C09 (400), 08-C10 (create),
   08-C11
