@@ -140,7 +140,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
      della chiamata, `_put` con il corpo, restituisce `None`).
   3. Controlli bloccanti; commit `feat(posts): risposta all'invito di un post evento`.
 
-### [ ] T08 – `parse_event_datetime` nella CLI
+### [x] T08 – `parse_event_datetime` nella CLI
 
 - Criteri: 08-C13 (parsing)
 - Dipende da: nessuno
