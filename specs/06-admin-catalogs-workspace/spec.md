@@ -1,6 +1,6 @@
 # 06 – Anagrafiche admin, seconda metà: cataloghi, voci di catalogo e workspace
 
-Stato: approvata
+Stato: chiusa
 Branch: `m32_admin_catalogs_workspace`
 Requisiti del PRD: RF-023, RF-025, RF-025a, RF-015, RF-015a, RF-024 (upload di copertina e
 logo), RNF-001, RNF-009; toccati RF-008, RF-013, RF-019, §6 "Dati scritti sul tenant"
