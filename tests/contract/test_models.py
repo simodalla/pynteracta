@@ -42,6 +42,11 @@ from pynteracta.models.facade.communities import (
 )
 from pynteracta.models.facade.groups import GroupMembersResult, GroupWriteResult
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
+from pynteracta.models.facade.posts_event import (
+    EventPostForCopy,
+    EventPostForCreate,
+    EventPostForEdit,
+)
 from pynteracta.models.facade.posts_write import (
     PostComment,
     PostForEdit,
@@ -1597,3 +1602,40 @@ class TestEventPostDTOs:
             == _COLLABORATOR_TYPE_ID_CONTRACT
         )
         assert generated.InvitationGroupDTO1.model_validate(invitations.groups[0].root).typeId == 0
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(
+        ("fixture", "facade"),
+        [
+            ("event_post_for_create_response.json", EventPostForCreate),
+            ("event_post_for_edit_response.json", EventPostForEdit),
+            ("event_post_for_copy_response.json", EventPostForCopy),
+        ],
+    )
+    def test_facade_smoke(self, fixture: str, facade: type) -> None:
+        form = facade.from_dict(load_payload(fixture))  # type: ignore[attr-defined]
+        assert form.content_data is not None
+        if facade is not EventPostForCreate:
+            assert form.occ_token is not None
+            assert form.event is not None
+            assert form.event.start_at is not None
+            assert form.event.invited_users
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "create_event_post_response.json",
+            "edit_event_post_response.json",
+            "copy_event_post_response.json",
+        ],
+    )
+    def test_facade_raw_accessible(self, fixture: str) -> None:
+        result = PostWriteResult.from_edit(load_payload(fixture))
+        assert result.raw is not None
+        assert result.post is not None
+        assert result.next_occ_token is not None
+        form = EventPostForEdit.from_dict(load_payload("event_post_for_edit_response.json"))
+        assert isinstance(form.raw, generated.GetEventPostForEditResponseDTO)
+        assert form.event is not None
+        assert isinstance(form.event.raw, generated.EventPostDataDTOModel)

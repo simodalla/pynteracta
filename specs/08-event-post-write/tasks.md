@@ -64,7 +64,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   3. Controlli bloccanti (anche `-m contract`); commit `refactor(facade): helper di
      rivalidazione degli stub condivisi tra le façade`.
 
-### [ ] T04 – Façade dei post evento e `ParticipationAnswer`
+### [x] T04 – Façade dei post evento e `ParticipationAnswer`
 
 - Criteri: 08-C07 (enum), 08-C11 (façade), 08-C22 (façade)
 - Dipende da: T02, T03
