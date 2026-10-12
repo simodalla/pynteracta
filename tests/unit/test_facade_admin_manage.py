@@ -144,3 +144,29 @@ class TestUserCredentialsForEdit:
         assert facade.has_custom_credentials is False
         assert facade.custom_username is None
         assert facade.custom_active is None
+
+
+class TestNullLanguageValues:
+    # criterio: 06-C23
+    def test_workspace_drops_null_languages(self) -> None:
+        payload = copy.deepcopy(_WORKSPACE_PAYLOAD)
+        payload["contentData"]["description"] = {"it": None, "en": "Ops"}
+        payload["contentData"]["translations"] = {"it": None}
+        workspace = WorkspaceForEdit.from_dict(payload)
+        assert workspace.description == {"en": "Ops"}
+        assert workspace.name == "Operations"
+        assert workspace.occ_token == _WORKSPACE_OCC_TOKEN
+
+    # criterio: 06-C23
+    def test_catalog_drops_null_languages(self) -> None:
+        payload = copy.deepcopy(_CATALOG_PAYLOAD)
+        payload["contentData"]["name"] = {"it": None, "en": "X"}
+        assert CatalogForEdit.from_dict(payload).name == {"en": "X"}
+
+    # criterio: 06-C23
+    def test_entry_drops_null_languages(self) -> None:
+        payload = copy.deepcopy(_ENTRY_PAYLOAD)
+        payload["label"] = {"it": None}
+        entry = CatalogEntryForEdit.from_dict(payload)
+        assert entry.label == {}
+        assert entry.occ_token == _ENTRY_OCC_TOKEN

@@ -360,7 +360,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      di §6 (cataloghi, voci, workspace, immagini); riga nella "Storia del documento".
   2. Commit `docs: PRD con RF-023 precisato, RF-023e e RF-023f (06-T16)`.
 
-### [ ] T17 – Lingue `null` nei form admin; correzione del test dei cataloghi
+### [x] T17 – Lingue `null` nei form admin; correzione del test dei cataloghi
 
 Numerato dopo T16 per non rinumerare, si esegue prima di T14: nasce dalla prima esecuzione di
 T14 (2026-10-12), con la decisione del maintainer registrata nella spec.

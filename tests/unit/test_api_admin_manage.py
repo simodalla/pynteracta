@@ -158,6 +158,18 @@ class TestEditWorkspace:
         assert json.loads(route.calls[0].request.content) == _WS_EXPECTED_BODY
         assert result.occ_token == _WS_NEXT_OCC_TOKEN
 
+    # criterio: 06-C23
+    @respx.mock
+    def test_response_with_null_description(self) -> None:
+        payload = load_payload("edit_workspace_response.json")
+        payload["contentData"]["description"] = {"it": None}
+        mock_json("PUT", _WS_EDIT_PATH, payload)
+        result = AdminManageAPI(make_transport()).edit_workspace(
+            _WORKSPACE_ID, _WS_OCC_TOKEN, add_user_ids=[1]
+        )
+        assert result.description == {}
+        assert result.occ_token == _WS_NEXT_OCC_TOKEN
+
     # criterio: 06-C09
     @respx.mock
     def test_409_raises_concurrency_error_once(self) -> None:

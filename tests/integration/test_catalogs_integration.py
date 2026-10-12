@@ -14,6 +14,7 @@ import time
 import pytest
 
 from pynteracta.client import InteractaClient
+from pynteracta.exceptions import ValidationError
 
 pytestmark = pytest.mark.integration
 
@@ -61,12 +62,12 @@ class TestCatalogsWriteIntegration:
                     f"parent_catalog_id={form.parent_catalog_id} name={form.name}"
                 )
 
-                edited = client.catalogs.edit(catalog_id, form.occ_token, name={"en": name})
+                edited = client.catalogs.edit(catalog_id, form.occ_token, name={"en": f"{name}-en"})
                 assert edited.catalog_id == catalog_id
                 after_edit = client.catalogs.get_for_edit(catalog_id)
                 print(
                     f"[06-C21] catalogs.edit(name={{'en': …}}) con la sola lingua en: "
-                    f"name={after_edit.name} (sostituita se manca 'it', unita se c'è) "
+                    f"name={after_edit.name} (prima: {form.name}) "
                     f"parent_catalog_id={after_edit.parent_catalog_id}"
                 )
 
@@ -84,8 +85,8 @@ class TestCatalogsWriteIntegration:
                 after_entry_edit = client.catalogs.get_entry_for_edit(catalog_id, entry_id)
                 print(
                     f"[06-C21] catalogs.edit_entry(label={{'en': …}}) con external id e parent "
-                    f"omessi: label={after_entry_edit.label} "
-                    f"external_id={after_entry_edit.external_id} "
+                    f"omessi: label={after_entry_edit.label} (prima: {entry_form.label}) "
+                    f"external_id={after_entry_edit.external_id} (prima: {entry_form.external_id}) "
                     f"parents_count={after_entry_edit.parents_count}"
                 )
 
@@ -98,8 +99,16 @@ class TestCatalogsWriteIntegration:
             finally:
                 if catalog_id is not None:
                     client.catalogs.set_deleted(catalog_id, True)
-            listed = client.catalogs.list([catalog_id])
-            visible = [c.id for c in listed.items_typed]
-            print(f"[06-C21] catalogs.list([id]) dopo set_deleted(True): ids={visible}")
+            try:
+                listed = client.catalogs.list([catalog_id])
+                visible = [c.id for c in listed.items_typed]
+                print(f"[06-C21] catalogs.list([id]) dopo set_deleted(True): ids={visible}")
+            # catalogs.list() senza id restituisce una lista vuota sul tenant di prova (T14):
+            # la visibilità dei disabilitati si prova solo chiedendoli per id.
+            except ValidationError as exc:  # il tenant risponde 400 NOT_EXISTS (T14)
+                print(
+                    f"[06-C21] catalogs.list([id]) dopo set_deleted(True): {exc.status_code} "
+                    f"{exc.response_body}"
+                )
             final = client.catalogs.get_for_edit(catalog_id)
         assert final.deleted is True

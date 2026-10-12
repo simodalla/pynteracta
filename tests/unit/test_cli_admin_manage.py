@@ -28,6 +28,16 @@ def runner() -> CliRunner:
 
 
 class TestAdminManageWorkspace:
+    # criterio: 06-C23
+    @respx.mock
+    def test_null_description_exits_0(self, runner: CliRunner) -> None:
+        payload = load_payload("get_workspace_for_edit_response.json")
+        payload["contentData"]["description"] = {"it": None}
+        mock_json("GET", f"admin/manage/workspaces/{_WORKSPACE_ID}/edit", payload)
+        result = runner.invoke(app, ["admin-manage", "workspace", str(_WORKSPACE_ID)], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        assert "Operations" in result.output
+
     @respx.mock
     def test_table_output(self, runner: CliRunner, snapshot: object) -> None:
         mock_json(

@@ -24,6 +24,26 @@ def _resolve_root(obj: object) -> object:
     return root if root is not None else obj
 
 
+def _drop_null_values(mapping: object) -> object:
+    """Toglie le lingue con valore ``None`` da una mappa per lingua (06-C23).
+
+    Il tenant può rispondere ``{"it": null}``, che il modello generato (``dict[str, str]``)
+    rifiuta. Un valore che non è un dict passa com'è.
+    """
+    if isinstance(mapping, dict):
+        return {key: value for key, value in mapping.items() if value is not None}
+    return mapping
+
+
+def _clean_maps(data: dict, *keys: str) -> dict:  # type: ignore[type-arg]
+    """Copia di ``data`` con le mappe per lingua ``keys`` ripulite dai valori ``None``."""
+    cleaned = dict(data)
+    for key in keys:
+        if key in cleaned:
+            cleaned[key] = _drop_null_values(cleaned[key])
+    return cleaned
+
+
 class WorkspaceForEdit:
     """Narrow facade over :class:`~generated.GetWorkspaceForEditResponseDTO`.
 
@@ -49,7 +69,9 @@ class WorkspaceForEdit:
             return None
         root = _resolve_root(raw.contentData)
         if isinstance(root, dict):
-            return generated.WorkspaceEditableContentDataDTO1.model_validate(root)
+            return generated.WorkspaceEditableContentDataDTO1.model_validate(
+                _clean_maps(root, "translations", "description")
+            )
         return None
 
     @property
@@ -126,7 +148,9 @@ class CatalogForEdit:
             return None
         root = _resolve_root(raw.contentData)
         if isinstance(root, dict):
-            return generated.CatalogEditableContentDTOModel.model_validate(root)
+            return generated.CatalogEditableContentDTOModel.model_validate(
+                _clean_maps(root, "name")
+            )
         return None
 
     @property
@@ -215,8 +239,10 @@ class CatalogEntryForEdit:
 
     @classmethod
     def from_dict(cls, data: dict) -> CatalogEntryForEdit:  # type: ignore[type-arg]
-        """Parse from a raw API response dict."""
-        return cls(generated.GetCatalogEntryForEditResponseDTO.model_validate(data))
+        """Parse from a raw API response dict; le lingue ``null`` di ``label`` sono scartate."""
+        return cls(
+            generated.GetCatalogEntryForEditResponseDTO.model_validate(_clean_maps(data, "label"))
+        )
 
 
 class UserCredentialsForEdit:
