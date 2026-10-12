@@ -51,7 +51,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   3. `uv run pytest -m contract` e controlli bloccanti; commit `test: fixture e contract test dei
      DTO dei post evento`.
 
-### [ ] T03 – Helper di rivalidazione degli stub in `facade/_stubs.py`
+### [x] T03 – Helper di rivalidazione degli stub in `facade/_stubs.py`
 
 - Criteri: nessuno (refactor preparatorio per 08-C11)
 - Dipende da: nessuno
