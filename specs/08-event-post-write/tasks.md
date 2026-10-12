@@ -171,7 +171,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   3. Snapshot letti, controlli bloccanti; commit `feat(cli): letture propedeutiche dei post
      evento`.
 
-### [ ] T10 – `posts create-event`
+### [x] T10 – `posts create-event`
 
 - Criteri: 08-C09 (exit 6), 08-C12, 08-C13
 - Dipende da: T08, T09
