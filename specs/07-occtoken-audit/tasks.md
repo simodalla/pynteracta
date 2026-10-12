@@ -12,7 +12,7 @@ Valori finti dei test (dal piano): `occToken` `3` e `7`, `nextOccToken` `4`, `sc
 
 ## Elenco
 
-### [ ] T01 – Riga di ROADMAP
+### [x] T01 – Riga di ROADMAP
 
 - Criteri: nessuno (voce di checklist del progetto)
 - Dipende da: nessuno
