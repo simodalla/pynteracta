@@ -10,8 +10,8 @@
 
 An unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`).
 Synchronous and typed: service-account and Google OAuth2 authentication, ten read resources, a
-write surface that grows one resource group at a time (tasks, posts and attachment upload so
-far), a Typer CLI with table/JSON/YAML output and file export. Current version and contents: see
+write surface that grows one resource group at a time (tasks, posts, attachment upload and the
+admin area so far), a Typer CLI with table/JSON/YAML output and file export. Current version and contents: see
 [`CHANGELOG.md`](https://github.com/simodalla/pynteracta/blob/main/CHANGELOG.md).
 
 ## Installation
@@ -101,11 +101,11 @@ pynteracta --version
   a `.raw` escape hatch to the generated DTO.
 - **Write operations** — `tasks` create/edit/delete, custom `posts` (create, edit, copy,
   custom data, watchers, attachments, delete, mark-as-erasable, comments, workflow), admin
-  `users` (create, edit, delete, credentials) and admin `groups` (create, edit, delete, members),
-  with explicit kwargs and `*_raw` variants in the library and `tasks …` / `posts …` / `users …` /
-  `groups …` write commands in the CLI (confirmation on destructive commands, exit code `9` on
-  `occToken` conflicts, no automatic retry of uncertain writes). Event posts and the admin
-  catalogs and workspace follow.
+  `users` (create, edit, delete, credentials), admin `groups` (create, edit, delete, members),
+  admin `catalogs` and catalog entries (create, edit, logical delete, restore) and the admin
+  workspace edit (name, description, members, roles, cover and logo), with explicit kwargs and `*_raw` variants in the library and `tasks …` / `posts …` / `users …` /
+  `groups …` / `catalogs …` / `admin-manage edit-workspace` write commands in the CLI (confirmation on destructive commands, exit code `9` on
+  `occToken` conflicts, no automatic retry of uncertain writes). Event posts follow.
 - **Attachment upload** — `client.attachments.upload()` and `--attach` / `attachments upload` /
   `posts edit-attachments` in the CLI; the uploaded file is attached to posts, comments and
   tasks, with no Interacta token sent to the storage and signed links redacted from logs.

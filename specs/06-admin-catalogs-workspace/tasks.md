@@ -337,7 +337,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
     **La risposta della `PUT` ha i conteggi a 0**: valgono solo quelli di una nuova lettura. Se
     traduzioni e descrizione omesse vengano azzerate non si è provato (workspace condiviso).
 
-### [ ] T15 – Documentazione
+### [x] T15 – Documentazione
 
 - Criteri: 06-C20
 - Dipende da: T10, T12, T14, T17, T18, T19
