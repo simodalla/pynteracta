@@ -125,7 +125,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
      `build_event_block` e `PostWriteResult.from_edit`/`from_copy`.
   3. Controlli bloccanti; commit `feat(posts): modifica e copia dei post evento con occToken`.
 
-### [ ] T07 – `participate`
+### [x] T07 – `participate`
 
 - Criteri: 08-C04 (participate), 08-C07, 08-C09 (404, 403), 08-C10 (participate)
 - Dipende da: T05

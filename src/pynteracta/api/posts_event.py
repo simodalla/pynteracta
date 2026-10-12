@@ -31,12 +31,14 @@ from pynteracta.models.facade.posts_event import (
     EventPostForCopy,
     EventPostForCreate,
     EventPostForEdit,
+    ParticipationAnswer,
 )
 from pynteracta.models.facade.posts_write import PostWriteResult
 from pynteracta.models.generated.external_v2 import (
     CopyEventPostRequestDTO,
     CreateEventPostRequestDTO,
     EditEventPostRequestDTO,
+    EditPostEventPartecipateRequestDTO,
 )
 
 _MANAGE = "communication/posts/manage"
@@ -46,6 +48,7 @@ _FOR_COPY_PATH = _MANAGE + "/event-post-data-for-copy/{post_id}"
 _CREATE_PATH = _MANAGE + "/create-event-post/{community_id}"
 _EDIT_PATH = _MANAGE + "/edit-event-post/{post_id}/{occ_token}"
 _COPY_PATH = _MANAGE + "/copy-event-post/{post_id}/{occ_token}"
+_PARTICIPATE_PATH = _MANAGE + "/post-event/{post_id}/partecipate"
 
 # Allegati: UploadedAttachment o dict/modello nella forma di InputPostAttachmentDTO.
 WriteItems = list[dict[str, Any]] | list[Any] | None
@@ -473,6 +476,39 @@ class PostsEventAPI(ResourceClient):
     ) -> PostWriteResult:
         path = _COPY_PATH.format(post_id=post_id, occ_token=occ_token)
         return PostWriteResult.from_copy(self._put(path, json=body))
+
+    # --- partecipazione ---------------------------------------------------------------------
+
+    def participate(
+        self,
+        post_id: int,
+        answer: ParticipationAnswer | int,
+        *,
+        notes: str | None = None,
+    ) -> None:
+        """PUT ``/communication/posts/manage/post-event/{postId}/partecipate``.
+
+        Registra la risposta all'invito dell'identità autenticata: con il service account
+        l'identità tecnica, con Google OAuth2 l'utente collegato. Il server risponde senza corpo.
+
+        Args:
+            post_id: Il post evento.
+            answer: :class:`~pynteracta.models.facade.posts_event.ParticipationAnswer` o il suo
+                valore intero (``1`` sì, ``2`` forse, ``3`` no).
+            notes: Note facoltative per l'organizzatore.
+
+        Raises:
+            ValueError: se ``answer`` non è ``1``, ``2`` o ``3``, prima della chiamata.
+        """
+        type_id = int(ParticipationAnswer(answer))
+        self._send_participate(post_id, build_write_body(type_id=type_id, notes=notes))
+
+    def participate_raw(self, post_id: int, req: EditPostEventPartecipateRequestDTO) -> None:
+        """Come :meth:`participate`, da un ``EditPostEventPartecipateRequestDTO``."""
+        self._send_participate(post_id, _dump(req))
+
+    def _send_participate(self, post_id: int, body: dict[str, Any]) -> None:
+        self._put(_PARTICIPATE_PATH.format(post_id=post_id), json=body)
 
     @staticmethod
     def _edit_body(  # noqa: PLR0913

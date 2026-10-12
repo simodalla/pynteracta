@@ -17,7 +17,13 @@ from api_helpers import BASE_URL, load_payload, make_transport
 from pynteracta.api.posts import PostsAPI
 from pynteracta.api.posts_event import PostsEventAPI, build_event_block
 from pynteracta.api.posts_write import PostsWriteAPI
-from pynteracta.exceptions import ConcurrencyError, TransportError, ValidationError
+from pynteracta.exceptions import (
+    ConcurrencyError,
+    NotFoundError,
+    PermissionError,
+    TransportError,
+    ValidationError,
+)
 from pynteracta.models.facade.posts_event import (
     EventPostForCopy,
     EventPostForCreate,
@@ -45,6 +51,9 @@ _COPY_PATH = f"{_MANAGE}/copy-event-post/{_POST_ID}/{_OCC_TOKEN}"
 _COPY_POST_ID = 21271
 _NEXT_OCC_TOKEN_EDIT = 6
 _HTTP_409 = 409
+_HTTP_403 = 403
+_HTTP_404 = 404
+_PARTICIPATE_PATH = f"{_MANAGE}/post-event/{_POST_ID}/partecipate"
 
 
 def _api() -> PostsAPI:
@@ -431,6 +440,45 @@ class TestEventCopy:
         assert result.post_id == _COPY_POST_ID
 
 
+def _mock_participate() -> respx.Route:
+    return respx.put(_PARTICIPATE_PATH).mock(return_value=httpx.Response(200))
+
+
+class TestParticipate:
+    # criterio: 08-C07
+    @respx.mock
+    def test_participate_body_and_none(self) -> None:
+        route = _mock_participate()
+        result = _api().participate(_POST_ID, ParticipationAnswer.YES, notes="Arrivo tardi")
+        assert result is None
+        assert route.call_count == 1
+        assert _sent(route) == {"typeId": 1, "notes": "Arrivo tardi"}
+
+    # criterio: 08-C07
+    @respx.mock
+    def test_participate_int_answer(self) -> None:
+        route = _mock_participate()
+        _api().participate(_POST_ID, 3)
+        assert _sent(route) == {"typeId": 3}
+
+    # criterio: 08-C07
+    @pytest.mark.parametrize("answer", [0, 4])
+    @respx.mock
+    def test_participate_invalid_answer_raises_before_request(self, answer: int) -> None:
+        route = _mock_participate()
+        with pytest.raises(ValueError, match=str(answer)):
+            _api().participate(_POST_ID, answer)
+        assert route.call_count == 0
+
+    # criterio: 08-C04
+    @respx.mock
+    def test_raw_equivalent(self) -> None:
+        route = _mock_participate()
+        req = generated.EditPostEventPartecipateRequestDTO(typeId=2, notes="Forse")
+        assert _api().participate_raw(_POST_ID, req) is None
+        assert _sent(route) == {"typeId": 2, "notes": "Forse"}
+
+
 class TestEventErrors:
     # criterio: 08-C03
     @pytest.mark.parametrize("field", ["start_at", "end_at"])
@@ -488,4 +536,33 @@ class TestEventErrors:
         with pytest.raises(ConcurrencyError) as exc_info:
             getattr(_api(), method)(_POST_ID, _OCC_TOKEN, location="Sala B")
         assert exc_info.value.status_code == _HTTP_409
+        assert route.call_count == 1
+
+    # criterio: 08-C09
+    @respx.mock
+    def test_participate_404_not_found_once(self) -> None:
+        route = respx.put(_PARTICIPATE_PATH).mock(
+            return_value=httpx.Response(_HTTP_404, json={"message": "Post evento non esistente"})
+        )
+        with pytest.raises(NotFoundError) as exc_info:
+            _api().participate(_POST_ID, ParticipationAnswer.NO)
+        assert exc_info.value.status_code == _HTTP_404
+        assert route.call_count == 1
+
+    # criterio: 08-C09
+    @respx.mock
+    def test_participate_403_permission_once(self) -> None:
+        route = respx.put(_PARTICIPATE_PATH).mock(
+            return_value=httpx.Response(_HTTP_403, json={"message": "Forbidden"})
+        )
+        with pytest.raises(PermissionError):
+            _api().participate(_POST_ID, ParticipationAnswer.MAYBE)
+        assert route.call_count == 1
+
+    # criterio: 08-C10
+    @respx.mock
+    def test_participate_timeout_raises_transport_error_once(self) -> None:
+        route = respx.put(_PARTICIPATE_PATH).mock(side_effect=httpx.ConnectError("boom"))
+        with pytest.raises(TransportError):
+            _api().participate(_POST_ID, ParticipationAnswer.YES)
         assert route.call_count == 1
