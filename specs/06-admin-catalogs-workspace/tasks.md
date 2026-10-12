@@ -307,7 +307,7 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
      commit `test: integration test opt-in dei cicli di scrittura di cataloghi e workspace
      (06-T13)`.
 
-### [ ] T14 – Esecuzione degli integration test sul tenant di prova (manuale)
+### [x] T14 – Esecuzione degli integration test sul tenant di prova (manuale)
 
 - Criteri: 06-C21, 06-C22 (esecuzione e registrazione)
 - Chi: maintainer
@@ -321,7 +321,21 @@ catalogo creato `6`, parent `3`; voce `100` (form `get_catalog_entry_for_edit_re
   descrizione del workspace omessi sono mantenuti o azzerati. Se nome o descrizione risultano
   azzerati, o se il server rifiuta un corpo che la spec dà per buono, si rivede la spec con
   l'approvazione del maintainer prima di T15.
-- Esito: <compilato a mano>
+- Esito (2026-10-12; eseguito da Claude su richiesta del maintainer): entrambi i cicli verdi
+  dopo T17 e T18. Righe `[06-C21]` e `[06-C22]`:
+  - Cataloghi: `edit(name={"en": …})` sul catalogo con `{"it": …}` → `{"en": X, "it": X}`: la
+    mappa è **sostituita** e la lingua `it` riceve il testo passato; idem per la label in
+    `edit_entry`. `externalId` e parent omessi in `edit_entry` **azzerati**. `…/entries/{id}/deleted`
+    risponde con `entryId`. `catalogs.list([id])` su un catalogo disabilitato → `400`
+    `NOT_EXISTS` (campo `catalogIds`); `catalogs.list()` senza id restituisce una lista vuota sul
+    tenant. La `GET` del form di una voce risponde con qualunque `catalogId` nel path. Tre
+    esecuzioni hanno lasciato i cataloghi 33, 34, 35 e le voci 8490-8492, tutti disabilitati.
+  - Workspace: il form reale ha `description: {"it": null}` (corretto da T17); la `PUT` senza
+    `name` → `400` `REQUIRED_FIELD` (corretto da T18, `edit-workspace` patch). Con nome,
+    traduzioni e descrizione letti: utente aggiunto e tolto, `member_users_count` 2 → 3 → 2,
+    nome, traduzioni e descrizione invariati; l'`occ_token` della risposta è quello successivo.
+    **La risposta della `PUT` ha i conteggi a 0**: valgono solo quelli di una nuova lettura. Se
+    traduzioni e descrizione omesse vengano azzerate non si è provato (workspace condiviso).
 
 ### [ ] T15 – Documentazione
 
