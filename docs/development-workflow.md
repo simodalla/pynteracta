@@ -42,9 +42,9 @@ in the repository).
 
 - **Pre-1.0, lenient semver.** Every feature is a **minor** bump; even breaking changes bump the
   minor until 1.0.
-- **Cadence:** one read-endpoint group per minor release. See `ROADMAP.md` for the current
-  objective and the backlog.
-- **Strict-semver 1.0** is deferred until the read surface is complete and the API has been
+- **Cadence:** one coherent endpoint group (read or write) per minor release. See `ROADMAP.md`
+  for the current objective and the backlog.
+- **Strict-semver 1.0** is deferred until the surface is complete and the API has been
   stable for a while. PyPI publication is *not* gated on it: releases are published from v0.9.4
   onward, with `Development Status :: 3 - Alpha` carrying the stability signal.
 - Versions are computed from [Conventional Commits](https://www.conventionalcommits.org/) by

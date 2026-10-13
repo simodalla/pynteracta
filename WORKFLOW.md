@@ -36,9 +36,9 @@ lifecycle. Knowing which file to touch is half the process.
 - **Pre-1.0, lenient semver.** Every feature is a **minor** bump; even breaking changes bump the
   minor until 1.0. Configured in `python-semantic-release` (`allow_zero_version = true`,
   `major_on_zero = false`).
-- **Cadence: one read-endpoint group per minor.** Each new minor adds one coherent slice of the
-  read surface.
-- **1.0** is deferred until the read surface is complete and the API has been stable for a while.
+- **Cadence: one coherent endpoint group per minor.** Each new minor adds one slice of the
+  surface, read or write (the write surface of ADR 0001 shipped with 0.10.0–0.14.0).
+- **1.0** is deferred until the surface is complete and the API has been stable for a while.
   Target audience today: **internal use / automations**.
 - **PyPI publication is not gated on 1.0** (decided 2026-09-12). Every `v*` tag publishes to
   [PyPI](https://pypi.org/project/pynteracta/) from v0.9.4 onward, via trusted publishing (OIDC)
@@ -55,7 +55,7 @@ are kept for continuity with `PROGRESS.md` and the legacy specs.
 
 ```
    ┌─ 1. PLAN  — /sddpa:specifica <ambito> → /sddpa:piano <nn> → /sddpa:task <nn> ─┐
-   │  • Pick the next scope from ROADMAP.md (one endpoint group per minor).         │
+   │  • Pick the next scope from ROADMAP.md (one coherent endpoint group per minor).│
    │  • specifica interviews, then writes specs/<nn>-<nome>/spec.md with            │
    │    acceptance criteria <nn>-C<mm>; piano writes plan.md; task writes tasks.md. │
    │  • Add a row to the ROADMAP version table; link the spec(s); mark ⏳.           │

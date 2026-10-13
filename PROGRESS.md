@@ -1931,3 +1931,28 @@ da [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md): con i p
   un tenant li restituisse, la patch li rimanderebbe già.
 - Resta aperto il follow-up di M31 su `docs/testing.md` e quello sulla docstring di
   `CatalogsAPI.list`.
+
+## Fuori milestone — Allineamento dei documenti di governo a scritture complete — 2026-10-13
+
+Solo documentazione, branch `bugfix_docs_allineamento`, dopo la verifica dello stato del progetto
+alla 0.14.0 (otto spec chiuse, ADR 0001 realizzato, 75 endpoint su 76 del swagger esposti).
+
+### Fatto
+
+- `CLAUDE.md`: l'introduzione dice che la superficie di scrittura dell'ADR 0001 è consegnata
+  (spec 02–08) e non più "in arrivo"; la cadenza è "un gruppo coerente di endpoint per minor";
+  la mappa dei moduli elenca tutti i sub-client di `api/`.
+- `WORKFLOW.md`, `ROADMAP.md`, `docs/development-workflow.md`: la cadenza e la condizione per
+  la 1.0 non parlano più della sola superficie di lettura.
+- `ROADMAP.md`: la sezione "Write surface" segna i quattro gruppi come consegnati, con spec e
+  versione; nuova sezione "Still uncovered in the pinned swagger" con l'unico endpoint
+  mancante, `GET communication/settings/communities/view-post`.
+- `specs/prd.md`: §3, §4 e §6 confermati per intero dal maintainer; stato del documento da
+  "bozza da confermare" a "confermato"; versione di riferimento 0.14.0.
+
+### Follow-up
+
+- Prossimo obiettivo da scegliere (vedi ROADMAP): l'endpoint `view-post`, i differiti (client
+  async, retry sulle letture, auth alternative) o il percorso verso la 1.0.
+- Restano aperti i follow-up di M31 (`docs/testing.md`), di M30 (branch locale
+  `bugfix_attachments_total_count` da fondere o scartare) e sulla docstring di `CatalogsAPI.list`.
