@@ -14,7 +14,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
 
 ## Elenco
 
-### [ ] T01 – Rigenerazione dei modelli dallo swagger live
+### [x] T01 – Rigenerazione dei modelli dallo swagger live
 
 - Criteri: 09-C01, 09-C18
 - Dipende da: nessuno

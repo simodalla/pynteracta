@@ -16,7 +16,16 @@ class LanguageDTO(BaseModel):
 class LicenseDTO(BaseModel):
     id: Annotated[int | None, Field(description='Id licenza')] = None
     type: Annotated[
-        int | None, Field(description='Tipo di licenza [1=BASE, 2=CHAT, 3=XLEARNING]')
+        int | None,
+        Field(
+            description='Tipo di licenza [1=BASE, 2=CHAT, 3=XLEARNING, 4=I_LAB, 5=INTERACTA_I]'
+        ),
+    ] = None
+    subType: Annotated[
+        str | None,
+        Field(
+            description='Sottotipo di licenza, dipendente dal tipo. Null se il tipo non prevede sottotipi. [5=INTERACTA_I: STARTER, ADVANCED]'
+        ),
     ] = None
 
 
@@ -993,6 +1002,7 @@ class CustomFieldValidationErrorDTO(BaseModel):
     validationId: int | None = None
     validationTypeId: int | None = None
     customFieldId: int | None = None
+    externalId: str | None = None
 
 
 class ZonedDatetimeInputDTO1(BaseModel):
@@ -2861,6 +2871,10 @@ class GetPostDetailResponseDTO(BaseModel):
         int | None,
         Field(description='Numero di task (di tipo standard) associati al post.'),
     ] = None
+    draft: Annotated[bool | None, Field(description='Stato bozza/pubblicato.')] = None
+    publicationTimestamp: Annotated[
+        int | None, Field(description='Timestamp UTC di pubblicazione.')
+    ] = None
 
 
 class GetPostAttachmentDetailResponseDTO(BaseModel):
@@ -4084,6 +4098,10 @@ class InputPostAttachmentDTO1(BaseModel):
     drive: Annotated[
         DriveAttachmentDataDTOModel | None,
         Field(description="Dettagli aggiuntivi dell'allegati di tipo DRIVE"),
+    ] = None
+    downloadable: Annotated[
+        bool | None,
+        Field(description="Indica se l'allegato è scaricabile. Default true."),
     ] = None
 
 

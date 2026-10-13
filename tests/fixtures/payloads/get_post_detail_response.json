@@ -47,5 +47,7 @@
   "likedByMe": false,
   "followedByMe": true,
   "tasksCount": 0,
-  "totalStandardTasksCount": 0
+  "totalStandardTasksCount": 0,
+  "draft": false,
+  "publicationTimestamp": 1760000000000
 }

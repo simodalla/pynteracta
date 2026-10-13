@@ -37,8 +37,28 @@ SWAGGER_SNAPSHOT = REPO_ROOT / "tests" / "fixtures" / "swagger.json"
 GENERATED_OUT = REPO_ROOT / "src" / "pynteracta" / "models" / "generated" / "external_v2.py"
 
 
+def stable_definitions_order(new: dict, previous: dict | None) -> dict:  # type: ignore[type-arg]
+    """Riordina le ``definitions`` di ``new`` secondo l'ordine di ``previous`` (spec 09).
+
+    datamodel-code-generator assegna i suffissi (``1``, ``Model``) alle definizioni omonime
+    nell'ordine in cui le incontra: se il tenant riordina lo swagger, le classi generate cambiano
+    nome. Qui le definizioni già note restano nell'ordine del pinnato precedente e le nuove vanno
+    in coda, nell'ordine ricevuto; quelle sparite sono tolte. Il resto dello swagger non cambia.
+    """
+    definitions = new.get("definitions", {})
+    if previous is None:
+        return new
+    known = [name for name in previous.get("definitions", {}) if name in definitions]
+    added = [name for name in definitions if name not in set(known)]
+    return {**new, "definitions": {name: definitions[name] for name in known + added}}
+
+
 def download_swagger() -> None:
-    """Download the Swagger snapshot and write it to ``tests/fixtures/swagger.json``."""
+    """Scarica lo swagger e lo scrive in ``tests/fixtures/swagger.json``.
+
+    Le definizioni mantengono l'ordine del pinnato precedente (:func:`stable_definitions_order`);
+    il file è JSON compatto, senza escape dei caratteri non ASCII, come quello del tenant.
+    """
     print(f"Downloading Swagger from {SWAGGER_URL} …", flush=True)
     try:
         response = httpx.get(SWAGGER_URL, follow_redirects=True, timeout=30.0)
@@ -47,9 +67,12 @@ def download_swagger() -> None:
         print(f"ERROR: Swagger download failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    previous = json.loads(SWAGGER_SNAPSHOT.read_bytes()) if SWAGGER_SNAPSHOT.exists() else None
+    ordered = stable_definitions_order(response.json(), previous)
+    content = json.dumps(ordered, separators=(",", ":"), ensure_ascii=False).encode()
     SWAGGER_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-    SWAGGER_SNAPSHOT.write_bytes(response.content)
-    print(f"Saved {len(response.content):,} bytes → {SWAGGER_SNAPSHOT}", flush=True)
+    SWAGGER_SNAPSHOT.write_bytes(content)
+    print(f"Saved {len(content):,} bytes → {SWAGGER_SNAPSHOT}", flush=True)
 
 
 def _to_oas3(swagger2: dict) -> dict:  # type: ignore[type-arg]
