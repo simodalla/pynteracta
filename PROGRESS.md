@@ -1882,3 +1882,52 @@ Chiude il follow-up di M32 su `catalogs.list()` senza id. Solo documentazione, b
 
 - La docstring di `CatalogsAPI.list` e l'help di `catalogs list` parlano ancora di filtro per id:
   da allineare alla prossima modifica del codice.
+
+## M34 — Scrittura dei post evento — completata 2026-10-13
+
+Ottava spec del metodo: [`specs/08-event-post-write/`](specs/08-event-post-write/) (`spec.md`,
+`plan.md`, `tasks.md`, `verifica.md`). Sesto e ultimo gruppo della superficie di scrittura aperta
+da [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md): con i post evento RF-021
+è completo e l'ADR è realizzato per intero. Minor **0.14.0**.
+
+### Fatto
+
+- Libreria: `client.posts.create_event|edit_event|copy_event|participate` (+ `_raw`) e
+  `get_event_for_create|edit|copy`, con il blocco `event` composto da kwargs piatti
+  (`build_event_block`): date con fuso IANA, date tutto il giorno senza fuso, invitati per id,
+  note di partecipazione in delta; façade `EventData`, `EventInvitee`, `EventPostFor*`,
+  `ParticipationAnswer`; helper `typed`/`typed_list` spostati in `facade/_stubs.py` (08-T01…T07,
+  T18).
+- CLI: `posts create-event|edit-event|copy-event|participate|get-event-for-create|edit|copy`, con
+  patch sul form evento, `--start`/`--end` con sola data o data-ora nel fuso di `--timezone`,
+  `--all-day` anche sul blocco unito, `--cover` con upload (08-T08…T13, T19).
+- Documentazione: `docs/api/posts.md` ("Event posts"), `docs/cli.md`, `docs/testing.md`, home e
+  README; PRD con RF-021e, RF-021f, RF-021 e §1 aggiornati, RNF-010 esteso (08-T14, T17).
+  Integration test opt-in del ciclo completo eseguito sul tenant di prova (08-T15, T16).
+- 166 unit test e 28 contract test nuovi (1383 → 1549, 201 → 229); copertura totale 95,18 % →
+  95,40 %.
+
+### Decisioni oltre la spec
+
+- **Scoperte sul tenant** (T16): invitati obbligatori con almeno un ospite (`400 REQUIRED_FIELD
+  event.inivations`, refuso del server); la lettura propedeutica restituisce gli invitati vuoti;
+  modifica e copia sostituiscono il post (`title`, `endAt`, `location`, invitati obbligatori,
+  `visibility` omessa → `500`, descrizione omessa azzerata, fuso omesso → `Europe/Paris`); gli
+  eventi `allDay` accettano solo date senza ora e senza fuso; le note di partecipazione solo in
+  delta; il service account può rispondere anche se non invitato; le risposte di scrittura non
+  hanno `event`.
+- Con l'approvazione del maintainer (revisione `95e8828`, task T18 e T19): date tutto il giorno
+  (08-C25…C27), date lette nel fuso dell'evento (08-C28), note in delta (08-C29, 08-C30),
+  tabella delle scritture senza colonne dell'evento (08-C31).
+- Gli helper privati del mixin evento hanno il suffisso `_event` per non collidere con quelli di
+  `PostsWriteAPI` nell'MRO di `PostsAPI`.
+- `--output json` delle scritture stampa la riga curata, come i comandi dei post custom; la
+  risposta grezza si ottiene con `--full`.
+
+### Follow-up
+
+- Release **0.14.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- Gli invitati vanno ripassati a ogni modifica o copia, perché la lettura non li restituisce: se
+  un tenant li restituisse, la patch li rimanderebbe già.
+- Resta aperto il follow-up di M31 su `docs/testing.md` e quello sulla docstring di
+  `CatalogsAPI.list`.

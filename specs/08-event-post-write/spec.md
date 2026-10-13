@@ -1,6 +1,6 @@
 # 08 – Scrittura dei post evento
 
-Stato: approvata
+Stato: chiusa
 Branch: `m34_event_post_write`
 Requisiti del PRD: RF-021, RF-021a, RF-021b, RF-021c, RF-021d, RF-025, RF-025a, RF-015,
 RF-015a, RF-024, RF-024a, RNF-009, RNF-010; toccati RF-019, §1 (scopo), §6 "Dati scritti sul
