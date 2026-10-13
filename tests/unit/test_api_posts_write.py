@@ -611,3 +611,38 @@ class TestPostsUploadedAttachments:
             "updateAttachments": [{"attachmentId": 7, **_ref()}],
             "removeAttachmentIds": [9],
         }
+
+
+# ---------------------------------------------------------------------------
+# Spec 09: allegati non scaricabili
+# ---------------------------------------------------------------------------
+
+
+def _not_downloadable() -> UploadedAttachment:
+    ticket = UploadTicket.from_dict(load_payload("upload_new_attachment_response.json"))
+    return UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain", downloadable=False)
+
+
+class TestPostsNotDownloadableAttachments:
+    # criterio: 09-C12
+    @respx.mock
+    def test_create(self) -> None:
+        route = respx.post(_CREATE_PATH).mock(
+            return_value=httpx.Response(200, json=load_payload("create_post_response.json"))
+        )
+        _api().create(_COMMUNITY_ID, attachments=[{"attachmentId": 3}, _not_downloadable()])
+        assert _sent(route)["attachments"] == [
+            {"attachmentId": 3},
+            {**_ref(), "downloadable": False},
+        ]
+
+    # criterio: 09-C12
+    @respx.mock
+    def test_edit_attachments_add(self) -> None:
+        route = respx.put(_ATTACHMENTS_PATH).mock(
+            return_value=httpx.Response(
+                200, json=load_payload("edit_post_attachments_response.json")
+            )
+        )
+        _api().edit_attachments(_POST_ID, add=[_not_downloadable()])
+        assert _sent(route)["addAttachments"] == [{**_ref(), "downloadable": False}]

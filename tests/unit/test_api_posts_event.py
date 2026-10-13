@@ -24,6 +24,7 @@ from pynteracta.exceptions import (
     TransportError,
     ValidationError,
 )
+from pynteracta.models.facade.attachments import UploadedAttachment, UploadTicket
 from pynteracta.models.facade.posts_event import (
     EventPostForCopy,
     EventPostForCreate,
@@ -642,3 +643,23 @@ class TestAllDay:
         assert form.event is not None
         api.edit_event(_POST_ID, _OCC_TOKEN, start_at=form.event.start_at)
         assert _sent(route) == {"event": {"startAt": _START_BLOCK, "timezone": "Europe/Rome"}}
+
+
+# ---------------------------------------------------------------------------
+# Spec 09: allegati non scaricabili nei post evento
+# ---------------------------------------------------------------------------
+
+
+class TestEventNotDownloadableAttachments:
+    # criterio: 09-C12
+    @respx.mock
+    def test_create_event(self) -> None:
+        ticket = UploadTicket.from_dict(load_payload("upload_new_attachment_response.json"))
+        uploaded = UploadedAttachment(
+            ticket, name="nota.txt", mime_type="text/plain", downloadable=False
+        )
+        route = _mock_create()
+        _api().create_event(_COMMUNITY_ID, start_at=_START, attachments=[uploaded])
+        assert _sent(route)["attachments"] == [
+            {"name": "nota.txt", "contentRef": uploaded.content_ref, "downloadable": False}
+        ]

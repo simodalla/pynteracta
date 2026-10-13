@@ -116,7 +116,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   5. Controlli bloccanti; commit `feat(posts): draft e publication_timestamp nel dettaglio del
      post`.
 
-### [ ] T06 – Flag `downloadable` sugli allegati caricati
+### [x] T06 – Flag `downloadable` sugli allegati caricati
 
 - Criteri: 09-C10, 09-C11, 09-C12
 - Dipende da: T01 (il campo esiste nel pinnato; i corpi passano comunque come dict)
