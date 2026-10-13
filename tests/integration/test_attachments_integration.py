@@ -102,6 +102,7 @@ _PLAIN_TEXT = 2
 
 class TestAttachmentsUploadIntegration:
     # criterio: 04-C18
+    # criterio: 09-C16
     def test_full_cycle(self, client: InteractaClient, tmp_path: Path) -> None:
         community_id = int(_require_env("PYNTERACTA_TEST_WRITE_COMMUNITY_ID"))
         first = tmp_path / "pynteracta-it-nota.txt"
@@ -111,7 +112,6 @@ class TestAttachmentsUploadIntegration:
         post_id: int | None = None
         with client:
             try:
-                # criterio: 09-C16
                 uploaded = client.attachments.upload(first, downloadable=False)
                 assert uploaded.content_ref
                 created = client.posts.create(

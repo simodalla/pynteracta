@@ -12,10 +12,10 @@ numeri; `/sddpa:verifica` li aggiorna quando migliorano. Non si modifica a mano.
 | Comando | Esito |
 |---|---|
 | `uv run ruff check .` | verde ("All checks passed!") |
-| `uv run ruff format --check .` | verde (116 file già formattati; 104 all'adozione) |
-| `uv run mypy src` | verde (56 file, nessun errore; 52 all'adozione) |
-| `uv run pytest -m "not integration and not contract"` | verde (998 test, 75 snapshot; 717 all'adozione) |
-| `uv run pytest -m contract` | verde (158 test; 87 all'adozione) |
+| `uv run ruff format --check .` | verde (136 file già formattati; 104 all'adozione) |
+| `uv run mypy src` | verde (64 file, nessun errore; 52 all'adozione) |
+| `uv run pytest -m "not integration and not contract"` | verde (1616 test, 104 snapshot; 717 all'adozione) |
+| `uv run pytest -m contract` | verde (238 test; 87 all'adozione) |
 
 Esclusi dai controlli del metodo: `uv run pytest -m integration` (20 test opt-in contro un tenant
 reale, si auto-skippano senza `tests/integration/.env` e `.secrets/sa.json`) e `uv build` (solo in
@@ -33,10 +33,10 @@ sotto `src/pynteracta/`.
 
 | Ambito | Copertura |
 |---|---|
-| Totale | 95,40 % (6578/6895 righe; 93,15 % all'adozione) |
-| `api` | 98,44 % (96,02 % all'adozione) |
-| `cli` | 93,53 % (89,31 % all'adozione) |
-| `models/facade` | 96,35 % (94,74 % all'adozione) |
+| Totale | 96,18 % (6680/6945 righe; 93,15 % all'adozione) |
+| `api` | 98,45 % (96,02 % all'adozione) |
+| `cli` | 95,29 % (89,31 % all'adozione) |
+| `models/facade` | 96,39 % (94,74 % all'adozione) |
 | `auth.py` | 94,01 % |
 | `client.py` | 96,70 % |
 | `config.py` | 98,86 % |
@@ -45,7 +45,8 @@ sotto `src/pynteracta/`.
 | `transport.py` | 98,73 % |
 | `exceptions.py`, `hooks.py`, `urls.py`, `__init__.py` | 100 % |
 
-Il file meno coperto è `cli/communities.py` (53 %).
+Il file meno coperto è `api/hashtags.py` (86 %); `cli/communities.py`, al 53 % all'adozione, è
+al 99 % dalla spec 09.
 
 ## Violazioni note delle regole non negoziabili
 
@@ -68,7 +69,7 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 - Identità corrente (`auth whoami`, `users me`, `users profile`) – `api/auth.py`, `api/users.py` – RF-004
 - Utenti: elenco con filtri e ordinamento, iterazione, form di modifica – `api/users.py`, `cli/users.py` – RF-005
 - Post: dettaglio, per client uid, capabilities, storia, stream globale, elenco in community con filtri su campi custom e di workflow (validazione opzionale), visibilità, commenti – `api/posts.py`, `models/facade/post_filters.py`, `cli/posts.py` – RF-006
-- Community: elenco, dettagli singoli e bulk, definizioni dei post – `api/communities.py`, `cli/communities.py` – RF-007
+- Community: elenco, dettagli singoli e bulk, definizioni dei post, elenco per capability di visualizzazione (spec 09) – `api/communities.py`, `cli/communities.py` – RF-007
 - Cataloghi: elenco e voci, con iterazione – `api/catalogs.py`, `cli/catalogs.py` – RF-008
 - Allegati: elenco per post, dettaglio, visibilità – `api/attachments.py`, `cli/attachments.py` – RF-009
 - Task: dettaglio – `api/tasks.py`, `cli/tasks.py` – RF-010
@@ -96,3 +97,4 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 | 2026-10-12 | 06 | Copertura totale 94,94 % → 95,18 %, `api` 98,04 % → 98,19 %, `cli` 92,59 % → 93,11 %, `models/facade` 96,18 % → 96,33 %; unit test 1208 → 1350, contract 185 → 201 |
 | 2026-10-12 | 07 | Copertura totale 95,18 % stabile (5998/6302 → 6003/6307 righe), `logging.py` 94,50 % → 94,74 %; unit test 1350 → 1383 |
 | 2026-10-13 | 08 | Copertura totale 95,18 % → 95,40 %, `api` 98,19 % → 98,44 %, `cli` 93,11 % → 93,53 %, `models/facade` 96,33 % → 96,35 %; unit test 1383 → 1549, contract 201 → 229 |
+| 2026-10-13 | 09 | Copertura totale 95,40 % → 96,18 %, `api` 98,44 % → 98,45 %, `cli` 93,53 % → 95,29 %, `models/facade` 96,35 % → 96,39 %, `cli/communities.py` 53 % → 99 %; unit test 1549 → 1616, contract 229 → 238 |

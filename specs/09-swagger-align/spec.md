@@ -1,6 +1,6 @@
 # 09 – Allineamento allo swagger live
 
-Stato: approvata
+Stato: chiusa
 Branch: `m35_swagger_align`
 Requisiti del PRD: RF-007, RF-006, RF-021c, RF-024, RF-015, RF-019, RNF-003; toccati RF-022
 e RF-023 (regola "la libreria invia solo i campi passati"), §6 "Dati scritti sul tenant"
