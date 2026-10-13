@@ -1956,3 +1956,22 @@ alla 0.14.0 (otto spec chiuse, ADR 0001 realizzato, 75 endpoint su 76 del swagge
   async, retry sulle letture, auth alternative) o il percorso verso la 1.0.
 - Restano aperti i follow-up di M31 (`docs/testing.md`), di M30 (branch locale
   `bugfix_attachments_total_count` da fondere o scartare) e sulla docstring di `CatalogsAPI.list`.
+
+## Fuori milestone — Conteggio totale degli allegati nell'integration test — 2026-10-13
+
+Chiude il follow-up di M30 su `test_list_for_post`. Solo test, branch
+`bugfix_attachments_total_count` (commit del 2026-10-10, ribasato su `main`).
+
+### Fatto
+
+- `test_list_for_post` non pretende più `totalItemsCount`: il server lo calcola solo con
+  `calculateTotalItemsCount`, altrimenti risponde `null`.
+- Nuovo `test_list_for_post_with_total_count`, che lo chiede con `list_for_post_raw` e verifica
+  il totale.
+- Provato sul tenant il 2026-10-13: i sei integration test degli allegati sono verdi.
+
+### Follow-up
+
+- `attachments.list_for_post` non espone il kwarg `calculate_total_items_count`, che l'helper
+  condiviso supporta e `catalogs.list_entries` espone già: il test deve passare dalla variante
+  `_raw`. Da colmare con una spec, insieme ad altre letture che hanno lo stesso vuoto.

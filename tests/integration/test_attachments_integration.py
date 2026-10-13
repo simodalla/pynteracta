@@ -19,6 +19,7 @@ import pytest
 
 from pynteracta.client import InteractaClient
 from pynteracta.exceptions import InteractaError, NotFoundError
+from pynteracta.models.facade.attachments import ListPostAttachmentsByPostIdRequestDTO
 
 pytestmark = pytest.mark.integration
 
@@ -65,8 +66,16 @@ class TestAttachmentsIntegration:
         post_id = int(_require_env("PYNTERACTA_TEST_POST_ID"))
         with client:
             result = client.attachments.list_for_post(post_id)
-        assert result.total_items_count is not None
+        # Senza calculateTotalItemsCount il server non calcola il totale: totalItemsCount è null.
         assert isinstance(result.items_typed, list)
+
+    def test_list_for_post_with_total_count(self, client: InteractaClient) -> None:
+        post_id = int(_require_env("PYNTERACTA_TEST_POST_ID"))
+        req = ListPostAttachmentsByPostIdRequestDTO(calculateTotalItemsCount=True)
+        with client:
+            result = client.attachments.list_for_post_raw(post_id, req)
+        assert result.total_items_count is not None
+        assert result.total_items_count >= len(result.items_typed)
 
     def test_get_attachment(self, client: InteractaClient) -> None:
         attachment_id = int(_require_env("PYNTERACTA_TEST_ATTACHMENT_ID"))
