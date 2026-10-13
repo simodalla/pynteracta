@@ -69,39 +69,39 @@ class TestParseZonedDatetime:
 
 
 class TestParseEventDatetime:
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_none_passes_through(self) -> None:
         assert parse_event_datetime(None, "Europe/Rome", option="--start") is None
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_date_only_is_local_midnight(self) -> None:
         parsed = parse_event_datetime("2026-11-05", "Europe/Rome", option="--start")
         assert parsed == datetime(2026, 11, 5, 0, 0, tzinfo=ZoneInfo("Europe/Rome"))
         assert parsed is not None
         assert parsed.tzinfo == ZoneInfo("Europe/Rome")
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_without_offset_uses_timezone(self) -> None:
         parsed = parse_event_datetime("2026-11-05T10:00", "America/New_York", option="--start")
         assert parsed == datetime(2026, 11, 5, 10, 0, tzinfo=ZoneInfo("America/New_York"))
         assert parsed is not None
         assert parsed.tzinfo == ZoneInfo("America/New_York")
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_explicit_offset_kept(self) -> None:
         parsed = parse_event_datetime("2026-11-05T10:00:00+02:00", "Europe/Rome", option="--end")
         assert parsed is not None
         assert parsed.utcoffset() == timedelta(hours=2)
         assert parsed.tzinfo == timezone(timedelta(hours=2))
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_not_iso_exits_2_naming_option(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             parse_event_datetime("tomorrow", "Europe/Rome", option="--end")
         assert exc_info.value.exit_code == _EXIT_CONFIG
         assert "--end" in capsys.readouterr().err
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     def test_unknown_timezone_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             parse_event_datetime("2026-11-05", "Nowhere/Town", option="--start")
