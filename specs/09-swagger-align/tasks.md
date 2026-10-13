@@ -157,7 +157,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   2. Controlli bloccanti (gli integration test non girano nei controlli); commit
      `test(integration): view-post e allegato non scaricabile`.
 
-### [ ] T08 – Prova sul tenant (manuale)
+### [x] T08 – Prova sul tenant (manuale)
 
 - Criteri: 09-C15, 09-C16; esito per 09-C14 (cosa risponde il tenant)
 - Chi: maintainer (o Claude su richiesta del maintainer, con `tests/integration/.env` e la
@@ -176,8 +176,20 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
      eliminare il post alla fine (i task e i commenti vanno con lui).
   3. Se `view-post` senza livello risponde con un errore, o se `downloadable` cambia qualcosa
      nelle scritture dei post rispetto alla spec, fermarsi: si rivede la spec prima di T09.
-- Esito: <compilato a mano: risposta senza livello; `draft`/`publicationTimestamp` sul
-  tenant; comportamento di `downloadable` su commento e task>
+- Esito (2026-10-13, eseguito da Claude su richiesta del maintainer, community di prova):
+  - integration test verdi: `test_list_by_view_post_capability` e `test_full_cycle` (12 test
+    nei due file, 9,2 s);
+  - `view-post` con il service account: 15 community senza livello e 15 con `PRIVATE`,
+    `PUBLIC` e `ALL`; `communities list` (dove si può pubblicare) ne dà 9. Senza livello il
+    server risponde come con `ALL`;
+  - il dettaglio del post creato porta `draft: false` e `publicationTimestamp` (epoch ms);
+  - `downloadable: false` su un post (`edit_attachments`) è applicato: l'allegato letto ha
+    `downloadable` falso, quello caricato senza flag vero;
+  - su un commento e su un task il server risponde `400` "Unrecognized field downloadable
+    (InputPostCommentAttachmentDTO / InputTaskAttachmentDTO), not marked as ignorable": il
+    campo non è ignorato, è rifiutato. Va detto nei docs (09-C14);
+  - i due post di prova (23397, 23398) sono stati eliminati; la sonda è rimasta fuori dal
+    repository.
 
 ### [ ] T09 – Documentazione e PRD (chiusura)
 
