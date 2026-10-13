@@ -16,16 +16,20 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
 
 ### [ ] T01 – Rigenerazione dei modelli dallo swagger live
 
-- Criteri: 09-C01
+- Criteri: 09-C01, 09-C18
 - Dipende da: nessuno
 - Test: `tests/contract/test_models.py::TestSwaggerAlignment09`: `assert_superset` su
   `GetPostDetailResponseDTO`, `InputPostAttachmentDTO1`, `CustomFieldValidationErrorDTO`,
   `LicenseDTO`; `draft`, `publicationTimestamp`, `downloadable`, `externalId`, `subType` presenti
-  sia nelle `properties` del pinnato sia in `model_fields` dei modelli generati.
+  sia nelle `properties` del pinnato sia in `model_fields` dei modelli generati;
+  `tests/unit/test_generate_models.py` (09-C18): riordino delle definizioni e formato compatto.
 - Passi:
-  1. Scrivere i test; eseguirli con `-m contract`: rossi (campi assenti dal pinnato e dai
-     modelli).
-  2. `uv run python scripts/generate_models.py` (con download). Confrontare il nuovo pinnato con
+  1. Scrivere i test; eseguirli: rossi (campi assenti dal pinnato e dai modelli; funzione
+     `stable_definitions_order` inesistente).
+  1b. `scripts/generate_models.py`: `stable_definitions_order` e scrittura del pinnato riordinato
+     nel formato compatto, come nel piano (revisione del 2026-10-13).
+  2. `uv run python scripts/generate_models.py` (con download). Confrontare con AST i nomi di
+     classe generati prima e dopo: nessuna rinomina, cambiano solo i quattro DTO attesi. Confrontare il nuovo pinnato con
      quello precedente (`git stash`/`git show HEAD:tests/fixtures/swagger.json` e lo script di
      confronto in scratchpad): stessi 76 endpoint, stessi 219 schemi, solo le cinque differenze
      attese. Se ce ne sono altre, fermarsi e tornare alla spec.
@@ -219,3 +223,4 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
 | 09-C15 | T07, T08 |
 | 09-C16 | T07, T08 |
 | 09-C17 | T03 |
+| 09-C18 | T01 |

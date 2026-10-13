@@ -26,7 +26,9 @@ Test prima del codice.
 
 | File | Nuovo o modificato | Responsabilità |
 |---|---|---|
-| `tests/fixtures/swagger.json` | modificato (rigenerato) | swagger live del tenant cert, scaricato da `scripts/generate_models.py` |
+| `scripts/generate_models.py` | modificato | `stable_definitions_order(new: dict, previous: dict \| None) -> dict`: restituisce `new` con `definitions` riordinate (prima le chiavi di `previous` presenti in `new`, nell'ordine di `previous`, poi le nuove nell'ordine di `new`); il resto invariato. `download_swagger` legge il pinnato esistente prima di sovrascriverlo e scrive `json.dumps(…, separators=(",", ":"), ensure_ascii=False)`, lo stesso formato compatto di oggi (09-C18) |
+| `tests/unit/test_generate_models.py` | nuovo | 09-C18: lo script caricato con `importlib.util.spec_from_file_location`; `stable_definitions_order` con ordine diverso più una definizione nuova, senza precedente, valori invariati; `download_swagger` con `httpx.get` mockato (respx) e `SWAGGER_SNAPSHOT` in `tmp_path`: file scritto nel formato compatto e nell'ordine del precedente |
+| `tests/fixtures/swagger.json` | modificato (rigenerato) | swagger live del tenant cert, scaricato da `scripts/generate_models.py`, con le definizioni nell'ordine del pinnato precedente |
 | `src/pynteracta/models/generated/external_v2.py` | modificato (rigenerato) | `GetPostDetailResponseDTO.draft`, `.publicationTimestamp`; `InputPostAttachmentDTO1.downloadable`; `CustomFieldValidationErrorDTO.externalId`; `LicenseDTO.subType` (e descrizione di `type`). Mai a mano |
 | `src/pynteracta/models/facade/communities.py` | modificato | `ViewPostCapabilityLevel(str, Enum)`: `PRIVATE = "PRIVATE"`, `PUBLIC = "PUBLIC"`, `ALL = "ALL"`; `_missing_(value)` accetta una `str` confrontata in maiuscolo, altrimenti `None` (quindi `ValueError` dell'enum per `"privato"`, `""`, `42`); docstring in italiano |
 | `src/pynteracta/api/communities.py` | modificato | `_VIEW_POST_PATH = "communication/settings/communities/view-post"`; `list_by_view_post_capability(self, level: ViewPostCapabilityLevel \| str \| None = None) -> CommunityList`: `params = build_query_params(view_post_capability_level=ViewPostCapabilityLevel(level).value if level is not None else None)` (la conversione precede `_get`: `ValueError` prima della richiesta), `CommunityList.from_dict(self._get(_VIEW_POST_PATH, params=params or None))`; docstring in italiano con il rinvio alla documentazione su cosa risponde il tenant senza livello |
@@ -146,6 +148,7 @@ variabili base già in `.env.example`.
 | 09-C15 | `test_communities_integration.py::test_list_by_view_post_capability`, eseguito sul tenant nel task manuale | integrazione |
 | 09-C16 | `test_attachments_integration.py::test_full_cycle` esteso, eseguito sul tenant nel task manuale | integrazione |
 | 09-C17 | `test_api_communities.py`: `httpx.TimeoutException` → `TransportError`, una chiamata | unitario |
+| 09-C18 | `test_generate_models.py` (riordino e formato); confronto AST dei nomi di classe generati prima e dopo la rigenerazione, in T01 | unitario + controllo |
 
 Verifica manuale (dalla spec): un task esegue i due integration test sul tenant, più una sonda in
 scratchpad (fuori dal repo) che allega un `UploadedAttachment` con `downloadable=False` a un
@@ -163,6 +166,7 @@ documentazione (`docs/api/attachments.md`, `docs/api/communities.md`) e nella se
 | Scelta CLI `ViewPostLevelChoice` in minuscolo, `case_sensitive=False`, tradotta nell'enum della libreria | Usare `ViewPostCapabilityLevel` direttamente come tipo di `--level` | Stesso schema di `ParticipationChoice` (spec 08): help con `private|public|all`, errore d'uso gestito da Typer con exit 2 |
 | `downloadable` conservato in `UploadedAttachment` e aggiunto ai dict solo se non `None` | Parametro di `as_write_input(downloadable=…)`; mutare il dict nelle API dei post | Il flag è una proprietà del file caricato e viaggia con esso ovunque lo si alleghi; i corpi delle scritture non cambiano altrove |
 | Rigenerazione con download (non `--offline`) in un task dedicato, primo della lista | Modificare a mano il pinnato | Il punto della spec è ripinnare lo swagger live; lo script esiste per questo; il diff è idempotente con il generatore in lock |
+| Ordine stabile delle definizioni nello script (revisione di T01) | Rinominare i riferimenti a `EventPostDataDTOModel`; alias | Scelta del maintainer: i nomi generati non devono cambiare per un riordino del tenant |
 | Test di caratterizzazione sui comandi scoperti prima di toccare `cli/communities.py` | Alzare la copertura solo con il comando nuovo | Il comando nuovo non basta a raggiungere l'85 % (113 righe, 53 scoperte); le righe scoperte sono tutte nei comandi esistenti |
 
 ## Rischi

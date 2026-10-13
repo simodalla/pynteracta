@@ -50,6 +50,13 @@ Ogni façade esistente continua a leggere le stesse risposte; i campi nuovi sono
 via `.raw` e, dove questa spec lo prevede, in façade. I contract test confermano che i modelli
 generati restano un sovrainsieme dello swagger pinnato.
 
+I nomi delle classi generate restano stabili tra una rigenerazione e l'altra: il generatore
+assegna i suffissi (`1`, `Model`) alle definizioni omonime nell'ordine in cui le incontra, e lo
+swagger live elenca le definizioni in un ordine diverso dal pinnato (che rinominava
+`EventPostDataDTOModel` in `EventPostDataDTO1`). Lo script di rigenerazione quindi riscrive il
+nuovo swagger con le definizioni nell'ordine del pinnato precedente, accodando quelle nuove: il
+contenuto resta quello del tenant, cambia solo l'ordine delle chiavi.
+
 ### Community per capability di visualizzazione dei post
 
 Da Python, `client.communities.list_by_view_post_capability(level=None)` restituisce le
@@ -111,6 +118,7 @@ per i file toccati: la spec porta quel file sopra soglia con unit test sui coman
 | 09-C15 | L'integration test delle community chiama `list_by_view_post_capability` senza livello e con `PRIVATE`, `PUBLIC` e `ALL`: ogni risposta è un `CommunityList` i cui elementi hanno un id, e quella senza livello è registrata nel log del test; sul tenant di prova è verde. | RF-007 |
 | 09-C16 | Il ciclo di upload dell'integration test carica il primo file con `downloadable=False`, crea il post, rilegge il dettaglio e verifica `draft` è `False` o `None` e `publication_timestamp` è un intero (o `None` se il tenant non lo manda, registrato nel log), e che l'allegato letto abbia `downloadable == False`; sul tenant di prova è verde e il post è eliminato alla fine, anche se un passo fallisce. | RF-006, RF-024 |
 | 09-C17 | Quando si chiama `list_by_view_post_capability` e la richiesta va in timeout, la libreria solleva `TransportError` dopo una sola richiesta. | RF-019, RNF-008 |
+| 09-C18 | Quando lo script di rigenerazione riceve uno swagger con le stesse definizioni del pinnato in ordine diverso più una definizione nuova, il pinnato scritto ha le definizioni nell'ordine del precedente con la nuova in coda, gli stessi valori dello swagger ricevuto e lo stesso formato JSON compatto; senza pinnato precedente l'ordine è quello ricevuto. Dopo la rigenerazione del 2026-10-13 i modelli generati hanno gli stessi nomi di classe di prima (nessuna rinominata) e cambiano solo `GetPostDetailResponseDTO`, `InputPostAttachmentDTO1`, `CustomFieldValidationErrorDTO`, `LicenseDTO`. | RNF-003 |
 
 ## Casi limite
 
@@ -172,6 +180,7 @@ credenziali. Gli integration test usano la community e il post di prova già con
 | `downloadable` su `upload` e `UploadedAttachment`, CLI via `--json` | Flag CLI `--attach-not-downloadable`; solo dict/`--json` senza kwarg | Caso raro: il kwarg copre la libreria senza un'opzione CLI in più; i dict passavano già |
 | Verifica sul tenant con integration test estesi (lettura `view-post`, ciclo di upload esistente) | Solo `view-post` in integration; solo unit con fixture | Nelle spec precedenti il tenant ha smentito lo swagger ogni volta; il ciclo di upload esiste già e cancella ciò che crea |
 | Copertura di `cli/communities.py` portata sopra l'85 % con unit test sui comandi esistenti | Lasciarla al 53 % | Regola della configurazione SDD sui file toccati |
+| Ordine stabile delle definizioni nello script di rigenerazione (revisione del 2026-10-13, in T01) | Accettare la rinomina `EventPostDataDTOModel` → `EventPostDataDTO1` aggiornando i riferimenti; rinomina più alias | I nomi generati dipendono dall'ordine dello swagger: senza ordine stabile ogni rigenerazione può rinominare classi usate dalle façade e raggiungibili via `.raw` |
 
 ## Verifica manuale
 
@@ -180,6 +189,12 @@ credenziali. Gli integration test usano la community e il post di prova già con
   `publicationTimestamp`, e se accetta, ignora o rifiuta `downloadable` su un commento e su un
   task (una sonda in sola scrittura nella community di prova, con pulizia). Non si può fare in
   unit test: è il comportamento del server a essere in questione.
+
+## Revisioni
+
+- 2026-10-13, durante T01: la rigenerazione dallo swagger live rinominava `EventPostDataDTOModel`
+  in `EventPostDataDTO1` (definizioni in ordine diverso). Scelta del maintainer: ordine stabile
+  nello script di rigenerazione; nuovo criterio 09-C18, coperto da T01.
 
 ## Domande aperte
 
