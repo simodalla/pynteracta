@@ -49,15 +49,33 @@ def stable_definitions_order(new: dict, previous: dict | None) -> dict:  # type:
     if previous is None:
         return new
     known = [name for name in previous.get("definitions", {}) if name in definitions]
-    added = [name for name in definitions if name not in set(known)]
+    known_set = set(known)
+    added = [name for name in definitions if name not in known_set]
     return {**new, "definitions": {name: definitions[name] for name in known + added}}
+
+
+def _read_previous_snapshot() -> dict | None:  # type: ignore[type-arg]
+    """Il pinnato attuale, o ``None`` se manca o non è leggibile (con un avviso)."""
+    if not SWAGGER_SNAPSHOT.exists():
+        return None
+    try:
+        previous = json.loads(SWAGGER_SNAPSHOT.read_bytes())
+    except ValueError as exc:
+        print(
+            f"WARNING: pinned swagger unreadable ({exc}); keeping the received order",
+            file=sys.stderr,
+        )
+        return None
+    return previous if isinstance(previous, dict) else None
 
 
 def download_swagger() -> None:
     """Scarica lo swagger e lo scrive in ``tests/fixtures/swagger.json``.
 
     Le definizioni mantengono l'ordine del pinnato precedente (:func:`stable_definitions_order`);
-    il file è JSON compatto, senza escape dei caratteri non ASCII, con a capo finale.
+    il file è JSON compatto, senza escape dei caratteri non ASCII, con a capo finale. Se la
+    risposta non è uno swagger (JSON non valido, niente ``definitions`` o vuote) lo script esce
+    con errore e il pinnato resta com'è; un pinnato precedente illeggibile dà solo un avviso.
     """
     print(f"Downloading Swagger from {SWAGGER_URL} …", flush=True)
     try:
@@ -67,8 +85,18 @@ def download_swagger() -> None:
         print(f"ERROR: Swagger download failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    previous = json.loads(SWAGGER_SNAPSHOT.read_bytes()) if SWAGGER_SNAPSHOT.exists() else None
-    ordered = stable_definitions_order(response.json(), previous)
+    try:
+        received = response.json()
+    except ValueError as exc:
+        print(f"ERROR: the response is not valid JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+    definitions = received.get("definitions") if isinstance(received, dict) else None
+    if not isinstance(definitions, dict) or not definitions:
+        print("ERROR: the response has no swagger definitions; pinned file kept", file=sys.stderr)
+        sys.exit(1)
+
+    previous = _read_previous_snapshot()
+    ordered = stable_definitions_order(received, previous)
     # JSON compatto con a capo finale, come lo lascia il hook end-of-file-fixer di pre-commit.
     content = json.dumps(ordered, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     SWAGGER_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
