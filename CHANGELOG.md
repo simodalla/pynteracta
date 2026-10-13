@@ -1,6 +1,42 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.15.0] - 2026-10-13
+
+### Chores
+
+- Conteggio totale degli allegati richiesto esplicitamente nell'integration test
+- **cli**: Caratterizzazione dei comandi delle community (09-T02)
+- **integration**: View-post e allegato non scaricabile (09-T07)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.14.0
+- Allineamento dei documenti di governo a scritture complete
+- Nota in PROGRESS per il conteggio totale degli allegati
+- Follow-up su testing.md e cataloghi
+- Spec 09, allineamento allo swagger live
+- Piano 09, allineamento allo swagger live
+- Task 09, allineamento allo swagger live
+- Revisione della spec 09, ordine stabile delle definizioni nella rigenerazione
+- Prova sul tenant della spec 09 (09-T08)
+- Allineamento allo swagger live, pagine e PRD (09-T09)
+- Verifica 09, allineamento allo swagger live
+- Release v0.15.0, riga di ROADMAP a shipped
+
+### Features
+
+- **models**: Rigenerazione dei modelli dallo swagger live del tenant cert (09-T01)
+- **communities**: Elenco delle community per capability di visualizzazione dei post (09-T03)
+- **cli**: Communities list-by-view-post (09-T04)
+- **posts**: Draft e publication_timestamp nel dettaglio del post (09-T05)
+- **attachments**: Flag downloadable sugli allegati caricati (09-T06)
+
+### Fixes
+
+- **scripts**: A capo finale nello swagger pinnato (09-T01)
+- **scripts**: Controlli sul download dello swagger prima di sovrascrivere il pinnato
+
 ## [0.14.0] - 2026-10-13
 
 ### Build
