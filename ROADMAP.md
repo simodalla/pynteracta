@@ -57,7 +57,7 @@ reads, extended to the writes by ADR 0001 on 2026-10-08).
 | **0.13.0** | Admin write, second half: catalogs, catalog entries and workspace (create, edit, logical delete and restore, workspace members and images; fifth write group, ADR 0001) | M32 | ✅ Shipped 2026-10-12 | [specs/06-admin-catalogs-workspace/spec.md](specs/06-admin-catalogs-workspace/spec.md) |
 | **0.13.1** | Audit readability: optimistic-concurrency tokens (`occToken` family) stay in clear in redacted bodies (patch) | M33 | ✅ Shipped 2026-10-12 | [specs/07-occtoken-audit/spec.md](specs/07-occtoken-audit/spec.md) |
 | **0.14.0** | Event post write: create, edit, copy and participate (sixth and last write group, ADR 0001) | M34 | ✅ Shipped 2026-10-13 | [specs/08-event-post-write/spec.md](specs/08-event-post-write/spec.md) |
-| **0.15.0** | Swagger alignment: regenerated models, `communities list-by-view-post` (last uncovered endpoint), `draft`/`publication_timestamp` on post detail, `downloadable` on uploaded attachments | M35 | ⏳ In progress | [specs/09-swagger-align/spec.md](specs/09-swagger-align/spec.md) |
+| **0.15.0** | Swagger alignment: regenerated models, `communities list-by-view-post` (last uncovered endpoint), `draft`/`publication_timestamp` on post detail, `downloadable` on uploaded attachments | M35 | ✅ Shipped 2026-10-13 | [specs/09-swagger-align/spec.md](specs/09-swagger-align/spec.md) |
 
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M35). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
@@ -114,9 +114,8 @@ propaedeutic to them. One spec per group (see `specs/prd.md` RF-021…RF-025); a
 
 ## Still uncovered in the pinned swagger
 
-- `GET communication/settings/communities/view-post` (`viewPostCapabilityLevel`): the
-  communities in which the caller has a given post-view capability. The only endpoint of the 76
-  in the swagger not yet exposed.
+None: since 0.15.0 the library exposes all 76 endpoints of the pinned swagger (the last one,
+`GET communication/settings/communities/view-post`, arrived with spec 09).
 
 ## Deferred / future
 
