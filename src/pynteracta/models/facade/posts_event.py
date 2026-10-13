@@ -9,7 +9,7 @@ nelle varianti tipizzate (``EventPostEditableContentDataDTOModel``, ``EventPostD
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import IntEnum
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -55,29 +55,36 @@ class EventInvitee:
         return self.raw.typeId
 
 
-def _event_datetime(stub: object, timezone: str | None) -> datetime | None:
+def _event_datetime(stub: object, timezone: str | None) -> date | None:
     value = typed(stub, generated.EventDatetimeDTO)
     if value is None:
         return None
+    local = value.localDatetime
+    if local and "T" not in local:
+        try:
+            return date.fromisoformat(local)
+        except ValueError:
+            return None
+    if local and timezone:
+        try:
+            return datetime.fromisoformat(local).replace(tzinfo=ZoneInfo(timezone))
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
     if value.zonedDatetime:
         try:
             return datetime.fromisoformat(value.zonedDatetime)
         except ValueError:
             pass
-    if value.localDatetime and timezone:
-        try:
-            zone = ZoneInfo(timezone)
-        except (ZoneInfoNotFoundError, ValueError):
-            return None
-        return datetime.fromisoformat(value.localDatetime).replace(tzinfo=zone)
     return None
 
 
 class EventData:
     """Façade sul blocco ``event`` di un post evento.
 
-    Le date sono ``datetime`` con fuso: da ``zonedDatetime`` se c'è, altrimenti da
-    ``localDatetime`` nel fuso ``timezone`` dell'evento; ``None`` se mancano entrambi.
+    Le date sono ``datetime`` nel fuso IANA dell'evento (``localDatetime`` più ``timezone``),
+    così rimandarle a ``edit_event`` non sposta l'evento; senza un fuso valido valgono
+    ``zonedDatetime`` (offset fisso). Gli eventi tutto il giorno hanno date senza ora: ``date``.
+    ``None`` se non si ricava nulla.
 
     Attributes:
         raw: L'``EventPostDataDTOModel`` generato.
@@ -88,12 +95,12 @@ class EventData:
         self._invitations = typed(raw.invitations, generated.EventPostInvitationsDataDTO1)
 
     @property
-    def start_at(self) -> datetime | None:
+    def start_at(self) -> date | None:
         """Inizio dell'evento."""
         return _event_datetime(self.raw.startAt, self.raw.timezone)
 
     @property
-    def end_at(self) -> datetime | None:
+    def end_at(self) -> date | None:
         """Fine dell'evento, se c'è."""
         return _event_datetime(self.raw.endAt, self.raw.timezone)
 

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -445,23 +445,23 @@ def _mock_participate() -> respx.Route:
 
 
 class TestParticipate:
-    # criterio: 08-C07
+    # criterio: 08-C29
     @respx.mock
     def test_participate_body_and_none(self) -> None:
         route = _mock_participate()
         result = _api().participate(_POST_ID, ParticipationAnswer.YES, notes="Arrivo tardi")
         assert result is None
         assert route.call_count == 1
-        assert _sent(route) == {"typeId": 1, "notes": "Arrivo tardi"}
+        assert _sent(route) == {"typeId": 1, "notes": '[{"insert":"Arrivo tardi\\n"}]'}
 
-    # criterio: 08-C07
+    # criterio: 08-C29
     @respx.mock
     def test_participate_int_answer(self) -> None:
         route = _mock_participate()
         _api().participate(_POST_ID, 3)
         assert _sent(route) == {"typeId": 3}
 
-    # criterio: 08-C07
+    # criterio: 08-C29
     @pytest.mark.parametrize("answer", [0, 4])
     @respx.mock
     def test_participate_invalid_answer_raises_before_request(self, answer: int) -> None:
@@ -471,6 +471,7 @@ class TestParticipate:
         assert route.call_count == 0
 
     # criterio: 08-C04
+    # criterio: 08-C29
     @respx.mock
     def test_raw_equivalent(self) -> None:
         route = _mock_participate()
@@ -566,3 +567,78 @@ class TestEventErrors:
         with pytest.raises(TransportError):
             _api().participate(_POST_ID, ParticipationAnswer.YES)
         assert route.call_count == 1
+
+
+_ALL_DAY_BLOCK = {
+    "startAt": {"localDatetime": "2026-11-05"},
+    "endAt": {"localDatetime": "2026-11-06"},
+    "allDay": True,
+}
+
+
+class TestAllDay:
+    # criterio: 08-C26
+    @respx.mock
+    def test_create_all_day_dates(self) -> None:
+        route = _mock_create()
+        _api().create_event(
+            _COMMUNITY_ID, start_at=date(2026, 11, 5), end_at=date(2026, 11, 6), all_day=True
+        )
+        assert _sent(route) == {"event": _ALL_DAY_BLOCK}
+
+    # criterio: 08-C26
+    def test_aware_datetime_all_day_uses_local_date(self) -> None:
+        late = datetime(2026, 11, 5, 23, 30, tzinfo=_ROME)
+        assert build_event_block(start_at=late, all_day=True) == {
+            "startAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+        }
+
+    # criterio: 08-C26
+    def test_naive_datetime_all_day_accepted(self) -> None:
+        naive = datetime(2026, 11, 5, 10, 0)
+        assert build_event_block(end_at=naive, all_day=True) == {
+            "endAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+        }
+
+    # criterio: 08-C26
+    @pytest.mark.parametrize("method", ["create_event", "edit_event", "copy_event"])
+    @pytest.mark.parametrize("all_day", [None, False])
+    @respx.mock
+    def test_date_without_all_day_raises(self, method: str, all_day: bool | None) -> None:
+        create, edit, copy = _mock_create(), _mock_edit(), _mock_copy()
+        args: tuple[int, ...] = (
+            (_COMMUNITY_ID,)
+            if method == "create_event"
+            else (
+                _POST_ID,
+                _OCC_TOKEN,
+            )
+        )
+        with pytest.raises(ValueError, match="all_day"):
+            getattr(_api(), method)(*args, start_at=date(2026, 11, 5), all_day=all_day)
+        assert create.call_count == edit.call_count == copy.call_count == 0
+
+    # criterio: 08-C26
+    @pytest.mark.parametrize("method", ["edit_event", "copy_event"])
+    @respx.mock
+    def test_edit_and_copy_all_day(self, method: str) -> None:
+        route = _mock_edit() if method == "edit_event" else _mock_copy()
+        getattr(_api(), method)(
+            _POST_ID, _OCC_TOKEN, start_at=date(2026, 11, 5), end_at=date(2026, 11, 6), all_day=True
+        )
+        assert _sent(route) == {"event": _ALL_DAY_BLOCK}
+
+    # criterio: 08-C28
+    @respx.mock
+    def test_edit_with_read_start_keeps_zone(self) -> None:
+        respx.get(f"{_MANAGE}/event-post-data-for-edit/{_POST_ID}").mock(
+            return_value=httpx.Response(200, json=load_payload("event_post_for_edit_response.json"))
+        )
+        route = _mock_edit()
+        api = _api()
+        form = api.get_event_for_edit(_POST_ID)
+        assert form.event is not None
+        api.edit_event(_POST_ID, _OCC_TOKEN, start_at=form.event.start_at)
+        assert _sent(route) == {"event": {"startAt": _START_BLOCK, "timezone": "Europe/Rome"}}

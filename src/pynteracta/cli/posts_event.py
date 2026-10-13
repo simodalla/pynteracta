@@ -897,7 +897,12 @@ def posts_participate(
     answer: Annotated[
         ParticipationChoice, typer.Argument(help="Answer to the invitation: yes, maybe or no.")
     ],
-    notes: Annotated[str | None, typer.Option("--notes", help="Notes for the organizer.")] = None,
+    notes: Annotated[
+        str | None,
+        typer.Option(
+            "--notes", help="Notes for the organizer (plain text, sent as a one-line delta)."
+        ),
+    ] = None,
     output: OutputOption = None,
 ) -> None:
     """Answer the invitation to an event post as the authenticated identity.

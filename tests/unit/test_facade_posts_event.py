@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import copy
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -40,7 +40,7 @@ def _event(data: dict) -> EventData:  # type: ignore[type-arg]
     return EventData(generated.EventPostDataDTOModel.model_validate(data))
 
 
-# criterio: 08-C07
+# criterio: 08-C29
 def test_participation_answer_values() -> None:
     assert ParticipationAnswer(1) is ParticipationAnswer.YES
     assert ParticipationAnswer(2) is ParticipationAnswer.MAYBE
@@ -175,3 +175,45 @@ class TestEventForms:
         form = EventPostForEdit.from_dict(data)
         assert form.event is None
         assert EventPostForEdit.from_dict({"occToken": 1}).content_data is None
+
+
+class TestEventDates:
+    # criterio: 08-C28
+    def test_iana_zone_from_local_and_timezone(self) -> None:
+        event = _event(_event_dict())
+        assert event.start_at == _START
+        assert event.start_at is not None
+        assert event.start_at.tzinfo == _ROME
+        assert event.end_at is not None
+        assert event.end_at.tzinfo == _ROME
+
+    # criterio: 08-C28
+    def test_all_day_is_date(self) -> None:
+        data = _event_dict()
+        data["allDay"] = True
+        data["timezone"] = None
+        day = {
+            "zonedDatetime": "2026-11-05",
+            "localDatetime": "2026-11-05",
+            "utcDatetime": "2026-11-05",
+        }
+        data["startAt"] = day
+        data["endAt"] = dict(day)
+        event = _event(data)
+        assert event.start_at == date(2026, 11, 5)
+        assert not isinstance(event.start_at, datetime)
+        assert event.end_at == date(2026, 11, 5)
+
+    # criterio: 08-C28
+    def test_zoned_only(self) -> None:
+        data = _event_dict()
+        data["startAt"] = {"zonedDatetime": "2026-11-05T10:00:00+01:00"}
+        data["timezone"] = None
+        assert _event(data).start_at == _START
+
+    # criterio: 08-C28
+    def test_unknown_zone_without_zoned_is_none(self) -> None:
+        data = _event_dict()
+        data["startAt"] = {"localDatetime": "2026-11-05T10:00:00"}
+        data["timezone"] = "Nowhere/Town"
+        assert _event(data).start_at is None

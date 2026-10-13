@@ -15,7 +15,7 @@ Watcher, allegati, eliminazione e commenti dei post evento usano i metodi dei po
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -25,6 +25,7 @@ from pynteracta.api._utils import (
     build_query_params,
     build_write_body,
     event_datetime_block,
+    text_to_delta,
     zoned_datetime_input,
 )
 from pynteracta.models.facade.posts_event import (
@@ -72,8 +73,8 @@ def _invitees(ids: list[int] | None, type_id: int | None) -> list[dict[str, int]
 
 def build_event_block(  # noqa: PLR0913
     *,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    start_at: date | None = None,
+    end_at: date | None = None,
     all_day: bool | None = None,
     location: str | None = None,
     invited_user_ids: list[int] | None = None,
@@ -93,7 +94,7 @@ def build_event_block(  # noqa: PLR0913
     Raises:
         ValueError: se una data passata non ha fuso.
     """
-    block = event_datetime_block(start_at, end_at)
+    block = event_datetime_block(start_at, end_at, all_day=bool(all_day))
     if all_day is not None:
         block["allDay"] = all_day
     if location is not None:
@@ -172,8 +173,8 @@ class PostsEventAPI(ResourceClient):
         self,
         community_id: int,
         *,
-        start_at: datetime,
-        end_at: datetime | None = None,
+        start_at: date,
+        end_at: date | None = None,
         all_day: bool | None = None,
         location: str | None = None,
         invited_user_ids: list[int] | None = None,
@@ -203,9 +204,10 @@ class PostsEventAPI(ResourceClient):
 
         Args:
             community_id: La community in cui creare il post evento.
-            start_at: Inizio dell'evento, ``datetime`` con fuso (obbligatorio).
+            start_at: Inizio dell'evento, ``datetime`` con fuso (obbligatorio); con
+                ``all_day`` anche un ``date``.
             end_at: Fine dell'evento, convertita nel fuso di ``start_at``.
-            all_day: Evento di tutto il giorno.
+            all_day: Evento di tutto il giorno: le date viaggiano senza ora e senza fuso.
             location: Luogo.
             invited_user_ids: Utenti invitati.
             invited_group_ids: Gruppi invitati.
@@ -233,7 +235,8 @@ class PostsEventAPI(ResourceClient):
             Un :class:`PostWriteResult` con ``post_id``, ``next_occ_token`` e ``post``.
 
         Raises:
-            ValueError: se ``start_at``, ``end_at`` o ``scheduled_publication`` non ha fuso.
+            ValueError: se ``start_at``, ``end_at`` o ``scheduled_publication`` non ha fuso, o
+                se una data senza ora è passata senza ``all_day``.
         """
         event = build_event_block(
             start_at=start_at,
@@ -281,8 +284,8 @@ class PostsEventAPI(ResourceClient):
         post_id: int,
         occ_token: int,
         *,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
+        start_at: date | None = None,
+        end_at: date | None = None,
         all_day: bool | None = None,
         location: str | None = None,
         invited_user_ids: list[int] | None = None,
@@ -318,9 +321,9 @@ class PostsEventAPI(ResourceClient):
         Args:
             post_id: Il post evento da modificare.
             occ_token: Token di concorrenza ottimistica letto.
-            start_at: Nuovo inizio, ``datetime`` con fuso.
-            end_at: Nuova fine, ``datetime`` con fuso.
-            all_day: Evento di tutto il giorno.
+            start_at: Nuovo inizio, ``datetime`` con fuso; con ``all_day`` anche un ``date``.
+            end_at: Nuova fine, ``datetime`` con fuso; con ``all_day`` anche un ``date``.
+            all_day: Evento di tutto il giorno: le date viaggiano senza ora e senza fuso.
             location: Luogo.
             invited_user_ids: Utenti invitati.
             invited_group_ids: Gruppi invitati.
@@ -396,8 +399,8 @@ class PostsEventAPI(ResourceClient):
         post_id: int,
         occ_token: int,
         *,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
+        start_at: date | None = None,
+        end_at: date | None = None,
         all_day: bool | None = None,
         location: str | None = None,
         invited_user_ids: list[int] | None = None,
@@ -495,13 +498,16 @@ class PostsEventAPI(ResourceClient):
             post_id: Il post evento.
             answer: :class:`~pynteracta.models.facade.posts_event.ParticipationAnswer` o il suo
                 valore intero (``1`` sì, ``2`` forse, ``3`` no).
-            notes: Note facoltative per l'organizzatore.
+            notes: Note facoltative per l'organizzatore, in testo: si inviano come delta di
+                una riga, l'unico formato che il server accetta. Un delta già pronto va con
+                :meth:`participate_raw`.
 
         Raises:
             ValueError: se ``answer`` non è ``1``, ``2`` o ``3``, prima della chiamata.
         """
         type_id = int(ParticipationAnswer(answer))
-        self._send_participate(post_id, build_write_body(type_id=type_id, notes=notes))
+        delta = text_to_delta(notes) if notes is not None else None
+        self._send_participate(post_id, build_write_body(type_id=type_id, notes=delta))
 
     def participate_raw(self, post_id: int, req: EditPostEventPartecipateRequestDTO) -> None:
         """Come :meth:`participate`, da un ``EditPostEventPartecipateRequestDTO``."""
@@ -513,8 +519,8 @@ class PostsEventAPI(ResourceClient):
     @staticmethod
     def _edit_body(  # noqa: PLR0913
         *,
-        start_at: datetime | None,
-        end_at: datetime | None,
+        start_at: date | None,
+        end_at: date | None,
         all_day: bool | None,
         location: str | None,
         invited_user_ids: list[int] | None,

@@ -264,6 +264,7 @@ class TestEventPostsWriteIntegration:
                 assert after.content_data.title == _EVENT_TITLE_EDITED
                 assert after.event is not None
                 assert after.event.location == _EVENT_LOCATION_EDITED
+                assert after.event.timezone == "Europe/Rome"
                 event_root = after.content_data.event.root if after.content_data.event else None
                 print(f"[T-manuale] event after edit: {event_write_block(event_root)!r}")
 

@@ -329,7 +329,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
     ripassati), campi obbligatori in modifica; (5) tabella di scrittura senza colonne evento,
     oppure documentarle come vuote.
 
-### [ ] T18 – Date tutto il giorno, date lette nel fuso dell'evento, note in delta: libreria (aggiunto il 2026-10-13 dopo T16)
+### [x] T18 – Date tutto il giorno, date lette nel fuso dell'evento, note in delta: libreria (aggiunto il 2026-10-13 dopo T16)
 
 - Criteri: 08-C26, 08-C28, 08-C29 (08-C29 sostituisce 08-C07)
 - Dipende da: T07, T16

@@ -339,16 +339,40 @@ class TestCreateEvent:
         assert "Sala A" not in result.output
         assert "start_at" in result.output
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
-    def test_date_only_is_local_midnight_and_all_day(self, runner: CliRunner) -> None:
+    def test_date_only_all_day_sends_date_without_timezone(self, runner: CliRunner) -> None:
         route = _mock_create()
         result = _create(runner, "--start", "2026-11-05", "--all-day")
         assert result.exit_code == 0, result.output
         assert _sent_body(route)["event"] == {
+            "startAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+        }
+
+    # criterio: 08-C25
+    @respx.mock
+    def test_datetimes_all_day_send_dates(self, runner: CliRunner) -> None:
+        route = _mock_create()
+        result = _create(
+            runner, "--start", "2026-11-05T10:00:00", "--end", "2026-11-06T18:00:00", "--all-day"
+        )
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["event"] == {
+            "startAt": {"localDatetime": "2026-11-05"},
+            "endAt": {"localDatetime": "2026-11-06"},
+            "allDay": True,
+        }
+
+    # criterio: 08-C25
+    @respx.mock
+    def test_date_only_without_all_day_is_local_midnight(self, runner: CliRunner) -> None:
+        route = _mock_create()
+        result = _create(runner, "--start", "2026-11-05")
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["event"] == {
             "startAt": {"localDatetime": "2026-11-05T00:00:00"},
             "timezone": "Europe/Rome",
-            "allDay": True,
         }
 
     # criterio: 08-C13
@@ -778,7 +802,7 @@ def _mock_participate(status: int = 200) -> respx.Route:
 
 
 class TestParticipate:
-    # criterio: 08-C17
+    # criterio: 08-C30
     @respx.mock
     def test_yes_with_notes_body_and_message(self, runner: CliRunner) -> None:
         route = _mock_participate()
@@ -789,10 +813,10 @@ class TestParticipate:
         )
         assert result.exit_code == 0, result.output
         assert route.call_count == 1
-        assert _sent_body(route) == {"typeId": 1, "notes": "Arrivo tardi"}
+        assert _sent_body(route) == {"typeId": 1, "notes": '[{"insert":"Arrivo tardi\\n"}]'}
         assert f"Participation to post {_POST_ID} recorded: yes" in result.output
 
-    # criterio: 08-C17
+    # criterio: 08-C30
     @pytest.mark.parametrize(("choice", "type_id"), [("maybe", 2), ("no", 3)])
     @respx.mock
     def test_maybe_and_no_type_ids(self, runner: CliRunner, choice: str, type_id: int) -> None:
@@ -801,7 +825,7 @@ class TestParticipate:
         assert result.exit_code == 0, result.output
         assert _sent_body(route) == {"typeId": type_id}
 
-    # criterio: 08-C17
+    # criterio: 08-C30
     @respx.mock
     def test_json_output(self, runner: CliRunner) -> None:
         _mock_participate()
@@ -813,7 +837,7 @@ class TestParticipate:
         assert result.exit_code == 0, result.output
         assert json.loads(result.output) == {"post_id": _POST_ID, "answer": "yes", "type_id": 1}
 
-    # criterio: 08-C17
+    # criterio: 08-C30
     @respx.mock
     def test_invalid_choice_exits_2_without_requests(self, runner: CliRunner) -> None:
         route = _mock_participate()
