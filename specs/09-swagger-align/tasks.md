@@ -78,7 +78,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   4. Controlli bloccanti; commit `feat(communities): elenco delle community per capability di
      visualizzazione dei post`.
 
-### [ ] T04 – Comando `communities list-by-view-post`
+### [x] T04 – Comando `communities list-by-view-post`
 
 - Criteri: 09-C06, 09-C07, 09-C13 (seconda metà: il file sopra l'85 % con il comando nuovo)
 - Dipende da: T02, T03

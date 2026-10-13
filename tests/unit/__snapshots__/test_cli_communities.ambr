@@ -76,6 +76,64 @@
   
   '''
 # ---
+# name: TestCommunitiesListByViewPost.test_empty_table
+  '''
+  No results.
+  
+  '''
+# ---
+# name: TestCommunitiesListByViewPost.test_full_and_fields
+  '''
+  [
+    {
+      "id": 10,
+      "name": "Engineering",
+      "description": "Engineering team community."
+    },
+    {
+      "id": 20,
+      "name": "Marketing"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCommunitiesListByViewPost.test_level_sent[Private-PRIVATE]
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesListByViewPost.test_level_sent[public-PUBLIC]
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesListByViewPost.test_table_without_level
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
 # name: TestCommunitiesPostDefinition.test_json_output
   '''
   [

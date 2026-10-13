@@ -12,7 +12,7 @@ from api_helpers import load_payload, mock_json
 from typer.testing import CliRunner
 
 from pynteracta.cli import app
-from pynteracta.cli._common import EXIT_NOT_FOUND
+from pynteracta.cli._common import EXIT_CONFIG, EXIT_NOT_FOUND, EXIT_PERMISSION
 
 BASE_ENV = {"PYNTERACTA_BASE_URL": "https://api.example.com"}
 
@@ -282,3 +282,107 @@ class TestCommunitiesErrors:
         result = runner.invoke(app, args, env=BASE_ENV)
         assert result.exit_code == EXIT_NOT_FOUND
         assert route.call_count == 1
+
+
+_VIEW_POST = "communication/settings/communities/view-post"
+
+
+class TestCommunitiesListByViewPost:
+    # criterio: 09-C06
+    @respx.mock
+    def test_table_without_level(self, runner: CliRunner, snapshot: object) -> None:
+        route = mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        result = runner.invoke(app, ["communities", "list-by-view-post"], env=BASE_ENV)
+        assert result.exit_code == 0
+        assert result.output == snapshot
+        assert route.calls[0].request.url.query == b""
+
+    # criterio: 09-C06
+    @respx.mock
+    @pytest.mark.parametrize(("flag", "sent"), [("public", "PUBLIC"), ("Private", "PRIVATE")])
+    def test_level_sent(self, runner: CliRunner, snapshot: object, flag: str, sent: str) -> None:
+        route = mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        result = runner.invoke(
+            app, ["communities", "list-by-view-post", "--level", flag], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        assert result.output == snapshot
+        assert dict(route.calls[0].request.url.params) == {"viewPostCapabilityLevel": sent}
+
+    # criterio: 09-C06
+    @respx.mock
+    def test_empty_table(self, runner: CliRunner, snapshot: object) -> None:
+        mock_json("GET", _VIEW_POST, load_payload("communities_list_empty.json"))
+        result = runner.invoke(
+            app, ["communities", "list-by-view-post", "--level", "all"], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        assert result.output == snapshot
+
+    # criterio: 09-C06
+    @respx.mock
+    def test_json_same_as_list(self, runner: CliRunner) -> None:
+        mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        mock_json(
+            "GET", "communication/settings/communities", load_payload("communities_list.json")
+        )
+        by_level = runner.invoke(
+            app, ["--output", "json", "communities", "list-by-view-post"], env=BASE_ENV
+        )
+        plain = runner.invoke(app, ["--output", "json", "communities", "list"], env=BASE_ENV)
+        assert by_level.exit_code == 0
+        assert json.loads(by_level.output) == json.loads(plain.output)
+
+    # criterio: 09-C06
+    @respx.mock
+    def test_full_and_fields(self, runner: CliRunner, snapshot: object) -> None:
+        mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        full = runner.invoke(
+            app, ["--output", "json", "communities", "list-by-view-post", "--full"], env=BASE_ENV
+        )
+        fields = runner.invoke(
+            app,
+            ["--output", "json", "communities", "list-by-view-post", "--fields", "id"],
+            env=BASE_ENV,
+        )
+        assert full.exit_code == 0
+        assert full.output == snapshot
+        assert fields.exit_code == 0
+        assert json.loads(fields.output) == [{"id": 10}, {"id": 20}]
+
+    # criterio: 09-C06
+    @respx.mock
+    def test_export_csv(self, runner: CliRunner, tmp_path: Path) -> None:
+        mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        target = tmp_path / "communities.csv"
+        result = runner.invoke(
+            app, ["communities", "list-by-view-post", "--export", str(target)], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        lines = target.read_text(encoding="utf-8").splitlines()
+        assert lines[0] == "id,name"
+        assert lines[1:] == ["10,Engineering", "20,Marketing"]
+
+    # criterio: 09-C07
+    @respx.mock
+    def test_invalid_level_exits_usage_without_requests(self, runner: CliRunner) -> None:
+        route = mock_json("GET", _VIEW_POST, load_payload("communities_list.json"))
+        result = runner.invoke(
+            app, ["communities", "list-by-view-post", "--level", "privato"], env=BASE_ENV
+        )
+        assert result.exit_code == EXIT_CONFIG
+        assert route.called is False
+
+    # criterio: 09-C07
+    @respx.mock
+    def test_forbidden_exits_permission(self, runner: CliRunner) -> None:
+        route = mock_json("GET", _VIEW_POST, {"errorCode": "FORBIDDEN"}, status=403)
+        result = runner.invoke(app, ["communities", "list-by-view-post"], env=BASE_ENV)
+        assert result.exit_code == EXIT_PERMISSION
+        assert route.call_count == 1
+
+    # criterio: 09-C06
+    def test_help_lists_command(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["communities", "--help"], env=BASE_ENV)
+        assert result.exit_code == 0
+        assert "list-by-view-post" in result.output
