@@ -4,6 +4,14 @@
 posts** (type 1), comments and workflow data, and **event posts** (type 2): create, edit, copy and
 the answer to the invitation (see [Event posts](#event-posts)).
 
+## Reading a post
+
+`client.posts.get(post_id)` returns a `Post` with `id`, `community_id`, `title`,
+`description_plain_text`, `creation_timestamp`, `last_modify_timestamp`, `comments_count`,
+`likes_count`, `draft` (`True` for a draft, `False` once published) and
+`publication_timestamp` (publication time, epoch milliseconds, UTC). Fields the tenant does not
+send are `None`; everything else is on `.raw`.
+
 ## Writing posts
 
 Every write mirrors the read API: explicit snake_case keyword arguments for every field of the

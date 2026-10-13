@@ -482,6 +482,9 @@ pynteracta posts get 21269
 pynteracta posts get 21269 --web-url --output json
 ```
 
+The table also shows `draft` (draft or published) and `publication_ts` (publication time, shown
+like `creation_ts`). With `--fields` use the raw names: `--fields draft,publicationTimestamp`.
+
 ### `posts list`
 
 Lists posts in a community. `--community` is required.
@@ -1016,6 +1019,21 @@ List all communities the authenticated principal can post in.
 pynteracta communities list
 pynteracta communities list --output json
 ```
+
+### `communities list-by-view-post`
+
+List the communities where the authenticated principal can **view** posts at a given
+capability level (`GET communication/settings/communities/view-post`). `--level` takes
+`private`, `public` or `all` (case-insensitive); without it the parameter is not sent and the
+server decides. Same columns (`id`, `name`) and output options as `communities list`.
+
+```bash
+pynteracta communities list-by-view-post
+pynteracta communities list-by-view-post --level public --output json
+```
+
+On the test tenant, with a service account, every level and no level returned the same 15
+communities, while `communities list` (where the principal can post) returned 9.
 
 ### `communities details COMMUNITY_ID`
 

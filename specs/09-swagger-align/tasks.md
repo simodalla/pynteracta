@@ -191,7 +191,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   - i due post di prova (23397, 23398) sono stati eliminati; la sonda è rimasta fuori dal
     repository.
 
-### [ ] T09 – Documentazione e PRD (chiusura)
+### [x] T09 – Documentazione e PRD (chiusura)
 
 - Criteri: 09-C14; chiusura dei "Requisiti nuovi" della spec
 - Dipende da: T04, T05, T06, T08
