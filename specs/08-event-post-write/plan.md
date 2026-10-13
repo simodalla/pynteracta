@@ -212,6 +212,22 @@ scrivono con il test che le usa. `_sent_body(route)`, `mock_json`, `load_payload
 | 08-C23 | `test_docs_snippets.py::test_event_posts_pages_document_write_commands`; `uv run mkdocs build --strict` nei controlli di verifica | unitario + verifica |
 | 08-C24 | `tests/integration/test_posts_integration.py::TestEventPostsWriteIntegration::test_full_cycle` (skip senza le variabili; `create_event` → `get_by_client_uid` → `get_event_for_edit` (`event.start_at == _START` inviato) → `edit_event` (titolo, luogo, blocco letto rimandato con `event_write_block`) → `participate(YES)` → `get_event_for_copy` → `copy_event` → `delete` × 2 in `finally` → `NotFoundError` × 2) | integrazione (opt-in) + verifica manuale |
 
+Revisione del 2026-10-13 (dopo T16). 08-C07, 08-C12, 08-C13, 08-C17 sono sostituiti: i loro test
+cambiano marker e attese. Moduli: `api/_utils.py` (`event_datetime_block` con `all_day`),
+`api/posts_event.py` (`build_event_block`, kwargs `date | datetime`, note in delta con
+`text_to_delta`), `models/facade/posts_event.py` (`_event_datetime`), `cli/posts_event.py`
+(`all_day_block` applicato al blocco unito, tabella di scrittura ridotta).
+
+| Criterio | Test previsto | Tipo |
+|---|---|---|
+| 08-C25 | `test_cli_posts_event.py::TestCreateEvent::test_date_only_all_day_sends_date_without_timezone`, `::test_datetimes_all_day_send_dates`, più i test di 08-C13 rimarcati | unitario |
+| 08-C26 | `test_api_posts_event.py::TestAllDay::test_create_all_day_dates`, `::test_aware_datetime_all_day_uses_local_date`, `::test_naive_datetime_all_day_accepted`, `::test_date_without_all_day_raises` parametrizzato su `create_event`, `edit_event`, `copy_event` | unitario |
+| 08-C27 | `test_cli_posts_event.py::TestAllDayMerge::test_edit_all_day_read_event_start_flag`, `::test_copy_all_day`, `::test_create_all_day_from_json`; `::TestAllDayBlock` sulla funzione pura | unitario |
+| 08-C28 | `test_facade_posts_event.py::TestEventDates::test_iana_zone_from_local_and_timezone`, `::test_all_day_is_date`, `::test_zoned_only`, `::test_unknown_zone_without_zoned_is_none`; `test_api_posts_event.py::TestAllDay::test_edit_with_read_start_keeps_zone`; snapshot di `get-event-for-edit` su un evento tutto il giorno | unitario + snapshot |
+| 08-C29 | `test_api_posts_event.py::TestParticipate::test_participate_body_and_none` (note in delta), `::test_participate_raw_notes_as_is` | unitario |
+| 08-C30 | `test_cli_posts_event.py::TestParticipate::test_yes_with_notes_body_and_message` (note in delta) e i test di 08-C17 rimarcati | unitario |
+| 08-C31 | `test_cli_posts_event.py::TestCreateEvent::test_flags_and_json_merge_flags_win` (tabella senza colonne dell'evento; snapshot aggiornati) | unitario + snapshot |
+
 Verifica manuale (dalla spec): l'esecuzione di 08-C24 sulla community di prova, più le prove a
 mano in un task dedicato (campi omessi in `edit-event-post` e `copy-event-post`, per il post e per
 le chiavi del blocco `event`; `typeId` degli invitati obbligatorio o no e suo default; effetto di

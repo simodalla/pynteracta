@@ -329,18 +329,54 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
     ripassati), campi obbligatori in modifica; (5) tabella di scrittura senza colonne evento,
     oppure documentarle come vuote.
 
+### [ ] T18 – Date tutto il giorno, date lette nel fuso dell'evento, note in delta: libreria (aggiunto il 2026-10-13 dopo T16)
+
+- Criteri: 08-C26, 08-C28, 08-C29 (08-C29 sostituisce 08-C07)
+- Dipende da: T07, T16
+- Test: `tests/unit/test_api_posts_event.py::TestAllDay` (08-C26 e la parte di 08-C28 su
+  `edit_event`), `::TestParticipate` con le note in delta (08-C29);
+  `tests/unit/test_facade_posts_event.py::TestEventDates` (08-C28). Rossi: date con ora e fuso,
+  `zonedDatetime` a offset fisso, note in testo.
+- Passi:
+  1. Scrivere e aggiornare i test; eseguirli: rossi per il motivo giusto.
+  2. `api/_utils.py`: `event_datetime_block(start_at, end_at, *, all_day=False)`; con `all_day`
+     sole date senza `timezone`, senza un `date` puro → `ValueError`.
+  3. `api/posts_event.py`: kwargs `date | datetime`; `build_event_block` passa `all_day`;
+     `participate` converte le note con `text_to_delta`; `participate_raw` invariato.
+  4. `models/facade/posts_event.py`: `_event_datetime` da `localDatetime` + `timezone` IANA, `date`
+     per le sole date, poi `zonedDatetime`.
+  5. Integration test: dopo `edit_event` il fuso resta `Europe/Rome`. Controlli bloccanti; commit
+     `fix: eventi tutto il giorno, date lette nel fuso dell'evento e note in delta (08-T18)`.
+
+### [ ] T19 – Tutto il giorno e tabella di scrittura nella CLI (aggiunto il 2026-10-13 dopo T16)
+
+- Criteri: 08-C25, 08-C27, 08-C30, 08-C31 (sostituiscono 08-C13, 08-C17, 08-C12)
+- Dipende da: T18
+- Test: `tests/unit/test_cli_posts_event.py::TestAllDayBlock`, `::TestAllDayMerge`,
+  `::TestCreateEvent` (08-C25, 08-C31), `::TestParticipate` (08-C30); snapshot aggiornati e
+  riletti. Rossi: `T00:00:00` e `timezone` con `--all-day`, colonne dell'evento in tabella.
+- Passi:
+  1. Scrivere e aggiornare i test; eseguirli: rossi per il motivo giusto.
+  2. `cli/posts_event.py`: `all_day_block(event)` applicato al blocco unito di `create-event`,
+     `edit-event`, `copy-event`; `event_flags_block` passa `all_day` alla libreria.
+  3. `event_write_result_row` senza colonne dell'evento.
+  4. Controlli bloccanti; commit `fix(cli): eventi tutto il giorno e tabella delle scritture
+     degli eventi (08-T19)`.
+
 ### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
 - Criteri: nessuno nuovo (chiusura: "Requisiti nuovi", conferme, esito di T16)
-- Dipende da: T14, T16
+- Dipende da: T14, T16, T18, T19
 - Test: nessuno; verifica con la rilettura dei diff, `test_docs_snippets` e `uv run mkdocs build
   --strict`.
 - Passi:
   1. `specs/prd.md`: RF-021e e RF-021f dalla sezione "Requisiti nuovi" della spec; RF-021
      aggiornato; §1 con la superficie di scrittura dell'ADR 0001 completa; conferma accanto a
      RF-021, RNF-010 e §6 per la parte degli eventi; riga nella storia.
-  2. `docs/api/posts.md` e `docs/cli.md`: l'esito di T16 al posto di "to be confirmed" (campi
-     omessi, `typeId`, `allDay`, colonne vuote se `event` manca da `postData`).
+  2. `docs/api/posts.md` e `docs/cli.md`: l'esito di T16 al posto di "to be confirmed" (il
+     server sostituisce: campi obbligatori in modifica e copia; invitati obbligatori con almeno
+     un ospite e non leggibili, da ripassare con `--invite-user`; `typeId` facoltativo; date
+     `allDay`; note in delta; nessuna colonna dell'evento nelle scritture).
   3. Se T16 impone una revisione della spec (08-C14…C16 o default di `invitation_type_id`):
      sezione "Revisioni" in `spec.md`, criteri nuovi, codice e test in un task aggiunto.
   4. Commit `docs: PRD e pagine aggiornate con l'esito delle prove sul tenant per la spec 08`.
@@ -358,17 +394,17 @@ La riga `0.14.0 ⏳ M34` in `ROADMAP.md` la scrive T01; la sezione M34 in `PROGR
 | 08-C04 | T05, T06, T07 |
 | 08-C05 | T06 |
 | 08-C06 | T06 |
-| 08-C07 | T04, T07 |
+| 08-C07 | T04, T07 (sostituito) |
 | 08-C08 | T06 |
 | 08-C09 | T05, T07, T10, T12 |
 | 08-C10 | T05, T07 |
 | 08-C11 | T04, T05 |
-| 08-C12 | T10 |
-| 08-C13 | T08, T10 |
+| 08-C12 | T10 (sostituito) |
+| 08-C13 | T08, T10 (sostituito) |
 | 08-C14 | T11 |
 | 08-C15 | T11 |
 | 08-C16 | T11 |
-| 08-C17 | T12 |
+| 08-C17 | T12 (sostituito) |
 | 08-C18 | T13 |
 | 08-C19 | T11 |
 | 08-C20 | T09 |
@@ -376,3 +412,10 @@ La riga `0.14.0 ⏳ M34` in `ROADMAP.md` la scrive T01; la sezione M34 in `PROGR
 | 08-C22 | T02, T04 |
 | 08-C23 | T14 |
 | 08-C24 | T15, T16 (manuale) |
+| 08-C25 | T19 |
+| 08-C26 | T18 |
+| 08-C27 | T19 |
+| 08-C28 | T18 |
+| 08-C29 | T18 |
+| 08-C30 | T19 |
+| 08-C31 | T19 |
