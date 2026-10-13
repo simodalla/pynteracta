@@ -13,12 +13,17 @@ import contextlib
 import json
 import os
 import time
+from datetime import date, datetime, timedelta
+from datetime import time as dtime
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from pynteracta.cli.posts_event import event_write_block
 from pynteracta.cli.posts_write import to_write_values
 from pynteracta.client import InteractaClient
 from pynteracta.exceptions import InteractaError, NotFoundError
+from pynteracta.models.facade import ParticipationAnswer
 
 pytestmark = pytest.mark.integration
 
@@ -177,3 +182,127 @@ class TestPostsWriteIntegration:
         assert screen.screen_occ_token is not None
         assert screen.current_workflow_state is not None
         print(f"\n[T16] workflow screen: {screen.screen_data!r}")
+
+
+_EVENT_TITLE = "pynteracta event integration test - safe to delete"
+_EVENT_TITLE_EDITED = "pynteracta event integration test (edited) - safe to delete"
+_EVENT_TITLE_COPY = "pynteracta event integration test (copy) - safe to delete"
+_EVENT_LOCATION = "pynteracta test room A"
+_EVENT_LOCATION_EDITED = "pynteracta test room B"
+_ROME = ZoneInfo("Europe/Rome")
+_DELTA = 1
+
+
+class TestEventPostsWriteIntegration:
+    """Ciclo completo dei post evento (spec 08, 08-C24) in una community di prova.
+
+    Le stampe ``[T-manuale]`` servono al maintainer per il task manuale T16: evento dopo la
+    modifica, invitati come li restituisce il server, esito della partecipazione.
+    """
+
+    # criterio: 08-C24
+    def test_full_cycle(self, client: InteractaClient) -> None:  # noqa: PLR0915
+        community_id = int(_require_env("PYNTERACTA_TEST_EVENT_COMMUNITY_ID"))
+        invitee_id = int(_require_env("PYNTERACTA_TEST_USER_ID"))
+        client_uid = f"pynteracta-it-event-{int(time.time())}"
+        tomorrow = date.today() + timedelta(days=1)
+        start = datetime.combine(tomorrow, dtime(10, 0), tzinfo=_ROME)
+        end = datetime.combine(tomorrow, dtime(12, 0), tzinfo=_ROME)
+        created_ids: list[int] = []
+        with client:
+            try:
+                created = client.posts.create_event(
+                    community_id,
+                    start_at=start,
+                    end_at=end,
+                    location=_EVENT_LOCATION,
+                    invited_user_ids=[invitee_id],
+                    title=_EVENT_TITLE,
+                    description="Created by the event post integration test; safe to delete.",
+                    description_format=_PLAIN_TEXT,
+                    client_uid=client_uid,
+                )
+                post_id = created.post_id
+                assert post_id is not None
+                created_ids.append(post_id)
+                raw_post = created.raw.postData.root if created.raw.postData else None
+                print(
+                    f"\n[T-manuale] event in postData of the create response: "
+                    f"{raw_post.get('event') if isinstance(raw_post, dict) else None!r}"
+                )
+
+                found = client.posts.get_by_client_uid(client_uid)
+                assert found.id == post_id
+
+                form = client.posts.get_event_for_edit(post_id)
+                assert form.occ_token is not None
+                event = form.event
+                assert event is not None
+                assert event.start_at == start
+                content = form.content_data
+                print(
+                    f"[T-manuale] invitees as read: "
+                    f"{[(u.id, u.name, u.type_id) for u in event.invited_users]!r}"
+                )
+
+                edited = client.posts.edit_event(
+                    post_id,
+                    form.occ_token,
+                    title=_EVENT_TITLE_EDITED,
+                    description=content.descriptionDelta if content else None,
+                    description_format=_DELTA,
+                    visibility=content.visibility if content else None,
+                    start_at=event.start_at,
+                    end_at=event.end_at,
+                    all_day=event.all_day,
+                    location=_EVENT_LOCATION_EDITED,
+                    invited_user_ids=[invitee_id],
+                )
+                assert edited.next_occ_token is not None
+                after = client.posts.get_event_for_edit(post_id)
+                assert after.content_data is not None
+                assert after.content_data.title == _EVENT_TITLE_EDITED
+                assert after.event is not None
+                assert after.event.location == _EVENT_LOCATION_EDITED
+                assert after.event.timezone == "Europe/Rome"
+                event_root = after.content_data.event.root if after.content_data.event else None
+                print(f"[T-manuale] event after edit: {event_write_block(event_root)!r}")
+
+                client.posts.participate(post_id, ParticipationAnswer.YES)
+                answered = client.posts.get_event_for_edit(post_id).event
+                print(
+                    f"[T-manuale] after participate(YES): my_answer="
+                    f"{answered.my_answer if answered else None!r} participants="
+                    f"{answered.participants_count if answered else None!r}"
+                )
+
+                copy_form = client.posts.get_event_for_copy(post_id)
+                assert copy_form.occ_token is not None
+                copied = client.posts.copy_event(
+                    post_id,
+                    copy_form.occ_token,
+                    title=_EVENT_TITLE_COPY,
+                    description=content.descriptionDelta if content else None,
+                    description_format=_DELTA,
+                    visibility=content.visibility if content else None,
+                    start_at=start,
+                    end_at=end,
+                    location=_EVENT_LOCATION,
+                    invited_user_ids=[invitee_id],
+                )
+                assert copied.post_id is not None
+                assert copied.post_id != post_id
+                created_ids.append(copied.post_id)
+            except InteractaError as exc:
+                print(
+                    f"\n[T-manuale] {exc.request_method} {exc.request_url} failed "
+                    f"({exc.status_code}): {exc.response_body!r}"
+                )
+                raise
+            finally:
+                for created_id in reversed(created_ids):
+                    with contextlib.suppress(NotFoundError):
+                        client.posts.delete(created_id)
+            for created_id in created_ids:
+                with pytest.raises(NotFoundError):
+                    client.posts.get(created_id)

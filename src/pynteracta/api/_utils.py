@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
+from datetime import UTC, date, datetime, tzinfo
 from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
@@ -82,6 +83,82 @@ def zoned_datetime_input(value: datetime) -> dict[str, str]:
         value = value.astimezone(UTC)
         key = "UTC"
     return {"datetime": value.replace(tzinfo=None).isoformat(timespec="seconds"), "timezone": key}
+
+
+def _require_aware(value: datetime, name: str) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        msg = f"{name} must be a timezone-aware datetime"
+        raise ValueError(msg)
+
+
+def text_to_delta(text: str) -> str:
+    """Un testo semplice come delta di una riga (``[{"insert":"testo\\n"}]``), in JSON compatto.
+
+    Serve ai campi che il server accetta solo in formato delta, come le note di partecipazione.
+    """
+    return json.dumps([{"insert": f"{text}\n"}], separators=(",", ":"), ensure_ascii=False)
+
+
+def _date_only(value: date) -> str:
+    return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+
+
+def event_datetime_block(
+    start_at: date | None, end_at: date | None, *, all_day: bool = False
+) -> dict[str, Any]:
+    """Traduce inizio e fine di un evento nelle chiavi ``startAt``, ``endAt`` e ``timezone``.
+
+    Il fuso dell'evento è quello di ``start_at`` (di ``end_at`` se ``start_at`` manca): con un
+    fuso IANA (``ZoneInfo``) si invia il suo nome, con un offset fisso, che non ha un nome IANA,
+    si converte in UTC e si invia ``"UTC"``. L'altra data è convertita in quel fuso. Ogni data
+    viaggia come ``{"localDatetime": ...}`` senza offset. Compaiono solo le chiavi delle date
+    passate; senza date il risultato è ``{}``.
+
+    Con ``all_day`` le date viaggiano senza ora (``"2026-11-05"``, la data nel fuso del valore,
+    se ne ha uno) e ``timezone`` manca: il server rifiuta ora e fuso sugli eventi tutto il
+    giorno. Un ``date`` che non è un ``datetime`` vale solo con ``all_day``.
+
+    Raises:
+        ValueError: se una data passata non ha fuso, o è un ``date`` senza ``all_day``, prima
+            di qualunque chiamata.
+    """
+    if all_day:
+        block: dict[str, Any] = {}
+        if start_at is not None:
+            block["startAt"] = {"localDatetime": _date_only(start_at)}
+        if end_at is not None:
+            block["endAt"] = {"localDatetime": _date_only(end_at)}
+        return block
+    start = _require_datetime(start_at, "start_at")
+    end = _require_datetime(end_at, "end_at")
+    reference = start if start is not None else end
+    if reference is None:
+        return {}
+    key = getattr(reference.tzinfo, "key", None)
+    zone: tzinfo = (reference.tzinfo or UTC) if key is not None else UTC
+    if key is None:
+        key = "UTC"
+    block = {}
+    if start is not None:
+        block["startAt"] = {"localDatetime": _local_iso(start, zone)}
+    if end is not None:
+        block["endAt"] = {"localDatetime": _local_iso(end, zone)}
+    block["timezone"] = key
+    return block
+
+
+def _require_datetime(value: date | None, name: str) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, datetime):
+        msg = f"{name} is a date without time: pass a datetime, or all_day=True"
+        raise ValueError(msg)
+    _require_aware(value, name)
+    return value
+
+
+def _local_iso(value: datetime, zone: tzinfo) -> str:
+    return value.astimezone(zone).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
 @runtime_checkable

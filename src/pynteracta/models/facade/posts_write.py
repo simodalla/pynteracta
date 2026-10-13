@@ -12,23 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
-
+from pynteracta.models.facade._stubs import typed, typed_list
 from pynteracta.models.generated import external_v2 as generated
-
-
-def _typed[M: BaseModel](stub: object, model: type[M]) -> M | None:
-    """Rivalida uno stub ``RootModel`` (o un dict) nel modello tipizzato; ``None`` se vuoto."""
-    root = getattr(stub, "root", stub)
-    if isinstance(root, dict):
-        return model.model_validate(root)
-    return None
-
-
-def _typed_list[M: BaseModel](stubs: list[Any] | None, model: type[M]) -> list[M]:
-    """Rivalida una lista di stub; gli elementi non oggetto si scartano."""
-    items = (_typed(item, model) for item in stubs or [])
-    return [item for item in items if item is not None]
 
 
 class PostWriteResult:
@@ -49,7 +34,7 @@ class PostWriteResult:
         ),
     ) -> None:
         self.raw = raw
-        self._post = _typed(raw.postData, generated.PostDetailDTO1)
+        self._post = typed(raw.postData, generated.PostDetailDTO1)
 
     @property
     def post_id(self) -> int | None:
@@ -94,7 +79,7 @@ class PostForCreate:
 
     def __init__(self, raw: generated.GetCustomPostForCreateResponseDTO) -> None:
         self.raw = raw
-        self._content = _typed(raw.contentData, generated.PostEditableContentDataDTO1)
+        self._content = typed(raw.contentData, generated.PostEditableContentDataDTO1)
 
     @property
     def content_data(self) -> generated.PostEditableContentDataDTO1 | None:
@@ -116,8 +101,8 @@ class PostForEdit:
 
     def __init__(self, raw: generated.GetCustomPostForEditResponseDTO) -> None:
         self.raw = raw
-        self._content = _typed(raw.contentData, generated.PostEditableContentDataDTO1)
-        self._state = _typed(raw.currentWorkflowState, generated.PostWorkflowDefinitionStateDTO1)
+        self._content = typed(raw.contentData, generated.PostEditableContentDataDTO1)
+        self._state = typed(raw.currentWorkflowState, generated.PostWorkflowDefinitionStateDTO1)
 
     @property
     def occ_token(self) -> int | None:
@@ -159,7 +144,7 @@ class PostForCopy:
 
     def __init__(self, raw: generated.GetCustomPostForCopyResponseDTO) -> None:
         self.raw = raw
-        self._content = _typed(raw.contentData, generated.PostEditableContentDataDTO1)
+        self._content = typed(raw.contentData, generated.PostEditableContentDataDTO1)
 
     @property
     def occ_token(self) -> int | None:
@@ -186,9 +171,9 @@ class PostComment:
 
     def __init__(self, raw: generated.CreatePostCommentResponseDTO) -> None:
         self.raw = raw
-        self._comment = _typed(raw.comment, generated.PostCommentDTO1)
+        self._comment = typed(raw.comment, generated.PostCommentDTO1)
         self._creator = (
-            _typed(self._comment.creatorUser, generated.UserDTOModel)
+            typed(self._comment.creatorUser, generated.UserDTOModel)
             if self._comment is not None
             else None
         )
@@ -255,12 +240,12 @@ class PostAttachmentsWriteResult:
     @property
     def added(self) -> list[generated.PostAttachmentDataDTO1]:
         """Allegati aggiunti."""
-        return _typed_list(self.raw.addedAttachments, generated.PostAttachmentDataDTO1)
+        return typed_list(self.raw.addedAttachments, generated.PostAttachmentDataDTO1)
 
     @property
     def updated(self) -> list[generated.PostAttachmentDataDTO1]:
         """Allegati aggiornati."""
-        return _typed_list(self.raw.updatedAttachments, generated.PostAttachmentDataDTO1)
+        return typed_list(self.raw.updatedAttachments, generated.PostAttachmentDataDTO1)
 
     @property
     def removed_ids(self) -> list[int]:
@@ -282,8 +267,8 @@ class WorkflowScreen:
 
     def __init__(self, raw: generated.GetPostWorkflowScreenDataForEditResponseDTO) -> None:
         self.raw = raw
-        self._screen = _typed(raw.screen, generated.WorkflowDefinitionScreenDTO1)
-        self._state = _typed(raw.currentWorkflowState, generated.PostWorkflowDefinitionStateDTO1)
+        self._screen = typed(raw.screen, generated.WorkflowDefinitionScreenDTO1)
+        self._state = typed(raw.currentWorkflowState, generated.PostWorkflowDefinitionStateDTO1)
 
     @property
     def screen_data(self) -> dict[str, Any]:
@@ -320,7 +305,7 @@ class WorkflowOperationResult:
 
     def __init__(self, raw: generated.ExecutePostWorkflowOperationResponseDTO) -> None:
         self.raw = raw
-        self._state = _typed(raw.newCurrentState, generated.PostWorkflowDefinitionStateDTO1)
+        self._state = typed(raw.newCurrentState, generated.PostWorkflowDefinitionStateDTO1)
 
     @property
     def new_current_state(self) -> generated.PostWorkflowDefinitionStateDTO1 | None:
@@ -335,7 +320,7 @@ class WorkflowOperationResult:
     @property
     def new_permitted_operations(self) -> list[generated.PostWorkflowDefinitionTransitionDTO1]:
         """Transizioni permesse dal nuovo stato."""
-        return _typed_list(
+        return typed_list(
             self.raw.newCurrentWorkflowPermittedOperations,
             generated.PostWorkflowDefinitionTransitionDTO1,
         )

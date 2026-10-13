@@ -79,6 +79,14 @@ from pynteracta.models.facade.posts import (
     PostList,
     VisibilityResult,
 )
+from pynteracta.models.facade.posts_event import (
+    EventData,
+    EventInvitee,
+    EventPostForCopy,
+    EventPostForCreate,
+    EventPostForEdit,
+    ParticipationAnswer,
+)
 from pynteracta.models.facade.tasks import (
     SubTask,
     Task,
@@ -112,6 +120,11 @@ __all__ = [
     "CommunityList",
     "CreateAccessTokenByServiceAccountRequestDTO",
     "CurrentUserResponse",
+    "EventData",
+    "EventInvitee",
+    "EventPostForCopy",
+    "EventPostForCreate",
+    "EventPostForEdit",
     "FieldEnumValue",
     "FieldType",
     "FilterType",
@@ -135,6 +148,7 @@ __all__ = [
     "ListPostDefinitionCatalogEntriesRequestDTO",
     "ListPostHistoryEventsRequestDTO",
     "ListSystemUsersRequestDTO",
+    "ParticipationAnswer",
     "Post",
     "PostAttachment",
     "PostAttachmentList",

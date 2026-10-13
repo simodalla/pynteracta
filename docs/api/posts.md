@@ -1,7 +1,8 @@
 # Posts
 
 `client.posts` reads posts (detail, lists, comments, history, visibility) and writes **custom
-posts** (type 1), comments and workflow data. Event posts (type 2) are read-only for now.
+posts** (type 1), comments and workflow data, and **event posts** (type 2): create, edit, copy and
+the answer to the invitation (see [Event posts](#event-posts)).
 
 ## Writing posts
 
@@ -172,6 +173,157 @@ every read afterwards). `mark_as_erasable()` also marks it for future physical e
 response carries `postId: 0` on the tenants observed so far, and the method returns that value
 as is. The CLI reports the id you asked for.
 
+## Event posts
+
+Event posts have their own create, edit and copy endpoints, a form read for each, and the answer
+to the invitation. The event block is built from flat keyword arguments: dates, time zone,
+all-day flag, location and invitees. The same rules as for custom posts apply: only the fields
+you pass are sent, one request per call, a `409` raised as `ConcurrencyError` and never retried.
+Watchers, attachments, delete, mark-as-erasable and comments of an event post use the methods
+above (`edit_watchers()`, `edit_attachments()`, `delete()`, …): the endpoints are the same for
+every post type.
+
+```python
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+from pynteracta.client import InteractaClient
+from pynteracta.models.facade import ParticipationAnswer
+
+rome = ZoneInfo("Europe/Rome")
+
+with InteractaClient(base_url="https://tenant.example.com", credentials=...) as client:
+    created = client.posts.create_event(
+        79,
+        start_at=datetime(2026, 11, 5, 10, 0, tzinfo=rome),
+        end_at=datetime(2026, 11, 5, 12, 0, tzinfo=rome),
+        location="Room A",
+        invited_user_ids=[1042],  # no invitation_type_id: guests
+        title="Quarterly review",
+        description="Agenda in the attachment.",
+        description_format=2,
+        client_uid="review-2026-q4",
+    )
+
+    form = client.posts.get_event_for_edit(created.post_id)
+    event = form.event  # EventData, or None if the server returns no event block
+    content = form.content_data
+    print(form.occ_token, event.start_at, event.timezone, event.location, event.my_answer)
+
+    # The server replaces the post: send back everything that must survive.
+    client.posts.edit_event(
+        created.post_id,
+        form.occ_token,
+        title=content.title,
+        description=content.descriptionDelta,
+        description_format=1,
+        visibility=content.visibility,
+        start_at=event.start_at,
+        end_at=event.end_at,
+        location="Room B",
+        invited_user_ids=[1042],  # the form does not return the invitees
+    )
+    client.posts.participate(created.post_id, ParticipationAnswer.YES, notes="Arriving late")
+
+    copy_form = client.posts.get_event_for_copy(created.post_id)
+    copied = client.posts.copy_event(
+        created.post_id,
+        copy_form.occ_token,
+        title="Quarterly review (Q1)",
+        visibility=copy_form.content_data.visibility,
+        start_at=datetime(2027, 2, 4, 10, 0, tzinfo=rome),
+        end_at=datetime(2027, 2, 4, 12, 0, tzinfo=rome),
+        location="Room A",
+        invited_user_ids=[1042],
+    )
+
+    holiday = client.posts.create_event(
+        79,
+        start_at=date(2026, 12, 24),
+        end_at=date(2026, 12, 26),
+        all_day=True,  # dates only, no time zone
+        location="Everywhere",
+        invited_group_ids=[3],
+        title="Office closed",
+    )
+```
+
+| Method | Endpoint | Returns |
+|---|---|---|
+| `get_event_for_create(community_id)` | `GET …/event-post-data-for-create/{communityId}` | `EventPostForCreate` |
+| `get_event_for_edit(post_id, load_attachments=None)` | `GET …/event-post-data-for-edit/{postId}` | `EventPostForEdit` (with `occ_token` and `event`) |
+| `get_event_for_copy(post_id, load_attachments=None)` | `GET …/event-post-data-for-copy/{postId}` | `EventPostForCopy` (with `occ_token` and `event`) |
+| `create_event(community_id, *, start_at, …)` / `create_event_raw` | `POST …/create-event-post/{communityId}` | `PostWriteResult` |
+| `edit_event(post_id, occ_token, …)` / `edit_event_raw` | `PUT …/edit-event-post/{postId}/{occToken}` | `PostWriteResult` |
+| `copy_event(post_id, occ_token, …)` / `copy_event_raw` | `PUT …/copy-event-post/{postId}/{occToken}` | `PostWriteResult` (the **new** post) |
+| `participate(post_id, answer, notes=None)` / `participate_raw` | `PUT …/post-event/{postId}/partecipate` | `None` |
+
+### Dates and time zone
+
+`start_at` (required by `create_event()`) and `end_at` are timezone-aware `datetime` objects; a
+naive one raises `ValueError` before any request. The library sends each date as a local
+date-time without offset (`"startAt": {"localDatetime": "2026-11-05T10:00:00"}`) plus the IANA
+name of the zone of `start_at` in `event.timezone`; `end_at` is converted into that zone. With a
+fixed offset (no IANA name) both are converted to UTC and `"UTC"` is sent. In `edit_event()` and
+`copy_event()`, where `start_at` is optional, the zone comes from `end_at` when `start_at` is
+missing. Without a time zone the server falls back to its own (`Europe/Paris` on the tested
+tenant).
+
+All-day events take dates only: with `all_day=True` the dates are sent as `"2026-11-05"`, with
+no `timezone` key, the only form the server accepts (a time or a time zone is rejected with
+`400`). `start_at` and `end_at` can then be `date` objects, or `datetime` objects whose date is
+taken in their own zone; a plain `date` without `all_day=True` raises `ValueError`.
+
+`EventData.start_at` and `end_at` are read in the event's IANA zone (`localDatetime` plus
+`timezone`), so passing them back to `edit_event()` keeps the event where it is; without a
+usable zone they come from `zonedDatetime` (a fixed offset). For all-day events they are `date`
+objects. They are `None` when nothing can be read.
+
+### Invitees and answers
+
+`invited_user_ids` and `invited_group_ids` become `event.invitations.users` and `.groups`, as
+`{"id": N}` items; with `invitation_type_id` every item also gets `"typeId"` (`0` guest, `2`
+collaborator). Without it the server treats the invitees as guests. The server requires
+invitees on create, edit and copy, and at least one guest among them: no invitees, or
+collaborators only, are rejected with `400 REQUIRED_FIELD event.inivations` (the misspelling is
+the server's). Different types per invitee need the `*_raw` variant with a prebuilt DTO.
+`send_edit_post_notifications=True` notifies the invitees when the post is edited.
+`EventData.invited_users` and `invited_groups` list `EventInvitee` objects (`id`, `name`,
+`type_id`, `.raw`), but the tested tenant returns them empty in the forms: keep the invitee ids
+on your side and pass them again when you edit or copy.
+
+`participate()` records the answer of the authenticated identity: the technical identity with a
+service account (accepted even when it is not invited), the linked user with Google OAuth2.
+`answer` is a `ParticipationAnswer` (`YES = 1`, `MAYBE = 2`, `NO = 3`) or its integer value;
+anything else raises `ValueError` before the request. `notes` is plain text, sent as a one-line
+Quill delta (`[{"insert":"Arriving late\n"}]`) because the server rejects plain text;
+`participate_raw()` sends a prebuilt delta as it is. `EventData.my_answer` is the answer
+already given, `None` if there is none. The server answers `404` (`NotFoundError`) for a post
+that does not exist or is not an event.
+
+### Cover image, watcher groups and pinning
+
+`cover_image_content_ref` is the `contentRef` of an image uploaded with
+`client.attachments.upload()` (see [Uploading files](attachments.md#uploading-files)).
+`watcher_group_ids` (create) and `add_watcher_group_ids` / `remove_watcher_group_ids` (edit,
+copy) work like their user counterparts. `pinned=None` leaves the pin as it is. `link_preview`
+is sent as given, in the shape of `LinkPreviewDTO`.
+
+### Omitted fields in `edit_event()` and `copy_event()`
+
+Only the fields you pass are sent, and inside `event` only the keys you pass, but the server
+treats edit and copy as a **replacement** of the post, as for custom posts:
+
+- `event` is required, and so are `title`, `event.endAt`, `event.location` and the invitees
+  (`400 REQUIRED_FIELD`); `create_event()` requires `event.endAt` and `event.location` too;
+- without `visibility` the server answers `500` with no body;
+- an omitted description is cleared, an omitted `event.timezone` becomes the server's default.
+
+So read the post with `get_event_for_edit()` (or `get_event_for_copy()`) and send back every
+field that must survive, as in the example above. The CLI commands `posts edit-event` and
+`posts copy-event` do this for you, except for the invitees. Write responses carry the post in
+`postData` without the `event` block: read the form again to see the event as saved.
+
 ## API Reference
 
 ::: pynteracta.api.posts
@@ -180,6 +332,10 @@ as is. The CLI reports the id you asked for.
         - PostsAPI
 
 ::: pynteracta.api.posts_write.PostsWriteAPI
+    options:
+      show_source: false
+
+::: pynteracta.api.posts_event.PostsEventAPI
     options:
       show_source: false
 
@@ -198,3 +354,14 @@ as is. The CLI reports the id you asked for.
         - WorkflowScreen
         - WorkflowOperationResult
         - WorkflowScreenWriteResult
+
+::: pynteracta.models.facade.posts_event
+    options:
+      show_source: false
+      members:
+        - EventData
+        - EventInvitee
+        - EventPostForCreate
+        - EventPostForEdit
+        - EventPostForCopy
+        - ParticipationAnswer

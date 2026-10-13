@@ -70,6 +70,7 @@ PYNTERACTA_TEST_POST_ID=789
 PYNTERACTA_TEST_WRITE_POST_ID=790
 PYNTERACTA_TEST_WRITE_COMMUNITY_ID=124
 PYNTERACTA_TEST_WORKFLOW_POST_ID=791
+PYNTERACTA_TEST_EVENT_COMMUNITY_ID=125
 ```
 
 `PYNTERACTA_TEST_WRITE_POST_ID` enables the **write** integration test (create → edit → delete of a
@@ -87,6 +88,13 @@ generated file, creates a post with it, uploads a second file as a new version o
 removes it, and deletes the post at the end (also when a step fails).
 `PYNTERACTA_TEST_WORKFLOW_POST_ID` (optional) points at a post with a workflow:
 the test only reads its workflow screen and never executes a transition.
+
+`PYNTERACTA_TEST_EVENT_COMMUNITY_ID` enables the **event post write** integration test: it creates
+an event post for tomorrow in that community, inviting `PYNTERACTA_TEST_USER_ID`, reads and edits
+it, answers the invitation, copies it, and deletes both posts at the end (also when a step
+fails). Use a **test community** that allows event posts, never a production one. The test
+prints `[T-manuale]` lines with what the server returned (the event after the edit, the invitees,
+the answer).
 
 The **group write** integration test (create → edit → add and remove a member → delete, also
 when a step fails) runs with the variables above and `PYNTERACTA_TEST_USER_ID`, the user it adds

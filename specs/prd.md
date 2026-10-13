@@ -20,9 +20,10 @@ Ha inoltre due usi voluti: essere la libreria che gli strumenti di *vibe coding*
 programmazione assistita) usano per lavorare con Interacta, quindi con un'API tipizzata, uniforme e
 documentata che un agente possa scoprire e comporre; ed essere la base di un **server MCP non
 ufficiale per Interacta**, che ne esporrà le operazioni come strumenti.
-La superficie è sincrona. Alla versione 0.9.4 è di sola lettura; con
-[ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post e commenti,
-task, anagrafiche admin, upload di allegati) entrano nell'ambito e arrivano con le prossime spec.
+La superficie è sincrona. Fino alla versione 0.9.4 era di sola lettura; con
+[ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post, post evento e
+commenti, task, anagrafiche admin, upload di allegati) sono entrate nell'ambito e le spec dalla 02
+alla 08 le hanno realizzate tutte: la superficie di scrittura dell'ADR è completa.
 
 ## 2. Attori e ruoli
 
@@ -106,8 +107,10 @@ Confermato dal maintainer il 2026-10-08.
 
 Scritture, decise con [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md): ogni spec
 che le realizza ne precisa i dettagli (RF-022 dalla [spec 02](02-task-write/spec.md), 0.10.0;
-RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md); RF-024
-dalla [spec 04](04-attachment-upload/spec.md); le altre non ancora implementate). Stessa forma
+RF-021 per i post custom, i commenti e il workflow dalla [spec 03](03-post-write/spec.md) e per i
+post evento dalla [spec 08](08-event-post-write/spec.md); RF-024 dalla
+[spec 04](04-attachment-upload/spec.md); RF-023 dalle [spec 05](05-admin-users-groups/spec.md) e
+[06](06-admin-catalogs-workspace/spec.md)). Stessa forma
 delle letture (façade con `.raw`, kwargs espliciti
 più `*_raw`, comando CLI, test unit e contract).
 
@@ -116,7 +119,8 @@ più `*_raw`, comando CLI, test unit e contract).
   marcatura per cancellazione, risposta di partecipazione a un evento, creazione di commenti; con
   gli helper di lettura propedeutici (`post-data-for-create|edit|copy`, `event-post-data-for-*`,
   `post-workflow-screen-data-for-edit`). La spec 03 realizza i post custom, i commenti e il
-  workflow; i post evento restano da fare. *(Confermato dal maintainer il 2026-10-10, spec 03.)*
+  workflow; la spec 08 i post evento. *(Confermato dal maintainer il 2026-10-10, spec 03, e il
+  2026-10-13, spec 08.)*
   - RF-021a. Le letture propedeutiche `get_for_create`, `get_for_edit`, `get_for_copy` sono
     esposte come letture e restituiscono `occ_token` (dove il server lo dà) e i dati editabili;
     `edit`, `edit_custom_data` e `copy` ricevono l'`occ_token` dal chiamante. *(Spec 03.)*
@@ -133,6 +137,28 @@ più `*_raw`, comando CLI, test unit e contract).
     della CLI traducono i valori letti che rimandano. `edit-post` e `copy-post` sostituiscono il
     post: la descrizione omessa conta come vuota. *(Spec 03, verificato sul tenant il
     2026-10-09.)*
+  - RF-021e. Post evento: `create_event`, `edit_event`, `copy_event`, `participate` e le letture
+    `get_event_for_create|edit|copy` stanno su `client.posts` con un kwarg per campo del DTO; il
+    blocco `event` lo compone la libreria; `start_at` ed `end_at` sono `datetime` con fuso,
+    inviati come data-ora locale più il nome IANA del fuso di `start_at` (RNF-010), o sole date
+    senza fuso per gli eventi `all_day`; in lettura (`EventData`) sono nel fuso dell'evento, e
+    `date` per gli eventi tutto il giorno; gli invitati si passano per id con un tipo unico
+    facoltativo; la risposta di partecipazione è `ParticipationAnswer` (sì 1, forse 2, no 3), con
+    le note in testo inviate come delta, e vale per l'identità autenticata (anche il service
+    account, anche se non invitato). Il server sostituisce il post in modifica e copia: titolo,
+    visibilità, fine, luogo e invitati sono obbligatori, la descrizione omessa conta come vuota,
+    il fuso omesso diventa quello del server; gli invitati sono obbligatori con almeno un ospite
+    (`typeId` 0 o omesso) e la lettura propedeutica non li restituisce. La libreria non aggiunge
+    nulla da sola: lo dice la documentazione. *(Spec 08, verificato sul tenant il 2026-10-13.)*
+  - RF-021f. In CLI: `posts create-event|edit-event|copy-event|participate|
+    get-event-for-create|get-event-for-edit|get-event-for-copy`. `edit-event` e `copy-event`
+    sono patch che rileggono il form evento e rimandano titolo, descrizione, visibilità,
+    copertina e il blocco `event` ripulito dai campi di sola lettura, con gli invitati tradotti
+    in `{id, typeId}`; gli invitati, che la lettura non restituisce, si ripassano con
+    `--invite-user`/`--invite-group`; `--start`/`--end` accettano data-ora o sola data nel fuso
+    di `--timezone` (in `edit-event`, per default quello dell'evento letto), e con `allDay` nel
+    blocco unito diventano sole date senza fuso; `--cover` carica la copertina (RF-024a). *(Spec
+    08.)*
 - RF-022. Task: creazione, modifica, eliminazione. La libreria invia solo i campi passati, in una
   sola richiesta; `edit` riceve l'`occToken` dal chiamante. Il server tratta la modifica come una
   sostituzione (i campi omessi sono azzerati, tranne watcher e allegati, che hanno coppie
@@ -256,10 +282,12 @@ più `*_raw`, comando CLI, test unit e contract).
   negoziabile): una scrittura che fallisce in modo incerto (timeout, errore di rete) non si ritenta
   da sola, l'errore risale al chiamante con esito sconosciuto; un futuro retry/backoff vale solo
   per le letture. *(Confermato dal maintainer il 2026-10-08, spec 02.)*
-- RNF-010. Le date-ora di scrittura (`expiration`) accettano solo `datetime` con fuso orario e
-  arrivano al server come data-ora locale più nome IANA del fuso (offset fisso → UTC); la CLI
-  interpreta i valori senza offset nel fuso `--timezone` (predefinito `Europe/Rome`). *(Spec 02,
-  2026-10-08.)*
+- RNF-010. Le date-ora di scrittura (`expiration`, `scheduled_publication`, inizio e fine degli
+  eventi) accettano solo `datetime` con fuso orario e arrivano al server come data-ora locale più
+  nome IANA del fuso (offset fisso → UTC); la CLI interpreta i valori senza offset nel fuso
+  `--timezone` (predefinito `Europe/Rome`). Eccezione: gli eventi tutto il giorno viaggiano come
+  sole date senza fuso, l'unica forma che il server accetta. *(Spec 02, 2026-10-08; confermato
+  dal maintainer per gli eventi il 2026-10-13, spec 08.)*
 - RNF-011. Il contenuto dei file caricati non compare mai in log, audit log né hook, neppure con
   `audit_log_bodies`: la richiesta allo storage è registrata con URL e stato, senza corpo, e non
   porta il token Interacta. *(Spec 04, 2026-10-10.)*
@@ -306,7 +334,10 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
   spec 05.)* Cataloghi e voci (spec 06): nomi e label per lingua, external id e
   parent, dati non personali; il workspace: nome, traduzioni, descrizione, id di utenti, gruppi
   e ruoli aggiunti o tolti, e i file di copertina e logo, che passano dallo storage temporaneo
-  come gli allegati. *(Confermato dal maintainer il 2026-10-12, spec 06.)*
+  come gli allegati. *(Confermato dal maintainer il 2026-10-12, spec 06.)* Post evento (spec 08): oltre ai
+  contenuti dei post, date, fuso e luogo dell'evento, id di utenti e gruppi invitati, risposta
+  di partecipazione e note dell'identità autenticata. *(Confermato dal maintainer il 2026-10-13,
+  spec 08.)*
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
@@ -350,3 +381,8 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
   cataloghi, voci e workspace, 0.13.0): RF-023 precisato con la semantica verificata sul tenant
   e con la versione della spec 05 corretta in 0.12.0; nuovi RF-023e e RF-023f; RF-023, RF-008,
   RF-013, RF-019 e la voce "Dati scritti sul tenant" di §6 confermati dal maintainer.
+- 2026-10-13: [spec 08](08-event-post-write/spec.md) (scrittura dei post evento, 0.14.0): nuovi
+  RF-021e e RF-021f con la semantica verificata sul tenant; RF-021 aggiornato (post evento
+  realizzati); §1 con la superficie di scrittura dell'ADR 0001 completa; RNF-010 esteso alle date
+  degli eventi; RF-021, RNF-010 e la voce "Dati scritti sul tenant" di §6 confermati dal
+  maintainer per la parte degli eventi.

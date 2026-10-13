@@ -100,12 +100,13 @@ pynteracta --version
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). One facade per response with
   a `.raw` escape hatch to the generated DTO.
 - **Write operations** — `tasks` create/edit/delete, custom `posts` (create, edit, copy,
-  custom data, watchers, attachments, delete, mark-as-erasable, comments, workflow), admin
+  custom data, watchers, attachments, delete, mark-as-erasable, comments, workflow), event posts
+  (create, edit, copy, answer to the invitation), admin
   `users` (create, edit, delete, credentials), admin `groups` (create, edit, delete, members),
   admin `catalogs` and catalog entries (create, edit, logical delete, restore) and the admin
   workspace edit (name, description, members, roles, cover and logo), with explicit kwargs and `*_raw` variants in the library and `tasks …` / `posts …` / `users …` /
   `groups …` / `catalogs …` / `admin-manage edit-workspace` write commands in the CLI (confirmation on destructive commands, exit code `9` on
-  `occToken` conflicts, no automatic retry of uncertain writes). Event posts follow.
+  `occToken` conflicts, no automatic retry of uncertain writes).
 - **Attachment upload** — `client.attachments.upload()` and `--attach` / `attachments upload` /
   `posts edit-attachments` in the CLI; the uploaded file is attached to posts, comments and
   tasks, with no Interacta token sent to the storage and signed links redacted from logs.

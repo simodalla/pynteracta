@@ -42,6 +42,11 @@ from pynteracta.models.facade.communities import (
 )
 from pynteracta.models.facade.groups import GroupMembersResult, GroupWriteResult
 from pynteracta.models.facade.posts import Post, PostCommentList, PostList
+from pynteracta.models.facade.posts_event import (
+    EventPostForCopy,
+    EventPostForCreate,
+    EventPostForEdit,
+)
 from pynteracta.models.facade.posts_write import (
     PostComment,
     PostForEdit,
@@ -1498,3 +1503,139 @@ class TestAdminCatalogsWorkspaceWriteDTOs:
         workspace = WorkspaceForEdit.from_dict(load_payload("edit_workspace_response.json"))
         assert workspace.id == _WORKSPACE_ID_CONTRACT
         assert workspace.occ_token == _WORKSPACE_NEXT_OCC_TOKEN_CONTRACT
+
+
+# ---------------------------------------------------------------------------
+# Spec 08: scrittura dei post evento
+# ---------------------------------------------------------------------------
+
+_EVENT_REQUEST_DTOS = [
+    ("CreateEventPostRequestDTO", generated.CreateEventPostRequestDTO),
+    ("EditEventPostRequestDTO", generated.EditEventPostRequestDTO),
+    ("CopyEventPostRequestDTO", generated.CopyEventPostRequestDTO),
+    ("EditPostEventPartecipateRequestDTO", generated.EditPostEventPartecipateRequestDTO),
+]
+_EVENT_RESPONSE_DTOS = [
+    ("GetEventPostForCreateResponseDTO", generated.GetEventPostForCreateResponseDTO),
+    ("GetEventPostForEditResponseDTO", generated.GetEventPostForEditResponseDTO),
+    ("GetEventPostForCopyResponseDTO", generated.GetEventPostForCopyResponseDTO),
+]
+_EVENT_TYPED_STUBS = [
+    ("EventPostEditableContentDataDTO", generated.EventPostEditableContentDataDTOModel),
+    ("EventPostDataDTO", generated.EventPostDataDTOModel),
+    ("EventDatetimeDTO", generated.EventDatetimeDTO),
+    ("EventPostInvitationsDataDTO", generated.EventPostInvitationsDataDTO1),
+    ("InvitationUserDTO", generated.InvitationUserDTO1),
+    ("InvitationGroupDTO", generated.InvitationGroupDTO1),
+]
+_EVENT_FIXTURES = [
+    ("create_event_post_response.json", generated.CreatePostResponseDTO),
+    ("edit_event_post_response.json", generated.EditPostResponseDTO),
+    ("copy_event_post_response.json", generated.CopyPostResponseDTO),
+    ("event_post_for_create_response.json", generated.GetEventPostForCreateResponseDTO),
+    ("event_post_for_edit_response.json", generated.GetEventPostForEditResponseDTO),
+    ("event_post_for_copy_response.json", generated.GetEventPostForCopyResponseDTO),
+]
+_COLLABORATOR_TYPE_ID_CONTRACT = 2
+_EVENT_CONTENT_FIXTURES = [
+    "event_post_for_create_response.json",
+    "event_post_for_edit_response.json",
+    "event_post_for_copy_response.json",
+]
+
+
+class TestEventPostDTOs:
+    # criterio: 08-C22
+    @pytest.mark.parametrize(("definition", "model"), _EVENT_REQUEST_DTOS)
+    def test_request_dto_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(("definition", "model"), _EVENT_RESPONSE_DTOS)
+    def test_response_dto_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(swagger_definitions, definition, model)
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(("definition", "model"), _EVENT_TYPED_STUBS)
+    def test_typed_stub_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        definition: str,
+        model: type,
+    ) -> None:
+        assert_superset(
+            swagger_definitions, definition, model, note="typed variant of RootModel stub"
+        )
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(("fixture", "model"), _EVENT_FIXTURES)
+    def test_response_fixtures_parse(self, fixture: str, model: type) -> None:
+        assert model.model_validate(load_payload(fixture)) is not None  # type: ignore[attr-defined]
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize("fixture", _EVENT_CONTENT_FIXTURES)
+    def test_content_fixtures_nested_typed(self, fixture: str) -> None:
+        content = generated.EventPostEditableContentDataDTOModel.model_validate(
+            load_payload(fixture)["contentData"]
+        )
+        if content.event is None:
+            return
+        event = generated.EventPostDataDTOModel.model_validate(content.event.root)
+        assert event.startAt is not None
+        assert generated.EventDatetimeDTO.model_validate(event.startAt.root).zonedDatetime
+        assert event.invitations is not None
+        invitations = generated.EventPostInvitationsDataDTO1.model_validate(event.invitations.root)
+        assert invitations.users is not None
+        assert invitations.groups is not None
+        assert (
+            generated.InvitationUserDTO1.model_validate(invitations.users[0].root).typeId
+            == _COLLABORATOR_TYPE_ID_CONTRACT
+        )
+        assert generated.InvitationGroupDTO1.model_validate(invitations.groups[0].root).typeId == 0
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(
+        ("fixture", "facade"),
+        [
+            ("event_post_for_create_response.json", EventPostForCreate),
+            ("event_post_for_edit_response.json", EventPostForEdit),
+            ("event_post_for_copy_response.json", EventPostForCopy),
+        ],
+    )
+    def test_facade_smoke(self, fixture: str, facade: type) -> None:
+        form = facade.from_dict(load_payload(fixture))  # type: ignore[attr-defined]
+        assert form.content_data is not None
+        if facade is not EventPostForCreate:
+            assert form.occ_token is not None
+            assert form.event is not None
+            assert form.event.start_at is not None
+            assert form.event.invited_users
+
+    # criterio: 08-C22
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "create_event_post_response.json",
+            "edit_event_post_response.json",
+            "copy_event_post_response.json",
+        ],
+    )
+    def test_facade_raw_accessible(self, fixture: str) -> None:
+        result = PostWriteResult.from_edit(load_payload(fixture))
+        assert result.raw is not None
+        assert result.post is not None
+        assert result.next_occ_token is not None
+        form = EventPostForEdit.from_dict(load_payload("event_post_for_edit_response.json"))
+        assert isinstance(form.raw, generated.GetEventPostForEditResponseDTO)
+        assert form.event is not None
+        assert isinstance(form.event.raw, generated.EventPostDataDTOModel)

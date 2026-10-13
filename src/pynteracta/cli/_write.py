@@ -99,6 +99,30 @@ def parse_zoned_datetime(value: str | None, timezone: str, *, option: str) -> di
     return zoned_datetime_input(parsed)
 
 
+def parse_event_datetime(value: str | None, timezone: str, *, option: str) -> datetime | None:
+    """Una data o data-ora ISO 8601 della CLI → ``datetime`` con fuso, per le date degli eventi.
+
+    ``YYYY-MM-DD`` vale mezzanotte; senza offset il valore è letto nel fuso ``timezone``; con un
+    offset il fuso è ignorato e l'offset resta. La traduzione nel blocco ``event`` la fa
+    :func:`~pynteracta.api._utils.event_datetime_block`. Valore non ISO o fuso sconosciuto →
+    messaggio (con il nome di ``option`` o ``--timezone``) ed ``EXIT_CONFIG``.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        typer.echo(f"{option}: not an ISO 8601 date or date-time: {value!r}.", err=True)
+        raise typer.Exit(EXIT_CONFIG) from exc
+    if parsed.tzinfo is None:
+        try:
+            parsed = parsed.replace(tzinfo=ZoneInfo(timezone))
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            typer.echo(f"--timezone: unknown IANA time zone {timezone!r}.", err=True)
+            raise typer.Exit(EXIT_CONFIG) from exc
+    return parsed
+
+
 def merge_body(json_body: dict[str, Any], **flags: Any) -> dict[str, Any]:
     """Unisce il corpo di ``--json`` con i flag: un flag passato sostituisce la sua chiave."""
     merged = dict(json_body)
