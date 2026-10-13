@@ -337,17 +337,28 @@ class UploadedAttachment:
 
     Si passa direttamente agli ``attachments`` (o ``add_attachments``, ``add``) dei metodi di
     scrittura di post, commenti e task, che lo inviano come ``{name, contentRef}``; per caricare
-    una nuova versione di un allegato esistente si usa :meth:`as_version_of`.
+    una nuova versione di un allegato esistente si usa :meth:`as_version_of`. Con
+    ``downloadable`` indicato (spec 09) i due riferimenti portano anche ``"downloadable"``, che il
+    server prevede negli allegati dei post custom ed evento; senza, decide il server (default
+    scaricabile).
 
     Attributes:
         raw: Il ``GetTemporaryImageUploadUrlBaseResponseDTO`` del primo passo.
     """
 
-    def __init__(self, ticket: UploadTicket, *, name: str, mime_type: str) -> None:
+    def __init__(
+        self,
+        ticket: UploadTicket,
+        *,
+        name: str,
+        mime_type: str,
+        downloadable: bool | None = None,
+    ) -> None:
         self.raw = ticket.raw
         self._ticket = ticket
         self._name = name
         self._mime_type = mime_type
+        self._downloadable = downloadable
 
     @property
     def content_ref(self) -> str | None:
@@ -369,13 +380,26 @@ class UploadedAttachment:
         """URL firmato da cui rileggere il file caricato."""
         return self._ticket.temporary_download_url
 
+    @property
+    def downloadable(self) -> bool | None:
+        """Se l'allegato sarà scaricabile; ``None`` se non indicato al caricamento."""
+        return self._downloadable
+
     def as_write_input(self) -> dict[str, Any]:
-        """Il riferimento da allegare: ``{"name", "contentRef"}``."""
-        return {"name": self._name, "contentRef": self.content_ref}
+        """Il riferimento da allegare: ``{"name", "contentRef"}``, con ``downloadable`` se dato."""
+        return self._with_downloadable({"name": self._name, "contentRef": self.content_ref})
 
     def as_version_of(self, attachment_id: int) -> dict[str, Any]:
         """Il riferimento come nuova versione dell'allegato ``attachment_id``.
 
-        Va in ``update_attachments`` (o ``update`` di ``edit_attachments``).
+        Va in ``update_attachments`` (o ``update`` di ``edit_attachments``); porta
+        ``downloadable`` se indicato.
         """
-        return {"attachmentId": attachment_id, "contentRef": self.content_ref, "name": self._name}
+        return self._with_downloadable(
+            {"attachmentId": attachment_id, "contentRef": self.content_ref, "name": self._name}
+        )
+
+    def _with_downloadable(self, ref: dict[str, Any]) -> dict[str, Any]:
+        if self._downloadable is not None:
+            ref["downloadable"] = self._downloadable
+        return ref

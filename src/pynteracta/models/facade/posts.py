@@ -54,6 +54,16 @@ class Post:
         return self.raw.lastModifyTimestamp
 
     @property
+    def draft(self) -> bool | None:
+        """Stato bozza (``True``) o pubblicato (``False``); ``None`` se il server non lo manda."""
+        return self.raw.draft
+
+    @property
+    def publication_timestamp(self) -> int | None:
+        """Timestamp UTC di pubblicazione (epoch in millisecondi); ``None`` se assente."""
+        return self.raw.publicationTimestamp
+
+    @property
     def comments_count(self) -> int | None:
         """Number of comments on this post."""
         return self.raw.commentsCount

@@ -32,6 +32,7 @@ _EPOCH_2025_01_02 = 1735776000000
 
 
 class TestPostsGet:
+    # criterio: 09-C09
     @respx.mock
     def test_table_output(self, runner: CliRunner, snapshot: object) -> None:
         mock_json(
@@ -43,6 +44,7 @@ class TestPostsGet:
         assert result.exit_code == 0
         assert result.output == snapshot
 
+    # criterio: 09-C09
     @respx.mock
     def test_json_output(self, runner: CliRunner, snapshot: object) -> None:
         mock_json(
@@ -53,6 +55,9 @@ class TestPostsGet:
         result = runner.invoke(app, ["--output", "json", "posts", "get", "21269"], env=BASE_ENV)
         assert result.exit_code == 0
         assert result.output == snapshot
+        rendered = json.loads(result.output)
+        assert rendered["draft"] is False
+        assert rendered["publication_ts"] == 1760000000000  # noqa: PLR2004
 
     @respx.mock
     def test_with_web_url(self, runner: CliRunner) -> None:

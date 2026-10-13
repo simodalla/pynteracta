@@ -414,3 +414,25 @@ def test_event_posts_pages_document_write_commands() -> None:
     env_example = (_ROOT / "tests" / "integration" / ".env.example").read_text(encoding="utf-8")
     for text in (testing, env_example):
         assert "PYNTERACTA_TEST_EVENT_COMMUNITY_ID" in text
+
+
+# criterio: 09-C14
+def test_swagger_alignment_pages() -> None:
+    """Le pagine documentano view-post, i campi nuovi del post e downloadable (spec 09)."""
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in ("communities list-by-view-post", "--level", "publication_ts"):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    communities = (_ROOT / "docs" / "api" / "communities.md").read_text(encoding="utf-8")
+    for needle in (
+        "list_by_view_post_capability",
+        "ViewPostCapabilityLevel",
+        "pynteracta.models.facade.communities.ViewPostCapabilityLevel",
+        "Without a level",
+    ):
+        assert needle in communities, f"'{needle}' missing from docs/api/communities.md"
+    posts = (_ROOT / "docs" / "api" / "posts.md").read_text(encoding="utf-8")
+    for needle in ("draft", "publication_timestamp"):
+        assert needle in posts, f"'{needle}' missing from docs/api/posts.md"
+    attachments = (_ROOT / "docs" / "api" / "attachments.md").read_text(encoding="utf-8")
+    for needle in ("downloadable=False", "Unrecognized field", "comments and tasks"):
+        assert needle in attachments, f"'{needle}' missing from docs/api/attachments.md"

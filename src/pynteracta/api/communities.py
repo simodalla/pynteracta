@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Communities settings resource client (endpoints 1-5)."""
+"""Communities settings resource client (endpoints 1-5, più ``view-post`` dalla spec 09)."""
 
 from __future__ import annotations
 
 from pynteracta.api._base import ResourceClient
+from pynteracta.api._utils import build_query_params
 from pynteracta.models.facade.communities import (
     CommunityDetail,
     CommunityList,
     ListCommunitiesRequestDTO,
     PostDefinition,
     PostDefinitionMap,
+    ViewPostCapabilityLevel,
 )
 from pynteracta.models.generated import external_v2 as generated
 from pynteracta.transport import HttpTransport
@@ -19,6 +21,7 @@ _DETAILS_SINGLE_PATH = "communication/settings/communities/{community_id}/detail
 _DETAILS_BULK_PATH = "communication/settings/communities/details"
 _POST_DEFINITION_PATH = "communication/settings/communities/{community_id}/post-definition"
 _POST_DEFINITIONS_PATH = "communication/settings/communities/post-definitions"
+_VIEW_POST_PATH = "communication/settings/communities/view-post"
 
 
 class CommunitiesAPI(ResourceClient):
@@ -33,6 +36,27 @@ class CommunitiesAPI(ResourceClient):
         Returns all communities the caller is allowed to post in.
         """
         return CommunityList.from_dict(self._get(_LIST_PATH))
+
+    def list_by_view_post_capability(
+        self, level: ViewPostCapabilityLevel | str | None = None
+    ) -> CommunityList:
+        """GET ``/communication/settings/communities/view-post``.
+
+        Restituisce le community in cui l'identità autenticata ha la capability di
+        visualizzazione dei post indicata, nella stessa forma di :meth:`list`.
+
+        Args:
+            level: ``ViewPostCapabilityLevel`` (``PRIVATE``, ``PUBLIC``, ``ALL``) o il suo nome
+                come stringa, senza distinzione di maiuscole. Senza livello la richiesta parte
+                senza parametro e la risposta è quella che decide il server (vedi la
+                documentazione).
+
+        Raises:
+            ValueError: Livello non valido; nessuna richiesta parte.
+        """
+        value = ViewPostCapabilityLevel(level).value if level is not None else None
+        params = build_query_params(view_post_capability_level=value)
+        return CommunityList.from_dict(self._get(_VIEW_POST_PATH, params=params or None))
 
     def details(self, community_id: int) -> CommunityDetail:
         """GET ``/communication/settings/communities/{communityId}/details``.

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""communities sub-commands: list, details, post-definition, post-definitions."""
+"""communities sub-commands: list, list-by-view-post, details, post-definition, post-definitions."""
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Annotated, Any
 
 import typer
@@ -28,7 +29,7 @@ from pynteracta.cli._common import (
     validate_full_fields,
 )
 from pynteracta.exceptions import InteractaError
-from pynteracta.models.facade.communities import FieldType
+from pynteracta.models.facade.communities import FieldType, ViewPostCapabilityLevel
 
 app = typer.Typer(help="Community settings commands.", no_args_is_help=True)
 
@@ -50,6 +51,63 @@ def communities_list(  # noqa: PLR0913
     try:
         with build_client(state) as client:
             result = client.communities.list()
+            items = list(result.items_typed)
+        fmt = resolve_output(state, output)
+        render_output(
+            fmt,
+            items,
+            lambda c: {"id": c.id, "name": c.name},
+            full=full,
+            fields=fields,
+            console=console,
+            title="Communities",
+            export_path=export,
+            export_format=export_format,
+            quiet=state.quiet,
+        )
+        raise typer.Exit(EXIT_SUCCESS)
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+
+
+class ViewPostLevelChoice(StrEnum):
+    """Livello della capability di visualizzazione dei post come opzione della CLI."""
+
+    PRIVATE = "private"
+    PUBLIC = "public"
+    ALL = "all"
+
+
+@app.command("list-by-view-post")
+def communities_list_by_view_post(  # noqa: PLR0913
+    ctx: typer.Context,
+    level: Annotated[
+        ViewPostLevelChoice | None,
+        typer.Option(
+            "--level",
+            case_sensitive=False,
+            help="Post-view capability level; omitted, the server decides.",
+        ),
+    ] = None,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """List communities where the caller can view posts at a given level.
+
+    GET /communication/settings/communities/view-post.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    try:
+        with build_client(state) as client:
+            result = client.communities.list_by_view_post_capability(
+                ViewPostCapabilityLevel(level.value) if level is not None else None
+            )
             items = list(result.items_typed)
         fmt = resolve_output(state, output)
         render_output(
@@ -277,4 +335,4 @@ def communities_post_definitions(  # noqa: PLR0913
 
 
 # Keep FieldType in scope so it's importable from this module for tests.
-__all__ = ["FieldType", "app"]
+__all__ = ["FieldType", "ViewPostLevelChoice", "app"]

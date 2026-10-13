@@ -57,8 +57,9 @@ reads, extended to the writes by ADR 0001 on 2026-10-08).
 | **0.13.0** | Admin write, second half: catalogs, catalog entries and workspace (create, edit, logical delete and restore, workspace members and images; fifth write group, ADR 0001) | M32 | ✅ Shipped 2026-10-12 | [specs/06-admin-catalogs-workspace/spec.md](specs/06-admin-catalogs-workspace/spec.md) |
 | **0.13.1** | Audit readability: optimistic-concurrency tokens (`occToken` family) stay in clear in redacted bodies (patch) | M33 | ✅ Shipped 2026-10-12 | [specs/07-occtoken-audit/spec.md](specs/07-occtoken-audit/spec.md) |
 | **0.14.0** | Event post write: create, edit, copy and participate (sixth and last write group, ADR 0001) | M34 | ✅ Shipped 2026-10-13 | [specs/08-event-post-write/spec.md](specs/08-event-post-write/spec.md) |
+| **0.15.0** | Swagger alignment: regenerated models, `communities list-by-view-post` (last uncovered endpoint), `draft`/`publication_timestamp` on post detail, `downloadable` on uploaded attachments | M35 | ⏳ In progress | [specs/09-swagger-align/spec.md](specs/09-swagger-align/spec.md) |
 
-> Milestone numbers continue the `PROGRESS.md` sequence (last used: M34). The gap M11–M13 is
+> Milestone numbers continue the `PROGRESS.md` sequence (last used: M35). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
 ## Read-surface inventory (target for the 0.2–0.6 line, all shipped)

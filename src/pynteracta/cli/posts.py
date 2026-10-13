@@ -79,6 +79,7 @@ def posts_get(  # noqa: PLR0913
         def _curated(obj: object) -> dict[str, object]:
             cts = getattr(obj, "creation_timestamp", None)
             lmts = getattr(obj, "last_modify_timestamp", None)
+            pts = getattr(obj, "publication_timestamp", None)
             return {
                 "id": getattr(obj, "id", None),
                 "title": getattr(obj, "title", None),
@@ -88,6 +89,8 @@ def posts_get(  # noqa: PLR0913
                 "last_modify_ts": EpochMs(lmts) if lmts is not None else None,
                 "comments_count": getattr(obj, "comments_count", None),
                 "likes_count": getattr(obj, "likes_count", None),
+                "draft": getattr(obj, "draft", None),
+                "publication_ts": EpochMs(pts) if pts is not None else None,
                 **({"web_url": web_url} if web_url is not None else {}),
             }
 

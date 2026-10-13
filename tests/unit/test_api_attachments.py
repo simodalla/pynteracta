@@ -413,3 +413,28 @@ class TestUpload:
             AttachmentsAPI(make_transport()).upload(path)
         assert opened
         assert all(handle.closed for handle in opened)
+
+
+class TestUploadDownloadable:
+    # criterio: 09-C10
+    @respx.mock
+    def test_flag_kept_and_not_sent_to_storage(self, tmp_path: Path) -> None:
+        ticket_route, storage_route = _mock_upload()
+        path = tmp_path / "nota.txt"
+        path.write_bytes(b"testo della nota")
+        uploaded = AttachmentsAPI(make_transport()).upload(path, downloadable=False)
+        assert [call.request.url for call in respx.calls] == [_UPLOAD_PATH, _STORAGE_URL]
+        assert ticket_route.calls[0].request.content in (b"", b"null")
+        assert b"downloadable" not in storage_route.calls[0].request.content
+        assert uploaded.downloadable is False
+        assert uploaded.as_write_input()["downloadable"] is False
+
+    # criterio: 09-C11
+    @respx.mock
+    def test_without_flag_is_none(self, tmp_path: Path) -> None:
+        _mock_upload()
+        path = tmp_path / "nota.txt"
+        path.write_bytes(b"x")
+        uploaded = AttachmentsAPI(make_transport()).upload(path)
+        assert uploaded.downloadable is None
+        assert "downloadable" not in uploaded.as_write_input()

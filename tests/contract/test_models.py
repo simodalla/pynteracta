@@ -328,6 +328,7 @@ class TestGetPostDetail:
             generated.GetPostDetailResponseDTO,
         )
 
+    # criterio: 09-C01
     def test_facade_smoke(self) -> None:
         payload = load_payload("get_post_detail_response.json")
         facade = Post.from_dict(payload)
@@ -337,6 +338,8 @@ class TestGetPostDetail:
         assert facade.title == "Aggiornamento procedure sicurezza Q2 2026"
         assert facade.comments_count == _POST_COMMENTS_COUNT
         assert facade.likes_count == 1
+        assert facade.draft is False
+        assert facade.publication_timestamp == 1760000000000  # noqa: PLR2004
 
     def test_facade_raw_accessible(self) -> None:
         payload = load_payload("get_post_detail_response.json")
@@ -1639,3 +1642,43 @@ class TestEventPostDTOs:
         assert isinstance(form.raw, generated.GetEventPostForEditResponseDTO)
         assert form.event is not None
         assert isinstance(form.event.raw, generated.EventPostDataDTOModel)
+
+
+# ---------------------------------------------------------------------------
+# Spec 09: allineamento allo swagger live del tenant cert
+# ---------------------------------------------------------------------------
+
+_SWAGGER_09_FIELDS = [
+    ("GetPostDetailResponseDTO", generated.GetPostDetailResponseDTO, "draft"),
+    ("GetPostDetailResponseDTO", generated.GetPostDetailResponseDTO, "publicationTimestamp"),
+    ("InputPostAttachmentDTO", generated.InputPostAttachmentDTO1, "downloadable"),
+    ("CustomFieldValidationErrorDTO", generated.CustomFieldValidationErrorDTO, "externalId"),
+    ("LicenseDTO", generated.LicenseDTO, "subType"),
+]
+
+
+class TestSwaggerAlignment09:
+    # criterio: 09-C01
+    @pytest.mark.parametrize(("dto_name", "model_cls", "field"), _SWAGGER_09_FIELDS)
+    def test_new_field_pinned_and_generated(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        dto_name: str,
+        model_cls: type,
+        field: str,
+    ) -> None:
+        assert field in swagger_definitions[dto_name]["properties"]
+        assert field in _model_fields(model_cls)
+
+    # criterio: 09-C01
+    @pytest.mark.parametrize(
+        ("dto_name", "model_cls"),
+        sorted({(name, cls) for name, cls, _ in _SWAGGER_09_FIELDS}, key=lambda x: x[0]),
+    )
+    def test_dto_superset(
+        self,
+        swagger_definitions: dict,  # type: ignore[type-arg]
+        dto_name: str,
+        model_cls: type,
+    ) -> None:
+        assert_superset(swagger_definitions, dto_name, model_cls)

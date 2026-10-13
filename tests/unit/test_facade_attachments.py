@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from pynteracta.models.facade.attachments import (
     AttachmentDetail,
     AttachmentVisibility,
@@ -165,3 +167,38 @@ class TestUploadedAttachment:
             "contentRef": ref,
             "name": "nota.txt",
         }
+
+
+class TestUploadedAttachmentDownloadable:
+    def _uploaded(self, downloadable: bool | None = None) -> UploadedAttachment:
+        ticket = UploadTicket.from_dict(load("upload_new_attachment_response.json"))
+        if downloadable is None:
+            return UploadedAttachment(ticket, name="nota.txt", mime_type="text/plain")
+        return UploadedAttachment(
+            ticket, name="nota.txt", mime_type="text/plain", downloadable=downloadable
+        )
+
+    # criterio: 09-C10
+    @pytest.mark.parametrize("flag", [False, True])
+    def test_flag_in_write_input_and_version(self, flag: bool) -> None:
+        uploaded = self._uploaded(flag)
+        ref = uploaded.content_ref
+        assert uploaded.downloadable is flag
+        assert uploaded.as_write_input() == {
+            "name": "nota.txt",
+            "contentRef": ref,
+            "downloadable": flag,
+        }
+        assert uploaded.as_version_of(7) == {
+            "attachmentId": 7,
+            "contentRef": ref,
+            "name": "nota.txt",
+            "downloadable": flag,
+        }
+
+    # criterio: 09-C11
+    def test_without_flag_dicts_unchanged(self) -> None:
+        uploaded = self._uploaded()
+        assert uploaded.downloadable is None
+        assert "downloadable" not in uploaded.as_write_input()
+        assert "downloadable" not in uploaded.as_version_of(7)

@@ -7,16 +7,35 @@ Endpoints covered:
   POST /communication/settings/communities/details                       (endpoint 3)
   GET  /communication/settings/communities/{communityId}/post-definition (endpoint 4)
   POST /communication/settings/communities/post-definitions              (endpoint 5)
+  GET  /communication/settings/communities/view-post                     (spec 09)
 """
 
 from __future__ import annotations
 
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 
 from pynteracta.models.generated import external_v2 as generated
 
 # Re-exported for use by the communities API layer.
 ListCommunitiesRequestDTO = generated.ListCommunitiesRequestDTO
+
+
+class ViewPostCapabilityLevel(StrEnum):
+    """Livello della capability di visualizzazione dei post, per ``communities/view-post``.
+
+    Accetta anche il nome come stringa, senza distinzione di maiuscole
+    (``ViewPostCapabilityLevel("private")``); qualunque altro valore solleva ``ValueError``.
+    """
+
+    PRIVATE = "PRIVATE"
+    PUBLIC = "PUBLIC"
+    ALL = "ALL"
+
+    @classmethod
+    def _missing_(cls, value: object) -> ViewPostCapabilityLevel | None:
+        if isinstance(value, str):
+            return cls.__members__.get(value.upper())
+        return None
 
 
 class FieldType(IntEnum):

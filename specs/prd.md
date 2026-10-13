@@ -23,7 +23,9 @@ ufficiale per Interacta**, che ne esporrà le operazioni come strumenti.
 La superficie è sincrona. Fino alla versione 0.9.4 era di sola lettura; con
 [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post, post evento e
 commenti, task, anagrafiche admin, upload di allegati) sono entrate nell'ambito e le spec dalla 02
-alla 08 le hanno realizzate tutte: la superficie di scrittura dell'ADR è completa.
+alla 08 le hanno realizzate tutte: la superficie di scrittura dell'ADR è completa. Dalla
+[spec 09](09-swagger-align/spec.md) la libreria espone tutti i 76 endpoint dello swagger
+`external_v2` pinnato.
 
 ## 2. Attori e ruoli
 
@@ -64,8 +66,19 @@ toccano.
   - RF-006a. `PostCapabilities` espone `can_copy`, `can_edit_attachments`,
     `can_edit_workflow_screen_data` e le operazioni di workflow permesse, con cui il chiamante
     scopre l'`operation_id` delle transizioni. *(Spec 03, 2026-10-10.)*
+  - RF-006b. Il dettaglio del post (`Post`) espone `draft` (bozza o pubblicato) e
+    `publication_timestamp` (epoch in millisecondi, UTC), `None` se il tenant non li manda;
+    `posts get` li mostra come `draft` e `publication_ts`. Il tenant di prova li manda.
+    *(Spec 09, 2026-10-13.)*
 - RF-007. Community: elenco, dettagli singoli e in blocco, definizione dei post (singola e
   multipla).
+  - RF-007a. Community per capability di visualizzazione dei post:
+    `communities.list_by_view_post_capability(level=None)` con `ViewPostCapabilityLevel`
+    (`PRIVATE`, `PUBLIC`, `ALL`) o il suo nome come stringa senza distinzione di maiuscole, un
+    valore diverso rifiutato prima della richiesta; senza livello il parametro non è inviato e
+    decide il server (sul tenant di prova, con il service account, come `ALL`: le tre scelte e
+    nessuna danno le stesse 15 community, contro le 9 di `list()`). In CLI
+    `communities list-by-view-post [--level private|public|all]`. *(Spec 09, 2026-10-13.)*
 - RF-008. Cataloghi: elenco dei cataloghi e delle voci, con iterazione; le scritture di
   cataloghi e voci stanno su `client.catalogs` (RF-023, RF-023e). *(Confermato dal maintainer il 2026-10-12, spec 06.)*
 - RF-009. Allegati: elenco per post, dettaglio per id, controllo di visibilità.
@@ -133,7 +146,9 @@ più `*_raw`, comando CLI, test unit e contract).
   - RF-021c. `edit_attachments` e gli `attachments` di `create`, `edit`, `copy`, `add_comment`
     accettano riferimenti già noti al server e, dalla spec 04, i file appena caricati
     (`UploadedAttachment`, RF-024); `posts edit-attachments` in CLI è arrivato con la spec 04
-    (RF-024a). *(Spec 03, aggiornato dalla spec 04.)*
+    (RF-024a). Dalla spec 09 un `UploadedAttachment` con `downloadable` porta il flag nella voce
+    degli allegati (RF-024b), che il server accetta solo sui post. *(Spec 03, aggiornato dalle
+    spec 04 e 09.)*
   - RF-021d. In scrittura i riferimenti a voci di catalogo, utenti e gruppi nei campi custom e nei
     dati di screen si inviano come id, anche se le letture li restituiscono come oggetti; le patch
     della CLI traducono i valori letti che rimandano. `edit-post` e `copy-post` sostituiscono il
@@ -238,6 +253,13 @@ più `*_raw`, comando CLI, test unit e contract).
     `posts edit-attachments` con `--add PATH`, `--remove ID`, `--update ID=PATH` (il server
     mantiene l'id, incrementa la versione e applica il nome nuovo). `UploadError` esce con exit
     code `11`; al primo upload fallito nessuna scrittura parte verso Interacta. *(Spec 04.)*
+  - RF-024b. `attachments.upload(..., downloadable=None)`: il flag non va allo storage;
+    `UploadedAttachment.downloadable` lo conserva e `as_write_input()` e `as_version_of()` lo
+    aggiungono come `"downloadable"` solo se indicato (omesso, il default del server è
+    scaricabile). Sul tenant di prova è applicato agli allegati dei post custom ed evento,
+    mentre su commenti e task il server rifiuta la scrittura con `400` ("Unrecognized field"):
+    la libreria lo invia così come lo riceve e lo dice la documentazione. In CLI passa solo
+    negli allegati di `--json`. *(Spec 09, 2026-10-13.)*
 - RF-025. Concorrenza ottimistica: dove l'API richiede un `occToken`, la libreria lo espone al
   chiamante e mappa il `409` su `ConcurrencyError`; non rilegge e non riprova da sola. Le
   operazioni distruttive nella CLI chiedono conferma esplicita. *(Confermato dal maintainer il
@@ -329,7 +351,8 @@ spec).
   watcher.)* Gli allegati caricati (spec 04) passano dalla libreria allo storage temporaneo del
   tenant così come il chiamante li fornisce, con nome e MIME; la libreria non li conserva né li
   logga, e i file temporanei scadono con la policy del tenant. *(Confermato dal maintainer il
-  2026-10-10, spec 04.)* Le anagrafiche admin (spec 05): nome, cognome, email di contatto e
+  2026-10-10, spec 04.)* Il flag `downloadable` degli allegati dei post (spec 09) non è un dato
+  personale. Le anagrafiche admin (spec 05): nome, cognome, email di contatto e
   privata, riferimento esterno, preferenze, info e impostazioni degli utenti; le credenziali
   (account Google e Microsoft, username custom, password impostata o generata, che la libreria
   redige in log, audit log, hook e messaggi di eccezione e mostra solo nell'output di
@@ -392,3 +415,7 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
 - 2026-10-13: §3, §4 e §6 confermati per intero dal maintainer a scritture completate; lo stato del
   documento passa da bozza a confermato e la versione di riferimento da 0.9.4 a 0.14.0 (branch
   `bugfix_docs_allineamento`, allineamento dei documenti di governo).
+- 2026-10-13: [spec 09](09-swagger-align/spec.md) (allineamento allo swagger live, 0.15.0):
+  swagger ripinnato e modelli rigenerati con ordine stabile delle definizioni; nuovi RF-006b,
+  RF-007a e RF-024b con la semantica verificata sul tenant; RF-021c e §6 aggiornati per
+  `downloadable`; §1 dice che tutti i 76 endpoint dello swagger pinnato sono esposti.

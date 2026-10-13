@@ -1994,3 +1994,50 @@ su `docs/testing.md` (ripreso da M30, M32, M33 e M34) e quello sulla docstring d
 
 - `cli/communities.py` al 53 % di copertura (dalla linea di partenza): lavoro di test, non
   documentale.
+
+## M35 — Allineamento allo swagger live — completata 2026-10-13
+
+Nona spec del metodo: [`specs/09-swagger-align/`](specs/09-swagger-align/) (`spec.md`, `plan.md`,
+`tasks.md`, `verifica.md`). Allinea la libreria allo swagger del tenant cert: con
+`communities/view-post` tutti i 76 endpoint dello swagger pinnato sono esposti. Minor **0.15.0**.
+
+### Fatto
+
+- Swagger ripinnato e modelli rigenerati: `draft` e `publicationTimestamp` nel dettaglio del
+  post, `downloadable` nell'allegato in input dei post, `externalId` nell'errore di validazione,
+  `subType` nella licenza. Lo script di rigenerazione mantiene l'ordine delle definizioni del
+  pinnato precedente, così i nomi delle classi generate non cambiano (09-T01).
+- Libreria: `communities.list_by_view_post_capability(level=None)` con `ViewPostCapabilityLevel`;
+  `Post.draft` e `Post.publication_timestamp`; `attachments.upload(..., downloadable=None)` e
+  `UploadedAttachment.downloadable` (09-T03, T05, T06).
+- CLI: `communities list-by-view-post [--level]`; `posts get` mostra `draft` e `publication_ts`
+  (09-T04, T05). Test di caratterizzazione dei comandi delle community: `cli/communities.py` dal
+  53 % al 99 % (09-T02).
+- Documentazione: `docs/cli.md`, `docs/api/communities.md`, `docs/api/posts.md`,
+  `docs/api/attachments.md`; PRD con RF-006b, RF-007a, RF-024b, RF-021c, §1 e §6 (09-T09).
+  Integration test eseguiti sul tenant di prova (09-T07, T08).
+- 67 unit test e 9 contract test nuovi (1549 → 1616, 229 → 238); copertura totale 95,40 % →
+  96,18 %.
+
+### Decisioni oltre la spec
+
+- **Ordine stabile delle definizioni** (revisione `4ec1648`, scelta del maintainer): lo swagger
+  live elenca le definizioni in un altro ordine e il generatore rinominava
+  `EventPostDataDTOModel` in `EventPostDataDTO1`; nuovo criterio 09-C18. Il pinnato resta JSON
+  compatto con a capo finale, come lo vuole `end-of-file-fixer` (`4d4c1a0`).
+- **Scoperte sul tenant** (T08): `view-post` dà 15 community con ogni livello e senza livello,
+  `communities list` 9; il dettaglio del post porta i due campi nuovi; `downloadable: false` è
+  applicato agli allegati dei post e rifiutato con `400` ("Unrecognized field") su commenti e
+  task.
+- 09-C09: `--fields` seleziona sui nomi dei campi grezzi (`draft,publicationTimestamp`), come in
+  tutta la CLI; testo del criterio corretto senza comportamento nuovo.
+- `posts get-by-client-uid` resta senza le colonne nuove: la spec nomina solo `posts get`.
+
+### Follow-up
+
+- Release **0.15.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅ e la
+  sezione "Still uncovered in the pinned swagger" va svuotata.
+- `posts get-by-client-uid` con `draft` e `publication_ts`.
+- Rifiutare prima della richiesta `downloadable` su commenti e task, invece del `400` del server.
+- `view-post` con utenti dai permessi diversi: i livelli potrebbero differire.
+- Resta aperto il kwarg `calculate_total_items_count` su `attachments.list_for_post`.

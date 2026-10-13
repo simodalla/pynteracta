@@ -42,6 +42,7 @@ from pynteracta.models.facade.communities import (
     PostDefinition,
     PostDefinitionMap,
     PostFieldDefinition,
+    ViewPostCapabilityLevel,
 )
 from pynteracta.models.facade.groups import (
     Group,
@@ -174,6 +175,7 @@ __all__ = [
     "UserForEdit",
     "UserProfile",
     "UserWriteResult",
+    "ViewPostCapabilityLevel",
     "VisibilityResult",
     "WorkspaceForEdit",
     "validate_field_filters",

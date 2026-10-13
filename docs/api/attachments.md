@@ -65,6 +65,25 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
   `{"attachmentId", "contentRef", "name"}` for `update_attachments` / `update`. The server applies
   the new name to the new version (verified against a tenant). Dicts and DTOs already accepted
   keep working, also mixed with uploaded files.
+- `upload(..., downloadable=False)` marks the file as **not downloadable**. The flag never goes
+  to the storage: the `UploadedAttachment` carries it and adds `"downloadable"` to the dicts of
+  `as_write_input()` and `as_version_of()`, only when you set it (omitted, the server default is
+  downloadable). On the test tenant the flag is stored on **post** attachments (custom and event
+  posts: `create`, `edit`, `copy`, `edit_attachments`) and read back as
+  `PostAttachment.downloadable`. On **comments and tasks** the server has no such field and
+  rejects the write with `400` "Unrecognized field downloadable": upload files for comments and
+  tasks without the flag. In the CLI pass it in the attachments of `--json`.
+
+  ```python
+  from pathlib import Path
+
+  from pynteracta.client import InteractaClient
+
+  with InteractaClient(base_url="https://tenant.example.com", credentials=...) as client:
+      contract = client.attachments.upload(Path("contract.pdf"), downloadable=False)
+      client.posts.create(79, title="Contract", attachments=[contract])
+  ```
+
 - `request_upload_url()` performs only the first step and returns an `UploadTicket`
   (`content_ref`, `upload_url`, `form_params`, `temporary_download_url`), for callers that upload
   the file with another tool.

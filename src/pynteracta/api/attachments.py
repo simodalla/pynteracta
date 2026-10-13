@@ -181,6 +181,7 @@ class AttachmentsAPI(ResourceClient):
         *,
         name: str | None = None,
         mime_type: str | None = None,
+        downloadable: bool | None = None,
     ) -> UploadedAttachment:
         """Carica un file nello storage temporaneo del tenant, in due passi.
 
@@ -197,6 +198,9 @@ class AttachmentsAPI(ResourceClient):
                 aperto è obbligatorio.
             mime_type: MIME del file; se manca è dedotto dall'estensione del nome
                 (``application/octet-stream`` se ignota).
+            downloadable: Se l'allegato sarà scaricabile. Non va allo storage: il risultato lo
+                porta negli allegati delle scritture (``"downloadable"``), previsto dal server per
+                i post custom ed evento. ``None`` (default) non lo invia e decide il server.
 
         Returns:
             Un :class:`UploadedAttachment` con ``content_ref``, ``name``, ``mime_type`` e
@@ -222,4 +226,4 @@ class AttachmentsAPI(ResourceClient):
         finally:
             if owned:
                 content.close()
-        return UploadedAttachment(ticket, name=file_name, mime_type=mime)
+        return UploadedAttachment(ticket, name=file_name, mime_type=mime, downloadable=downloadable)
