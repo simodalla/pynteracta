@@ -190,7 +190,6 @@ _EVENT_TITLE_COPY = "pynteracta event integration test (copy) - safe to delete"
 _EVENT_LOCATION = "pynteracta test room A"
 _EVENT_LOCATION_EDITED = "pynteracta test room B"
 _ROME = ZoneInfo("Europe/Rome")
-_COLLABORATOR = 2
 _DELTA = 1
 
 
@@ -218,7 +217,6 @@ class TestEventPostsWriteIntegration:
                     end_at=end,
                     location=_EVENT_LOCATION,
                     invited_user_ids=[invitee_id],
-                    invitation_type_id=_COLLABORATOR,
                     title=_EVENT_TITLE,
                     description="Created by the event post integration test; safe to delete.",
                     description_format=_PLAIN_TEXT,
@@ -258,8 +256,7 @@ class TestEventPostsWriteIntegration:
                     end_at=event.end_at,
                     all_day=event.all_day,
                     location=_EVENT_LOCATION_EDITED,
-                    invited_user_ids=[u.id for u in event.invited_users if u.id is not None],
-                    invitation_type_id=_COLLABORATOR,
+                    invited_user_ids=[invitee_id],
                 )
                 assert edited.next_occ_token is not None
                 after = client.posts.get_event_for_edit(post_id)
@@ -286,8 +283,11 @@ class TestEventPostsWriteIntegration:
                     title=_EVENT_TITLE_COPY,
                     description=content.descriptionDelta if content else None,
                     description_format=_DELTA,
+                    visibility=content.visibility if content else None,
                     start_at=start,
                     end_at=end,
+                    location=_EVENT_LOCATION,
+                    invited_user_ids=[invitee_id],
                 )
                 assert copied.post_id is not None
                 assert copied.post_id != post_id

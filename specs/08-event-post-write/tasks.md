@@ -268,7 +268,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   2. Verificare lo skip senza variabili; `uv run ruff check .` e `mypy`.
   3. Commit `test: ciclo completo dei post evento sul tenant (opt-in)`.
 
-### [ ] T16 – Prove sul tenant (manuale)
+### [x] T16 – Prove sul tenant (manuale)
 
 - Criteri: 08-C24 (esecuzione)
 - Chi: maintainer
@@ -279,7 +279,55 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   invitati obbligatorio o no e suo default; effetto di `allDay` con date-ora; partecipazione del
   service account; formato della descrizione in modifica; presenza di `event` in `postData`
   delle risposte di scrittura.
-- Esito: <compilato a mano>
+- Esito (2026-10-13, community di prova 126, service account; prove eseguite da Claude su
+  delega del maintainer, post di prova 23360–23366 e quelli dell'integration test eliminati):
+  - **Integration test**: `uv run pytest -m integration -k EventPosts -s` verde (1 passed) dopo
+    averlo adattato alle regole del tenant qui sotto (invitato senza `typeId`, invitati espliciti
+    in modifica e copia, `location` e `visibility` nella copia). Con `invitation_type_id=2` e un
+    solo invitato falliva con `400 REQUIRED_FIELD event.inivations`.
+  - **Invitati**: obbligatori in creazione, modifica e copia (senza → `400 REQUIRED_FIELD
+    event.inivations`, refuso del server; la chiave JSON resta `invitations`). Serve almeno un
+    invitato ospite: `typeId` omesso o `0` passano, `1` e `2` da soli → stesso `400`; ospite più
+    collaboratore passa. `typeId` non obbligatorio: il default del server vale come ospite.
+  - **Invitati in lettura**: `event-post-data-for-edit` restituisce sempre `invitations.users` e
+    `groups` vuoti, anche su post creati con invitati. Conseguenza: `posts edit-event` e
+    `posts copy-event` senza `--invite-user`/`--invite-group` (o `invitations` in `--json`)
+    falliscono con il `400` sopra, perché la patch copia gli invitati letti (vuoti).
+  - **Campi omessi in `edit-event-post`**: il server sostituisce per intero. `event` obbligatorio;
+    `title`, `event.endAt`, `event.location` e gli invitati obbligatori (`400 REQUIRED_FIELD`);
+    `visibility` omessa → `500` senza corpo; descrizione omessa → azzerata; `event.timezone`
+    omesso → il server mette `Europe/Paris` lasciando l'ora locale. La patch sul form letto
+    (08-C14) è quindi la scelta giusta e non va ridotta.
+  - **Campi omessi in creazione**: `event.endAt` e `event.location` obbligatori (`400`);
+    `timezone` omesso → `Europe/Paris`.
+  - **Copia**: stesse regole della modifica; con la patch della CLI più `--invite-user` riesce e
+    copia date, luogo e descrizione dell'originale.
+  - **`allDay`**: con `allDay: true` il server accetta solo date senza ora (`"2026-10-14"`) e
+    **senza** `timezone`; con `T00:00:00` → `400 INVALID_VALUE event.startAt` ("Invalid datetime
+    format"), con `timezone` (anche `UTC`) → `400 INVALID_VALUE event.timezone`. In lettura
+    l'evento ha `localDatetime`/`zonedDatetime`/`utcDatetime` = `"2026-10-14"` e `timezone: null`.
+    Quindi `posts create-event --start <data> --all-day` (08-C13) oggi fallisce. La modifica dalla
+    CLI di un evento `allDay` esistente riesce, perché copia le date lette tali e quali.
+  - **Date in lettura**: `EventData.start_at` usa `zonedDatetime`, che ha offset fisso
+    (`+02:00`): ripassata a `edit_event` (come fa l'integration test) l'evento passa a
+    `timezone: "UTC"` con l'ora convertita. Sugli eventi `allDay` `start_at` è un `datetime`
+    senza fuso, che `edit_event` rifiuterebbe.
+  - **Partecipazione del service account**: accettata, anche su un post dove non è invitato
+    (`participateTypeId` 1/2/3 e `participantsCount` aggiornati). `notes` in testo semplice →
+    `400 INVALID_VALUE comment`; `notes` come delta Quill (`[{"insert":"Arrivo tardi\n"}]`)
+    passa.
+  - **Formato della descrizione in modifica**: la CLI rimanda il delta letto con
+    `descriptionFormat: 1` e il testo resta; il server aggiunge al plain text un carattere
+    `\u200b\n` finale (artefatto del delta, innocuo).
+  - **`event` in `postData`** delle risposte di creazione, modifica e copia: assente. Le colonne
+    `start_at`, `end_at`, `timezone`, `location` della tabella di scrittura restano vuote.
+  - **Revisioni proposte per T17** (da approvare): (1) `all_day=True` → date senza ora e niente
+    `timezone` (08-C13, `build_event_block`); (2) `EventData.start_at`/`end_at` da
+    `localDatetime` + `timezone` IANA prima di `zonedDatetime`, e per gli `allDay` un tipo data;
+    (3) `notes` della partecipazione: convertire il testo in delta o documentare il formato;
+    (4) docs: invitati obbligatori con almeno un ospite, invitati non leggibili (in CLI vanno
+    ripassati), campi obbligatori in modifica; (5) tabella di scrittura senza colonne evento,
+    oppure documentarle come vuote.
 
 ### [ ] T17 – Chiusura: PRD, esito delle prove nei docs, eventuale revisione
 
