@@ -95,7 +95,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   4. Copertura di `cli/communities.py` ≥ 85 % (`--cov-report=term-missing`), totale ≥ 95,40 %.
   5. Controlli bloccanti; commit `feat(cli): communities list-by-view-post`.
 
-### [ ] T05 – `draft` e `publication_timestamp` nel dettaglio del post
+### [x] T05 – `draft` e `publication_timestamp` nel dettaglio del post
 
 - Criteri: 09-C08, 09-C09; smoke di `Post` per 09-C01
 - Dipende da: T01
@@ -104,7 +104,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   `tests/contract/test_models.py::TestGetPostDetail::test_facade_smoke` esteso con i due campi;
   `tests/unit/test_cli_posts.py::TestPostsGet` e `tests/unit/test_cli_full_fields.py`: snapshot
   di tabella e json con `draft` e `publication_ts` (reso come `creation_ts`), `--fields
-  draft,publication_ts` → solo quelle chiavi, `--full` contiene `publicationTimestamp`.
+  draft,publicationTimestamp` → solo quelle chiavi, `--full` contiene `publicationTimestamp`.
 - Passi:
   1. Scrivere i test; eseguirli: rossi (`AttributeError` sulle proprietà, snapshot senza le
      colonne).

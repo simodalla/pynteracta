@@ -79,7 +79,7 @@ si riprova.
 `Post.draft` (`bool | None`) e `Post.publication_timestamp` (`int | None`, epoch in
 millisecondi) leggono i campi nuovi del dettaglio; sono `None` quando il server non li manda.
 `posts get` li mostra nella tabella curata come `draft` e `publication_ts`, quest'ultimo reso
-come gli altri timestamp; `--fields` li seleziona per nome.
+come gli altri timestamp; `--fields draft,publicationTimestamp` li seleziona per nome del campo grezzo, come ogni `--fields`.
 
 ### Allegati non scaricabili
 
@@ -109,7 +109,7 @@ per i file toccati: la spec porta quel file sopra soglia con unit test sui coman
 | 09-C06 | Quando si esegue `communities list-by-view-post`, senza o con `--level public`, la tabella ha le colonne `id` e `name` e il titolo `Communities`; `--output json|yaml`, `--full`, `--fields id`, `--export FILE` producono gli stessi dati di `communities list` (snapshot). | RF-007, RF-015 |
 | 09-C07 | Quando si esegue `communities list-by-view-post --level privato`, il comando esce con codice `2` senza fare richieste; con un `403` del server esce con `4`. | RF-007, RF-019 |
 | 09-C08 | Quando il dettaglio del post ha `draft: true` e `publicationTimestamp: 1760000000000`, `client.posts.get(...)` espone `draft == True` e `publication_timestamp == 1760000000000`; senza quei campi entrambi sono `None`. | RF-006 |
-| 09-C09 | Quando si esegue `posts get ID`, la tabella curata ha le colonne `draft` e `publication_ts`, con il timestamp reso come `creation_ts`; `--fields draft,publication_ts` le seleziona; `--full` mostra anche i campi grezzi nuovi (snapshot). | RF-006, RF-015 |
+| 09-C09 | Quando si esegue `posts get ID`, la tabella curata ha le colonne `draft` e `publication_ts`, con il timestamp reso come `creation_ts`; `--fields draft,publicationTimestamp` (nomi dei campi grezzi, come per ogni `--fields`) seleziona solo quelli; `--full` mostra anche i campi grezzi nuovi (snapshot). | RF-006, RF-015 |
 | 09-C10 | Quando si chiama `client.attachments.upload(file, downloadable=False)`, le due richieste dell'upload sono quelle di oggi (il flag non va allo storage), `UploadedAttachment.downloadable` è `False`, `as_write_input()` è `{"name": …, "contentRef": …, "downloadable": false}` e `as_version_of(5)` è `{"attachmentId": 5, "contentRef": …, "name": …, "downloadable": false}`; con `downloadable=True` i dict hanno `"downloadable": true`. | RF-024 |
 | 09-C11 | Quando si chiama `upload(file)` senza `downloadable`, `UploadedAttachment.downloadable` è `None` e `as_write_input()` e `as_version_of()` non contengono la chiave `downloadable` (corpo identico a oggi). | RF-024 |
 | 09-C12 | Quando un `UploadedAttachment` con `downloadable=False` è passato a `posts.create(attachments=[…])`, `posts.edit_attachments(add=[…])` e `posts.create_event(attachments=[…])`, il corpo della richiesta contiene `"downloadable": false` in quella voce degli allegati e nient'altro cambia. | RF-021c, RF-024 |
@@ -195,6 +195,9 @@ credenziali. Gli integration test usano la community e il post di prova già con
 - 2026-10-13, durante T01: la rigenerazione dallo swagger live rinominava `EventPostDataDTOModel`
   in `EventPostDataDTO1` (definizioni in ordine diverso). Scelta del maintainer: ordine stabile
   nello script di rigenerazione; nuovo criterio 09-C18, coperto da T01.
+- 2026-10-13, durante T05: 09-C09 citava `--fields draft,publication_ts`, ma `--fields`
+  seleziona sui nomi dei campi grezzi in tutta la CLI (`render_output`, `docs/cli.md`). Testo
+  corretto in `--fields draft,publicationTimestamp`; nessun comportamento nuovo.
 
 ## Domande aperte
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pynteracta.models.facade.posts import (
     GlobalPostStream,
+    Post,
     PostCapabilities,
     PostHistoryEventList,
     VisibilityResult,
@@ -20,6 +21,7 @@ _POST_ID2 = 21270
 _HISTORY_COUNT = 2
 _TYPE_CREATED = 1
 _TYPE_MODIFIED = 2
+_PUBLICATION_TS = 1760000000000
 
 
 def load(name: str) -> dict:  # type: ignore[type-arg]
@@ -112,3 +114,23 @@ class TestGlobalPostStream:
     def test_empty_items(self) -> None:
         stream = GlobalPostStream.from_dict({"items": None, "nextSyncToken": None})
         assert stream.items_typed == []
+
+
+class TestPostDraftAndPublication:
+    # criterio: 09-C08
+    def test_fields_from_fixture(self) -> None:
+        post = Post.from_dict(load("get_post_detail_response.json"))
+        assert post.draft is False
+        assert post.publication_timestamp == _PUBLICATION_TS
+
+    # criterio: 09-C08
+    def test_draft_true(self) -> None:
+        post = Post.from_dict({"id": _POST_ID, "draft": True, "publicationTimestamp": 1})
+        assert post.draft is True
+        assert post.publication_timestamp == 1
+
+    # criterio: 09-C08
+    def test_absent_fields_are_none(self) -> None:
+        post = Post.from_dict({"id": _POST_ID})
+        assert post.draft is None
+        assert post.publication_timestamp is None

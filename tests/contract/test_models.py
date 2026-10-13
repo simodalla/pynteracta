@@ -337,6 +337,9 @@ class TestGetPostDetail:
         assert facade.title == "Aggiornamento procedure sicurezza Q2 2026"
         assert facade.comments_count == _POST_COMMENTS_COUNT
         assert facade.likes_count == 1
+        # criterio: 09-C01 (campi nuovi del dettaglio letti dalla façade)
+        assert facade.draft is False
+        assert facade.publication_timestamp == 1760000000000  # noqa: PLR2004
 
     def test_facade_raw_accessible(self) -> None:
         payload = load_payload("get_post_detail_response.json")

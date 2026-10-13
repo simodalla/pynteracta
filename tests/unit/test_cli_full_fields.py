@@ -282,6 +282,47 @@ class TestPostsGetFull:
         data = _json_output(result)
         assert set(data.keys()) == {"id", "title"}
 
+    # criterio: 09-C09
+    @respx.mock
+    def test_fields_draft_and_publication(self, runner: CliRunner) -> None:
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app,
+            [
+                "posts",
+                "get",
+                "21269",
+                "--output",
+                "json",
+                "--fields",
+                "draft,publicationTimestamp",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0
+        assert _json_output(result) == {"draft": False, "publicationTimestamp": 1760000000000}
+
+    # criterio: 09-C09
+    @respx.mock
+    def test_full_contains_new_fields(self, runner: CliRunner) -> None:
+        mock_json(
+            "GET",
+            "communication/posts/data/post-detail-by-id/21269",
+            load_payload("get_post_detail_response.json"),
+        )
+        result = runner.invoke(
+            app, ["posts", "get", "21269", "--output", "json", "--full"], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        data = _json_output(result)
+        assert data["draft"] is False
+        assert data["publicationTimestamp"] == 1760000000000  # noqa: PLR2004
+
+    # criterio: 09-C09
     @respx.mock
     def test_no_flags_curated_unchanged(self, runner: CliRunner, snapshot: object) -> None:
         mock_json(
