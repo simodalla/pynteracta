@@ -904,15 +904,22 @@ replace the invited users or groups as a whole. `--description` sends plain text
 **Dates.** `--start` and `--end` take an ISO 8601 date-time (`2026-11-05T10:00`) or a date
 (`2026-11-05`, read as local midnight), interpreted in the `--timezone` zone (IANA name). With an
 explicit offset (`2026-11-05T10:00+02:00`) the zone is ignored and the date is sent in UTC.
-`--all-day` sends `allDay: true` and leaves the dates as given.
+`--all-day` sends `allDay: true` and the dates as dates only (`2026-11-05`), without a time zone:
+the server rejects a time or a time zone on all-day events. The same happens whenever the merged
+event block is all-day, also when `allDay` comes from `--json` or from the post as read.
+
+**Invitees.** The server requires invitees on create, edit and copy, with at least one guest:
+no invitees, or collaborators only (`--invite-type 2`), fail with exit code **6**
+(`REQUIRED_FIELD event.inivations`). Without `--invite-type` the invitees are guests.
 
 #### `posts create-event COMMUNITY_ID`
 
 ```bash
 pynteracta posts create-event 79 --start 2026-11-05T10:00 --end 2026-11-05T12:00 \
-    --location "Room A" --invite-user 1042 --invite-group 3 --invite-type 2 \
+    --location "Room A" --invite-user 1042 --invite-group 3 \
     --title "Quarterly review" --description "Agenda attached." --attach agenda.pdf
-pynteracta posts create-event 79 --start 2026-11-05 --all-day --title "Company day"
+pynteracta posts create-event 79 --start 2026-11-05 --end 2026-11-06 --all-day \
+    --location "Everywhere" --invite-group 3 --title "Company days"
 pynteracta posts create-event 79 --json event.json   # event.startAt in the file
 ```
 
@@ -922,7 +929,7 @@ pynteracta posts create-event 79 --json event.json   # event.startAt in the file
 | `--all-day` | `event.allDay` |
 | `--location` | `event.location` |
 | `--invite-user`, `--invite-group` (repeatable) | `event.invitations.users`, `.groups` (`{id}` items) |
-| `--invite-type` | `typeId` of every invitee (`0` guest, `2` collaborator); without it the server decides |
+| `--invite-type` | `typeId` of every invitee (`0` guest, `2` collaborator); without it the invitees are guests |
 | `--notify-on-edit` | `event.invitations.sendEditPostNotifications` |
 | `--title`, `--description` | `title`, `description` + `descriptionFormat: 2` |
 | `--cover PATH` | `coverImageContentRef` (uploaded file, before `--attach`) |
@@ -934,10 +941,10 @@ pynteracta posts create-event 79 --json event.json   # event.startAt in the file
 | `--client-uid` | `clientUid` |
 | `--json FILE\|-` | any field of `CreateEventPostRequestDTO` (e.g. `linkPreview`, invitees with different types) |
 
-`--start` is required unless `--json` has `event.startAt` (exit code 2 otherwise, no request).
-The table shows `id`, `community_id`, `title`, `start_at`, `end_at`, `timezone`, `location`,
-`visibility`, `next_occ_token`; the event columns come from the response and stay empty when
-the server does not return the event block there.
+`--start` is required unless `--json` has `event.startAt` (exit code 2 otherwise, no request);
+the server also requires `--end`, `--location` and the invitees. The table shows `id`,
+`community_id`, `title`, `visibility`, `next_occ_token`: write responses do not carry the event
+block, so read it with `posts get-event-for-edit`.
 
 #### `posts edit-event POST_ID`
 
@@ -948,12 +955,15 @@ watchers) and `--occ-token`. The command is a **patch**: it reads the post
 and event block (dates, time zone, all-day flag, location, invitees as `{id, typeId}`, without
 the read-only keys), overridden by `--json` and then by the flags. Without `--timezone`,
 `--start` and `--end` are read in the zone of the event; with `--timezone` the zone of the
-event changes. `--cover PATH` replaces the cover.
+event changes. `--cover PATH` replaces the cover. The server replaces the whole post, which is
+why the command sends back what it read; the invitees are the exception, because the form returns
+them empty: pass them again with `--invite-user`/`--invite-group` (or `invitations` in `--json`)
+on every edit, or the server rejects the edit.
 
 ```bash
-pynteracta posts edit-event 21269 --location "Room B"
-pynteracta posts edit-event 21269 --start 2026-11-06T09:00 --end 2026-11-06T11:00
-pynteracta posts edit-event 21269 --invite-user 1099 --notify-on-edit
+pynteracta posts edit-event 21269 --location "Room B" --invite-user 1042
+pynteracta posts edit-event 21269 --start 2026-11-06T09:00 --end 2026-11-06T11:00 --invite-user 1042
+pynteracta posts edit-event 21269 --invite-user 1042 --invite-user 1099 --notify-on-edit
 ```
 
 #### `posts copy-event POST_ID`
@@ -961,17 +971,18 @@ pynteracta posts edit-event 21269 --invite-user 1099 --notify-on-edit
 Copies an event post into a new one: same flags as `posts create-event` plus `--occ-token`. The
 post is read (`event-post-data-for-copy`) and its title, description, visibility, announcement
 flag, cover and event block are copied unless overridden. `--timezone` defaults to
-`Europe/Rome`. The table shows the **new** post.
+`Europe/Rome`. The table shows the **new** post. As with `edit-event`, pass the invitees again.
 
 ```bash
 pynteracta posts copy-event 21269 --title "Quarterly review (Q1)" \
-    --start 2027-02-04T10:00 --end 2027-02-04T12:00
+    --start 2027-02-04T10:00 --end 2027-02-04T12:00 --invite-user 1042
 ```
 
 #### `posts participate POST_ID yes|maybe|no`
 
 Answers the invitation as the authenticated identity (the technical identity with a service
-account). `--notes TEXT` adds a note. Prints `Participation to post 21269 recorded: yes`;
+account, accepted even when it is not invited). `--notes TEXT` adds a note in plain text, sent
+as a one-line rich-text delta (the only format the server accepts). Prints `Participation to post 21269 recorded: yes`;
 `--output json` prints `{"post_id", "answer", "type_id"}`. Any other answer is a usage error
 (exit code 2, no request); a post that does not exist or is not an event exits with code **5**.
 

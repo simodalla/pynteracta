@@ -402,6 +402,7 @@ def test_event_posts_pages_document_write_commands() -> None:
     ):
         assert needle in api, f"'{needle}' missing from docs/api/posts.md"
     assert "read-only for now" not in api
+    assert "to be confirmed" not in api, "docs/api/posts.md still waits for the tenant check"
     for page in (_ROOT / "docs" / "index.md", _ROOT / "README.md"):
         text = page.read_text(encoding="utf-8")
         assert "Event posts follow" not in text, f"stale 'Event posts follow' in {page.name}"

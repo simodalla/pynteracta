@@ -184,7 +184,7 @@ above (`edit_watchers()`, `edit_attachments()`, `delete()`, …): the endpoints 
 every post type.
 
 ```python
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from pynteracta.client import InteractaClient
@@ -198,9 +198,7 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
         start_at=datetime(2026, 11, 5, 10, 0, tzinfo=rome),
         end_at=datetime(2026, 11, 5, 12, 0, tzinfo=rome),
         location="Room A",
-        invited_user_ids=[1042],
-        invited_group_ids=[3],
-        invitation_type_id=2,  # 0 = guest, 2 = collaborator, for every invitee
+        invited_user_ids=[1042],  # no invitation_type_id: guests
         title="Quarterly review",
         description="Agenda in the attachment.",
         description_format=2,
@@ -209,10 +207,22 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
 
     form = client.posts.get_event_for_edit(created.post_id)
     event = form.event  # EventData, or None if the server returns no event block
+    content = form.content_data
     print(form.occ_token, event.start_at, event.timezone, event.location, event.my_answer)
-    print([(u.id, u.name, u.type_id) for u in event.invited_users])
 
-    client.posts.edit_event(created.post_id, form.occ_token, location="Room B")
+    # The server replaces the post: send back everything that must survive.
+    client.posts.edit_event(
+        created.post_id,
+        form.occ_token,
+        title=content.title,
+        description=content.descriptionDelta,
+        description_format=1,
+        visibility=content.visibility,
+        start_at=event.start_at,
+        end_at=event.end_at,
+        location="Room B",
+        invited_user_ids=[1042],  # the form does not return the invitees
+    )
     client.posts.participate(created.post_id, ParticipationAnswer.YES, notes="Arriving late")
 
     copy_form = client.posts.get_event_for_copy(created.post_id)
@@ -220,8 +230,21 @@ with InteractaClient(base_url="https://tenant.example.com", credentials=...) as 
         created.post_id,
         copy_form.occ_token,
         title="Quarterly review (Q1)",
+        visibility=copy_form.content_data.visibility,
         start_at=datetime(2027, 2, 4, 10, 0, tzinfo=rome),
         end_at=datetime(2027, 2, 4, 12, 0, tzinfo=rome),
+        location="Room A",
+        invited_user_ids=[1042],
+    )
+
+    holiday = client.posts.create_event(
+        79,
+        start_at=date(2026, 12, 24),
+        end_at=date(2026, 12, 26),
+        all_day=True,  # dates only, no time zone
+        location="Everywhere",
+        invited_group_ids=[3],
+        title="Office closed",
     )
 ```
 
@@ -243,26 +266,40 @@ date-time without offset (`"startAt": {"localDatetime": "2026-11-05T10:00:00"}`)
 name of the zone of `start_at` in `event.timezone`; `end_at` is converted into that zone. With a
 fixed offset (no IANA name) both are converted to UTC and `"UTC"` is sent. In `edit_event()` and
 `copy_event()`, where `start_at` is optional, the zone comes from `end_at` when `start_at` is
-missing. `all_day=True` sends `allDay: true` and leaves the dates as they are.
+missing. Without a time zone the server falls back to its own (`Europe/Paris` on the tested
+tenant).
 
-`EventData.start_at` and `end_at` are timezone-aware `datetime` objects too: read from
-`zonedDatetime` when the server sends it, otherwise from `localDatetime` in the event's
-`timezone`, and `None` when neither is available.
+All-day events take dates only: with `all_day=True` the dates are sent as `"2026-11-05"`, with
+no `timezone` key, the only form the server accepts (a time or a time zone is rejected with
+`400`). `start_at` and `end_at` can then be `date` objects, or `datetime` objects whose date is
+taken in their own zone; a plain `date` without `all_day=True` raises `ValueError`.
+
+`EventData.start_at` and `end_at` are read in the event's IANA zone (`localDatetime` plus
+`timezone`), so passing them back to `edit_event()` keeps the event where it is; without a
+usable zone they come from `zonedDatetime` (a fixed offset). For all-day events they are `date`
+objects. They are `None` when nothing can be read.
 
 ### Invitees and answers
 
 `invited_user_ids` and `invited_group_ids` become `event.invitations.users` and `.groups`, as
 `{"id": N}` items; with `invitation_type_id` every item also gets `"typeId"` (`0` guest, `2`
-collaborator). Different types per invitee need the `*_raw` variant with a prebuilt DTO.
+collaborator). Without it the server treats the invitees as guests. The server requires
+invitees on create, edit and copy, and at least one guest among them: no invitees, or
+collaborators only, are rejected with `400 REQUIRED_FIELD event.inivations` (the misspelling is
+the server's). Different types per invitee need the `*_raw` variant with a prebuilt DTO.
 `send_edit_post_notifications=True` notifies the invitees when the post is edited.
 `EventData.invited_users` and `invited_groups` list `EventInvitee` objects (`id`, `name`,
-`type_id`, `.raw`).
+`type_id`, `.raw`), but the tested tenant returns them empty in the forms: keep the invitee ids
+on your side and pass them again when you edit or copy.
 
 `participate()` records the answer of the authenticated identity: the technical identity with a
-service account, the linked user with Google OAuth2. `answer` is a `ParticipationAnswer`
-(`YES = 1`, `MAYBE = 2`, `NO = 3`) or its integer value; anything else raises `ValueError`
-before the request. `EventData.my_answer` is the answer already given, `None` if there is none.
-The server answers `404` (`NotFoundError`) for a post that does not exist or is not an event.
+service account (accepted even when it is not invited), the linked user with Google OAuth2.
+`answer` is a `ParticipationAnswer` (`YES = 1`, `MAYBE = 2`, `NO = 3`) or its integer value;
+anything else raises `ValueError` before the request. `notes` is plain text, sent as a one-line
+Quill delta (`[{"insert":"Arriving late\n"}]`) because the server rejects plain text;
+`participate_raw()` sends a prebuilt delta as it is. `EventData.my_answer` is the answer
+already given, `None` if there is none. The server answers `404` (`NotFoundError`) for a post
+that does not exist or is not an event.
 
 ### Cover image, watcher groups and pinning
 
@@ -274,12 +311,18 @@ is sent as given, in the shape of `LinkPreviewDTO`.
 
 ### Omitted fields in `edit_event()` and `copy_event()`
 
-Only the fields you pass are sent, and inside `event` only the keys you pass. What the server
-does with the omitted fields and event keys is **to be confirmed** against a tenant; until then
-read the post with `get_event_for_edit()` (or `get_event_for_copy()`) and send back every field
-that must survive. The CLI commands `posts edit-event` and `posts copy-event` do this for you.
-Write responses carry the post in `postData`; when the server includes the `event` block there,
-the CLI shows its dates and location, otherwise those columns stay empty.
+Only the fields you pass are sent, and inside `event` only the keys you pass, but the server
+treats edit and copy as a **replacement** of the post, as for custom posts:
+
+- `event` is required, and so are `title`, `event.endAt`, `event.location` and the invitees
+  (`400 REQUIRED_FIELD`); `create_event()` requires `event.endAt` and `event.location` too;
+- without `visibility` the server answers `500` with no body;
+- an omitted description is cleared, an omitted `event.timezone` becomes the server's default.
+
+So read the post with `get_event_for_edit()` (or `get_event_for_copy()`) and send back every
+field that must survive, as in the example above. The CLI commands `posts edit-event` and
+`posts copy-event` do this for you, except for the invitees. Write responses carry the post in
+`postData` without the `event` block: read the form again to see the event as saved.
 
 ## API Reference
 
