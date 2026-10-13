@@ -56,7 +56,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
      --cov-report=term-missing`: annotare la copertura raggiunta (attesa sopra l'85 % già qui).
   3. Controlli bloccanti; commit `test(cli): caratterizzazione dei comandi delle community`.
 
-### [ ] T03 – Enum del livello e `list_by_view_post_capability`
+### [x] T03 – Enum del livello e `list_by_view_post_capability`
 
 - Criteri: 09-C02, 09-C03, 09-C04, 09-C05, 09-C17
 - Dipende da: nessuno (T01 non è necessario: la risposta è `ListCommunitiesResponseDTO`, già

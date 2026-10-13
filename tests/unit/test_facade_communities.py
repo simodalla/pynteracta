@@ -13,6 +13,7 @@ from pynteracta.models.facade.communities import (
     PostDefinition,
     PostDefinitionMap,
     PostFieldDefinition,
+    ViewPostCapabilityLevel,
 )
 from pynteracta.models.generated import external_v2 as generated
 
@@ -189,3 +190,27 @@ class TestCatalogFacades:
         result = CatalogEntryList.from_dict({"items": [], "nextPageToken": None})
         assert result.items_typed == []
         assert result.next_page_token is None
+
+
+class TestViewPostCapabilityLevel:
+    # criterio: 09-C03
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("private", ViewPostCapabilityLevel.PRIVATE),
+            ("Private", ViewPostCapabilityLevel.PRIVATE),
+            ("PRIVATE", ViewPostCapabilityLevel.PRIVATE),
+            ("public", ViewPostCapabilityLevel.PUBLIC),
+            ("all", ViewPostCapabilityLevel.ALL),
+            (ViewPostCapabilityLevel.ALL, ViewPostCapabilityLevel.ALL),
+        ],
+    )
+    def test_accepted_values(self, value: object, expected: ViewPostCapabilityLevel) -> None:
+        assert ViewPostCapabilityLevel(value) is expected
+        assert expected.value == expected.name
+
+    # criterio: 09-C04
+    @pytest.mark.parametrize("value", ["privato", "", 42, None])
+    def test_invalid_values_raise(self, value: object) -> None:
+        with pytest.raises(ValueError, match="is not a valid ViewPostCapabilityLevel"):
+            ViewPostCapabilityLevel(value)

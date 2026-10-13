@@ -6,11 +6,18 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, make_transport
 
 from pynteracta.api.communities import CommunitiesAPI
-from pynteracta.models.facade.communities import FieldType, ListCommunitiesRequestDTO
+from pynteracta.exceptions import PermissionError, TransportError
+from pynteracta.models.facade.communities import (
+    CommunityList,
+    FieldType,
+    ListCommunitiesRequestDTO,
+    ViewPostCapabilityLevel,
+)
 
 _COMMUNITY_ID_A = 10
 _COMMUNITY_ID_B = 20
@@ -117,3 +124,73 @@ class TestCommunitiesAPI:
         defn_map = api.post_definitions_raw(req)
         assert route.called
         assert _COMMUNITY_ID_A in defn_map.definitions
+
+
+_VIEW_POST_URL = f"{BASE_URL}/communication/settings/communities/view-post"
+
+
+class TestViewPostCapability:
+    # criterio: 09-C02
+    @respx.mock
+    def test_without_level_sends_no_query(self) -> None:
+        payload = load_payload("communities_list.json")
+        route = respx.get(_VIEW_POST_URL).mock(return_value=httpx.Response(200, json=payload))
+        result = CommunitiesAPI(make_transport()).list_by_view_post_capability()
+        assert route.call_count == 1
+        assert route.calls[0].request.url.query == b""
+        assert isinstance(result, CommunityList)
+        assert [c.id for c in result.items_typed] == [_COMMUNITY_ID_A, _COMMUNITY_ID_B]
+        assert result.items_typed[0].name == "Engineering"
+        assert result.raw.communities is not None
+
+    # criterio: 09-C03
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("level", "sent"),
+        [
+            (ViewPostCapabilityLevel.PRIVATE, "PRIVATE"),
+            ("private", "PRIVATE"),
+            ("Private", "PRIVATE"),
+            ("PRIVATE", "PRIVATE"),
+            (ViewPostCapabilityLevel.PUBLIC, "PUBLIC"),
+            ("public", "PUBLIC"),
+            (ViewPostCapabilityLevel.ALL, "ALL"),
+            ("all", "ALL"),
+        ],
+    )
+    def test_level_sent_as_query(self, level: object, sent: str) -> None:
+        route = respx.get(_VIEW_POST_URL).mock(
+            return_value=httpx.Response(200, json={"communities": []})
+        )
+        result = CommunitiesAPI(make_transport()).list_by_view_post_capability(level)  # type: ignore[arg-type]
+        assert dict(route.calls[0].request.url.params) == {"viewPostCapabilityLevel": sent}
+        assert result.items_typed == []
+
+    # criterio: 09-C04
+    @respx.mock
+    @pytest.mark.parametrize("level", ["privato", "", 42])
+    def test_invalid_level_raises_before_request(self, level: object) -> None:
+        route = respx.get(_VIEW_POST_URL).mock(
+            return_value=httpx.Response(200, json={"communities": []})
+        )
+        with pytest.raises(ValueError, match="is not a valid ViewPostCapabilityLevel"):
+            CommunitiesAPI(make_transport()).list_by_view_post_capability(level)  # type: ignore[arg-type]
+        assert route.called is False
+
+    # criterio: 09-C05
+    @respx.mock
+    def test_403_raises_permission_error_once(self) -> None:
+        route = respx.get(_VIEW_POST_URL).mock(
+            return_value=httpx.Response(403, json={"errorCode": "FORBIDDEN"})
+        )
+        with pytest.raises(PermissionError):
+            CommunitiesAPI(make_transport()).list_by_view_post_capability("all")
+        assert route.call_count == 1
+
+    # criterio: 09-C17
+    @respx.mock
+    def test_timeout_raises_transport_error_once(self) -> None:
+        route = respx.get(_VIEW_POST_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(TransportError):
+            CommunitiesAPI(make_transport()).list_by_view_post_capability()
+        assert route.call_count == 1
