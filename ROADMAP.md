@@ -31,7 +31,8 @@ gated on 1.0** (decided 2026-09-12, see [specs/legacy/v0.9.4-pypi-publication.md
 releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9.4 onward, and
 `Development Status :: 3 - Alpha` carries the stability signal.
 
-**Scope cadence:** one read-endpoint group per minor release (decided 2026-06-04).
+**Scope cadence:** one coherent endpoint group per minor release (decided 2026-06-04 for the
+reads, extended to the writes by ADR 0001 on 2026-10-08).
 
 ## Versions
 
@@ -60,7 +61,7 @@ releases are published to [PyPI](https://pypi.org/project/pynteracta/) from v0.9
 > Milestone numbers continue the `PROGRESS.md` sequence (last used: M34). The gap M11–M13 is
 > unused legacy numbering and is intentionally skipped.
 
-## Read-surface inventory (target for the 0.2–0.6 line)
+## Read-surface inventory (target for the 0.2–0.6 line, all shipped)
 
 Endpoints present in the pinned swagger but **not yet covered**, grouped by the minor that will
 add them. (`✅` = already shipped in 0.1.0, listed for context.)
@@ -94,20 +95,27 @@ add them. (`✅` = already shipped in 0.1.0, listed for context.)
 - `GET  admin/manage/catalogs/{catalogId}/entries/{entryId}/edit`
 - `GET  admin/manage/users/{userId}/credentials/edit`
 
-## Write surface (in scope since 2026-10-08, [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md))
+## Write surface (in scope since 2026-10-08, [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md), complete since 2026-10-13)
 
 The 34 mutating endpoints of the pinned swagger, plus the read "form-prep" helpers that are
-propaedeutic to them. One spec per group (order decided spec by spec, see `specs/prd.md`
-RF-021…RF-025):
+propaedeutic to them. One spec per group (see `specs/prd.md` RF-021…RF-025); all shipped:
 
-- **Posts & comments** (15) — `communication/posts/manage/*`: create/edit post and event-post,
-  custom data, attachments, watchers, workflow screen data and operations, copy, delete,
-  mark-as-erasable, event participation, create-comment; helpers `post-data-for-create|edit|copy`,
-  `event-post-data-for-*`, `post-workflow-screen-data-for-edit`.
-- **Tasks** (3) — `communication/tasks/manage/*`: create, edit, delete.
-- **Admin** (15) — `admin/manage/*`: users (create, edit, delete, credentials), groups (create,
-  edit, delete, members), catalogs and entries (create, edit, `deleted` flag), workspace edit.
-- **Attachment upload** (1) — `core/storage/upload-new-attachment`.
+- ✅ **Posts & comments** (15) — `communication/posts/manage/*`: custom posts, custom data,
+  attachments, watchers, workflow screen data and operations, copy, delete, mark-as-erasable,
+  create-comment, with the helpers `post-data-for-create|edit|copy` and
+  `post-workflow-screen-data-for-edit` (spec 03, 0.11.0); event posts create, edit, copy and
+  participation, with `event-post-data-for-*` (spec 08, 0.14.0).
+- ✅ **Tasks** (3) — `communication/tasks/manage/*`: create, edit, delete (spec 02, 0.10.0).
+- ✅ **Admin** (15) — `admin/manage/*`: users (create, edit, delete, credentials) and groups
+  (create, edit, delete, members) (spec 05, 0.12.0); catalogs and entries (create, edit,
+  `deleted` flag) and workspace edit (spec 06, 0.13.0).
+- ✅ **Attachment upload** (1) — `core/storage/upload-new-attachment` (spec 04, 0.12.0).
+
+## Still uncovered in the pinned swagger
+
+- `GET communication/settings/communities/view-post` (`viewPostCapabilityLevel`): the
+  communities in which the caller has a given post-view capability. The only endpoint of the 76
+  in the swagger not yet exposed.
 
 ## Deferred / future
 
@@ -115,4 +123,5 @@ RF-021…RF-025):
 - **Alternate auth**: Microsoft OAuth2, username/password (same exchange pattern as Google OAuth2).
 - **Automatic retry/backoff** with jitter — **reads only**: writes are never retried automatically
   (non-negotiable rule, ADR 0001).
-- **Strict-semver 1.0** once the surface is stable. (PyPI publication shipped in 0.9.4.)
+- **Strict-semver 1.0** once the surface is complete (see above) and stable. (PyPI publication
+  shipped in 0.9.4.)

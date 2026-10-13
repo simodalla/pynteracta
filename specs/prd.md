@@ -1,11 +1,11 @@
 # PRD – pynteracta
 
 Origine: ricostruito dal codice il 2026-10-08 da `/sddpa:init`
-Stato: bozza da confermare
+Stato: confermato (tutte le sezioni confermate dal maintainer; l'ultima il 2026-10-13)
 
-Ogni sezione porta "Da confermare" finché il maintainer non la conferma; `/sddpa:specifica` chiede
-di confermare le sezioni che la spec tocca. Le funzioni sono descritte per quello che il codice fa
-davvero alla versione 0.9.4. Le spec per versione precedenti all'adozione del metodo stanno in
+Ogni sezione porta la data della conferma del maintainer; `/sddpa:specifica` chiede di
+riconfermare le sezioni che la spec tocca. Le funzioni sono descritte per quello che il codice fa
+davvero alla versione 0.14.0. Le spec per versione precedenti all'adozione del metodo stanno in
 [`legacy/`](legacy/), congelate; la storia del progetto è in [`../PROGRESS.md`](../PROGRESS.md).
 
 ## 1. Scopo
@@ -39,7 +39,9 @@ Confermato dal maintainer il 2026-10-08.
 
 ## 3. Requisiti funzionali
 
-*Da confermare.* Uno per funzione; il dettaglio arriva con le spec che li toccano.
+Confermato dal maintainer il 2026-10-13 (i singoli requisiti portano la data della conferma
+data dalla spec che li ha toccati). Uno per funzione; il dettaglio arriva con le spec che li
+toccano.
 
 - RF-001. Autenticazione con service account: da un file chiave JSON (`ServiceAccountKey`) la
   libreria costruisce un'asserzione JWT firmata RS512 e ottiene un access token dal tenant.
@@ -249,7 +251,7 @@ più `*_raw`, comando CLI, test unit e contract).
 
 ## 4. Requisiti non funzionali
 
-*Da confermare.* Solo ciò che il codice o la configurazione mostrano.
+Confermato dal maintainer il 2026-10-13. Solo ciò che il codice o la configurazione mostrano.
 
 - RNF-001. Redazione prima di log, audit log e hook, dentro il transport: gli header
   `Authorization`, `Proxy-Authorization` e quelli il cui nome contiene `token`, `secret`,
@@ -305,7 +307,8 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
 
 ## 6. Dati personali trattati
 
-*Da confermare.*
+Confermato dal maintainer il 2026-10-13 (le voci sulle scritture erano già confermate spec per
+spec).
 
 - **Dati letti dal tenant**: anagrafiche degli utenti Interacta (nome, cognome, email, id, stato,
   provider di login), contenuti di post, commenti, allegati e task, membri dei gruppi. La libreria
@@ -386,3 +389,6 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
   realizzati); §1 con la superficie di scrittura dell'ADR 0001 completa; RNF-010 esteso alle date
   degli eventi; RF-021, RNF-010 e la voce "Dati scritti sul tenant" di §6 confermati dal
   maintainer per la parte degli eventi.
+- 2026-10-13: §3, §4 e §6 confermati per intero dal maintainer a scritture completate; lo stato del
+  documento passa da bozza a confermato e la versione di riferimento da 0.9.4 a 0.14.0 (branch
+  `bugfix_docs_allineamento`, allineamento dei documenti di governo).
