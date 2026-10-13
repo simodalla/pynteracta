@@ -1,6 +1,57 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.14.0] - 2026-10-13
+
+### Build
+
+- **deps**: Aggiornamento del lock e di ruff nel hook pre-commit
+
+### Chores
+
+- **deps**: Bump the pre-commit group across 1 directory with 5 updates
+- **deps**: Unione della PR #5 di Dependabot (hook pre-commit)
+- Fixture e contract test dei DTO dei post evento (08-T02)
+- Ciclo completo dei post evento sul tenant, opt-in (08-T15)
+- Esito delle prove sul tenant e integration test adattato (08-T16)
+- Marker 08-C25 sui test di parse_event_datetime, al posto del sostituito 08-C13 (08-T19)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.13.1
+- Lista dei cataloghi senza id vuota sul tenant
+- Spec 08, scrittura dei post evento
+- Piano 08, scrittura dei post evento
+- Task 08, scrittura dei post evento
+- Scrittura dei post evento nella libreria e nella CLI (08-T14)
+- Revisione della spec 08 dopo la prova sul tenant, criteri 08-C25..31 e task T18, T19
+- PRD e pagine aggiornate con l'esito delle prove sul tenant per la spec 08 (08-T17)
+- Verifica 08, scrittura dei post evento
+- Release v0.14.0, riga di ROADMAP a shipped
+
+### Features
+
+- **api**: Blocco data-ora degli eventi con fuso IANA; riga 0.14.0 in ROADMAP (08-T01)
+- **posts**: Façade dei dati evento, delle letture propedeutiche e risposta di partecipazione (08-T04)
+- **posts**: Letture propedeutiche e creazione dei post evento (08-T05)
+- **posts**: Modifica e copia dei post evento con occToken (08-T06)
+- **posts**: Risposta all'invito di un post evento (08-T07)
+- **cli**: Lettura delle date degli eventi da data o data-ora (08-T08)
+- **cli**: Letture propedeutiche dei post evento (08-T09)
+- **cli**: Creazione dei post evento (08-T10)
+- **cli**: Modifica e copia dei post evento a partire dal form letto (08-T11)
+- **cli**: Risposta all'invito di un post evento (08-T12)
+- **cli**: Copertina dei post evento caricata dallo storage (08-T13)
+
+### Fixes
+
+- Eventi tutto il giorno, date lette nel fuso dell'evento e note in delta (08-T18)
+- **cli**: Eventi tutto il giorno e tabella delle scritture degli eventi (08-T19)
+
+### Refactors
+
+- **facade**: Helper di rivalidazione degli stub condivisi tra le façade (08-T03)
+
 ## [0.13.1] - 2026-10-12
 
 ### Documentation
