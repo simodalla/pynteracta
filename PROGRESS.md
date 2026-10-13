@@ -2041,3 +2041,25 @@ Nona spec del metodo: [`specs/09-swagger-align/`](specs/09-swagger-align/) (`spe
 - Rifiutare prima della richiesta `downloadable` su commenti e task, invece del `400` del server.
 - `view-post` con utenti dai permessi diversi: i livelli potrebbero differire.
 - Resta aperto il kwarg `calculate_total_items_count` su `attachments.list_for_post`.
+
+## Fuori milestone — Controlli sul download dello swagger — 2026-10-13
+
+Dalla code review del codice della spec 09. Solo lo script di rigenerazione e il suo test, branch
+`bugfix_generate_models_guard`.
+
+### Fatto
+
+- `scripts/generate_models.py`: una risposta che non è JSON, o è JSON senza `definitions` (o con
+  `definitions` vuote o non oggetto), fa uscire lo script con `ERROR` e codice `1` senza toccare
+  il pinnato; prima, un JSON senza `definitions` sovrascriveva il pinnato con zero schemi e una
+  pagina HTML dava un traceback. Un pinnato precedente illeggibile dà un `WARNING` e si tiene
+  l'ordine ricevuto. `set(known)` calcolato una volta sola.
+- `tests/unit/test_generate_models.py`: sei test nuovi sotto 09-C18, rossi prima della
+  correzione; il modulo dello script è registrato in `sys.modules` solo per la durata del test.
+
+### Follow-up
+
+- L'ordine stabile vale per le `definitions` di primo livello: se il tenant riordinasse le
+  `properties` di uno schema con oggetti annidati, i suffissi generati potrebbero ancora
+  cambiare. Non osservato; il confronto AST dei nomi di classe dopo ogni rigenerazione lo
+  mostrerebbe.

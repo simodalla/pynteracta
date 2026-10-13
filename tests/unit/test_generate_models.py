@@ -16,19 +16,20 @@ import respx
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "generate_models.py"
 
 
-def _load_script() -> ModuleType:
+def _load_script(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     spec = importlib.util.spec_from_file_location("generate_models_under_test", _SCRIPT)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
+    # registrato solo per la durata del test: monkeypatch lo toglie alla fine
+    monkeypatch.setitem(sys.modules, spec.name, module)
     spec.loader.exec_module(module)
     return module
 
 
 @pytest.fixture
-def script() -> ModuleType:
-    return _load_script()
+def script(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    return _load_script(monkeypatch)
 
 
 def _swagger(*names: str, note: str = "") -> dict:  # type: ignore[type-arg]
@@ -94,3 +95,75 @@ class TestDownloadSwagger:
         )
         script.download_swagger()
         assert list(json.loads(snapshot.read_bytes())["definitions"]) == ["C", "A"]
+
+
+class TestDownloadGuards:
+    """Un download che non è uno swagger non tocca il pinnato (spec 09, bugfix)."""
+
+    def _setup(self, script: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        snapshot = tmp_path / "swagger.json"
+        snapshot.write_text(json.dumps(_swagger("B", "A")) + "\n", encoding="utf-8")
+        monkeypatch.setattr(script, "SWAGGER_SNAPSHOT", snapshot)
+        return snapshot
+
+    # criterio: 09-C18
+    @respx.mock
+    def test_html_response_exits_and_keeps_pinned(
+        self,
+        script: ModuleType,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        snapshot = self._setup(script, tmp_path, monkeypatch)
+        before = snapshot.read_bytes()
+        respx.get(script.SWAGGER_URL).mock(
+            return_value=httpx.Response(200, text="<html>maintenance</html>")
+        )
+        with pytest.raises(SystemExit) as exc:
+            script.download_swagger()
+        assert exc.value.code == 1
+        assert snapshot.read_bytes() == before
+        assert "ERROR" in capsys.readouterr().err
+
+    # criterio: 09-C18
+    @respx.mock
+    @pytest.mark.parametrize(
+        "body",
+        [{"error": "boom"}, {"swagger": "2.0", "definitions": {}}, [1, 2], {"definitions": []}],
+    )
+    def test_json_without_definitions_exits_and_keeps_pinned(
+        self,
+        script: ModuleType,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        body: object,
+    ) -> None:
+        snapshot = self._setup(script, tmp_path, monkeypatch)
+        before = snapshot.read_bytes()
+        respx.get(script.SWAGGER_URL).mock(return_value=httpx.Response(200, json=body))
+        with pytest.raises(SystemExit) as exc:
+            script.download_swagger()
+        assert exc.value.code == 1
+        assert snapshot.read_bytes() == before
+        assert "definitions" in capsys.readouterr().err
+
+    # criterio: 09-C18
+    @respx.mock
+    def test_corrupt_previous_snapshot_warns_and_keeps_received_order(
+        self,
+        script: ModuleType,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        snapshot = tmp_path / "swagger.json"
+        snapshot.write_text("{not json", encoding="utf-8")
+        monkeypatch.setattr(script, "SWAGGER_SNAPSHOT", snapshot)
+        respx.get(script.SWAGGER_URL).mock(
+            return_value=httpx.Response(200, json=_swagger("C", "A"))
+        )
+        script.download_swagger()
+        assert list(json.loads(snapshot.read_bytes())["definitions"]) == ["C", "A"]
+        assert "WARNING" in capsys.readouterr().err
