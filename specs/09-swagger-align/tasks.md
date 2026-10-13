@@ -40,7 +40,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
   5. Controlli bloccanti (contract compresi); commit `feat(models): rigenerazione dei modelli
      dallo swagger live del tenant cert`.
 
-### [ ] T02 – Test di caratterizzazione della CLI delle community
+### [x] T02 – Test di caratterizzazione della CLI delle community
 
 - Criteri: 09-C13 (prima metà: i comandi esistenti)
 - Dipende da: nessuno

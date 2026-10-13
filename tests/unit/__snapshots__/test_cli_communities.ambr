@@ -22,6 +22,33 @@
   
   '''
 # ---
+# name: TestCommunitiesDetailsBulk.test_json_output
+  '''
+  [
+    {
+      "id": 10,
+      "name": "Engineering"
+    },
+    {
+      "id": 20,
+      "name": "Marketing"
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCommunitiesDetailsBulk.test_table_output
+  '''
+      Communities     
+  ┏━━━━┳━━━━━━━━━━━━━┓
+  ┃ id ┃ name        ┃
+  ┡━━━━╇━━━━━━━━━━━━━┩
+  │ 10 │ Engineering │
+  │ 20 │ Marketing   │
+  └────┴─────────────┘
+  
+  '''
+# ---
 # name: TestCommunitiesList.test_json_output
   '''
   [
@@ -79,6 +106,57 @@
   │ 1459 │ column_1459 │ Rate the experience │ FEEDBACK │ False    │
   │ 1460 │ column_1460 │ Category            │ ENUM     │ True     │
   └──────┴─────────────┴─────────────────────┴──────────┴──────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesPostDefinitions.test_full_table
+  '''
+                 Post Definitions [1]               
+  ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Field            ┃ Value                       ┃
+  ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ id               │ 1459                        │
+  │ name             │ column_1459                 │
+  │ label            │ Rate the experience         │
+  │ type             │ 12                          │
+  │ required         │ False                       │
+  │ readonly         │ False                       │
+  │ searchable       │ True                        │
+  │ sortable         │ True                        │
+  │ visibleInPreview │ True                        │
+  │ visibleInDetail  │ True                        │
+  │ visibleInCreate  │ True                        │
+  │ visibleInEdit    │ True                        │
+  │ enumValues       │ []                          │
+  │ metadata         │ {"feedback_max_value":"10"} │
+  │ validations      │ []                          │
+  │ community_id     │ 10                          │
+  └──────────────────┴─────────────────────────────┘
+  
+  '''
+# ---
+# name: TestCommunitiesPostDefinitions.test_json_output
+  '''
+  [
+    {
+      "community_id": 10,
+      "field_id": 1459,
+      "label": "Rate the experience",
+      "type": "FEEDBACK",
+      "required": false
+    }
+  ]
+  
+  '''
+# ---
+# name: TestCommunitiesPostDefinitions.test_table_output
+  '''
+                             Post Definitions                            
+  ┏━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+  ┃ community_id ┃ field_id ┃ label               ┃ type     ┃ required ┃
+  ┡━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
+  │ 10           │ 1459     │ Rate the experience │ FEEDBACK │ False    │
+  └──────────────┴──────────┴─────────────────────┴──────────┴──────────┘
   
   '''
 # ---
