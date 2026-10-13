@@ -57,7 +57,7 @@ def download_swagger() -> None:
     """Scarica lo swagger e lo scrive in ``tests/fixtures/swagger.json``.
 
     Le definizioni mantengono l'ordine del pinnato precedente (:func:`stable_definitions_order`);
-    il file è JSON compatto, senza escape dei caratteri non ASCII, come quello del tenant.
+    il file è JSON compatto, senza escape dei caratteri non ASCII, con a capo finale.
     """
     print(f"Downloading Swagger from {SWAGGER_URL} …", flush=True)
     try:
@@ -69,7 +69,8 @@ def download_swagger() -> None:
 
     previous = json.loads(SWAGGER_SNAPSHOT.read_bytes()) if SWAGGER_SNAPSHOT.exists() else None
     ordered = stable_definitions_order(response.json(), previous)
-    content = json.dumps(ordered, separators=(",", ":"), ensure_ascii=False).encode()
+    # JSON compatto con a capo finale, come lo lascia il hook end-of-file-fixer di pre-commit.
+    content = json.dumps(ordered, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     SWAGGER_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
     SWAGGER_SNAPSHOT.write_bytes(content)
     print(f"Saved {len(content):,} bytes → {SWAGGER_SNAPSHOT}", flush=True)

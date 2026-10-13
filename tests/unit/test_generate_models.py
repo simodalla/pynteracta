@@ -77,7 +77,9 @@ class TestDownloadSwagger:
         script.download_swagger()
         written = snapshot.read_bytes()
         expected = script.stable_definitions_order(live, _swagger("B", "A"))
-        assert written == json.dumps(expected, separators=(",", ":"), ensure_ascii=False).encode()
+        compact = json.dumps(expected, separators=(",", ":"), ensure_ascii=False)
+        # a capo finale, come vuole il hook end-of-file-fixer di pre-commit
+        assert written == compact.encode() + b"\n"
         assert list(json.loads(written)["definitions"]) == ["B", "A", "C"]
 
     # criterio: 09-C18
