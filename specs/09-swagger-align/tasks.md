@@ -138,7 +138,7 @@ del commit. Costanti dei test: community `10` e `20` (fixture `communities_list.
      docstring `Args` in italiano.
   4. Controlli bloccanti; commit `feat(attachments): flag downloadable sugli allegati caricati`.
 
-### [ ] T07 – Integration test: `view-post` e allegato non scaricabile
+### [x] T07 – Integration test: `view-post` e allegato non scaricabile
 
 - Criteri: 09-C15, 09-C16 (scrittura dei test; l'esecuzione sul tenant è T08)
 - Dipende da: T03, T05, T06

@@ -8,6 +8,7 @@ import os
 import pytest
 
 from pynteracta.client import InteractaClient
+from pynteracta.models.facade.communities import CommunityList, ViewPostCapabilityLevel
 
 pytestmark = pytest.mark.integration
 
@@ -42,6 +43,23 @@ class TestCommunitiesIntegration:
         with client:
             result = client.communities.list()
         assert isinstance(result.items_typed, list)
+
+    # criterio: 09-C15
+    def test_list_by_view_post_capability(self, client: InteractaClient) -> None:
+        with client:
+            results = {
+                "none": client.communities.list_by_view_post_capability(),
+                **{
+                    level.value: client.communities.list_by_view_post_capability(level)
+                    for level in ViewPostCapabilityLevel
+                },
+            }
+            plain = client.communities.list()
+        for name, result in results.items():
+            assert isinstance(result, CommunityList), name
+            assert all(item.id is not None for item in result.items_typed), name
+        counts = {name: len(result.items_typed) for name, result in results.items()}
+        print(f"\n[09-T08] view-post counts={counts} list={len(plain.items_typed)}")
 
     def test_community_details(self, client: InteractaClient) -> None:
         community_id = int(_require_env("PYNTERACTA_TEST_COMMUNITY_ID"))

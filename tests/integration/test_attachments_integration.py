@@ -111,7 +111,8 @@ class TestAttachmentsUploadIntegration:
         post_id: int | None = None
         with client:
             try:
-                uploaded = client.attachments.upload(first)
+                # criterio: 09-C16
+                uploaded = client.attachments.upload(first, downloadable=False)
                 assert uploaded.content_ref
                 created = client.posts.create(
                     community_id,
@@ -125,11 +126,22 @@ class TestAttachmentsUploadIntegration:
                 post_id = created.post_id
                 assert post_id is not None
 
+                detail = client.posts.get(post_id)
+                assert detail.draft in (False, None)
+                assert detail.publication_timestamp is None or isinstance(
+                    detail.publication_timestamp, int
+                )
+                print(
+                    f"\n[09-T08] draft={detail.draft} "
+                    f"publication_timestamp={detail.publication_timestamp}"
+                )
+
                 items = client.attachments.list_for_post(post_id).items_typed
                 attached = [item for item in items if item.name == first.name]
                 assert attached, f"{first.name} not in {[item.name for item in items]}"
                 attachment_id = attached[0].id
                 assert attachment_id is not None
+                assert attached[0].downloadable is False
                 print(
                     f"\n[T15] attached: id={attachment_id} name={attached[0].name!r} "
                     f"version={attached[0].version_number} mime={attached[0].content_mime_type}"
