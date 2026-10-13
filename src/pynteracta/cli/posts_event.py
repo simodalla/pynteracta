@@ -282,7 +282,8 @@ def event_copy_base(form: EventPostForCopy) -> dict[str, Any]:
 def merge_event(
     base_event: dict[str, Any], json_event: dict[str, Any], flags_event: dict[str, Any]
 ) -> dict[str, Any]:
-    """Blocco ``event`` unito: letto < ``--json`` < flag, chiave per chiave.
+    """Blocco ``event`` unito: letto < ``--json`` < flag, chiave per chiave, poi
+    :func:`all_day_block`.
 
     ``invitations`` di ``--json`` sostituisce per intero quella letta; quella dei flag si unisce
     per chiave (``--invite-user`` sostituisce solo ``users``, ``--invite-group`` solo ``groups``).
@@ -293,7 +294,24 @@ def merge_event(
             merged[key] = {**(merged.get(key) or {}), **value}
         else:
             merged[key] = value
-    return merged
+    return all_day_block(merged)
+
+
+def all_day_block(event: dict[str, Any]) -> dict[str, Any]:
+    """Con ``allDay: true`` le date perdono l'ora e ``timezone`` sparisce (08-C27).
+
+    Il server rifiuta ora e fuso sugli eventi tutto il giorno; il blocco unito può averli dai
+    flag (``--start`` letto nel fuso) anche quando ``allDay`` viene dal post letto o da
+    ``--json``. Senza ``allDay: true`` il blocco resta com'è.
+    """
+    if event.get("allDay") is not True:
+        return event
+    result = {key: value for key, value in event.items() if key != "timezone"}
+    for key in ("startAt", "endAt"):
+        value = result.get(key)
+        if isinstance(value, dict) and isinstance(value.get("localDatetime"), str):
+            result[key] = {**value, "localDatetime": value["localDatetime"].split("T")[0]}
+    return result
 
 
 def read_timezone(form: EventPostForEdit | EventPostForCopy) -> str:
@@ -327,37 +345,23 @@ def _event_columns(event: EventData | None) -> dict[str, object]:
     }
 
 
-def _event_dt_text(value: Any) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    text = value.get("zonedDatetime") or value.get("localDatetime")
-    return str(text) if text is not None else None
-
-
 # --- righe curate -------------------------------------------------------------------------
 
 
 def event_write_result_row(obj: object) -> dict[str, object]:
     """Tabella di ``create-event``, ``edit-event`` e ``copy-event``.
 
-    Le colonne dell'evento vengono da ``postData.event`` della risposta, se il server lo
-    restituisce; altrimenti restano vuote.
+    Nessuna colonna dell'evento: le risposte di scrittura non riportano ``event`` in
+    ``postData`` (08-C31); i dati dell'evento si leggono con ``get-event-for-edit``.
     """
     result = obj if isinstance(obj, PostWriteResult) else None
     if result is None:
         return {}
     post = result.post
-    raw_post = _root(result.raw.postData) if result.raw.postData is not None else None
-    event = raw_post.get("event") if isinstance(raw_post, dict) else None
-    event = event if isinstance(event, dict) else {}
     return {
         "id": result.post_id,
         "community_id": post.communityId if post is not None else None,
         "title": post.title if post is not None else None,
-        "start_at": _event_dt_text(event.get("startAt")),
-        "end_at": _event_dt_text(event.get("endAt")),
-        "timezone": event.get("timezone"),
-        "location": event.get("location"),
         "visibility": post.visibility if post is not None else None,
         "next_occ_token": result.next_occ_token,
     }

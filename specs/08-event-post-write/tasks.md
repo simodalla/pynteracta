@@ -348,7 +348,7 @@ ZoneInfo("Europe/Rome")`, `_START` 2026-11-05 10:00 e `_END` 12:00 nel fuso `_RO
   5. Integration test: dopo `edit_event` il fuso resta `Europe/Rome`. Controlli bloccanti; commit
      `fix: eventi tutto il giorno, date lette nel fuso dell'evento e note in delta (08-T18)`.
 
-### [ ] T19 – Tutto il giorno e tabella di scrittura nella CLI (aggiunto il 2026-10-13 dopo T16)
+### [x] T19 – Tutto il giorno e tabella di scrittura nella CLI (aggiunto il 2026-10-13 dopo T16)
 
 - Criteri: 08-C25, 08-C27, 08-C30, 08-C31 (sostituiscono 08-C13, 08-C17, 08-C12)
 - Dipende da: T18

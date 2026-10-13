@@ -15,6 +15,7 @@ from typer.testing import CliRunner
 
 from pynteracta.cli import app
 from pynteracta.cli.posts_event import (
+    all_day_block,
     event_copy_base,
     event_edit_base,
     event_write_block,
@@ -183,7 +184,7 @@ def _create(runner: CliRunner, *args: str) -> Any:
 
 
 class TestMergeEvent:
-    # criterio: 08-C12
+    # criterio: 08-C31
     def test_flags_win_and_invitations_merge_by_key(self) -> None:
         merged = merge_event(
             {},
@@ -220,7 +221,7 @@ class TestMergeEvent:
 
 
 class TestCreateEvent:
-    # criterio: 08-C12
+    # criterio: 08-C31
     @respx.mock
     def test_flags_and_json_merge_flags_win(
         self, runner: CliRunner, tmp_path: pathlib.Path
@@ -281,7 +282,7 @@ class TestCreateEvent:
             },
         }
 
-    # criterio: 08-C12
+    # criterio: 08-C31
     @respx.mock
     def test_without_announcement_and_pinned_keys_missing(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -292,27 +293,19 @@ class TestCreateEvent:
             "event": {"startAt": _START_BLOCK, "timezone": "Europe/Rome"},
         }
 
-    # criterio: 08-C12
+    # criterio: 08-C31
     @respx.mock
     def test_table_output(self, runner: CliRunner, snapshot: object) -> None:
         _mock_create()
         result = _create(runner, "--start", "2026-11-05T10:00:00", "--title", "T")
         assert result.exit_code == 0, result.output
-        for column in (
-            "id",
-            "community_id",
-            "title",
-            "start_at",
-            "end_at",
-            "timezone",
-            "location",
-            "visibility",
-            "next_occ_token",
-        ):
+        for column in ("id", "community_id", "title", "visibility", "next_occ_token"):
             assert column in result.output
+        for column in ("start_at", "end_at", "timezone", "location"):
+            assert column not in result.output
         assert result.output == snapshot
 
-    # criterio: 08-C12
+    # criterio: 08-C31
     @respx.mock
     def test_json_output(self, runner: CliRunner, snapshot: object) -> None:
         _mock_create()
@@ -329,15 +322,16 @@ class TestCreateEvent:
         assert json.loads(result.output)["id"] == 21270  # noqa: PLR2004
         assert result.output == snapshot
 
+    # criterio: 08-C31
     @respx.mock
-    def test_table_without_event_in_response_has_empty_columns(self, runner: CliRunner) -> None:
-        payload = load_payload("create_event_post_response.json")
-        del payload["postData"]["event"]
-        mock_json("POST", _CREATE_PATH, payload)
+    def test_table_has_no_event_columns_even_with_event_in_response(
+        self, runner: CliRunner
+    ) -> None:
+        _mock_create()
         result = _create(runner, "--start", "2026-11-05T10:00:00")
         assert result.exit_code == 0, result.output
         assert "Sala A" not in result.output
-        assert "start_at" in result.output
+        assert "start_at" not in result.output
 
     # criterio: 08-C25
     @respx.mock
@@ -375,7 +369,7 @@ class TestCreateEvent:
             "timezone": "Europe/Rome",
         }
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_explicit_offset_sends_utc(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -386,7 +380,7 @@ class TestCreateEvent:
             "timezone": "UTC",
         }
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_timezone_flag_applied(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -397,7 +391,7 @@ class TestCreateEvent:
             "timezone": "America/New_York",
         }
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_unknown_timezone_exits_2(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -405,7 +399,7 @@ class TestCreateEvent:
         assert result.exit_code == _EXIT_CONFIG
         assert route.call_count == 0
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_bad_start_exits_2(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -413,7 +407,7 @@ class TestCreateEvent:
         assert result.exit_code == _EXIT_CONFIG
         assert route.call_count == 0
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_missing_start_exits_2_without_requests(self, runner: CliRunner) -> None:
         route = _mock_create()
@@ -422,7 +416,7 @@ class TestCreateEvent:
         assert "--start" in result.output
         assert route.call_count == 0
 
-    # criterio: 08-C13
+    # criterio: 08-C25
     @respx.mock
     def test_start_from_json_event_is_enough(
         self, runner: CliRunner, tmp_path: pathlib.Path
@@ -977,3 +971,101 @@ class TestCoverAndAttach:
         assert result.exit_code == _EXIT_CONFIG
         assert storage.call_count == 0
         assert route.call_count == 0
+
+
+def _all_day_event() -> dict[str, Any]:
+    day = {
+        "zonedDatetime": "2026-11-05",
+        "localDatetime": "2026-11-05",
+        "utcDatetime": "2026-11-05",
+    }
+    return {
+        "startAt": dict(day),
+        "endAt": dict(day),
+        "timezone": None,
+        "allDay": True,
+        "location": "Sala A",
+        "invitations": {"users": [{"id": 7}]},
+    }
+
+
+def _all_day_form(form: dict[str, Any]) -> dict[str, Any]:
+    data = json.loads(json.dumps(form))
+    data["contentData"]["event"] = _all_day_event()
+    return data
+
+
+class TestAllDayBlock:
+    # criterio: 08-C27
+    def test_all_day_drops_time_and_timezone(self) -> None:
+        block = {
+            "startAt": {"localDatetime": "2026-11-06T00:00:00"},
+            "endAt": {"localDatetime": "2026-11-05"},
+            "timezone": "Europe/Rome",
+            "allDay": True,
+            "location": "Sala A",
+        }
+        assert all_day_block(block) == {
+            "startAt": {"localDatetime": "2026-11-06"},
+            "endAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+            "location": "Sala A",
+        }
+
+    # criterio: 08-C27
+    @pytest.mark.parametrize("all_day", [False, None])
+    def test_not_all_day_unchanged(self, all_day: bool | None) -> None:
+        block: dict[str, Any] = {"startAt": _START_BLOCK, "timezone": "Europe/Rome"}
+        if all_day is not None:
+            block["allDay"] = all_day
+        assert all_day_block(block) == block
+
+
+class TestAllDayMerge:
+    # criterio: 08-C27
+    @respx.mock
+    def test_edit_all_day_read_event_start_flag(self, runner: CliRunner) -> None:
+        _, write = _mock_edit_flow(_all_day_form(_EDIT_FORM))
+        result = _edit(runner, "--start", "2026-11-06")
+        assert result.exit_code == 0, result.output
+        assert _sent_body(write)["event"] == {
+            "startAt": {"localDatetime": "2026-11-06"},
+            "endAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+            "location": "Sala A",
+            "invitations": {"users": [{"id": 7}]},
+        }
+
+    # criterio: 08-C27
+    @respx.mock
+    def test_copy_all_day(self, runner: CliRunner) -> None:
+        mock_json("GET", _FOR_COPY_PATH, _all_day_form(_COPY_FORM))
+        write = mock_json("PUT", _COPY_PATH, load_payload("copy_event_post_response.json"))
+        result = _copy(runner, "--start", "2026-11-07T09:00:00")
+        assert result.exit_code == 0, result.output
+        event = _sent_body(write)["event"]
+        assert event["startAt"] == {"localDatetime": "2026-11-07"}
+        assert "timezone" not in event
+
+    # criterio: 08-C27
+    @respx.mock
+    def test_create_all_day_from_json(self, runner: CliRunner, tmp_path: pathlib.Path) -> None:
+        route = _mock_create()
+        body_file = tmp_path / "body.json"
+        body_file.write_text(json.dumps({"event": {"allDay": True}}), encoding="utf-8")
+        result = _create(runner, "--start", "2026-11-05T10:00:00", "--json", str(body_file))
+        assert result.exit_code == 0, result.output
+        assert _sent_body(route)["event"] == {
+            "startAt": {"localDatetime": "2026-11-05"},
+            "allDay": True,
+        }
+
+    # criterio: 08-C28
+    @respx.mock
+    def test_get_event_for_edit_all_day_shows_date(self, runner: CliRunner) -> None:
+        mock_json("GET", _FOR_EDIT_PATH, _all_day_form(_EDIT_FORM))
+        result = runner.invoke(app, ["posts", "get-event-for-edit", str(_POST_ID)], env=BASE_ENV)
+        assert result.exit_code == 0, result.output
+        start_line = next(line for line in result.output.splitlines() if "start_at" in line)
+        assert "2026-11-05" in start_line
+        assert "00:00" not in start_line
