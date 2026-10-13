@@ -37,7 +37,11 @@ def catalogs_list(  # noqa: PLR0913
     ctx: typer.Context,
     ids: Annotated[
         list[int] | None,
-        typer.Option("--id", help="Catalog ID (repeat for multiple)."),
+        typer.Option(
+            "--id",
+            help="Catalog ID to read (repeat for multiple); without it the server answers "
+            "an empty list.",
+        ),
     ] = None,
     load_entries: Annotated[
         bool,
@@ -49,7 +53,10 @@ def catalogs_list(  # noqa: PLR0913
     export: ExportOption = None,
     export_format: ExportFormatOption = None,
 ) -> None:
-    """List post-definition catalogs (POST /communication/settings/post-definition/catalogs)."""
+    """List post-definition catalogs by ID.
+
+    POST /communication/settings/post-definition/catalogs.
+    """
     state: CliState = ctx.obj
     console = make_console(state)
     validate_full_fields(full, fields)

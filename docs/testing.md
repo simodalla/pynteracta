@@ -55,9 +55,11 @@ The `.secrets/` directory is git-ignored and will never be committed.
 
 ```bash
 cp tests/integration/.env.example tests/integration/.env
+chmod 600 tests/integration/.env
 ```
 
-Edit `tests/integration/.env` with your real values:
+The file holds the tenant URL and the test ids, and it is git-ignored like `.secrets/`; keep it
+readable by you only. Edit `tests/integration/.env` with your real values:
 
 ```dotenv
 PYNTERACTA_BASE_URL=https://my-tenant.interacta.io
@@ -82,7 +84,9 @@ in that community, edits it, adds a watcher and a comment, copies it, and delete
 end (also when a step fails). It needs `PYNTERACTA_TEST_USER_ID` too (the watcher). Use a **test
 community** only. If that community has required custom fields, put them in
 `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` as a JSON object; catalog and user references are written as
-lists of ids (`{"2003": [89]}`), not as the objects the server returns when reading.
+lists of ids (`{"2003": [89]}`), not as the objects the server returns when reading. Quote the
+value in `.env` (`PYNTERACTA_TEST_WRITE_CUSTOM_DATA='{"2003": [89]}'`): neither `source` nor
+`uv run --env-file` reads bare JSON.
 The same two variables enable the **attachment upload** integration test: it uploads a small
 generated file, creates a post with it, uploads a second file as a new version of the attachment,
 removes it, and deletes the post at the end (also when a step fails).
@@ -115,11 +119,20 @@ lines with what the server did with omitted fields, deletion and listing.
 
 ### Step 3 — export the variables into your shell
 
-pytest does not load `.env` files automatically:
+pytest does not load `.env` files automatically. Export the file into the current shell:
 
 ```bash
-export $(grep -v '^#' tests/integration/.env | xargs)
+set -a; source tests/integration/.env; set +a
 ```
+
+Or pass it to `uv` for a single run, without touching the shell environment:
+
+```bash
+uv run --env-file tests/integration/.env pytest -m integration -v
+```
+
+Both read quoted values correctly (see `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` above); the older
+`export $(grep -v '^#' .env | xargs)` idiom splits them on spaces and must not be used.
 
 ### Step 4 — run the tests
 
