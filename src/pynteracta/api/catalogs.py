@@ -58,11 +58,14 @@ class CatalogsAPI(ResourceClient):
     ) -> CatalogList:
         """POST ``/communication/settings/post-definition/catalogs``.
 
-        Retrieve catalog header information for the given catalog IDs.
+        Legge le intestazioni dei cataloghi con gli id indicati. Non è un filtro: senza id il
+        server risponde con una lista vuota (verificato sul tenant con service account e Google
+        OAuth2). Gli id si ricavano da ``metadata["catalog_id"]`` dei campi della definizione dei
+        post di una community.
 
         Args:
-            catalog_ids: Optional list of catalog identifiers to filter by.
-            load_entries: When ``True``, include catalog entries in the response.
+            catalog_ids: Id dei cataloghi da leggere; senza id la risposta è vuota.
+            load_entries: Con ``True`` include le voci di ogni catalogo nella risposta.
         """
         req = GetPostDefinitionCatalogsRequestDTO(catalogIds=catalog_ids)
         return self.list_raw(req, load_entries=load_entries)

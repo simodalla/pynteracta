@@ -1975,3 +1975,22 @@ Chiude il follow-up di M30 su `test_list_for_post`. Solo test, branch
 - `attachments.list_for_post` non espone il kwarg `calculate_total_items_count`, che l'helper
   condiviso supporta e `catalogs.list_entries` espone già: il test deve passare dalla variante
   `_raw`. Da colmare con una spec, insieme ad altre letture che hanno lo stesso vuoto.
+
+## Fuori milestone — Follow-up documentali di M31 e dei cataloghi — 2026-10-13
+
+Solo documentazione e testi di aiuto, branch `bugfix_docs_follow_up`. Chiude il follow-up di M31
+su `docs/testing.md` (ripreso da M30, M32, M33 e M34) e quello sulla docstring di
+`CatalogsAPI.list`.
+
+### Fatto
+
+- `docs/testing.md`: `chmod 600 tests/integration/.env`; `set -a; source …; set +a` oppure
+  `uv run --env-file` al posto di `export $(… | xargs)`, che spezza i valori con spazi; il JSON
+  di `PYNTERACTA_TEST_WRITE_CUSTOM_DATA` va quotato nel `.env`, detto anche in `.env.example`.
+- `CatalogsAPI.list` (docstring, in italiano) e `catalogs list --id` (help) dicono che gli id
+  sono quelli da leggere, non un filtro: senza id il server risponde con una lista vuota.
+
+### Follow-up
+
+- `cli/communities.py` al 53 % di copertura (dalla linea di partenza): lavoro di test, non
+  documentale.
