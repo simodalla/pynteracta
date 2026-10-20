@@ -35,4 +35,4 @@ Reviews changed code for reuse, simplification, efficiency, and altitude cleanup
 - **Architecture**: See [CLAUDE.md > Architecture](CLAUDE.md#architecture).
 - **Testing**: See [CLAUDE.md > Testing Layout](CLAUDE.md#testing-layout).
 - **Code conventions**: See [CLAUDE.md > Code Conventions](CLAUDE.md#code-conventions).
-- **Planning documents**: See [CLAUDE.md > Planning Documents](CLAUDE.md#planning-documents).
+- **Planning documents**: See [CLAUDE.md > Prima di lavorare](CLAUDE.md#prima-di-lavorare).
