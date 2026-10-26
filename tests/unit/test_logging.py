@@ -217,6 +217,88 @@ class TestSetupDefaultLoggingAudit:
         audit_logger.handlers.clear()
 
 
+class TestSetupDefaultLoggingIdempotent:
+    """Chiamate ripetute non devono accumulare handler (la CLI la invoca due volte per comando)."""
+
+    @staticmethod
+    def _reset() -> tuple[logging.Logger, logging.Logger]:
+        root = logging.getLogger("pynteracta")
+        audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
+        for lg in (root, audit_logger):
+            for h in list(lg.handlers):
+                h.close()
+            lg.handlers.clear()
+        return root, audit_logger
+
+    def test_second_call_replaces_console_handler(self) -> None:
+        root, _ = self._reset()
+
+        setup_default_logging(level="INFO")
+        setup_default_logging(level="DEBUG")
+
+        assert len(root.handlers) == 1
+        assert root.level == logging.DEBUG
+        self._reset()
+
+    def test_second_call_replaces_audit_handlers(self, tmp_path: Path) -> None:
+        _, audit_logger = self._reset()
+        log_file = tmp_path / "audit.log"
+
+        setup_default_logging(audit=True, audit_file=log_file)
+        first_file_handlers = [
+            h for h in audit_logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
+        ]
+        setup_default_logging(audit=True, audit_file=log_file)
+
+        stream_handlers = [
+            h
+            for h in audit_logger.handlers
+            if type(h) is logging.StreamHandler  # RotatingFileHandler è una sottoclasse
+        ]
+        file_handlers = [
+            h for h in audit_logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
+        ]
+        assert len(stream_handlers) == 1
+        assert len(file_handlers) == 1
+        # il vecchio file handler è stato rimosso e chiuso (nessun descrittore trapelato)
+        assert first_file_handlers[0] not in audit_logger.handlers
+        assert first_file_handlers[0].stream is None
+        self._reset()
+
+    def test_second_call_without_audit_removes_audit_handlers(self, tmp_path: Path) -> None:
+        _, audit_logger = self._reset()
+
+        setup_default_logging(audit=True, audit_file=tmp_path / "audit.log")
+        setup_default_logging(audit=False)
+
+        assert audit_logger.handlers == []
+        self._reset()
+
+    def test_foreign_handlers_are_preserved(self) -> None:
+        root, _ = self._reset()
+        mine = logging.NullHandler()
+        root.addHandler(mine)
+
+        setup_default_logging()
+        setup_default_logging()
+
+        assert mine in root.handlers
+        managed = [h for h in root.handlers if h is not mine]
+        assert len(managed) == 1  # un solo handler gestito dalla libreria, oltre al mio
+        self._reset()
+
+    def test_event_emitted_once_after_two_calls(self, capsys: pytest.CaptureFixture[str]) -> None:
+        self._reset()
+
+        setup_default_logging(level="DEBUG", json=True)
+        setup_default_logging(level="DEBUG", json=True)
+        structlog.get_logger("pynteracta.test_idempotent").info("idempotent.probe")
+
+        err = capsys.readouterr().err
+        assert err.count("idempotent.probe") == 1
+        self._reset()
+
+
 class TestSensitiveKeyCoverage:
     """Fix 1b (v0.9.3): the key regex must cover the auth payloads, not just ``token``."""
 

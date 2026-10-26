@@ -386,3 +386,29 @@ class TestCommunitiesListByViewPost:
         result = runner.invoke(app, ["communities", "--help"], env=BASE_ENV)
         assert result.exit_code == 0
         assert "list-by-view-post" in result.output
+
+
+class TestCliLoggingNotDuplicated:
+    """Il callback principale e ``build_client`` configurano entrambi il logging: ogni riga di log
+    deve comunque uscire una sola volta."""
+
+    @respx.mock
+    def test_debug_log_lines_emitted_once(self, runner: CliRunner) -> None:
+        import logging  # noqa: PLC0415
+
+        root = logging.getLogger("pynteracta")
+        for h in list(root.handlers):
+            h.close()
+        root.handlers.clear()
+
+        mock_json(
+            "GET",
+            "communication/settings/communities/10/details",
+            load_payload("community_details.json"),
+        )
+        result = runner.invoke(
+            app, ["--log-level", "DEBUG", "communities", "details", "10"], env=BASE_ENV
+        )
+        assert result.exit_code == 0
+        assert result.stderr.count("http.response") == 1
+        assert len(root.handlers) == 1
