@@ -255,6 +255,26 @@ def build_audit_file_handler(
 # ---------------------------------------------------------------------------
 
 
+_MANAGED_ATTR = "_pynteracta_managed"
+
+
+def _mark_managed(handler: logging.Handler) -> logging.Handler:
+    """Marca un handler come installato da :func:`setup_default_logging`."""
+    setattr(handler, _MANAGED_ATTR, True)
+    return handler
+
+
+def _remove_managed_handlers(logger: logging.Logger) -> None:
+    """Rimuove e chiude gli handler installati da una chiamata precedente.
+
+    Gli handler aggiunti dall'utente, privi del marcatore, restano al loro posto.
+    """
+    for handler in list(logger.handlers):
+        if getattr(handler, _MANAGED_ATTR, False):
+            logger.removeHandler(handler)
+            handler.close()
+
+
 def setup_default_logging(  # noqa: PLR0913
     level: str = "INFO",
     *,
@@ -269,6 +289,10 @@ def setup_default_logging(  # noqa: PLR0913
     """Configure structlog with opinionated defaults.
 
     This is an opt-in helper; the library never calls it implicitly.
+
+    La funzione è idempotente: una nuova chiamata sostituisce gli handler installati dalla
+    precedente (la CLI la invoca due volte per comando) invece di accumularli, che farebbe
+    uscire ogni riga di log più volte. Gli handler aggiunti dall'utente non vengono toccati.
 
     Args:
         level: Log level string (``DEBUG``, ``INFO``, ``WARNING``, ``ERROR``).
@@ -320,19 +344,23 @@ def setup_default_logging(  # noqa: PLR0913
     handler.setFormatter(formatter)
 
     root = logging.getLogger("pynteracta")
-    root.addHandler(handler)
+    _remove_managed_handlers(root)
+    root.addHandler(_mark_managed(handler))
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # ------------------------------------------------------------------
     # Audit logger
     # ------------------------------------------------------------------
     enable_audit = audit or audit_file is not None
+    audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
+    _remove_managed_handlers(audit_logger)
     if enable_audit:
-        audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
         audit_logger.setLevel(logging.DEBUG)
         audit_logger.propagate = False  # don't double-emit on root pynteracta logger
 
-        if audit_raw and not _AUDIT_RAW_WARNED:
+        if audit_raw:
+            # L'avviso esce una sola volta per processo; l'handler raw si installa a ogni chiamata.
+            warn_raw = not _AUDIT_RAW_WARNED
             _AUDIT_RAW_WARNED = True
             audit_processors_raw: list[Any] = [
                 structlog.stdlib.add_log_level,
@@ -350,12 +378,13 @@ def setup_default_logging(  # noqa: PLR0913
             )
             raw_console_handler = logging.StreamHandler()
             raw_console_handler.setFormatter(raw_formatter)
-            audit_logger.addHandler(raw_console_handler)
-            logging.getLogger("pynteracta").warning(
-                "audit.redaction_disabled: --audit-raw is active — "
-                "raw tokens and sensitive data MAY appear in audit output. "
-                "Never use this in production."
-            )
+            audit_logger.addHandler(_mark_managed(raw_console_handler))
+            if warn_raw:
+                logging.getLogger("pynteracta").warning(
+                    "audit.redaction_disabled: --audit-raw is active — "
+                    "raw tokens and sensitive data MAY appear in audit output. "
+                    "Never use this in production."
+                )
         else:
             audit_console_handler = logging.StreamHandler()
             audit_console_formatter = structlog.stdlib.ProcessorFormatter(
@@ -366,7 +395,7 @@ def setup_default_logging(  # noqa: PLR0913
                 ],
             )
             audit_console_handler.setFormatter(audit_console_formatter)
-            audit_logger.addHandler(audit_console_handler)
+            audit_logger.addHandler(_mark_managed(audit_console_handler))
 
         if audit_file is not None:
             file_handler = build_audit_file_handler(
@@ -390,4 +419,4 @@ def setup_default_logging(  # noqa: PLR0913
                     ],
                 )
                 file_handler.setFormatter(raw_file_formatter)
-            audit_logger.addHandler(file_handler)
+            audit_logger.addHandler(_mark_managed(file_handler))
