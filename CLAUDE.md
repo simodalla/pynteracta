@@ -198,7 +198,7 @@ ROADMAP e PROGRESS); la fase RELEASE (semantic-release, git-cliff, PyPI) resta q
 
 ## Configurazione SDD
 
-Plugin: `sddpa` 0.4.0. Regole del metodo in `riferimenti/metodo.md` del plugin.
+Plugin: `sddpa` 0.4.2. Regole del metodo in `riferimenti/metodo.md` del plugin.
 
 - Modalità: esistente
 - Linea di partenza: `specs/00-partenza/partenza.md`
