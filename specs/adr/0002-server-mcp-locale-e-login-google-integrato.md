@@ -1,7 +1,7 @@
 # 0002 – Server MCP locale e login Google integrato
 
 Data: 2026-11-20
-Stato: proposto (bozza da brainstorming; il numero e il testo definitivi li fissa `/sddpa:adr`)
+Stato: accettato
 
 ## Contesto
 
@@ -112,23 +112,28 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
   - §1: il server MCP non è più un uso futuro ma una parte del pacchetto.
   - §2: nuovo attore (client MCP o agente LLM che agisce per conto della persona); la riga
     "Utente Google" non dice più solo "fornisce un access token".
-  - §3: RF-002 e RF-003 precisati (login integrato, rinnovo, uscita); in RF-002 lo scope
-    minimo passa da `profile` a `email`; nuovi requisiti per il
-    login e per il server (i numeri li assegnano le spec).
+  - §3: RF-002 e RF-003 precisati (login integrato, rinnovo, durata di un'ora del token
+    Interacta); in RF-002 lo scope minimo passa da `profile` a `email`; nuovi RF-026 (login
+    Google integrato) e RF-027 (server MCP locale), da realizzare: le spec 10 e 11 li precisano
+    e aggiungono i sottorequisiti.
   - §4: RNF-001 esteso a refresh token, authorization code, verificatore PKCE, id token e client
-    secret; nuovo requisito sul canale stdio; RNF-002 affiancato dalla regola sul portachiavi.
-    RNF-004 non cambia: il client resta sincrono.
+    secret; nuovo RNF-012 (segreti di lunga durata nel portachiavi), che affianca RNF-002; nuovo
+    RNF-013 (canale stdio). RNF-004 non cambia: il client resta sincrono.
   - §5: la riga "Google OAuth2" descrive gli endpoint di autorizzazione e di token di Google,
-    che la libreria ora chiama direttamente; nuova riga per il client MCP.
-  - §6: il refresh token è un nuovo dato scritto dalla libreria (nel portachiavi). I dati letti
-    dal tenant passano al client MCP e da lì al fornitore del modello: è un trattamento che la
-    libreria non controlla, a carico di chi abilita il server, e va detto.
+    che la libreria ora chiama direttamente; nuove righe per il client MCP e per il portachiavi.
+  - §6: refresh token e client secret sono nuovi dati scritti dalla libreria (nel portachiavi).
+    I dati letti dal tenant passano al client MCP e da lì al fornitore del modello: è un
+    trattamento che la libreria non controlla, a carico di chi abilita il server, e va detto.
   - §7: esce "ottenere un token Google per conto dell'utente"; entrano il server MCP remoto, le
     scritture via MCP oltre i task e l'area admin via MCP.
-- `CLAUDE.md`: le regole non negoziabili su token e cache citano refresh token e portachiavi;
-  nuova regola sul canale stdio; la mappa dei moduli e lo "Stack" aggiungono il server e le
-  dipendenze opzionali.
-- `ROADMAP.md`: due righe ⏳, una per il login (M36) e una per il server (M37).
+- `CLAUDE.md`, con questo ADR: la regola non negoziabile sui token cita i segreti del login
+  Google; nuove regole sul portachiavi e sul canale stdio; la regola sui segreti fuori dal
+  repository cita il client OAuth; la regola sulle operazioni ripetute vale anche per il server;
+  l'introduzione cita le due funzioni decise. La mappa dei moduli e lo "Stack" li aggiornano le
+  spec 10 e 11, quando i moduli e le dipendenze opzionali esistono.
+- `ROADMAP.md`: due righe ⏳, una per il login (M36) e una per il server (M37), all'apertura
+  delle spec 10 e 11.
+- Codice: nessuna modifica con questo ADR.
 - `docs/` e `README.md`: `authentication.md` oggi afferma che la libreria non esegue il login
   Google e va riscritta in quella parte; servono una guida al server MCP (installazione,
   configurazione del client, flag delle scritture, avvertenze) e l'aggiornamento della home e
@@ -155,7 +160,7 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
 ## Verifiche fatte prima di accettare
 
 Eseguite il 2026-11-20; passaggi ed esiti sono in
-[`verifiche-adr-0002.md`](verifiche-adr-0002.md).
+[`../bozze/verifiche-adr-0002.md`](../bozze/verifiche-adr-0002.md).
 
 1. **Sul tenant**: il token Interacta ottenuto dallo scambio dura un'ora. Lo scambio accetta un
    token Google con lo scope `email`; con il solo `profile` risponde `401` `BAD_CREDENTIALS`. Il

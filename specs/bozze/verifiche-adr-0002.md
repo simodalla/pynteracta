@@ -1,7 +1,7 @@
 # Verifiche prima di accettare l'ADR 0002
 
 Le due verifiche di fatto elencate nei "Punti aperti" della
-[bozza dell'ADR 0002](adr-0002-server-mcp-login-google.md): il client secret sulla console Google
+[bozza dell'ADR 0002](../adr/0002-server-mcp-locale-e-login-google-integrato.md) (ora in `specs/adr/`): il client secret sulla console Google
 e, sul tenant, lo scope accettato e la durata del token Interacta. Si fanno insieme: si crea il
 client OAuth, si prova lo scambio del codice con e senza client secret, poi si usa il token
 ottenuto contro il tenant.
