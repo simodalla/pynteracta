@@ -137,6 +137,22 @@ def _profile_table(doc: tomlkit.TOMLDocument, name: str) -> Any:
     return profiles_table[name]
 
 
+def _persist_connection(table: Any, base_profile: Profile) -> None:
+    """Scrive nel profilo i dati di connessione che gli mancano.
+
+    Un profilo senza ``base_url`` rende ``config.toml`` invalido per ogni comando: il login su un
+    profilo nuovo salva quindi l'indirizzo con cui si è appena autenticato, più ``base_path`` e
+    ``api_version`` se diversi dai valori predefiniti. Un ``base_url`` già presente non si tocca.
+    """
+    if "base_url" in table:
+        return
+    table["base_url"] = str(base_profile.base_url).rstrip("/")
+    for field in ("base_path", "api_version"):
+        value = getattr(base_profile, field)
+        if value != Profile.model_fields[field].default:
+            table[field] = value
+
+
 def _validate_and_report(console: Console, client: InteractaClient) -> None:
     me = client.users.me()
     ud = me.user_data_typed
@@ -154,6 +170,7 @@ def _login_service_account(
 ) -> None:
     doc = _load_config_doc(config_path)
     table = _profile_table(doc, effective_profile)
+    _persist_connection(table, base_profile)
     table["auth_method"] = "service_account"
     table["service_account_key"] = str(service_account_key)
     config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
@@ -194,6 +211,7 @@ def _login_google(
     # Persist only the auth method — never the (short-lived, sensitive) Google token.
     doc = _load_config_doc(config_path)
     table = _profile_table(doc, effective_profile)
+    _persist_connection(table, base_profile)
     table["auth_method"] = "google_oauth2"
     config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
     console.print(
