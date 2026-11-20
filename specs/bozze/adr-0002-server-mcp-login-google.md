@@ -152,6 +152,8 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
 
 ## Punti aperti da chiudere prima di accettare
 
+I passaggi per le due verifiche sono in [`verifiche-adr-0002.md`](verifiche-adr-0002.md).
+
 1. **Da misurare sul tenant**: quanto dura il token Interacta dopo lo scambio, e quali scope
    Google lo scambio accetta (`profile` da solo basta?).
 2. **Da verificare sulla console Google**: che il client "Desktop" richieda davvero il client
