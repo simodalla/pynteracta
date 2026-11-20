@@ -23,6 +23,7 @@ from pynteracta.cli._common import (
     EXIT_SERVER,
     EXIT_VALIDATION,
 )
+from pynteracta.config import load_config
 from pynteracta.urls import build_api_base
 
 
@@ -217,6 +218,134 @@ class TestAuthLoginGoogle:
         )
         assert result.exit_code == EXIT_CONFIG
         assert "Google access token" in result.output
+
+
+class TestAuthLoginNewProfile:
+    """Il login su un profilo che non esiste deve lasciare un ``config.toml`` valido."""
+
+    def _mock_tenant(self) -> None:
+        token_payload = {"accessToken": _fake_token()}
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(return_value=httpx.Response(200, json=token_payload))
+        mock_json("POST", "core/auth/create-access-token-by-service-account", token_payload)
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+
+    @respx.mock
+    def test_google_login_on_new_profile_keeps_config_loadable(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        self._mock_tenant()
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "--base-url",
+                "https://api.example.com",
+                "auth",
+                "login",
+                "--google",
+                "--profile",
+                "nuovo",
+            ],
+            env={"PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok"},
+        )
+        assert result.exit_code == 0, result.output
+
+        profile = load_config(config_file).profiles["nuovo"]
+        assert str(profile.base_url).rstrip("/") == "https://api.example.com"
+        assert profile.auth_method == "google_oauth2"
+
+        # Il comando successivo sullo stesso profilo non deve più richiedere --base-url.
+        again = runner.invoke(
+            app,
+            ["--config-file", str(config_file), "--profile", "nuovo", "auth", "whoami"],
+            env={"PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok", "PYNTERACTA_TOKEN_CACHE": "memory"},
+        )
+        assert again.exit_code == 0, again.output
+
+    @respx.mock
+    def test_service_account_login_on_new_profile_keeps_config_loadable(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        self._mock_tenant()
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--service-account-key",
+                str(_SA_KEY_PATH),
+                "--profile",
+                "nuovo",
+            ],
+            env=BASE_ENV,
+        )
+        assert result.exit_code == 0, result.output
+        profile = load_config(config_file).profiles["nuovo"]
+        assert str(profile.base_url).rstrip("/") == "https://api.example.com"
+
+    @respx.mock
+    def test_login_on_new_profile_persists_non_default_base_path(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        token_payload = {"accessToken": _fake_token()}
+        respx.post(
+            "https://api.example.com/altro/api/core/auth/"
+            "create-access-token-by-google-oauth2-access-token-credentials"
+        ).mock(return_value=httpx.Response(200, json=token_payload))
+        respx.get("https://api.example.com/altro/api/external/v2/core/auth/current-user-data").mock(
+            return_value=httpx.Response(200, json=load_payload("current_user_data_response.json"))
+        )
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "--base-path",
+                "/altro",
+                "auth",
+                "login",
+                "--google",
+                "--profile",
+                "nuovo",
+            ],
+            env={**BASE_ENV, "PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok"},
+        )
+        assert result.exit_code == 0, result.output
+        assert load_config(config_file).profiles["nuovo"].base_path == "/altro"
+
+    @respx.mock
+    def test_login_does_not_overwrite_existing_base_url(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        self._mock_tenant()
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            '[profiles.esistente]\nbase_url = "https://altro.example.com"\n', encoding="utf-8"
+        )
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--google",
+                "--profile",
+                "esistente",
+            ],
+            env={**BASE_ENV, "PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok"},
+        )
+        assert result.exit_code == 0, result.output
+        profile = load_config(config_file).profiles["esistente"]
+        assert str(profile.base_url).rstrip("/") == "https://altro.example.com"
 
 
 class TestAuthLogout:
