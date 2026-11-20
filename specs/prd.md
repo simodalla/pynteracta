@@ -19,7 +19,11 @@ task, gruppi e hashtag di un tenant con tipi espliciti, paginazione pigra ed esp
 Ha inoltre due usi voluti: essere la libreria che gli strumenti di *vibe coding* (agenti di
 programmazione assistita) usano per lavorare con Interacta, quindi con un'API tipizzata, uniforme e
 documentata che un agente possa scoprire e comporre; ed essere la base di un **server MCP non
-ufficiale per Interacta**, che ne esporrà le operazioni come strumenti.
+ufficiale per Interacta**. Con [ADR 0002](adr/0002-server-mcp-locale-e-login-google-integrato.md)
+il server entra nel pacchetto: locale, su stdio, avviato da `pynteracta mcp serve` e distribuito
+come extra opzionale (`pynteracta[mcp]`), con letture curate e la scrittura dei task dietro un
+flag esplicito (RF-027); lo stesso ADR porta nella libreria il login Google dal browser, con
+rinnovo automatico della sessione (RF-026). Entrambi sono decisi e da realizzare.
 La superficie è sincrona. Fino alla versione 0.9.4 era di sola lettura; con
 [ADR 0001](adr/0001-apertura-della-superficie-di-scrittura.md) le scritture (post, post evento e
 commenti, task, anagrafiche admin, upload di allegati) sono entrate nell'ambito e le spec dalla 02
@@ -36,7 +40,8 @@ Confermato dal maintainer il 2026-10-08.
 | Sviluppatore di integrazioni | usa la libreria da Python | istanzia `InteractaClient`, chiama le risorse `client.<risorsa>.*`, registra hook, legge gli errori tipizzati |
 | Operatore | usa la CLI `pynteracta` | configura profili, si autentica, interroga ed esporta dati di lettura |
 | Service account Interacta | identità tecnica del tenant | firma l'asserzione JWT (RS512) con cui la libreria ottiene l'access token; vede ciò che il tenant gli concede |
-| Utente Google | identità personale già collegata a un utente Interacta | fornisce un access token Google che la libreria scambia con un access token Interacta |
+| Utente Google | identità personale già collegata a un utente Interacta | fornisce un access token Google, oppure (ADR 0002, RF-026) fa il login Google dal browser una volta e la libreria ne conserva e rinnova la sessione; in entrambi i casi la libreria scambia il token Google con un access token Interacta |
+| Client MCP o agente LLM | agisce per conto della persona che lo avvia, con l'identità del profilo | chiama gli strumenti del server MCP locale (ADR 0002, RF-027): letture curate e, solo con `--enable-task-writes`, scrittura dei task; mai l'area admin |
 | Tenant Interacta | sistema esterno | espone l'API `external_v2`; decide visibilità e permessi, che la libreria non aggira |
 
 ## 3. Requisiti funzionali
@@ -47,11 +52,16 @@ toccano.
 
 - RF-001. Autenticazione con service account: da un file chiave JSON (`ServiceAccountKey`) la
   libreria costruisce un'asserzione JWT firmata RS512 e ottiene un access token dal tenant.
-- RF-002. Autenticazione Google OAuth2: un access token Google (scope minimo `profile`), fornito
-  dall'utente, viene scambiato con un access token Interacta.
+- RF-002. Autenticazione Google OAuth2: un access token Google (scope minimo `email`), fornito
+  dall'utente o ottenuto con il login integrato (RF-026), viene scambiato con un access token
+  Interacta. Verificato sul tenant il 2026-11-20: con il solo scope `profile` lo scambio
+  risponde `401` `BAD_CREDENTIALS`. *(Precisato da ADR 0002, 2026-11-20.)*
 - RF-003. Ciclo di vita del token: cache su file (`FileTokenCache`) o in memoria
   (`MemoryTokenCache`), refresh anticipato di 60 s rispetto alla scadenza, invalidazione quando il
-  server rifiuta il token, chiave di cache distinta per tenant.
+  server rifiuta il token, chiave di cache distinta per tenant. Il token Interacta ottenuto
+  dallo scambio Google dura un'ora (verificato sul tenant il 2026-11-20); con il login
+  integrato la libreria rinnova da sola l'access token Google e ripete lo scambio (RF-026).
+  *(Precisato da ADR 0002, 2026-11-20.)*
 - RF-004. Identità corrente: dati dell'utente autenticato (`auth whoami`, `users me`,
   `users profile`).
 - RF-005. Utenti: elenco paginato con filtri (stato, provider di login, manager, lingua, prefissi
@@ -271,6 +281,34 @@ più `*_raw`, comando CLI, test unit e contract).
     perché il server sostituisce il task intero; `--occ-token` impone solo il token. *(Spec 02,
     2026-10-08, dopo la prova sul tenant.)*
 
+Login Google integrato e server MCP, decisi con
+[ADR 0002](adr/0002-server-mcp-locale-e-login-google-integrato.md) e da realizzare: ogni
+spec che li realizza ne precisa i dettagli e aggiunge i sottorequisiti.
+
+- RF-026. Login Google integrato: `pynteracta auth login --google` esegue il flusso OAuth2 per
+  applicazioni installate (authorization code con PKCE e redirect su loopback) con un client
+  OAuth dell'organizzazione, il cui id sta nel profilo, e con lo scope minimo dello scambio
+  (`email`, RF-002). La libreria conserva il refresh token (RNF-012) e rinnova da sola l'access
+  token Google quando deve ripetere lo scambio con Interacta; la sessione si può eliminare
+  (logout). Il token statico (`--google-token`, `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`,
+  `google_token`, `google_token_provider`) resta valido. Il client "Desktop" di Google richiede
+  il client secret allo scambio del codice (verificato il 2026-11-20): la persona lo fornisce
+  una volta, mai come argomento di riga di comando. *(ADR 0002, 2026-11-20.)*
+- RF-027. Server MCP locale: `pynteracta mcp serve` avvia un server MCP sul solo trasporto
+  stdio, distribuito come extra opzionale (`pynteracta[mcp]`). Agisce con l'identità del
+  profilo: quella prevista è Google OAuth2 personale; un profilo con service account è
+  accettato con un avviso, sullo standard error e nello strumento dell'identità corrente.
+  Espone letture curate per intento (identità corrente, community, post, storia, commenti,
+  allegati, cataloghi, hashtag, dettaglio di un task), con output ridotto e paginazione
+  limitata; mai gli endpoint `admin/*` né gli elenchi di utenti e gruppi. Creazione, modifica
+  ed eliminazione dei task sono registrate come strumenti solo con `--enable-task-writes`;
+  nessun'altra scrittura è esposta. Le regole sulle scritture valgono anche qui (RF-025,
+  RNF-009): un esito incerto torna al modello come "esito sconosciuto, non ripetere", un `409`
+  come conflitto, e l'eliminazione è dichiarata distruttiva nelle annotazioni MCP perché sia il
+  client a chiedere conferma. Il server non apre mai il browser: se la sessione Google manca o
+  è revocata, gli strumenti rispondono con un errore che indica di rieseguire il login.
+  *(ADR 0002, 2026-11-20.)*
+
 ## 4. Requisiti non funzionali
 
 Confermato dal maintainer il 2026-10-13. Solo ciò che il codice o la configurazione mostrano.
@@ -288,6 +326,10 @@ Confermato dal maintainer il 2026-10-13. Solo ciò che il codice o la configuraz
   ottimistica `occToken`, `nextOccToken`, `screenOccToken`, `nextScreenOccToken` (e le grafie
   snake_case) non sono segreti e passano in chiaro nei body redatti, per nome esatto e senza
   distinzione di maiuscole; ogni altra chiave che contiene `token` resta redatta (RNF-001b).
+  Con ADR 0002 la redazione copre anche i segreti del login Google, sulle chiamate agli
+  endpoint di Google come su quelle a Interacta: refresh token, authorization code,
+  verificatore PKCE, id token e client secret non compaiono in log, audit log, hook né
+  messaggi di eccezione (da realizzare con RF-026).
 - RNF-002. Cache del token su file con permessi POSIX stretti (`0o600` file, `0o700` cartella),
   lettura rifiutata se più larghi; su Windows avviso una tantum e raccomandazione di
   `token_cache = "memory"`.
@@ -315,6 +357,16 @@ Confermato dal maintainer il 2026-10-13. Solo ciò che il codice o la configuraz
 - RNF-011. Il contenuto dei file caricati non compare mai in log, audit log né hook, neppure con
   `audit_log_bodies`: la richiesta allo storage è registrata con URL e stato, senza corpo, e non
   porta il token Interacta. *(Spec 04, 2026-10-10.)*
+- RNF-012. Segreti di lunga durata nel portachiavi di sistema (ADR 0002, regola non
+  negoziabile; affianca RNF-002): il refresh token Google e il client secret OAuth stanno nel
+  Portachiavi di macOS o nella Gestione credenziali di Windows, mai in `config.toml`, mai in
+  un file in chiaro, mai nei log. Se il portachiavi non è disponibile (per esempio Linux senza
+  sessione grafica) il login integrato fallisce con un messaggio chiaro, senza ripiegare su un
+  file. Nessun id o segreto di client OAuth è distribuito con il codice. *(ADR 0002,
+  2026-11-20; da realizzare con RF-026.)*
+- RNF-013. Canale stdio riservato al protocollo (ADR 0002, regola non negoziabile): in modalità
+  server MCP lo standard output porta solo messaggi MCP; log e diagnostica vanno sullo standard
+  error. *(ADR 0002, 2026-11-20; da realizzare con RF-027.)*
 
 ## 5. Integrazioni esterne
 
@@ -324,7 +376,9 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dell'API `extern
 |---|---|---|
 | Interacta REST API `external_v2` | letture e scritture | HTTPS verso `{base_url}{base_path}/api/external/v{api_version}/`, header `Authorization: Bearer <token>` e `User-Agent: pynteracta/<versione>` |
 | Interacta auth (`core/auth`) | ottenere l'access token | `create-access-token-by-service-account` con asserzione JWT RS512; `create-access-token-by-google-oauth2-access-token-credentials` con token Google |
-| Google OAuth2 | identità personale | il token lo procura l'utente fuori dalla libreria; la libreria lo inoltra una sola volta per lo scambio |
+| Google OAuth2 | identità personale | con il token statico lo procura l'utente fuori dalla libreria, che lo inoltra una sola volta per lo scambio; con il login integrato (ADR 0002, RF-026) la libreria chiama direttamente gli endpoint di autorizzazione (nel browser della persona, redirect su loopback) e di token di Google, con il client OAuth "Desktop" dell'ente in un'app "Internal" del Workspace |
+| Portachiavi di sistema | custodia del refresh token Google e del client secret (RNF-012) | Portachiavi di macOS e Gestione credenziali di Windows, tramite `keyring` (dipendenza opzionale) |
+| Client MCP | usa Interacta per conto della persona (ADR 0002, RF-027) | avvia `pynteracta mcp serve` in locale e parla MCP su stdio; nessun trasporto di rete |
 | PyPI, GitHub Releases, GitHub Pages | distribuzione e documentazione | solo in CI, su tag `v*` e push su `main`; nessun uso a runtime |
 
 ## 6. Dati personali trattati
@@ -342,7 +396,13 @@ spec).
   body delle risposte e quindi i dati personali sopra elencati (eccezione documentata nelle
   Regole non negoziabili del `CLAUDE.md`); i token di concorrenza ottimistica vi compaiono in
   chiaro (RNF-001b). *(Confermato dal maintainer il 2026-10-12, spec 07, per la parte
-  sull'audit log.)*
+  sull'audit log.)* Con il login Google integrato (ADR 0002, RF-026): il refresh token Google e
+  il client secret, solo nel portachiavi di sistema (RNF-012), e l'id del client OAuth nel
+  profilo.
+- **Dati passati al client MCP** (ADR 0002, RF-027): ciò che gli strumenti del server leggono
+  dal tenant (contenuti di post, commenti e task, nomi, metadati degli allegati) passa al
+  client MCP e da lì al fornitore del modello. È un trattamento che la libreria non controlla,
+  a carico di chi abilita il server; la guida al server lo dichiara.
 - **Dati scritti sul tenant** (dalle spec di scrittura, ADR 0001): anagrafiche di utenti
   (compresi i dati di credenziale), appartenenze ai gruppi, contenuti di post, commenti, task e
   allegati forniti dal chiamante. La libreria li inoltra al tenant così come li riceve; non li
@@ -367,7 +427,9 @@ spec).
 - **Chiave del service account**: letta dal percorso configurato, mai copiata altrove; la chiave
   privata non compare nei log.
 - **Conservazione**: nessuna, oltre a cache del token (fino alla scadenza) e audit log (rotazione a
-  `audit_log_max_bytes` × `audit_log_backups`), entrambi a carico di chi li abilita.
+  `audit_log_max_bytes` × `audit_log_backups`), entrambi a carico di chi li abilita, e alla
+  sessione Google nel portachiavi (refresh token e client secret, fino al logout o alla revoca;
+  ADR 0002).
 
 ## 7. Fuori ambito
 
@@ -377,7 +439,11 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
 - Autenticazione Microsoft OAuth2 e username/password.
 - Retry automatico con backoff sulle scritture (vedi RNF-009); sulle letture è solo rimandato.
 - Risoluzione automatica dei conflitti di concorrenza (`occToken`): spetta al chiamante.
-- Ottenere un token Google per conto dell'utente.
+- Server MCP remoto (HTTP) con autenticazione per utente (ADR 0002): il server è solo locale,
+  su stdio.
+- Scritture via MCP oltre i task: allargarle richiede una spec che citi ADR 0002. Area admin ed
+  elenchi di utenti e gruppi via MCP: richiedono un nuovo ADR.
+- Un client OAuth (id o segreto) distribuito con il pacchetto: lo fornisce l'organizzazione.
 - Versione 1.0 con semver stretto, finché la superficie di lettura non è completa e stabile.
 
 ## Storia del documento
@@ -419,3 +485,8 @@ Confermato dal maintainer il 2026-10-10 (spec 03), per la parte dei post.
   swagger ripinnato e modelli rigenerati con ordine stabile delle definizioni; nuovi RF-006b,
   RF-007a e RF-024b con la semantica verificata sul tenant; RF-021c e §6 aggiornati per
   `downloadable`; §1 dice che tutti i 76 endpoint dello swagger pinnato sono esposti.
+- 2026-11-20: server MCP locale e login Google integrato, vedi
+  [ADR 0002](adr/0002-server-mcp-locale-e-login-google-integrato.md): §1, §2 (nuovo attore, riga
+  "Utente Google"), RF-002 (scope minimo `email`) e RF-003 precisati, nuovi RF-026 e RF-027,
+  RNF-001 esteso, nuovi RNF-012 e RNF-013, §5, §6 e §7 (esce "ottenere un token Google per conto
+  dell'utente"). RF-026, RF-027, RNF-012 e RNF-013 sono decisi e da realizzare.

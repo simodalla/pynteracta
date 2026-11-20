@@ -15,8 +15,8 @@ Numerazione attesa: ADR `0002`; spec `10` su `m36_google_login`; spec `11` su `m
 ```
 
 Testo di partenza:
-[`adr-0002-server-mcp-login-google.md`](adr-0002-server-mcp-login-google.md), in questa
-cartella. Le decisioni sono tutte confermate; in fondo alla bozza restano due verifiche di fatto
+[`0002-server-mcp-locale-e-login-google-integrato.md`](../adr/0002-server-mcp-locale-e-login-google-integrato.md),
+ora in `specs/adr/`. Le decisioni sono tutte confermate; in fondo alla bozza restano due verifiche di fatto
 (sul tenant e sulla console Google) da fare prima di accettarlo.
 
 ---

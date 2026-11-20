@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-`pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async client deferred, see `ROADMAP.md`). Current scope: service-account and Google OAuth2 auth, JWT lifecycle + caching, read access to auth/identity, users, posts, communities, catalogs, attachments, tasks, groups, hashtags and admin forms; the full write surface of [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md) (custom and event posts, comments and workflow, tasks, admin users/groups/catalogs/workspace, attachment upload), delivered by specs 02–08. Optional extras: `yaml` and `parquet` for `--export` CLI support.
+`pynteracta` is an unofficial Python 3.12+ library and CLI client for the Interacta™ REST API (`external_v2`). The library is synchronous-only (async client deferred, see `ROADMAP.md`). Current scope: service-account and Google OAuth2 auth, JWT lifecycle + caching, read access to auth/identity, users, posts, communities, catalogs, attachments, tasks, groups, hashtags and admin forms; the full write surface of [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md) (custom and event posts, comments and workflow, tasks, admin users/groups/catalogs/workspace, attachment upload), delivered by specs 02–08. Decided by [ADR 0002](specs/adr/0002-server-mcp-locale-e-login-google-integrato.md) and not yet implemented: integrated Google login with a keychain-stored session, and a local stdio MCP server (`pynteracta mcp serve`, curated reads, task writes behind a flag). Optional extras: `yaml` and `parquet` for `--export` CLI support.
 
 La fonte di verità sui requisiti è [`specs/prd.md`](specs/prd.md).
 
@@ -29,12 +29,22 @@ Vincoli che nessuna spec può violare. Le violazioni note stanno nella linea di 
 - **Token e segreti mai nei log.** Il transport redige `Authorization`, i JWT e i campi
   `token|password|secret|privatekey|assertion|jwt` dei body prima che richieste e risposte
   raggiungano log, audit log e hook; nessuna credenziale compare in log applicativi, audit log o
-  messaggi di eccezione. (Da "Architecture > `transport.py`" e dalla v0.9.3.)
+  messaggi di eccezione. (Da "Architecture > `transport.py`" e dalla v0.9.3.) Vale anche per i
+  segreti del login Google, sulle chiamate agli endpoint di Google: refresh token, authorization
+  code, verificatore PKCE, id token e client secret. (Da
+  [ADR 0002](specs/adr/0002-server-mcp-locale-e-login-google-integrato.md).)
 - **Cache del token con permessi stretti.** Su POSIX il file è `0o600` e la cartella `0o700`, e la
   cache si rifiuta di leggere se i permessi sono più larghi; la chiave di cache è per tenant; su
   Windows avviso una tantum e raccomandazione di `token_cache = "memory"`. (Da "Token cache
   security".)
-- **Segreti fuori dal repository.** Nessuna credenziale nel codice né in file versionati; le chiavi
+- **Segreti di lunga durata solo nel portachiavi di sistema.** Il refresh token Google e il
+  client secret OAuth stanno nel portachiavi (Portachiavi di macOS, Gestione credenziali di
+  Windows): mai in `config.toml`, mai in un file in chiaro, mai come argomento di riga di
+  comando. Se il portachiavi non è disponibile il login integrato fallisce con un messaggio
+  chiaro, senza ripiegare in silenzio su un file. (Da
+  [ADR 0002](specs/adr/0002-server-mcp-locale-e-login-google-integrato.md).)
+- **Segreti fuori dal repository.** Nessuna credenziale nel codice né in file versionati, e nessun
+  id o segreto di client OAuth distribuito con il codice; le chiavi
   di esempio sono finte e riconoscibili; `tests/integration/.secrets/`, `*.env` e `audit.log`
   restano in `.gitignore`. (Da "Before Committing".)
 - **Soglie che non scendono.** La copertura minima (85 %), i controlli bloccanti e le regole di
@@ -48,7 +58,12 @@ Vincoli che nessuna spec può violare. Le violazioni note stanno nella linea di 
   l'invio — non si ritenta da sola: l'errore risale al chiamante con esito sconosciuto. Un
   eventuale retry/backoff vale solo per le letture. I conflitti di concorrenza (`occToken`, `409`
   → `ConcurrencyError`) non si risolvono rileggendo e riprovando. (Da
-  [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md).)
+  [ADR 0001](specs/adr/0001-apertura-della-superficie-di-scrittura.md).) Vale anche per il
+  server MCP: un esito incerto torna al modello come "esito sconosciuto, non ripetere". (Da
+  [ADR 0002](specs/adr/0002-server-mcp-locale-e-login-google-integrato.md).)
+- **Il canale stdio del server MCP è riservato al protocollo.** In modalità server lo standard
+  output porta solo messaggi MCP; log e diagnostica vanno sullo standard error. Il server non apre
+  mai il browser. (Da [ADR 0002](specs/adr/0002-server-mcp-locale-e-login-google-integrato.md).)
 
 ## Branch Discipline
 
