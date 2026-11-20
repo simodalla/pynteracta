@@ -88,7 +88,8 @@ As an alternative to a service account, you can obtain an Interacta access token
 
 **Prerequisites**
 
-- A **Google access token** with **minimum scope `profile`**.
+- A **Google access token** with the **`email` scope**. A token carrying only `profile` has
+  been seen rejected with `401` (`BAD_CREDENTIALS`).
 - The Google identity behind that token must already be **linked to an Interacta user**
   (ask your tenant administrator to associate the Google account).
 
@@ -144,19 +145,19 @@ Supply it each session via `PYNTERACTA_GOOGLE_OAUTH2_TOKEN` or `--google-token`.
 ### How to obtain a Google access token
 
 Any standard Google OAuth2 mechanism works, as long as the resulting access token includes
-the `profile` scope and belongs to an Interacta-linked Google identity. Common options:
+the `email` scope and belongs to an Interacta-linked Google identity. Common options:
 
 - **Google OAuth2 Playground** (<https://developers.google.com/oauthplayground>): select the
-  `profile` (userinfo.profile) scope, authorize, and copy the **access token**. Convenient
+  `email` (userinfo.email) scope, authorize, and copy the **access token**. Convenient
   for quick manual testing.
 - **`gcloud`**:
   ```bash
   gcloud auth login --enable-gdrive-access  # or your normal login
   gcloud auth print-access-token
   ```
-  Ensure the credentials carry the `profile` / `userinfo.profile` scope.
+  Ensure the credentials carry the `email` / `userinfo.email` scope.
 - **Your own Google Cloud OAuth2 client**: register an OAuth client in a Google Cloud
-  project and run the authorization-code (or installed-app) flow with the `profile` scope to
+  project and run the authorization-code (or installed-app) flow with the `email` scope to
   mint access tokens programmatically.
 
 Google access tokens are short-lived (typically ~1 hour). When the Interacta token derived

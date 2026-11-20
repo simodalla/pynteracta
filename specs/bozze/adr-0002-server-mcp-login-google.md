@@ -60,7 +60,8 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
 6. **Il login Google diventa una funzione della libreria.** `pynteracta auth login --google`
    esegue il flusso OAuth2 per applicazioni installate (authorization code con PKCE e redirect
    su loopback) con un client OAuth dell'organizzazione, con lo scope minimo necessario allo
-   scambio (`profile`). La libreria conserva il refresh token e rinnova da sola l'access token
+   scambio (`email`, verificato sul tenant il 2026-11-20: `profile` da solo è rifiutato). La
+   libreria conserva il refresh token e rinnova da sola l'access token
    Google quando deve ripetere lo scambio con Interacta. Il token statico (`--google-token`,
    `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`, `google_token`, `google_token_provider`) resta valido.
 7. **Il refresh token sta nel portachiavi di sistema.** Le postazioni sono macOS e Windows
@@ -111,7 +112,8 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
   - §1: il server MCP non è più un uso futuro ma una parte del pacchetto.
   - §2: nuovo attore (client MCP o agente LLM che agisce per conto della persona); la riga
     "Utente Google" non dice più solo "fornisce un access token".
-  - §3: RF-002 e RF-003 precisati (login integrato, rinnovo, uscita); nuovi requisiti per il
+  - §3: RF-002 e RF-003 precisati (login integrato, rinnovo, uscita); in RF-002 lo scope
+    minimo passa da `profile` a `email`; nuovi requisiti per il
     login e per il server (i numeri li assegnano le spec).
   - §4: RNF-001 esteso a refresh token, authorization code, verificatore PKCE, id token e client
     secret; nuovo requisito sul canale stdio; RNF-002 affiancato dalla regola sul portachiavi.
@@ -150,12 +152,14 @@ espone solo `tasksCount`, l'elenco dei post di una community ha il filtro
   libreria custodisce un segreto di lunga durata, la superficie pubblica cresce di un comando e
   di un protocollo, e i test devono coprire un flusso OAuth e un server senza toccare la rete.
 
-## Punti aperti da chiudere prima di accettare
+## Verifiche fatte prima di accettare
 
-I passaggi per le due verifiche sono in [`verifiche-adr-0002.md`](verifiche-adr-0002.md).
+Eseguite il 2026-11-20; passaggi ed esiti sono in
+[`verifiche-adr-0002.md`](verifiche-adr-0002.md).
 
-1. **Da misurare sul tenant**: quanto dura il token Interacta dopo lo scambio, e quali scope
-   Google lo scambio accetta (`profile` da solo basta?).
-2. **Da verificare sulla console Google**: che il client "Desktop" richieda davvero il client
-   secret allo scambio del codice. Se non servisse, la parte della decisione 7 che lo riguarda
-   cade senza altre conseguenze.
+1. **Sul tenant**: il token Interacta ottenuto dallo scambio dura un'ora. Lo scambio accetta un
+   token Google con lo scope `email`; con il solo `profile` risponde `401` `BAD_CREDENTIALS`. Il
+   tenant accetta i token emessi dal client "Desktop" dell'ente, in un'app "Internal".
+2. **Sulla console Google**: il client "Desktop" richiede il client secret allo scambio del
+   codice (senza: `invalid_request`, "client_secret is missing."), e la risposta contiene il
+   refresh token. La decisione 7 resta com'è.

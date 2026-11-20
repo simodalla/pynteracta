@@ -82,12 +82,11 @@ Vincoli.
 Fuori da questa spec. Il server MCP; Microsoft OAuth2 e username/password; un client OAuth
 distribuito con il pacchetto; il rinnovo di un token statico passato dall'esterno.
 
-Da verificare sul tenant prima del piano.
-- Quali scope Google accetta lo scambio: `profile` da solo basta?
-- Quanto dura il token Interacta ottenuto dallo scambio.
-- Che un'app OAuth "Internal" del Workspace dell'ente funzioni con un client di tipo "Desktop".
-
-- Che il client "Desktop" richieda davvero il client secret allo scambio del codice.
+Verificato sul tenant il 2026-11-20 (esiti in `specs/bozze/verifiche-adr-0002.md`).
+- Lo scambio accetta lo scope `email`; `profile` da solo è rifiutato con `401`.
+- Il token Interacta ottenuto dallo scambio dura un'ora.
+- Un'app OAuth "Internal" del Workspace dell'ente funziona con un client di tipo "Desktop".
+- Il client "Desktop" richiede il client secret allo scambio del codice.
 
 Da decidere nella spec. Nome dei campi di profilo e del comando di stato; come si sostituisce
 il client secret salvato.
