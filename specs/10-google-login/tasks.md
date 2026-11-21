@@ -414,7 +414,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti e `mkdocs build --strict`; commit `feat(cli): auth logout segnala
      quando non c'è nulla da revocare (10-T22)`.
 
-### [ ] T18 – Prova reale su macOS e Windows (manuale)
+### [x] T18 – Prova reale su macOS e Windows (manuale)
 
 - Criteri: sezione "Verifica manuale" della spec (10-C03, 10-C14, 10-C15, 10-C29 sui sistemi
   reali)
@@ -431,7 +431,29 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. Su una delle due postazioni, un nuovo login con `--google-client-file` sul JSON scaricato
      dalla console (dopo T21).
   Riportare qui gli esiti, senza token né segreti.
-- Esito: <compilato a mano>
+- Esito: 2026-11-21, maintainer, tenant dell'ente, client "Desktop" dell'ente, pacchetto
+  installato dal branch (macOS: `uv tool install --editable` dal worktree; Windows: wheel
+  costruito dal branch).
+  - macOS (Portachiavi): (1) login riuscito, `✓ Authenticated as` e sessione salvata; nei log
+    solo metodo, URL, stato e nome della voce. (2) `auth status` con sessione, account, data e
+    secret salvato, senza richieste di rete; `auth whoami` riuscito, con rinnovo dell'access
+    token Google al primo comando dopo il login (`google.token_refreshed`). (3) Il comando
+    successivo prima della scadenza usa la cache (`auth.token_cache_loaded`); `auth whoami`
+    lanciato alle 15:47:30, dopo la scadenza del token Interacta (15:46:31), esce `0` senza
+    browser e riscrive la cache con un token nuovo (le righe di log non sono finite nel file
+    del job in background: la prova è il file di cache riscritto). (5) Login con
+    `--google-client-file` riuscito, senza richiesta del secret. (4) `auth logout --revoke`:
+    sessione revocata e rimossa; `auth whoami` esce `3` con l'invito a rifare il login.
+  - Windows (Gestione credenziali): (1) login riuscito, portachiavi `available`; compare l'avviso
+    `token_cache.windows_permissions` (previsto, una volta per comando). (2) `auth status` e
+    `auth whoami` riusciti, con rinnovo dell'access token Google senza browser. (4) Dopo la
+    revoca fatta dal Mac, `auth whoami` su Windows esce `3`: la revoca vale per account e client
+    anche sull'altra postazione. Il rinnovo dopo la scadenza non è stato ripetuto con esito
+    positivo su Windows, perché la revoca è arrivata prima.
+  - Emerso durante la prova: `auth logout --revoke` senza `--profile` agiva in silenzio sul
+    profilo corrente con service account (corretto con 10-C46, T22); id e secret dal JSON della
+    console (10-C42–10-C45, T21). Senza `--profile` dopo `auth login`, il livello di log viene
+    dal profilo corrente: comportamento precedente alla spec, non cambiato.
 
 ### [ ] T19 – Chiusura: `CLAUDE.md` e PRD
 
