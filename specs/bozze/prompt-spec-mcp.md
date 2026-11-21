@@ -1,23 +1,24 @@
 # Prompt per ADR e spec – server MCP e login Google
 
-Tre blocchi da incollare, nell'ordine. Ogni blocco è autonomo: non presuppone la conversazione
-di brainstorming. I nomi di comandi, flag e strumenti sono proposte; la spec li può cambiare.
+Tre blocchi, nell'ordine. Il primo (ADR) è fatto; restano da incollare i due delle spec. Ogni
+blocco è autonomo: non presuppone la conversazione di brainstorming. I nomi di comandi, flag e
+strumenti sono proposte; la spec li può cambiare.
 
-Numerazione attesa: ADR `0002`; spec `10` su `m36_google_login`; spec `11` su `m37_mcp_server`
-(l'ultimo milestone in `PROGRESS.md` è M35).
+Numerazione: ADR `0002` (accettato); spec `10` su `m36_google_login`; spec `11` su
+`m37_mcp_server` (l'ultimo milestone in `PROGRESS.md` è M35). L'ADR ha già assegnato i requisiti
+ombrello RF-026 (login), RF-027 (server), RNF-012 (portachiavi) e RNF-013 (canale stdio): le
+spec li precisano con i sottorequisiti (`RF-026a`…), senza aprire numeri nuovi per le stesse
+funzioni.
 
 ---
 
-## 1. ADR
+## 1. ADR (fatto)
 
-```
-/sddpa:adr Server MCP locale e login Google integrato
-```
-
-Testo di partenza:
-[`0002-server-mcp-locale-e-login-google-integrato.md`](../adr/0002-server-mcp-locale-e-login-google-integrato.md),
-ora in `specs/adr/`. Le decisioni sono tutte confermate; in fondo alla bozza restano due verifiche di fatto
-(sul tenant e sulla console Google) da fare prima di accettarlo.
+Accettato il 2026-11-21:
+[`0002-server-mcp-locale-e-login-google-integrato.md`](../adr/0002-server-mcp-locale-e-login-google-integrato.md).
+Le due verifiche di fatto sono chiuse (esiti in
+[`verifiche-adr-0002.md`](verifiche-adr-0002.md)); PRD e `CLAUDE.md` sono aggiornati nello
+stesso commit.
 
 ---
 
@@ -33,9 +34,10 @@ prerequisito del server MCP (spec successiva), ma vale da solo per la CLI.
 Comportamento attuale da cui partire. La libreria riceve un access token Google già pronto
 (`--google-token`, `PYNTERACTA_GOOGLE_OAUTH2_TOKEN`, `google_token`, `google_token_provider`) e
 lo scambia con un token Interacta; non esegue alcun flusso di login, non salva il token Google,
-e `auth login --google` scrive nel profilo solo `auth_method = "google_oauth2"`. Il PRD lo
-dichiara in RF-002, in §5 e in §7 ("ottenere un token Google per conto dell'utente" fuori
-ambito); `docs/authentication.md` lo ripete.
+e `auth login --google` scrive nel profilo solo `auth_method = "google_oauth2"` (più
+l'indirizzo del tenant, se il profilo è nuovo). Il PRD descrive già il comportamento voluto
+(RF-026, RNF-012, decisi con ADR 0002 e da realizzare); `docs/authentication.md` dice ancora
+che la libreria non esegue il login.
 
 Comportamento voluto.
 - `pynteracta auth login --google`, senza un token statico, apre il browser sul consenso Google
@@ -89,11 +91,15 @@ Verificato sul tenant il 2026-11-20 (esiti in `specs/bozze/verifiche-adr-0002.md
 - Il client "Desktop" richiede il client secret allo scambio del codice.
 
 Da decidere nella spec. Nome dei campi di profilo e del comando di stato; come si sostituisce
-il client secret salvato.
+il client secret salvato; nome dell'extra che porta `keyring` (l'ADR nomina solo
+`pynteracta[mcp]`) e se l'extra `mcp` lo include.
 
-PRD toccato. RF-002, RF-003, RF-016; RNF-001, RNF-002; §2 (riga "Utente Google"), §5 (riga
-"Google OAuth2"), §6 (refresh token come dato scritto dalla libreria), §7 (esce "ottenere un
-token Google per conto dell'utente"). `CLAUDE.md`: regole non negoziabili su token e cache.
+PRD toccato. L'ADR 0002 ha già aggiornato il PRD: la spec realizza e precisa RF-026 (con i
+sottorequisiti), RNF-012 e l'estensione di RNF-001 ai segreti Google; tocca RF-002, RF-003 e
+RF-016 (campi di profilo del client OAuth) e chiede la riconferma di §2 (riga "Utente
+Google"), §5 (righe "Google OAuth2" e "Portachiavi di sistema"), §6 e §7, già allineati.
+`CLAUDE.md`: le regole non negoziabili ci sono già; la spec aggiorna la mappa dei moduli e lo
+"Stack" (nuovo modulo, `keyring` opzionale). Riga ⏳ in `ROADMAP.md` (M36).
 
 Documentazione. `docs/authentication.md` (la sezione Google afferma il contrario e va
 riscritta), `docs/configuration.md`, `docs/cli.md`; `docs/index.md` e `README.md` perché cambia
@@ -179,14 +185,16 @@ Da decidere nella spec. Elenco e nomi definitivi degli strumenti (indicativament
 filtri dei post esporre; dimensione massima di pagina; se le voci di catalogo servono davvero
 al caso d'uso guida.
 
-PRD toccato. §1; §2 (nuovo attore: client MCP o agente per conto della persona); nuovi RF per
-il server; nuovo RNF sul canale stdio; RF-010, RF-022, RF-025, RNF-009, RNF-010 per i task; §5
-(nuova riga); §6 (i dati letti passano al client MCP e al fornitore del modello, a carico di chi
-abilita il server); §7 (server remoto, altre scritture e admin via MCP fuori ambito).
+PRD toccato. L'ADR 0002 ha già aggiornato il PRD: la spec realizza e precisa RF-027 (con i
+sottorequisiti) e RNF-013 (canale stdio); tocca RF-010, RF-022, RF-025, RNF-009 e RNF-010 per i
+task e chiede la riconferma di §1, §2 (attore "Client MCP o agente LLM"), §5 (riga "Client
+MCP"), §6 (dati passati al client MCP e al fornitore del modello) e §7, già allineati.
+`CLAUDE.md`: le regole non negoziabili ci sono già; la spec aggiorna la mappa dei moduli e lo
+"Stack" (nuovo modulo, SDK MCP opzionale) e, a server realizzato, l'introduzione.
 
 Documentazione. Nuova guida in `docs/guides/` (installazione, configurazione in Claude Desktop
 e Claude Code, flag delle scritture, avvertenze su contenuti non fidati, dati personali e uso
 con service account, sconsigliato insieme a `--enable-task-writes`),
 `docs/cli.md` per il nuovo comando, `docs/index.md` e `README.md` perché cambia lo scope, senza
-numeri di versione. Righe ⏳ in `ROADMAP.md`.
+numeri di versione. Riga ⏳ in `ROADMAP.md` (M37).
 ```
