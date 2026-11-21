@@ -190,7 +190,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(auth): chiamate a token, userinfo e revoca di Google
      (10-T08)`.
 
-### [ ] T09 – Sessione salvata e rinnovo dell'access token Google
+### [x] T09 – Sessione salvata e rinnovo dell'access token Google
 
 - Criteri: 10-C19, 10-C20, 10-C21, 10-C22 (parte di libreria)
 - Dipende da: T05, T08
