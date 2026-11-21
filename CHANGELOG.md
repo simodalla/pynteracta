@@ -1,6 +1,71 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.16.0] - 2026-11-21
+
+### Build
+
+- **deps**: Aggiornamento delle dipendenze e degli hook di pre-commit
+- **deps**: Aggiornamento delle dipendenze e degli hook di pre-commit
+- **deps**: Aggiornamento delle dipendenze e degli hook di pre-commit
+
+### Chores
+
+- **deps-dev**: Aggiornamento di syrupy alla 7.0.2
+- Caratterizzazione di login statico, logout e precedenza dei token (10-T01)
+- I segreti del login Google non compaiono in log, audit e hook (10-T16)
+
+### Documentation
+
+- Aggiornamento del CHANGELOG per v0.15.0
+- Aggiornamento del metodo spec-driven (sddpa 0.4.0)
+- Aggiornamento del metodo spec-driven (sddpa 0.4.2)
+- Bozza dell'ADR 0002 e prompt delle spec per server MCP e login Google
+- Passaggi per le verifiche dell'ADR 0002 (client secret, scope, durata del token)
+- Esiti delle verifiche dell'ADR 0002 e scope Google `email`
+- ADR 0002: server MCP locale e login Google integrato
+- Prompt delle spec 10 e 11 allineato all'ADR 0002 accettato
+- Spec 10, login Google integrato con rinnovo automatico
+- Revisione della spec 10, profilo corrente per i login ed email da userinfo
+- Piano 10, login Google integrato con rinnovo automatico
+- Task 10, login Google integrato con rinnovo automatico
+- Revisione della spec 10, cache del token Google eliminata dal logout (10-C41, 10-T20)
+- Login Google dal browser (10-T17)
+- Revisione della spec 10, client Google dal file JSON della console (10-C42–10-C45, 10-T21)
+- Revisione della spec 10, nota di auth logout senza nulla da revocare (10-C46, 10-T22)
+- Esiti della prova reale su macOS e Windows (10-T18)
+- Chiusura della spec 10, PRD e CLAUDE.md (10-T19)
+- Verifica 10, login Google integrato con rinnovo automatico
+- Release v0.16.0, riga di ROADMAP a shipped
+
+### Features
+
+- **config**: ConfigurationError e campo google_client_id (10-T02)
+- **auth**: Login e client usano il profilo corrente (10-T04)
+- **auth**: Extra google e accesso al portachiavi di sistema (10-T05)
+- **transport**: Richieste esterne senza corpo in log, audit e hook (10-T06)
+- **auth**: PKCE, indirizzo di consenso e listener su loopback (10-T07)
+- **auth**: Chiamate a token, userinfo e revoca di Google (10-T08)
+- **auth**: Rinnovo dell'access token Google dalla sessione salvata (10-T09)
+- **auth**: Il client usa la sessione Google salvata (10-T10)
+- **auth**: Login Google dal browser in libreria (10-T11)
+- **auth**: Stato e logout della sessione Google in libreria (10-T12)
+- **cli**: Auth login --google dal browser (10-T13)
+- **cli**: Auth status (10-T14)
+- **cli**: Auth logout elimina la sessione Google (10-T15)
+- **cli**: Id e secret del client Google dal file JSON della console (10-T21)
+- **cli**: Auth logout segnala quando non c'è nulla da revocare (10-T22)
+
+### Fixes
+
+- **logging**: Setup_default_logging non accumula più gli handler
+- Il login su un profilo nuovo salva anche l'indirizzo del tenant
+- **auth**: Il logout elimina la cache del token Google (10-T20)
+
+### Refactors
+
+- **config**: Scrittura del profilo in config.py (10-T03)
+
 ## [0.15.0] - 2026-10-13
 
 ### Chores
