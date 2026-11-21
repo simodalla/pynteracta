@@ -6,6 +6,7 @@ import pytest
 from pynteracta.exceptions import (
     AuthenticationError,
     ConcurrencyError,
+    ConfigurationError,
     CustomFieldValidationError,
     InteractaError,
     NotFoundError,
@@ -79,3 +80,10 @@ def test_upload_error_is_interacta_error_with_file_name() -> None:
     assert err.status_code == 400  # noqa: PLR2004
     assert err.request_id is None
     assert UploadError("x").file_name is None
+
+
+# criterio: 10-C04
+def test_configuration_error_is_interacta_error() -> None:
+    err = ConfigurationError("set google_client_id")
+    assert isinstance(err, InteractaError)
+    assert str(err) == "set google_client_id"

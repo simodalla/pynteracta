@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import stat
@@ -22,6 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
+from pynteracta.config import Profile, _xdg_config_dir
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
@@ -149,12 +151,14 @@ class GoogleOAuth2Credentials:
 
     Supply **exactly one** of:
 
-    - ``token``: a static Google OAuth2 access token (min scope ``profile``), or
-    - ``token_provider``: a callable returning a fresh Google access token on demand.
+    - ``token``: un access token Google statico (scope minimo ``email``), oppure
+    - ``token_provider``: una funzione che restituisce un access token Google aggiornato.
 
-    The library never runs a Google browser/PKCE flow; obtaining the Google access token is
-    the caller's responsibility (see ``docs/authentication.md``).  The Google identity must
-    already be linked to an Interacta user.
+    Il login dal browser (``pynteracta auth login --google`` o
+    :func:`pynteracta.google_login.login`) salva una sessione nel portachiavi di sistema;
+    ``InteractaClient`` costruito da quel profilo usa da solo
+    :class:`~pynteracta.google_login.GoogleSessionTokenProvider` come ``token_provider``.
+    L'identità Google deve essere già collegata a un utente Interacta.
     """
 
     token: str | None = None
@@ -221,6 +225,45 @@ def build_cache_key(api_base: str, identity: str) -> str:
     """
     digest = hashlib.sha256(api_base.encode("utf-8")).hexdigest()[:16]
     return f"{digest}-{identity}"
+
+
+def legacy_google_cache_key(profile: Profile, profile_name: str) -> str:
+    """La chiave di cache del token Google calcolata prima della spec 10.
+
+    Il client la derivava dalla base dello scambio Google (``{base_url}/{base_path}/api``)
+    invece che dall'indirizzo dell'API: il logout la elimina per non lasciare token orfani.
+    """
+    base = f"{str(profile.base_url).rstrip('/')}/{profile.base_path.strip('/')}/api"
+    return build_cache_key(base, profile_name)
+
+
+def default_token_cache_dir() -> Path:
+    """La cartella predefinita della cache su file dei token Interacta."""
+    return _xdg_config_dir() / "tokens"
+
+
+def clear_cached_token(profile: Profile, profile_name: str, api_base: str) -> None:
+    """Elimina il token Interacta in cache per il profilo (logout e login Google, spec 10).
+
+    La chiave deve coincidere con quella dei token manager, altrimenti il logout non elimina
+    nulla: identità del service account (``client_id`` della chiave) o nome del profilo, più
+    l'indirizzo dell'API. Per i profili ``google_oauth2`` elimina anche la chiave calcolata
+    prima della spec 10 (10-C41).
+    """
+    cache: TokenCache
+    if profile.token_cache == "memory":
+        cache = MemoryTokenCache()
+    else:
+        cache = FileTokenCache(
+            profile.token_cache_dir or default_token_cache_dir(), api_base=api_base
+        )
+    key_id = profile_name
+    if profile.service_account_key is not None:
+        with contextlib.suppress(AuthenticationError):
+            key_id = str(load_service_account_key(profile.service_account_key).client_id)
+    cache.clear(build_cache_key(api_base, key_id))
+    if profile.auth_method == "google_oauth2":
+        cache.clear(legacy_google_cache_key(profile, profile_name))
 
 
 class FileTokenCache:
@@ -416,13 +459,14 @@ class GoogleOAuth2TokenManager:
 
     _SKEW_SECONDS: int = TokenManager._SKEW_SECONDS
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         credentials: GoogleOAuth2Credentials,
         cache: TokenCache,
         transport: HttpTransport,
         *,
         cache_key: str,
+        cache_api_base: str | None = None,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         self._credentials = credentials
@@ -430,7 +474,9 @@ class GoogleOAuth2TokenManager:
         self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
-        self._profile = build_cache_key(transport.base_url, cache_key)
+        # La chiave si calcola sull'indirizzo dell'API, come per il service account, così
+        # coincide con quella di ``auth logout`` (10-C41); senza, resta la base del transport.
+        self._profile = build_cache_key(cache_api_base or transport.base_url, cache_key)
 
     def get_token(self) -> str:
         """Return a valid Interacta access token, refreshing if near expiry."""

@@ -28,8 +28,10 @@ from pynteracta.auth import (
     TokenProvider,
     _decode_token_expiry,
     build_cache_key,
+    legacy_google_cache_key,
     load_service_account_key,
 )
+from pynteracta.config import Profile
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.models.facade.auth import GoogleOAuth2AccessTokenResponse
 from pynteracta.transport import HttpTransport
@@ -386,6 +388,37 @@ def _make_google_manager(
         cache_key=_GOOGLE_CACHE_KEY,
         clock=clock or (lambda: datetime.now(tz=UTC)),
     )
+
+
+class TestGoogleCacheKey:
+    # criterio: 10-C41
+    def test_cache_api_base_sets_the_key(self) -> None:
+        cache = MemoryTokenCache()
+        manager = GoogleOAuth2TokenManager(
+            GoogleOAuth2Credentials(token="g"),
+            cache,
+            _mock_transport(_GOOGLE_BASE),
+            cache_key=_GOOGLE_CACHE_KEY,
+            cache_api_base=_BASE,
+        )
+        cached = _token()
+        cache.save(build_cache_key(_BASE, _GOOGLE_CACHE_KEY), cached)
+        assert manager.get_token() == cached.access_token
+        manager.invalidate()
+        assert cache.load(build_cache_key(_BASE, _GOOGLE_CACHE_KEY)) is None
+
+    # criterio: 10-C41
+    def test_without_cache_api_base_uses_transport_base(self) -> None:
+        cache = MemoryTokenCache()
+        manager = _make_google_manager(cache=cache)
+        cache.save(_google_cache_key(), _token())
+        manager.invalidate()
+        assert cache.load(_google_cache_key()) is None
+
+    # criterio: 10-C41
+    def test_legacy_google_cache_key(self) -> None:
+        profile = Profile(base_url="https://api.example.com", auth_method="google_oauth2")  # type: ignore[arg-type]
+        assert legacy_google_cache_key(profile, "default") == _google_cache_key()
 
 
 class TestGoogleOAuth2Credentials:

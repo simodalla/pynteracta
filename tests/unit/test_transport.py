@@ -932,3 +932,101 @@ def test_occ_token_in_clear_with_audit_raw(
     assert "audit.request" in raw_output
     assert f'"occToken": {_OCC}' in raw_output
     assert f'"nextOccToken": {_NEXT_OCC}' in raw_output
+
+
+# ---------------------------------------------------------------------------
+# request_external — chiamate agli endpoint di Google (spec 10)
+# ---------------------------------------------------------------------------
+
+_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+_FORM_SECRET = "GOCSPX-example-not-a-secret"
+_BEARER = "ya29.example-access-token"
+_HTTP_400 = 400
+
+
+class TestRequestExternal:
+    # criterio: 10-C34
+    @respx.mock
+    def test_post_form_to_absolute_url(self) -> None:
+        route = respx.post(_TOKEN_URL).mock(
+            return_value=httpx.Response(_HTTP_200, json={"access_token": "x"})
+        )
+        transport = _make_transport(token_provider=lambda: _FAKE_JWT)
+        response = transport.request_external(
+            "POST", _TOKEN_URL, form={"client_secret": _FORM_SECRET}
+        )
+        assert response.status_code == _HTTP_200
+        request = route.calls[0].request
+        assert "Authorization" not in request.headers
+        assert request.headers["User-Agent"] == _DEFAULT_USER_AGENT
+        assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
+        assert f"client_secret={_FORM_SECRET}".encode() in request.content
+
+    # criterio: 10-C34
+    @respx.mock
+    def test_get_with_bearer(self) -> None:
+        route = respx.get(_USERINFO_URL).mock(return_value=httpx.Response(_HTTP_200, json={}))
+        _make_transport().request_external("GET", _USERINFO_URL, bearer_token=_BEARER)
+        assert route.calls[0].request.headers["Authorization"] == f"Bearer {_BEARER}"
+
+    # criterio: 10-C34
+    @pytest.mark.parametrize("audit_bodies", [False, True])
+    @respx.mock
+    def test_audit_and_hooks_without_bodies(self, audit_bodies: bool) -> None:
+        respx.post(_TOKEN_URL).mock(
+            return_value=httpx.Response(_HTTP_200, json={"refresh_token": "1//sentinel"})
+        )
+        hooks = _RecordingHooks()
+        transport = _make_transport(hooks=hooks, audit=True, audit_bodies=audit_bodies)
+        with capture_logs() as logs:
+            transport.request_external(
+                "POST", _TOKEN_URL, form={"client_secret": _FORM_SECRET}, bearer_token=_BEARER
+            )
+        audit = [e for e in logs if e.get("event", "").startswith("audit.")]
+        assert [e["event"] for e in audit] == ["audit.request", "audit.response"]
+        assert audit[0]["method"] == "POST"
+        assert audit[0]["url"] == _TOKEN_URL
+        assert audit[1]["status"] == _HTTP_200
+        assert all(e.get("body") is None for e in audit)
+        assert audit[0]["headers"]["Authorization"] == _REDACTED
+        req = hooks.requests[0]
+        assert (req.method, req.url, req.body) == ("POST", _TOKEN_URL, None)
+        assert req.headers["Authorization"] == _REDACTED
+        assert hooks.responses[0].status_code == _HTTP_200
+        assert hooks.responses[0].body is None
+        dumped = repr(logs) + repr(hooks.requests) + repr(hooks.responses)
+        for secret in (_FORM_SECRET, _BEARER, "1//sentinel"):
+            assert secret not in dumped
+
+    # criterio: 10-C34
+    @respx.mock
+    def test_error_status_is_returned_not_raised(self) -> None:
+        respx.post(_TOKEN_URL).mock(
+            return_value=httpx.Response(_HTTP_400, json={"error": "invalid_grant"})
+        )
+        hooks = _RecordingHooks()
+        response = _make_transport(hooks=hooks).request_external("POST", _TOKEN_URL, form={})
+        assert response.status_code == _HTTP_400
+        assert hooks.errors == []
+
+    # criterio: 10-C34
+    @pytest.mark.parametrize(
+        "exc", [httpx.ConnectTimeout("timeout"), httpx.ConnectError("refused")]
+    )
+    @respx.mock
+    def test_timeout_and_network_error_single_request(self, exc: Exception) -> None:
+        route = respx.post(_TOKEN_URL).mock(side_effect=exc)
+        hooks = _RecordingHooks()
+        with pytest.raises(TransportError):
+            _make_transport(hooks=hooks).request_external("POST", _TOKEN_URL, form={})
+        assert route.call_count == 1
+        assert len(hooks.errors) == 1
+
+    # criterio: 10-C34
+    def test_notify_error_calls_hook(self) -> None:
+        hooks = _RecordingHooks()
+        err = AuthenticationError("x")
+        _make_transport(hooks=hooks).notify_error(err)
+        _make_transport().notify_error(err)  # senza hook: nessun errore
+        assert hooks.errors == [err]

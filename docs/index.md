@@ -11,7 +11,10 @@ that grows one resource group at a time; the current version and its contents ar
 ## What's included
 
 - **Authentication** — service-account RS512 JWT assertion with token lifecycle and file/memory
-  cache (POSIX `0o600`/`0o700` enforcement), and Google OAuth2 access-token exchange.
+  cache (POSIX `0o600`/`0o700` enforcement), and Google OAuth2: sign in once from the
+  browser (`auth login --google`, with the `pynteracta[google]` extra; the session stays in the
+  system keychain and is renewed automatically) or exchange a Google access token you already
+  hold.
 - **Read resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). Each response is wrapped in a
   hand-written facade with a `.raw` escape hatch to the generated DTO.

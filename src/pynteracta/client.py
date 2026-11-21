@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pynteracta import google_login
 from pynteracta.api.admin_manage import AdminManageAPI
 from pynteracta.api.attachments import AttachmentsAPI
 from pynteracta.api.auth import AuthAPI
@@ -26,17 +27,19 @@ from pynteracta.auth import (
     TokenCache,
     TokenManager,
     TokenProvider,
+    default_token_cache_dir,
     load_service_account_key,
 )
-from pynteracta.config import Profile, _xdg_config_dir, resolve_profile
-from pynteracta.exceptions import AuthenticationError
+from pynteracta.config import Profile, resolve_profile, resolve_profile_name
+from pynteracta.exceptions import AuthenticationError, ConfigurationError
+from pynteracta.google_login import GOOGLE_OAUTH_BASE, GoogleSessionTokenProvider
 from pynteracta.hooks import ClientHooks
 from pynteracta.transport import HttpTransport
 from pynteracta.urls import WebUrls, build_api_base
 
 
 def _default_token_cache_dir() -> Path:
-    return _xdg_config_dir() / "tokens"
+    return default_token_cache_dir()
 
 
 def _build_token_cache(profile: Profile, api_base: str | None = None) -> TokenCache:
@@ -72,6 +75,9 @@ class InteractaClient:
         audit_bodies: bool = False,
     ) -> None:
         if profile is None and base_url is None:
+            # Il nome effettivo serve alla chiave di cache e alla sessione: senza
+            # ``profile_name`` è il profilo corrente di ``config.toml`` (RF-016b).
+            profile_name = resolve_profile_name(profile_name, config_file)
             profile = resolve_profile(profile_name=profile_name, config_file=config_file)
 
         auth_method = "service_account"
@@ -117,6 +123,23 @@ class InteractaClient:
             audit=audit,
             audit_bodies=audit_bodies,
         )
+        self._google_oauth_transport: HttpTransport | None = None
+        if (
+            profile is not None
+            and auth_method == "google_oauth2"
+            and google_token is None
+            and google_token_provider is None
+        ):
+            # Né token né provider: si usa la sessione salvata dal login integrato (spec 10).
+            # Le chiamate a Google passano da un transport dedicato, con gli stessi hook e audit.
+            self._google_oauth_transport = HttpTransport(
+                base_url=GOOGLE_OAUTH_BASE,
+                hooks=hooks,
+                timeout=timeout_seconds,
+                audit=audit,
+                audit_bodies=audit_bodies,
+            )
+            google_token_provider = self._session_provider(profile, profile_name)
         token_manager = self._build_token_manager(
             auth_method=auth_method,
             credentials=credentials,
@@ -163,6 +186,29 @@ class InteractaClient:
         self.hashtags = HashtagsAPI(api_transport)
         self.admin_manage = AdminManageAPI(api_transport)
 
+    def _session_provider(
+        self, profile: Profile, profile_name: str | None
+    ) -> GoogleSessionTokenProvider:
+        """Il provider della sessione Google salvata, o l'errore che invita al login."""
+        assert self._google_oauth_transport is not None  # creato dal chiamante
+        try:
+            return google_login.session_token_provider(
+                profile, profile_name or "default", self._google_oauth_transport
+            )
+        except ConfigurationError as exc:
+            # Extra o portachiavi mancanti: per chi usa il client resta un errore di
+            # autenticazione (exit 3), con il motivo e le alternative.
+            self._google_oauth_transport.close()
+            msg = (
+                "auth_method is 'google_oauth2' but no Google access token or saved session is "
+                f"available: {google_login.LOGIN_HINT} or set PYNTERACTA_GOOGLE_OAUTH2_TOKEN. "
+                f"{exc}"
+            )
+            raise AuthenticationError(msg) from None
+        except AuthenticationError:
+            self._google_oauth_transport.close()
+            raise
+
     def _build_token_manager(  # noqa: PLR0913
         self,
         *,
@@ -202,15 +248,11 @@ class InteractaClient:
                 cache,
                 google_transport,
                 cache_key=profile_name or "default",
+                cache_api_base=api_base,
             )
 
-        if auth_method == "google_oauth2":
-            raise AuthenticationError(
-                "auth_method is 'google_oauth2' but no Google access token was provided "
-                "(set PYNTERACTA_GOOGLE_OAUTH2_TOKEN, pass --google-token, or supply "
-                "google_token / google_token_provider)"
-            )
-
+        # Un profilo ``google_oauth2`` ha sempre un token, un provider o la sessione salvata
+        # (che solleva da sé se manca): qui resta solo il client non autenticato.
         return None
 
     def close(self) -> None:
@@ -219,6 +261,8 @@ class InteractaClient:
         if self._api_transport is not self._auth_transport:
             self._auth_transport.close()
         self._google_exchange_transport.close()
+        if self._google_oauth_transport is not None:
+            self._google_oauth_transport.close()
 
     def __enter__(self) -> InteractaClient:
         return self

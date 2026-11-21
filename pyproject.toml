@@ -40,6 +40,7 @@ pynteracta = "pynteracta.cli:app"
 yaml = ["ruamel.yaml>=0.18"]
 parquet = ["pyarrow>=18"]
 export = ["ruamel.yaml>=0.18", "pyarrow>=18"]
+google = ["keyring>=25"]
 
 [project.urls]
 Homepage = "https://github.com/simodalla/pynteracta"
@@ -63,6 +64,7 @@ dev = [
     "python-semantic-release>=9",
     "ruamel.yaml>=0.18",
     "pyarrow>=18",
+    "keyring>=25",
 ]
 
 [tool.hatch.version]

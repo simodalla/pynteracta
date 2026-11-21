@@ -5,7 +5,16 @@ from pathlib import Path
 import platformdirs
 import pytest
 
-from pynteracta.config import Config, Profile, _xdg_config_dir, load_config, resolve_profile
+from pynteracta.config import (
+    Config,
+    Profile,
+    _xdg_config_dir,
+    config_file_path,
+    load_config,
+    resolve_profile,
+    resolve_profile_name,
+    write_profile_fields,
+)
 
 _MINIMAL_TOML = """\
 [profiles.dev]
@@ -244,3 +253,86 @@ class TestPathExpansion:
         assert profile.service_account_key is None
         assert profile.token_cache_dir is None
         assert profile.audit_log_file is None
+
+
+class TestGoogleClientId:
+    _ID = "000000000000-example.apps.googleusercontent.com"
+
+    # criterio: 10-C04
+    def test_read_from_profile(self, tmp_path: Path) -> None:
+        cfg = _write(tmp_path, _MINIMAL_TOML + f'google_client_id = "{self._ID}"\n')
+        assert resolve_profile("dev", cfg).google_client_id == self._ID
+
+    # criterio: 10-C04
+    def test_env_overrides_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        cfg = _write(tmp_path, _MINIMAL_TOML + 'google_client_id = "file-id"\n')
+        monkeypatch.setenv("PYNTERACTA_GOOGLE_CLIENT_ID", self._ID)
+        assert resolve_profile("dev", cfg).google_client_id == self._ID
+
+    # criterio: 10-C04
+    def test_absent_is_none_and_existing_profiles_stay_valid(self, tmp_path: Path) -> None:
+        cfg = _write(tmp_path, _FULL_TOML)
+        assert resolve_profile("dev", cfg).google_client_id is None
+        assert load_config(cfg).profiles["dev"].google_client_id is None
+
+
+class TestConfigFilePath:
+    def test_argument_wins(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PYNTERACTA_CONFIG_FILE", str(tmp_path / "env.toml"))
+        assert config_file_path(tmp_path / "arg.toml") == tmp_path / "arg.toml"
+
+    def test_env_variable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PYNTERACTA_CONFIG_FILE", str(tmp_path / "env.toml"))
+        assert config_file_path(None) == tmp_path / "env.toml"
+
+    def test_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("PYNTERACTA_CONFIG_FILE", raising=False)
+        assert config_file_path(None) == _xdg_config_dir() / "config.toml"
+
+
+class TestWriteProfileFields:
+    _CONN = Profile(base_url="https://interacta.example.it")  # type: ignore[arg-type]
+
+    def test_missing_file_is_created(self, tmp_path: Path) -> None:
+        path = tmp_path / "sub" / "config.toml"
+        write_profile_fields(
+            path, "nuovo", connection=self._CONN, fields={"auth_method": "google_oauth2"}
+        )
+        profile = load_config(path).profiles["nuovo"]
+        assert str(profile.base_url).rstrip("/") == "https://interacta.example.it"
+        assert profile.auth_method == "google_oauth2"
+        assert "base_path" not in path.read_text(encoding="utf-8")
+        assert "api_version" not in path.read_text(encoding="utf-8")
+
+    def test_new_profile_writes_non_default_connection(self, tmp_path: Path) -> None:
+        path = _write(tmp_path, _MINIMAL_TOML)
+        conn = Profile(base_url="https://altro.example.it", base_path="/x", api_version=3)  # type: ignore[arg-type]
+        write_profile_fields(path, "nuovo", connection=conn, fields={})
+        profile = load_config(path).profiles["nuovo"]
+        assert profile.base_path == "/x"
+        assert profile.api_version == _FULL_API_VERSION
+        assert "dev" in load_config(path).profiles
+
+    def test_existing_profile_keeps_base_url_and_comments(self, tmp_path: Path) -> None:
+        path = _write(tmp_path, "# commento\n" + _MINIMAL_TOML)
+        conn = Profile(base_url="https://altro.example.it")  # type: ignore[arg-type]
+        write_profile_fields(path, "dev", connection=conn, fields={"google_client_id": "id"})
+        text = path.read_text(encoding="utf-8")
+        assert "# commento" in text
+        profile = load_config(path).profiles["dev"]
+        assert str(profile.base_url).rstrip("/") == "https://interacta.example.it"
+        assert profile.google_client_id == "id"
+
+
+class TestResolveProfileName:
+    # criterio: 10-C39
+    def test_given_name_wins(self, tmp_path: Path) -> None:
+        assert resolve_profile_name("x", _write(tmp_path, _FULL_TOML)) == "x"
+
+    # criterio: 10-C39
+    def test_current_profile(self, tmp_path: Path) -> None:
+        assert resolve_profile_name(None, _write(tmp_path, _FULL_TOML)) == "dev"
+
+    # criterio: 10-C39
+    def test_default_without_file(self, tmp_path: Path) -> None:
+        assert resolve_profile_name(None, tmp_path / "missing.toml") == "default"

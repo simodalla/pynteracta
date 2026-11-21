@@ -4,19 +4,17 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, NoReturn
 
-import tomlkit
 import typer
 from rich.console import Console
+from rich.markup import escape
 
-from pynteracta.auth import (
-    FileTokenCache,
-    MemoryTokenCache,
-    build_cache_key,
-    load_service_account_key,
-)
+from pynteracta import google_login, keychain
+from pynteracta.auth import clear_cached_token
+from pynteracta.cli import _common
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
@@ -35,19 +33,29 @@ from pynteracta.cli._common import (
     validate_export_options,
     validate_full_fields,
 )
-from pynteracta.client import InteractaClient, _default_token_cache_dir
-from pynteracta.config import Profile, load_config, resolve_profile
-from pynteracta.exceptions import InteractaError
+from pynteracta.cli._write import read_secret
+from pynteracta.client import InteractaClient
+from pynteracta.config import (
+    Profile,
+    load_config,
+    resolve_profile,
+    resolve_profile_name,
+    write_profile_fields,
+)
+from pynteracta.exceptions import ConfigurationError, InteractaError
+from pynteracta.keychain import client_secret_entry
 from pynteracta.urls import build_api_base
 
 app = typer.Typer(help="Authentication commands.", no_args_is_help=True)
 
 
 _GOOGLE_TOKEN_ENV = "PYNTERACTA_GOOGLE_OAUTH2_TOKEN"
+_LOGIN_TIMEOUT = 300.0
+_SECRET_PROMPT = "Google OAuth client secret"
 
 
 @app.command("login")
-def login(
+def login(  # noqa: PLR0913
     ctx: typer.Context,
     service_account_key: Annotated[
         Path | None,
@@ -61,31 +69,102 @@ def login(
         str | None,
         typer.Option(
             "--google-token",
-            help=f"Google access token (falls back to ${_GOOGLE_TOKEN_ENV}).",
+            help=f"Static Google access token (falls back to ${_GOOGLE_TOKEN_ENV}).",
         ),
     ] = None,
     profile: Annotated[
         str | None,
-        typer.Option("--profile", help="Profile to update (default: active profile)."),
+        typer.Option("--profile", help="Profile to update (default: current profile)."),
+    ] = None,
+    google_client_id: Annotated[
+        str | None,
+        typer.Option(
+            "--google-client-id",
+            help="OAuth client id for the browser sign-in (saved in the profile).",
+        ),
+    ] = None,
+    google_client_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--google-client-file",
+            metavar="PATH",
+            help="OAuth client JSON downloaded from the Google Cloud console (Desktop app): "
+            "client id and secret are read from it; the path is not saved.",
+        ),
+    ] = None,
+    client_secret_stdin: Annotated[
+        bool,
+        typer.Option(
+            "--client-secret-stdin",
+            help="Read the OAuth client secret from the first line of stdin.",
+        ),
+    ] = False,
+    replace_client_secret: Annotated[
+        bool,
+        typer.Option(
+            "--replace-client-secret",
+            help="Ask for the OAuth client secret again even if one is saved.",
+        ),
+    ] = False,
+    no_browser: Annotated[
+        bool,
+        typer.Option("--no-browser", help="Print the sign-in URL instead of opening a browser."),
+    ] = False,
+    login_timeout: Annotated[
+        float | None,
+        typer.Option(
+            "--login-timeout",
+            metavar="SECONDS",
+            help=f"Seconds to wait for the browser sign-in (default {_LOGIN_TIMEOUT:g}).",
+        ),
     ] = None,
 ) -> None:
     """Configure an auth method for a profile and validate it by fetching a token.
 
     Service-account: ``--service-account-key PATH`` (persists the key path).
-    Google OAuth2:   ``--google`` (persists ``auth_method``; the Google access token is read
-    from ``--google-token`` / ``$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`` and is never persisted).
+    Google OAuth2:   ``--google`` signs in from the browser and saves the session in the system
+    keychain (needs ``pynteracta[google]`` and an OAuth client id). With ``--google-token`` or
+    ``$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`` a static access token is used instead (never persisted).
+    Without ``--profile`` the current profile of ``config.toml`` is updated.
     """
     state: CliState = ctx.obj
     console = make_console(state)
     config_path = config_path_from_state(state)
-    effective_profile = profile or state.profile or "default"
+    effective_profile = profile or resolve_profile_name(state.profile, state.config_file)
 
-    use_google = google or google_token is not None
+    integrated = [
+        name
+        for name, given in (
+            ("--google-client-id", google_client_id is not None),
+            ("--google-client-file", google_client_file is not None),
+            ("--client-secret-stdin", client_secret_stdin),
+            ("--replace-client-secret", replace_client_secret),
+            ("--no-browser", no_browser),
+            ("--login-timeout", login_timeout is not None),
+        )
+        if given
+    ]
+    use_google = google or google_token is not None or bool(integrated)
     if use_google and service_account_key is not None:
         typer.echo("--google and --service-account-key are mutually exclusive.", err=True)
         raise typer.Exit(2)
     if not use_google and service_account_key is None:
         typer.echo("Provide either --service-account-key or --google.", err=True)
+        raise typer.Exit(2)
+
+    static_token = google_token or os.environ.get(_GOOGLE_TOKEN_ENV) or None
+    if integrated and static_token:
+        if google_token is not None:
+            hint = "remove --google-token to sign in from the browser."
+        else:
+            hint = f"unset ${_GOOGLE_TOKEN_ENV} to sign in from the browser."
+        typer.echo(
+            f"{', '.join(integrated)} cannot be combined with a static Google token; {hint}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if google_client_file is not None and client_secret_stdin:
+        typer.echo("--google-client-file cannot be combined with --client-secret-stdin.", err=True)
         raise typer.Exit(2)
 
     # Resolve connection info BEFORE writing the partial profile (load_config validates
@@ -101,13 +180,28 @@ def login(
         typer.echo(f"Cannot resolve base profile for login: {exc}", err=True)
         raise typer.Exit(2) from exc
 
-    if use_google:
+    if use_google and static_token:
         _login_google(
             console=console,
             config_path=config_path,
             effective_profile=effective_profile,
             base_profile=base_profile,
-            token=google_token or os.environ.get(_GOOGLE_TOKEN_ENV),
+            token=static_token,
+        )
+    elif use_google:
+        _login_google_browser(
+            console=console,
+            state=state,
+            effective_profile=effective_profile,
+            base_profile=base_profile,
+            options=_BrowserLoginOptions(
+                client_id=google_client_id,
+                client_file=google_client_file,
+                secret_from_stdin=client_secret_stdin,
+                replace_secret=replace_client_secret,
+                open_browser=not no_browser,
+                timeout=login_timeout if login_timeout is not None else _LOGIN_TIMEOUT,
+            ),
         )
     else:
         assert service_account_key is not None  # narrowed above
@@ -120,37 +214,112 @@ def login(
         )
 
 
-def _load_config_doc(config_path: Path) -> tomlkit.TOMLDocument:
-    if config_path.exists():
-        return tomlkit.loads(config_path.read_text(encoding="utf-8"))
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    return tomlkit.document()
+@dataclass(frozen=True)
+class _BrowserLoginOptions:
+    client_id: str | None
+    client_file: Path | None
+    secret_from_stdin: bool
+    replace_secret: bool
+    open_browser: bool
+    timeout: float
 
 
-def _profile_table(doc: tomlkit.TOMLDocument, name: str) -> Any:
-    profiles_table = doc.get("profiles")
-    if profiles_table is None:
-        profiles_table = tomlkit.table()
-        doc.add("profiles", profiles_table)
-    if name not in profiles_table:
-        profiles_table.add(name, tomlkit.table())
-    return profiles_table[name]
+def _show_auth_url(url: str) -> None:
+    """Stampa l'indirizzo di consenso, senza a capo automatici che lo spezzerebbero."""
+    typer.echo(f"Open this URL to sign in:\n{url}", err=True)
 
 
-def _persist_connection(table: Any, base_profile: Profile) -> None:
-    """Scrive nel profilo i dati di connessione che gli mancano.
+def _browser_login_overrides(
+    state: CliState, effective_profile: str, base_profile: Profile
+) -> dict[str, Any]:
+    """I flag globali, più la connessione del profilo di partenza se il profilo è nuovo."""
+    overrides: dict[str, Any] = dict(_profile_overrides(state))
+    if effective_profile not in load_config(state.config_file).profiles:
+        overrides.setdefault("base_url", str(base_profile.base_url))
+        overrides.setdefault("base_path", base_profile.base_path)
+        overrides.setdefault("api_version", base_profile.api_version)
+    return overrides
 
-    Un profilo senza ``base_url`` rende ``config.toml`` invalido per ogni comando: il login su un
-    profilo nuovo salva quindi l'indirizzo con cui si è appena autenticato, più ``base_path`` e
-    ``api_version`` se diversi dai valori predefiniti. Un ``base_url`` già presente non si tocca.
-    """
-    if "base_url" in table:
-        return
-    table["base_url"] = str(base_profile.base_url).rstrip("/")
-    for field in ("base_path", "api_version"):
-        value = getattr(base_profile, field)
-        if value != Profile.model_fields[field].default:
-            table[field] = value
+
+def _read_client_secret(options: _BrowserLoginOptions, stored: str | None) -> str | None:
+    """Il secret da usare, o ``None`` per quello salvato; mai da un argomento."""
+    if options.secret_from_stdin:
+        return read_secret(
+            prompt=_SECRET_PROMPT, option="--client-secret-stdin", confirm=False, stdin_only=True
+        )
+    if not options.replace_secret and stored is not None:
+        return None
+    if not _common._stdin_is_interactive():
+        typer.echo(
+            "Client secret required: run interactively or pass --client-secret-stdin.", err=True
+        )
+        raise typer.Exit(2)
+    return read_secret(prompt=_SECRET_PROMPT, option="--client-secret-stdin", confirm=False)
+
+
+def _login_google_browser(
+    *,
+    console: Console,
+    state: CliState,
+    effective_profile: str,
+    base_profile: Profile,
+    options: _BrowserLoginOptions,
+) -> None:
+    """Login integrato: id del client, portachiavi e secret controllati prima del browser."""
+    overrides = _browser_login_overrides(state, effective_profile, base_profile)
+    if options.client_file is not None:
+        # Id e secret dal file del client: li legge e li controlla login(), prima della rete.
+        _run_browser_login(
+            console,
+            state,
+            effective_profile,
+            overrides,
+            options,
+            client_id=options.client_id,
+            secret=None,
+        )
+    try:
+        target = resolve_profile(effective_profile, state.config_file, overrides=overrides)
+        client_id = options.client_id or target.google_client_id
+        if not client_id:
+            raise ConfigurationError(google_login.NO_CLIENT_ID)
+        stored = keychain.open_keychain().get(client_secret_entry(client_id))
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+    secret = _read_client_secret(options, stored)
+    _run_browser_login(
+        console, state, effective_profile, overrides, options, client_id=client_id, secret=secret
+    )
+
+
+def _run_browser_login(  # noqa: PLR0913
+    console: Console,
+    state: CliState,
+    effective_profile: str,
+    overrides: dict[str, Any],
+    options: _BrowserLoginOptions,
+    *,
+    client_id: str | None,
+    secret: str | None,
+) -> NoReturn:
+    try:
+        result = google_login.login(
+            effective_profile,
+            config_file=state.config_file,
+            overrides=overrides,
+            client_id=client_id,
+            client_secret=secret,
+            client_file=options.client_file,
+            replace_client_secret=options.replace_secret,
+            open_browser=options.open_browser,
+            timeout=options.timeout,
+            on_auth_url=_show_auth_url,
+        )
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+    console.print(f"[green]✓[/green] Authenticated as: {result.user_name}")
+    console.print(f"[green]✓[/green] Google session saved for profile '{result.profile_name}'")
+    raise typer.Exit(EXIT_SUCCESS)
 
 
 def _validate_and_report(console: Console, client: InteractaClient) -> None:
@@ -168,12 +337,15 @@ def _login_service_account(
     base_profile: Profile,
     service_account_key: Path,
 ) -> None:
-    doc = _load_config_doc(config_path)
-    table = _profile_table(doc, effective_profile)
-    _persist_connection(table, base_profile)
-    table["auth_method"] = "service_account"
-    table["service_account_key"] = str(service_account_key)
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    write_profile_fields(
+        config_path,
+        effective_profile,
+        connection=base_profile,
+        fields={
+            "auth_method": "service_account",
+            "service_account_key": str(service_account_key),
+        },
+    )
     console.print(f"[green]✓[/green] Saved service_account_key for profile '{effective_profile}'")
 
     try:
@@ -209,11 +381,12 @@ def _login_google(
         raise typer.Exit(2)
 
     # Persist only the auth method — never the (short-lived, sensitive) Google token.
-    doc = _load_config_doc(config_path)
-    table = _profile_table(doc, effective_profile)
-    _persist_connection(table, base_profile)
-    table["auth_method"] = "google_oauth2"
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    write_profile_fields(
+        config_path,
+        effective_profile,
+        connection=base_profile,
+        fields={"auth_method": "google_oauth2"},
+    )
     console.print(
         f"[green]✓[/green] Set auth_method=google_oauth2 for profile '{effective_profile}' "
         "(token not persisted)"
@@ -284,9 +457,109 @@ def whoami(  # noqa: PLR0913
         raise handle_error(exc, console=console) from exc
 
 
+_UNREADABLE = "unreadable"
+
+
+def _status_record(st: google_login.GoogleSessionStatus) -> dict[str, Any]:
+    """Le righe di ``auth status``; con il portachiavi non leggibile le voci dicono il motivo."""
+    readable = st.keychain == google_login.KEYCHAIN_AVAILABLE
+    account: str | None = None
+    if st.google_session:
+        account = st.google_account or "unknown"
+    return {
+        "profile": st.profile,
+        "base_url": st.base_url,
+        "auth_method": st.auth_method,
+        "google_client_id": st.google_client_id,
+        "keychain": st.keychain,
+        "google_session": st.google_session if readable else _UNREADABLE,
+        "google_account": account,
+        "google_login_at": st.google_login_at,
+        "client_secret_saved": st.client_secret_saved if readable else _UNREADABLE,
+    }
+
+
+@app.command("status")
+def status(  # noqa: PLR0913
+    ctx: typer.Context,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="Also authenticate against the tenant and show the identity."),
+    ] = False,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Show the active profile and its saved Google session, without network calls.
+
+    Never shows tokens or secrets. ``--check`` also signs in (for a Google session: refresh and
+    exchange) and exits 3 if authentication fails.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    try:
+        record = _status_record(
+            google_login.status(
+                state.profile,
+                config_file=state.config_file,
+                overrides=_profile_overrides(state),
+            )
+        )
+        if check:
+            with build_client(state) as client:
+                me = client.users.me()
+            ud = me.user_data_typed
+            record["check"] = "ok"
+            record["authenticated_as"] = (
+                f"{ud.firstName or ''} {ud.lastName or ''}".strip() if ud is not None else None
+            )
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+    render_output(
+        resolve_output(state, output),
+        [record],
+        lambda r: r,
+        full=full,
+        fields=fields,
+        console=console,
+        title="Auth Status",
+        export_path=export,
+        export_format=export_format,
+        quiet=state.quiet,
+        single_command=True,
+    )
+
+
 @app.command("logout")
-def logout(ctx: typer.Context) -> None:
-    """Clear the cached token for the current profile."""
+def logout(
+    ctx: typer.Context,
+    forget_client_secret: Annotated[
+        bool,
+        typer.Option(
+            "--forget-client-secret",
+            help="Also remove the saved OAuth client secret of the profile's client.",
+        ),
+    ] = False,
+    revoke: Annotated[
+        bool,
+        typer.Option(
+            "--revoke",
+            help=(
+                "Revoke the Google session at Google first (this also ends the sessions of the "
+                "same account for this OAuth client on other profiles and machines)."
+            ),
+        ),
+    ] = False,
+) -> None:
+    """Clear the cached token and the saved Google session of the current profile.
+
+    No network calls unless ``--revoke``. The OAuth client secret is kept unless
+    ``--forget-client-secret``.
+    """
     state: CliState = ctx.obj
     console = make_console(state)
 
@@ -301,28 +574,64 @@ def logout(ctx: typer.Context) -> None:
         typer.echo(f"Cannot resolve profile: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    config = load_config(state.config_file)
-    profile_name = state.profile or config.current_profile
+    profile_name = resolve_profile_name(state.profile, state.config_file)
+    if profile_obj.auth_method != "google_oauth2":
+        api_base = build_api_base(
+            str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
+        )
+        clear_cached_token(profile_obj, profile_name, api_base)
+        console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+        # Il logout del service account non agisce su sessioni né secret Google (10-C46).
+        _print_nothing_to_do(
+            console, profile_name, nothing_to_revoke=revoke, nothing_to_forget=forget_client_secret
+        )
+        raise typer.Exit(EXIT_SUCCESS)
 
-    api_base = build_api_base(
-        str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
-    )
-
-    if profile_obj.token_cache == "memory":
-        cache: MemoryTokenCache | FileTokenCache = MemoryTokenCache()
-    else:
-        cache_dir = profile_obj.token_cache_dir or _default_token_cache_dir()
-        cache = FileTokenCache(cache_dir, api_base=api_base)
-
-    key_id = profile_name
-    if profile_obj.service_account_key is not None:
-        try:
-            sa = load_service_account_key(profile_obj.service_account_key)
-            key_id = str(sa.client_id)
-        except Exception:
-            pass
-
-    # Must match how the token managers derive the key, or logout silently clears nothing.
-    cache.clear(build_cache_key(api_base, key_id))
+    try:
+        result = google_login.logout(
+            state.profile,
+            config_file=state.config_file,
+            overrides=overrides,
+            forget_client_secret=forget_client_secret,
+            revoke=revoke,
+        )
+    except InteractaError as exc:
+        # La revoca è fallita: la sessione locale è comunque eliminata (10-C29).
+        console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+        console.print(
+            f"[green]✓[/green] Google session removed for profile '{profile_name}' "
+            "(revocation failed)."
+        )
+        raise handle_error(exc, console=console) from exc
     console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+    if result.keychain_error is not None:
+        console.print(
+            "Note: system keychain not readable, no Google session removed. "
+            f"{escape(result.keychain_error)}"
+        )
+    if result.revoked:
+        console.print("[green]✓[/green] Google session revoked.")
+    if result.session_removed:
+        console.print(f"[green]✓[/green] Google session removed for profile '{profile_name}'.")
+    if result.client_secret_removed:
+        console.print("[green]✓[/green] Client secret removed.")
+    if result.keychain_error is None:
+        _print_nothing_to_do(
+            console,
+            profile_name,
+            nothing_to_revoke=revoke and not result.revoked,
+            nothing_to_forget=forget_client_secret and not result.client_secret_removed,
+        )
     raise typer.Exit(EXIT_SUCCESS)
+
+
+def _print_nothing_to_do(
+    console: Console, profile_name: str, *, nothing_to_revoke: bool, nothing_to_forget: bool
+) -> None:
+    """Note per ``--revoke`` e ``--forget-client-secret`` che non hanno trovato nulla (10-C46)."""
+    if nothing_to_revoke:
+        console.print(f"Note: no Google session for profile '{profile_name}', nothing to revoke.")
+    if nothing_to_forget:
+        console.print(
+            f"Note: no client secret saved for profile '{profile_name}', nothing to remove."
+        )

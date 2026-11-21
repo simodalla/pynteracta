@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,10 +15,11 @@ from rich.table import Table
 
 from pynteracta.api._utils import snake_to_camel
 from pynteracta.client import InteractaClient
-from pynteracta.config import _xdg_config_dir, load_config, resolve_profile
+from pynteracta.config import config_file_path, load_config, resolve_profile
 from pynteracta.exceptions import (
     AuthenticationError,
     ConcurrencyError,
+    ConfigurationError,
     InteractaError,
     NotFoundError,
     ServerError,
@@ -101,6 +101,7 @@ _EXIT_MAP: dict[type[InteractaError], int] = {
     TransportError: EXIT_TRANSPORT,
     ServerError: EXIT_SERVER,
     ConcurrencyError: EXIT_CONFLICT,
+    ConfigurationError: EXIT_CONFIG,
 }
 
 
@@ -221,12 +222,7 @@ def build_client(state: CliState) -> InteractaClient:
 
 def config_path_from_state(state: CliState) -> Path:
     """Resolve the config file path from state, env, or platform default."""
-    if state.config_file is not None:
-        return state.config_file
-    env_file = os.environ.get("PYNTERACTA_CONFIG_FILE")
-    if env_file:
-        return Path(env_file)
-    return _xdg_config_dir() / "config.toml"
+    return config_file_path(state.config_file)
 
 
 def make_console(state: CliState) -> Console:

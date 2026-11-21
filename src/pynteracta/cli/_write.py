@@ -60,21 +60,38 @@ OccTokenOption = Annotated[
 ]
 
 
+def read_secret(
+    *,
+    prompt: str,
+    option: str,
+    confirm: bool,
+    stdin_only: bool = False,
+    label: str = "secret",
+) -> str:
+    """Un segreto mai da un argomento: prompt nascosto o prima riga dello standard input.
+
+    Con un terminale interattivo (e senza ``stdin_only``) lo chiede con un prompt nascosto,
+    confermato se ``confirm``; altrimenti legge la prima riga dello standard input, senza il fine
+    riga. Una stringa vuota → messaggio con il nome di ``option`` ed ``EXIT_CONFIG``, prima di
+    qualunque richiesta.
+    """
+    if not stdin_only and _common._stdin_is_interactive():
+        value = str(typer.prompt(prompt, hide_input=True, confirmation_prompt=confirm))
+    else:
+        value = sys.stdin.readline().rstrip("\r\n")
+    if not value:
+        typer.echo(f"{option}: no {label} read from stdin.", err=True)
+        raise typer.Exit(EXIT_CONFIG)
+    return value
+
+
 def read_password(*, option: str = "--password-stdin") -> str:
     """La password custom di ``users create`` (spec 05), mai da un argomento.
 
     Con un terminale interattivo la chiede con un prompt nascosto e la conferma; altrimenti
-    legge la prima riga dello standard input, senza il fine riga. Una stringa vuota → messaggio
-    con il nome di ``option`` ed ``EXIT_CONFIG``, prima di qualunque richiesta.
+    legge la prima riga dello standard input. Vedi :func:`read_secret`.
     """
-    if _common._stdin_is_interactive():
-        password = str(typer.prompt("Password", hide_input=True, confirmation_prompt=True))
-    else:
-        password = sys.stdin.readline().rstrip("\r\n")
-    if not password:
-        typer.echo(f"{option}: no password read from stdin.", err=True)
-        raise typer.Exit(EXIT_CONFIG)
-    return password
+    return read_secret(prompt="Password", option=option, confirm=True, label="password")
 
 
 def parse_zoned_datetime(value: str | None, timezone: str, *, option: str) -> dict[str, str] | None:
