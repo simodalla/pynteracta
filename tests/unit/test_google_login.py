@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import io
 import json
+import logging
 import sys
 import urllib.parse
 import webbrowser
@@ -15,6 +17,7 @@ import httpx
 import jwt
 import pytest
 import respx
+import structlog
 from api_helpers import load_payload
 from google_fakes import (
     ACCESS_TOKEN,
@@ -37,8 +40,14 @@ from structlog.testing import capture_logs
 from pynteracta import google_login, google_oauth
 from pynteracta.auth import CachedToken, FileTokenCache, build_cache_key
 from pynteracta.config import Profile, load_config
-from pynteracta.exceptions import AuthenticationError, ConfigurationError, TransportError
+from pynteracta.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    InteractaError,
+    TransportError,
+)
 from pynteracta.keychain import client_secret_entry, session_entry
+from pynteracta.logging import setup_default_logging
 from pynteracta.transport import HttpTransport
 
 
@@ -688,3 +697,215 @@ class TestLogout:
         assert result.session_removed is False
         assert result.keychain_error is not None
         assert "pynteracta[google]" in result.keychain_error
+
+
+# ---------------------------------------------------------------------------
+# Segreti e dati personali lungo tutto il flusso (10-C33, 10-C34, 10-C35)
+# ---------------------------------------------------------------------------
+
+S_REFRESH = "1//sentinel-refresh-token"
+S_CODE = "4/sentinel-authorization-code"
+S_VERIFIER = "sentinel-pkce-verifier-0123456789abcdefghijklmnopqrstuvwxyz"
+S_ID_TOKEN = "sentinel-id-token"
+S_SECRET = "GOCSPX-sentinel-client-secret"
+S_ACCESS = "ya29.sentinel-google-access-token"
+S_EMAIL = "sentinel.person@example.org"
+SECRETS = (S_REFRESH, S_CODE, S_VERIFIER, S_ID_TOKEN, S_SECRET, S_ACCESS)
+
+_PKG_LOGGERS = ("pynteracta", "pynteracta.audit")
+
+
+class _EverythingHooks:
+    def __init__(self) -> None:
+        self.seen: list[str] = []
+
+    def on_request(self, req: object) -> None:
+        self.seen.append(repr(req))
+
+    def on_response(self, resp: object) -> None:
+        self.seen.append(repr(resp))
+
+    def on_error(self, exc: BaseException) -> None:
+        self.seen.append(repr(exc))
+
+
+@pytest.fixture
+def leak_env(tmp_path: Path, fresh_loggers: None) -> Iterator[dict[str, object]]:
+    """Audit su file con corpi e senza redazione, log applicativi a DEBUG catturati."""
+    saved_config = structlog.get_config()
+    saved = {
+        name: (list(logging.getLogger(name).handlers), logging.getLogger(name).level)
+        for name in _PKG_LOGGERS
+    }
+    audit_file = tmp_path / "audit.log"
+    setup_default_logging(
+        "DEBUG", json=True, audit_file=audit_file, audit_bodies=True, audit_raw=True
+    )
+    structlog.configure(cache_logger_on_first_use=False)
+    app_stream, audit_stream = io.StringIO(), io.StringIO()
+    for name, stream in zip(_PKG_LOGGERS, (app_stream, audit_stream), strict=True):
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logging.getLogger(name).addHandler(handler)
+    yield {"audit_file": audit_file, "app": app_stream, "audit": audit_stream}
+    for name, (handlers, level) in saved.items():
+        lg = logging.getLogger(name)
+        for h in list(lg.handlers):
+            if h not in handlers:
+                h.close()
+                lg.removeHandler(h)
+        lg.setLevel(level)
+    structlog.configure(**saved_config)
+
+
+_REAL_NEW_PKCE = google_oauth.new_pkce
+
+
+def _sentinel_pkce() -> google_oauth.Pkce:
+    real = _REAL_NEW_PKCE()
+    return google_oauth.Pkce(verifier=S_VERIFIER, challenge=real.challenge, state=real.state)
+
+
+def _sentinel_config(tmp_path: Path) -> Path:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        f'[profiles.default]\nbase_url = "{BASE}"\ngoogle_client_id = "{CLIENT_ID}"\n'
+        'auth_method = "google_oauth2"\ntoken_cache = "memory"\n'
+        "audit_log = true\naudit_log_bodies = true\naudit_log_raw = true\n",
+        encoding="utf-8",
+    )
+    return config_file
+
+
+def _flush() -> None:
+    for name in _PKG_LOGGERS:
+        for h in logging.getLogger(name).handlers:
+            h.flush()
+
+
+def _leaked(env: dict[str, object], hooks: _EverythingHooks, errors: list[BaseException]) -> str:
+    _flush()
+    audit_file = env["audit_file"]
+    assert isinstance(audit_file, Path)
+    parts = [
+        audit_file.read_text(encoding="utf-8"),
+        env["app"].getvalue(),  # type: ignore[attr-defined]
+        env["audit"].getvalue(),  # type: ignore[attr-defined]
+        *hooks.seen,
+    ]
+    for exc in errors:
+        parts += [str(exc), repr(exc), repr(getattr(exc, "response_body", None))]
+    return "\n".join(parts)
+
+
+def _sentinel_error(error: str, status: int = 400) -> httpx.Response:
+    """Errore di Google con le sentinelle nei campi che la libreria non deve riportare."""
+    return httpx.Response(
+        status,
+        json={
+            "error": error,
+            "error_description": "Bad Request",
+            "refresh_token": S_REFRESH,
+            "client_secret": S_SECRET,
+            "access_token": S_ACCESS,
+            "id_token": S_ID_TOKEN,
+        },
+    )
+
+
+@pytest.mark.usefixtures("memory_keychain")
+class TestNoSecretsLeak:
+    # criterio: 10-C33, 10-C34, 10-C35
+    def test_login_refresh_revoke_and_errors(
+        self,
+        tmp_path: Path,
+        leak_env: dict[str, object],
+        monkeypatch: pytest.MonkeyPatch,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        monkeypatch.setattr(google_oauth, "new_pkce", _sentinel_pkce)
+        hooks = _EverythingHooks()
+        errors: list[BaseException] = []
+        config_file = _sentinel_config(tmp_path)
+
+        token_route = google_mock.post(google_oauth.TOKEN_URL)
+        token_route.side_effect = [
+            _sentinel_error("invalid_client", 401),  # login con secret sbagliato
+            token_response(
+                access_token=S_ACCESS, refresh_token=S_REFRESH, id_token=S_ID_TOKEN
+            ),  # login riuscito
+            token_response(access_token=S_ACCESS, refresh_token=None),  # rinnovo
+            _sentinel_error("invalid_grant"),  # rinnovo rifiutato
+            _sentinel_error("server_error", 500),  # Google in errore
+        ]
+        google_mock.get(google_oauth.USERINFO_URL).mock(return_value=userinfo_response(S_EMAIL))
+        google_mock.post(EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": interacta_token()})
+        )
+        google_mock.get(ME_URL).mock(
+            return_value=httpx.Response(200, json=load_payload("current_user_data_response.json"))
+        )
+        google_mock.post(google_oauth.REVOKE_URL).mock(
+            return_value=_sentinel_error("server_error", 503)
+        )
+
+        def _login() -> None:
+            fake = FakeBrowser(code=S_CODE)
+            monkeypatch.setattr(webbrowser, "open", fake)
+            try:
+                google_login.login(config_file=config_file, client_secret=S_SECRET, hooks=hooks)
+            finally:
+                fake.join()
+
+        # 1. login con invalid_client, 2. login riuscito
+        with pytest.raises(AuthenticationError) as first:
+            _login()
+        errors.append(first.value)
+        _login()
+
+        # 3. rinnovo riuscito, 4. invalid_grant, 5. 500
+        from pynteracta.client import InteractaClient  # noqa: PLC0415
+
+        with InteractaClient(profile_name="default", config_file=config_file, hooks=hooks) as c:
+            c.users.me()
+        for _ in range(2):
+            with (
+                InteractaClient(
+                    profile_name="default", config_file=config_file, hooks=hooks
+                ) as client,
+                pytest.raises(InteractaError) as info,
+            ):
+                client.users.me()
+            errors.append(info.value)
+
+        # stato, poi logout con revoca fallita (503)
+        status = google_login.status(config_file=config_file)
+        assert status.google_account == S_EMAIL
+        with pytest.raises(InteractaError) as revoke_error:
+            google_login.logout(config_file=config_file, revoke=True)
+        errors.append(revoke_error.value)
+
+        leaked = _leaked(leak_env, hooks, errors)
+        for secret in SECRETS:
+            assert secret not in leaked, f"{secret} trapelato"
+        assert S_EMAIL not in leaked
+
+        # 10-C34: le chiamate a Google sono nell'audit con metodo, URL e stato, senza corpo.
+        _flush()
+        events = [
+            json.loads(line)
+            for line in leak_env["audit_file"].read_text(encoding="utf-8").splitlines()  # type: ignore[attr-defined]
+        ]
+        google_events = [e for e in events if "googleapis.com" in str(e.get("url", ""))]
+        for url in (google_oauth.TOKEN_URL, google_oauth.USERINFO_URL, google_oauth.REVOKE_URL):
+            requests = [
+                e for e in google_events if e["event"] == "audit.request" and e["url"] == url
+            ]
+            responses = [
+                e for e in google_events if e["event"] == "audit.response" and e["url"] == url
+            ]
+            assert requests, url
+            assert responses, url
+            assert all("method" in e for e in requests)
+            assert all("status" in e for e in responses)
+        assert all(e.get("body") is None for e in google_events)

@@ -130,7 +130,7 @@ class FakeBrowser:
     (timeout); ``opens`` è il valore restituito, come ``webbrowser.open``.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         opens: bool = True,
@@ -138,7 +138,9 @@ class FakeBrowser:
         query: dict[str, str] | None = None,
         before: tuple[str, ...] = (),
         after: tuple[str, ...] = (),
+        code: str = AUTH_CODE,
     ) -> None:
+        self.code = code
         self.opens = opens
         self.follow = follow
         self.query = query
@@ -158,7 +160,7 @@ class FakeBrowser:
     def start(self, url: str) -> None:
         """Segue il redirect di ``url`` (usato anche quando il browser "non si apre")."""
         params = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
-        query = self.query or {"code": AUTH_CODE, "state": params["state"]}
+        query = self.query or {"code": self.code, "state": params["state"]}
         redirect = params["redirect_uri"]
         self._thread = threading.Thread(target=self._visit, args=(redirect, query), daemon=True)
         self._thread.start()

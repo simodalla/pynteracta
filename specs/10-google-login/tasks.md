@@ -335,7 +335,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
      `google_login.logout`, messaggi come nel piano.
   3. Controlli bloccanti; commit `feat(cli): auth logout elimina la sessione Google (10-T15)`.
 
-### [ ] T16 – Test sui segreti e sui dati personali lungo tutto il flusso
+### [x] T16 – Test sui segreti e sui dati personali lungo tutto il flusso
 
 - Criteri: 10-C33, 10-C34, 10-C35
 - Dipende da: T13, T14, T15
