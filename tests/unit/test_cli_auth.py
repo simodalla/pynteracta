@@ -209,6 +209,49 @@ class TestAuthLoginGoogle:
         assert result.exit_code == EXIT_CONFIG
         assert "mutually exclusive" in result.output
 
+    @respx.mock
+    def test_static_login_writes_profile_before_validation(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Caratterizzazione: con token statico il profilo è scritto prima dello scambio."""
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(401, json={"error": "Unauthorized"})
+        )
+        config_file = tmp_path / "config.toml"
+        result = runner.invoke(
+            app,
+            ["--config-file", str(config_file), "auth", "login", "--google", "--profile", "g"],
+            env={**BASE_ENV, "PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok"},
+        )
+        assert result.exit_code == EXIT_AUTH
+        profile = load_config(config_file).profiles["g"]
+        assert profile.auth_method == "google_oauth2"
+        assert str(profile.base_url).rstrip("/") == "https://api.example.com"
+
+    @pytest.mark.parametrize("method", ["google", "service_account"])
+    @respx.mock
+    def test_static_login_without_profile_uses_default_when_current_is_default(
+        self, runner: CliRunner, tmp_path: Path, method: str
+    ) -> None:
+        """Caratterizzazione: senza ``--profile`` e senza profilo corrente scrive in ``default``."""
+        token_payload = {"accessToken": _fake_token()}
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(return_value=httpx.Response(200, json=token_payload))
+        mock_json("POST", "core/auth/create-access-token-by-service-account", token_payload)
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        config_file = tmp_path / "config.toml"
+        args = (
+            ["--google-token", "tok"]
+            if method == "google"
+            else ["--service-account-key", str(_SA_KEY_PATH)]
+        )
+        result = runner.invoke(
+            app, ["--config-file", str(config_file), "auth", "login", *args], env=BASE_ENV
+        )
+        assert result.exit_code == 0, result.output
+        assert list(load_config(config_file).profiles) == ["default"]
+
     def test_login_google_missing_token(self, runner: CliRunner, tmp_path: Path) -> None:
         config_file = tmp_path / "config.toml"
         result = runner.invoke(
@@ -414,6 +457,42 @@ class TestAuthLogout:
         )
         assert result.exit_code == 0
         assert not written[0].exists(), "logout reported success but left the token file on disk"
+
+    def test_logout_unresolvable_profile_exits_1(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Caratterizzazione: senza indirizzo del tenant il logout esce con ``1``."""
+        result = runner.invoke(
+            app, ["--config-file", str(tmp_path / "missing.toml"), "auth", "logout"]
+        )
+        assert result.exit_code == 1
+        assert "Cannot resolve profile" in result.output
+
+    def test_logout_google_profile_clears_profile_key(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Caratterizzazione: profilo Google → voce con indirizzo dell'API e nome del profilo."""
+        cache_dir = tmp_path / "tokens"
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            "[profiles.default]\n"
+            'base_url = "https://api.example.com"\n'
+            'auth_method = "google_oauth2"\n'
+            f'token_cache_dir = "{cache_dir}"\n',
+            encoding="utf-8",
+        )
+        api_base = build_api_base("https://api.example.com", "/portal", 2)
+        cache = FileTokenCache(cache_dir, api_base=api_base)
+        key = build_cache_key(api_base, "default")
+        cache.save(
+            key,
+            CachedToken(
+                access_token="tok",
+                expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+                obtained_at=datetime.now(tz=UTC),
+            ),
+        )
+        result = runner.invoke(app, ["--config-file", str(config_file), "auth", "logout"])
+        assert result.exit_code == 0
+        assert cache.load(key) is None
 
 
 class TestExitCodes:

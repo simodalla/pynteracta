@@ -17,7 +17,7 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
 
 ## Elenco
 
-### [ ] T01 – Test di caratterizzazione di login statico, logout e precedenza dei token
+### [x] T01 – Test di caratterizzazione di login statico, logout e precedenza dei token
 
 - Criteri: nessuno direttamente; fissa il comportamento che 10-C12 e 10-C16 devono conservare
 - Dipende da: nessuno

@@ -125,6 +125,38 @@ class TestInteractaClientGoogleOAuth2:
             client.users.me()
         assert b"provided-tok" in exchange.calls[0].request.content
 
+    @respx.mock
+    def test_explicit_token_wins_over_profile_token(self) -> None:
+        """Caratterizzazione: ``google_token`` esplicito vince sul token del profilo (ambiente)."""
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _access_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        profile = Profile(
+            base_url="https://api.example.com",  # type: ignore[arg-type]
+            auth_method="google_oauth2",
+            google_oauth2_token="env-tok",
+            token_cache="memory",
+        )
+        with InteractaClient(profile=profile, google_token="explicit-tok") as client:
+            client.users.me()
+        body = exchange.calls[0].request.content
+        assert b"explicit-tok" in body
+        assert b"env-tok" not in body
+
+    def test_explicit_provider_with_profile_token(self) -> None:
+        """Caratterizzazione: provider esplicito più token del profilo → errore."""
+        profile = Profile(
+            base_url="https://api.example.com",  # type: ignore[arg-type]
+            auth_method="google_oauth2",
+            google_oauth2_token="env-tok",
+            token_cache="memory",
+        )
+        with pytest.raises(AuthenticationError, match="exactly one"):
+            InteractaClient(profile=profile, google_token_provider=lambda: "p")
+
     def test_google_auth_method_without_token_raises(self) -> None:
         profile = Profile(
             base_url="https://api.example.com",  # type: ignore[arg-type]
