@@ -36,7 +36,7 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
   3. Controlli bloccanti; commit `test: caratterizzazione di login statico, logout e
      precedenza dei token (10-T01)`.
 
-### [ ] T20 – Chiave di cache del token Google sull'indirizzo dell'API
+### [x] T20 – Chiave di cache del token Google sull'indirizzo dell'API
 
 Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito dopo T01.
 

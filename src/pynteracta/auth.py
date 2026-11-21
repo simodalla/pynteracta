@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import uuid4
 
 import jwt
@@ -29,6 +29,9 @@ from pynteracta.models.facade.auth import (
     ServiceAccountTokenResponse,
 )
 from pynteracta.transport import HttpTransport
+
+if TYPE_CHECKING:
+    from pynteracta.config import Profile
 
 _log = structlog.get_logger("pynteracta.auth")
 
@@ -221,6 +224,16 @@ def build_cache_key(api_base: str, identity: str) -> str:
     """
     digest = hashlib.sha256(api_base.encode("utf-8")).hexdigest()[:16]
     return f"{digest}-{identity}"
+
+
+def legacy_google_cache_key(profile: Profile, profile_name: str) -> str:
+    """La chiave di cache del token Google calcolata prima della spec 10.
+
+    Il client la derivava dalla base dello scambio Google (``{base_url}/{base_path}/api``)
+    invece che dall'indirizzo dell'API: il logout la elimina per non lasciare token orfani.
+    """
+    base = f"{str(profile.base_url).rstrip('/')}/{profile.base_path.strip('/')}/api"
+    return build_cache_key(base, profile_name)
 
 
 class FileTokenCache:
@@ -416,13 +429,14 @@ class GoogleOAuth2TokenManager:
 
     _SKEW_SECONDS: int = TokenManager._SKEW_SECONDS
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         credentials: GoogleOAuth2Credentials,
         cache: TokenCache,
         transport: HttpTransport,
         *,
         cache_key: str,
+        cache_api_base: str | None = None,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         self._credentials = credentials
@@ -430,7 +444,9 @@ class GoogleOAuth2TokenManager:
         self._transport = transport
         self._clock = clock
         self._lock = threading.Lock()
-        self._profile = build_cache_key(transport.base_url, cache_key)
+        # La chiave si calcola sull'indirizzo dell'API, come per il service account, così
+        # coincide con quella di ``auth logout`` (10-C41); senza, resta la base del transport.
+        self._profile = build_cache_key(cache_api_base or transport.base_url, cache_key)
 
     def get_token(self) -> str:
         """Return a valid Interacta access token, refreshing if near expiry."""

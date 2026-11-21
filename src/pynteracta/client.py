@@ -202,6 +202,7 @@ class InteractaClient:
                 cache,
                 google_transport,
                 cache_key=profile_name or "default",
+                cache_api_base=api_base,
             )
 
         if auth_method == "google_oauth2":

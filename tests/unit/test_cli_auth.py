@@ -494,6 +494,63 @@ class TestAuthLogout:
         assert result.exit_code == 0
         assert cache.load(key) is None
 
+    def _google_config(self, tmp_path: Path) -> tuple[Path, Path]:
+        cache_dir = tmp_path / "tokens"
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            "[profiles.default]\n"
+            'base_url = "https://api.example.com"\n'
+            'auth_method = "google_oauth2"\n'
+            f'token_cache_dir = "{cache_dir}"\n',
+            encoding="utf-8",
+        )
+        return config_file, cache_dir
+
+    # criterio: 10-C41
+    @respx.mock
+    def test_logout_google_removes_client_cache_file(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        config_file, cache_dir = self._google_config(tmp_path)
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _fake_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        whoami = runner.invoke(
+            app,
+            ["--config-file", str(config_file), "auth", "whoami"],
+            env={"PYNTERACTA_GOOGLE_OAUTH2_TOKEN": "tok"},
+        )
+        assert whoami.exit_code == 0, whoami.output
+        assert len(list(cache_dir.glob("*.token.json"))) == 1, "precondizione: cache scritta"
+
+        result = runner.invoke(app, ["--config-file", str(config_file), "auth", "logout"])
+        assert result.exit_code == 0
+        assert list(cache_dir.glob("*.token.json")) == []
+
+    # criterio: 10-C41
+    def test_logout_google_removes_legacy_cache_file(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        config_file, cache_dir = self._google_config(tmp_path)
+        legacy_base = "https://api.example.com/portal/api"
+        cache = FileTokenCache(
+            cache_dir, api_base=build_api_base(BASE_ENV["PYNTERACTA_BASE_URL"], "/portal", 2)
+        )
+        cache.save(
+            build_cache_key(legacy_base, "default"),
+            CachedToken(
+                access_token="tok",
+                expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+                obtained_at=datetime.now(tz=UTC),
+            ),
+        )
+        result = runner.invoke(app, ["--config-file", str(config_file), "auth", "logout"])
+        assert result.exit_code == 0
+        assert list(cache_dir.glob("*.token.json")) == []
+
 
 class TestExitCodes:
     """Verify that InteractaError subclasses map to the correct exit codes."""

@@ -15,6 +15,7 @@ from pynteracta.auth import (
     FileTokenCache,
     MemoryTokenCache,
     build_cache_key,
+    legacy_google_cache_key,
     load_service_account_key,
 )
 from pynteracta.cli._common import (
@@ -324,5 +325,8 @@ def logout(ctx: typer.Context) -> None:
 
     # Must match how the token managers derive the key, or logout silently clears nothing.
     cache.clear(build_cache_key(api_base, key_id))
+    if profile_obj.auth_method == "google_oauth2":
+        # Chiave scritta dal client prima della spec 10 (10-C41).
+        cache.clear(legacy_google_cache_key(profile_obj, profile_name))
     console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
     raise typer.Exit(EXIT_SUCCESS)
