@@ -581,6 +581,10 @@ def logout(
         )
         clear_cached_token(profile_obj, profile_name, api_base)
         console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+        # Il logout del service account non agisce su sessioni né secret Google (10-C46).
+        _print_nothing_to_do(
+            console, profile_name, nothing_to_revoke=revoke, nothing_to_forget=forget_client_secret
+        )
         raise typer.Exit(EXIT_SUCCESS)
 
     try:
@@ -611,4 +615,23 @@ def logout(
         console.print(f"[green]✓[/green] Google session removed for profile '{profile_name}'.")
     if result.client_secret_removed:
         console.print("[green]✓[/green] Client secret removed.")
+    if result.keychain_error is None:
+        _print_nothing_to_do(
+            console,
+            profile_name,
+            nothing_to_revoke=revoke and not result.revoked,
+            nothing_to_forget=forget_client_secret and not result.client_secret_removed,
+        )
     raise typer.Exit(EXIT_SUCCESS)
+
+
+def _print_nothing_to_do(
+    console: Console, profile_name: str, *, nothing_to_revoke: bool, nothing_to_forget: bool
+) -> None:
+    """Note per ``--revoke`` e ``--forget-client-secret`` che non hanno trovato nulla (10-C46)."""
+    if nothing_to_revoke:
+        console.print(f"Note: no Google session for profile '{profile_name}', nothing to revoke.")
+    if nothing_to_forget:
+        console.print(
+            f"Note: no client secret saved for profile '{profile_name}', nothing to remove."
+        )

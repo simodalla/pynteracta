@@ -1791,3 +1791,67 @@ class TestAuthLoginClientFile:
         )
         fake_browser.join()
         assert result.exit_code == 0, result.output
+
+
+class TestAuthLogoutNothingToDo:
+    def _logout(self, runner: CliRunner, config_file: Path, *args: str) -> Result:
+        return runner.invoke(app, ["--config-file", str(config_file), "auth", "logout", *args])
+
+    # criterio: 10-C46
+    @respx.mock
+    def test_revoke_on_service_account_profile(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        route = respx.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        result = self._logout(runner, _browser_config(tmp_path, client_id=None), "--revoke")
+        assert result.exit_code == 0, result.output
+        assert "✓ Token cache cleared for profile 'default'." in result.output
+        assert "Note: no Google session for profile 'default', nothing to revoke." in result.output
+        assert route.call_count == 0
+
+    # criterio: 10-C46
+    @respx.mock
+    def test_revoke_on_google_profile_without_session(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        route = respx.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        result = self._logout(runner, _two_profiles(tmp_path), "--revoke")
+        assert result.exit_code == 0, result.output
+        assert "Note: no Google session for profile 'default', nothing to revoke." in result.output
+        assert route.call_count == 0
+
+    # criterio: 10-C46
+    @pytest.mark.parametrize("google", [True, False], ids=["google", "service_account"])
+    def test_forget_client_secret_without_secret(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain, google: bool
+    ) -> None:
+        config_file = _two_profiles(tmp_path) if google else _browser_config(tmp_path)
+        result = self._logout(runner, config_file, "--forget-client-secret")
+        assert result.exit_code == 0, result.output
+        assert (
+            "Note: no client secret saved for profile 'default', nothing to remove."
+            in result.output
+        )
+
+    # criterio: 10-C46
+    @respx.mock
+    def test_no_note_when_there_is_something_to_do(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        respx.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        result = self._logout(runner, _two_profiles(tmp_path), "--revoke", "--forget-client-secret")
+        assert result.exit_code == 0, result.output
+        assert "✓ Google session revoked." in result.output
+        assert "✓ Client secret removed." in result.output
+        assert "Note:" not in result.output
+
+    # criterio: 10-C46
+    @pytest.mark.parametrize("google", [True, False], ids=["google", "service_account"])
+    def test_no_note_without_flags(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain, google: bool
+    ) -> None:
+        config_file = _two_profiles(tmp_path) if google else _browser_config(tmp_path)
+        result = self._logout(runner, config_file)
+        assert result.exit_code == 0, result.output
+        assert "Note:" not in result.output

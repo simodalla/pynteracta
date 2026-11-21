@@ -271,6 +271,10 @@ pynteracta auth logout --revoke
 | `--forget-client-secret` | Also remove the client secret of the profile's OAuth client. |
 | `--revoke` | Revoke the session at Google first. The revocation ends the consent to the OAuth client, so it also ends the sessions of the same account on other profiles and machines. If it fails, the local session is removed anyway and the command exits with the error's code. |
 
+When `--revoke` or `--forget-client-secret` find nothing to act on (no Google session, no saved
+client secret, or a service-account profile) the command says so in a note and still exits
+`0`: check `--profile` if you expected a session.
+
 ## config
 
 ### `config set`

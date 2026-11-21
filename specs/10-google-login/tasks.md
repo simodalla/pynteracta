@@ -401,7 +401,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   6. Controlli bloccanti e `mkdocs build --strict`; commit `feat(cli): id e secret del client
      Google dal file JSON della console (10-T21)`.
 
-### [ ] T22 – Nota di `auth logout` quando non c'è nulla da revocare o eliminare
+### [x] T22 – Nota di `auth logout` quando non c'è nulla da revocare o eliminare
 
 - Criteri: 10-C46
 - Dipende da: T15

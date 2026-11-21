@@ -172,8 +172,9 @@ CLI, testi in inglese (deroga del `CLAUDE.md`).
   salvata (anche su un profilo con service account): `Note: no Google session for profile
   '<nome>', nothing to revoke.`; con `--forget-client-secret` e nessun secret salvato: `Note: no
   client secret saved for profile '<nome>', nothing to remove.` (10-C46). Le note si stampano
-  solo se il portachiavi è leggibile; senza, resta la nota del portachiavi. Per il service
-  account la CLI legge lo stato con `google_login.status()`, senza rete.
+  solo se il portachiavi è leggibile; senza, resta la nota del portachiavi. Su un profilo con
+  service account le note si stampano senza leggere il portachiavi: lì il logout non agisce su
+  sessioni né secret Google.
 - Pagina dopo il redirect: `Sign-in complete. You can close this window.` oppure `Sign-in
   failed. Return to the terminal for details.`; testo semplice, leggibile da uno screen reader,
   senza script né dati della richiesta.
