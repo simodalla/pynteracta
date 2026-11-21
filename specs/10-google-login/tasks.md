@@ -71,7 +71,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(config): ConfigurationError e campo google_client_id
      (10-T02)`.
 
-### [ ] T03 – Scrittura del profilo e percorso del file in `config.py`
+### [x] T03 – Scrittura del profilo e percorso del file in `config.py`
 
 - Criteri: nessuno (spostamento senza cambio di comportamento, serve a T11)
 - Dipende da: T01

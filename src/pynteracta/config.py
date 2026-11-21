@@ -10,10 +10,12 @@ from __future__ import annotations
 import os
 import sys
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
 import platformdirs
+import tomlkit
 from pydantic import BaseModel, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -109,16 +111,58 @@ def _default_config_path() -> Path:
     return _xdg_config_dir() / "config.toml"
 
 
+def config_file_path(config_file: Path | None = None) -> Path:
+    """Il percorso di ``config.toml``: argomento, poi ``PYNTERACTA_CONFIG_FILE``, poi il
+    predefinito della piattaforma."""
+    if config_file is not None:
+        return config_file
+    env_file = os.environ.get("PYNTERACTA_CONFIG_FILE")
+    return Path(env_file) if env_file else _default_config_path()
+
+
+def write_profile_fields(
+    config_path: Path,
+    name: str,
+    *,
+    connection: Profile,
+    fields: Mapping[str, str],
+) -> None:
+    """Scrive in ``config.toml`` i campi ``fields`` del profilo ``name``, con ``tomlkit``.
+
+    Crea il file e il profilo se mancano e conserva commenti e formattazione. Un profilo senza
+    ``base_url`` renderebbe il file invalido per ogni comando: se manca, si scrive quello di
+    ``connection``, più ``base_path`` e ``api_version`` se diversi dai predefiniti. Un
+    ``base_url`` già presente non si tocca.
+    """
+    if config_path.exists():
+        doc = tomlkit.loads(config_path.read_text(encoding="utf-8"))
+    else:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        doc = tomlkit.document()
+    profiles_table: Any = doc.get("profiles")
+    if profiles_table is None:
+        profiles_table = tomlkit.table()
+        doc.add("profiles", profiles_table)
+    if name not in profiles_table:
+        profiles_table.add(name, tomlkit.table())
+    table = profiles_table[name]
+    if "base_url" not in table:
+        table["base_url"] = str(connection.base_url).rstrip("/")
+        for field in ("base_path", "api_version"):
+            value = getattr(connection, field)
+            if value != Profile.model_fields[field].default:
+                table[field] = value
+    for key, value in fields.items():
+        table[key] = value
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+
 def load_config(config_file: Path | None = None) -> Config:
     """Load :class:`Config` from a TOML file.
 
     Falls back to an empty config (no profiles) if the file does not exist.
     """
-    if config_file is None:
-        env_file = os.environ.get("PYNTERACTA_CONFIG_FILE")
-        path = Path(env_file) if env_file else _default_config_path()
-    else:
-        path = config_file
+    path = config_file_path(config_file)
 
     if not path.exists():
         return Config()

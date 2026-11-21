@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
-import tomlkit
 import typer
 from rich.console import Console
 
@@ -37,7 +36,7 @@ from pynteracta.cli._common import (
     validate_full_fields,
 )
 from pynteracta.client import InteractaClient, _default_token_cache_dir
-from pynteracta.config import Profile, load_config, resolve_profile
+from pynteracta.config import Profile, load_config, resolve_profile, write_profile_fields
 from pynteracta.exceptions import InteractaError
 from pynteracta.urls import build_api_base
 
@@ -121,39 +120,6 @@ def login(
         )
 
 
-def _load_config_doc(config_path: Path) -> tomlkit.TOMLDocument:
-    if config_path.exists():
-        return tomlkit.loads(config_path.read_text(encoding="utf-8"))
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    return tomlkit.document()
-
-
-def _profile_table(doc: tomlkit.TOMLDocument, name: str) -> Any:
-    profiles_table = doc.get("profiles")
-    if profiles_table is None:
-        profiles_table = tomlkit.table()
-        doc.add("profiles", profiles_table)
-    if name not in profiles_table:
-        profiles_table.add(name, tomlkit.table())
-    return profiles_table[name]
-
-
-def _persist_connection(table: Any, base_profile: Profile) -> None:
-    """Scrive nel profilo i dati di connessione che gli mancano.
-
-    Un profilo senza ``base_url`` rende ``config.toml`` invalido per ogni comando: il login su un
-    profilo nuovo salva quindi l'indirizzo con cui si è appena autenticato, più ``base_path`` e
-    ``api_version`` se diversi dai valori predefiniti. Un ``base_url`` già presente non si tocca.
-    """
-    if "base_url" in table:
-        return
-    table["base_url"] = str(base_profile.base_url).rstrip("/")
-    for field in ("base_path", "api_version"):
-        value = getattr(base_profile, field)
-        if value != Profile.model_fields[field].default:
-            table[field] = value
-
-
 def _validate_and_report(console: Console, client: InteractaClient) -> None:
     me = client.users.me()
     ud = me.user_data_typed
@@ -169,12 +135,15 @@ def _login_service_account(
     base_profile: Profile,
     service_account_key: Path,
 ) -> None:
-    doc = _load_config_doc(config_path)
-    table = _profile_table(doc, effective_profile)
-    _persist_connection(table, base_profile)
-    table["auth_method"] = "service_account"
-    table["service_account_key"] = str(service_account_key)
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    write_profile_fields(
+        config_path,
+        effective_profile,
+        connection=base_profile,
+        fields={
+            "auth_method": "service_account",
+            "service_account_key": str(service_account_key),
+        },
+    )
     console.print(f"[green]✓[/green] Saved service_account_key for profile '{effective_profile}'")
 
     try:
@@ -210,11 +179,12 @@ def _login_google(
         raise typer.Exit(2)
 
     # Persist only the auth method — never the (short-lived, sensitive) Google token.
-    doc = _load_config_doc(config_path)
-    table = _profile_table(doc, effective_profile)
-    _persist_connection(table, base_profile)
-    table["auth_method"] = "google_oauth2"
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    write_profile_fields(
+        config_path,
+        effective_profile,
+        connection=base_profile,
+        fields={"auth_method": "google_oauth2"},
+    )
     console.print(
         f"[green]✓[/green] Set auth_method=google_oauth2 for profile '{effective_profile}' "
         "(token not persisted)"
