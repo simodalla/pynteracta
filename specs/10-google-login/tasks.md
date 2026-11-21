@@ -129,7 +129,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. Controlli bloccanti; commit `feat(auth): extra google e accesso al portachiavi di sistema
      (10-T05)`.
 
-### [ ] T06 – `HttpTransport.request_external`
+### [x] T06 – `HttpTransport.request_external`
 
 - Criteri: 10-C34 (parte del transport)
 - Dipende da: nessuno

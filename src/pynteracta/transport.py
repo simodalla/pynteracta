@@ -181,6 +181,43 @@ class HttpTransport:
             self._hooks.on_error(err)
         raise err
 
+    def request_external(
+        self,
+        method: str,
+        url: str,
+        *,
+        form: Mapping[str, str] | None = None,
+        bearer_token: str | None = None,
+    ) -> httpx.Response:
+        """Una richiesta verso un URL assoluto fuori da Interacta (endpoint di Google, spec 10).
+
+        Porta solo lo ``User-Agent`` e, se dato, ``Authorization: Bearer <bearer_token>``; mai
+        il token Interacta. ``form`` è inviato come ``application/x-www-form-urlencoded``.
+        Passa da log, audit e hook come le altre, con metodo, URL e stato e con il corpo sempre
+        assente, di richiesta e di risposta, anche con ``audit_bodies``: refresh token, codici e
+        client secret viaggiano nei corpi. Una sola richiesta. La risposta torna con qualunque
+        stato: la mappa il chiamante. Timeout ed errori di rete → :class:`TransportError`.
+        """
+        headers = {"User-Agent": self._user_agent}
+        if bearer_token is not None:
+            headers["Authorization"] = f"Bearer {bearer_token}"
+        redacted_url = redact_string(url)
+        self._emit_request(method, redacted_url, headers, None)
+        response, elapsed_ms = self._send(
+            method,
+            url,
+            redacted_url=redacted_url,
+            headers=headers,
+            data=dict(form) if form is not None else None,
+        )
+        self._emit_response(response, redacted_url, elapsed_ms, capture_body=False)
+        return response
+
+    def notify_error(self, err: InteractaError) -> None:
+        """Passa a ``hooks.on_error`` un errore costruito dal chiamante (spec 10)."""
+        if self._hooks is not None:
+            self._hooks.on_error(err)
+
     def close(self) -> None:
         """Close the underlying ``httpx.Client``."""
         self._client.close()
