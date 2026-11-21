@@ -148,7 +148,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(transport): richieste esterne senza corpo in log, audit
      e hook (10-T06)`.
 
-### [ ] T07 – PKCE, indirizzo di consenso e listener su loopback
+### [x] T07 – PKCE, indirizzo di consenso e listener su loopback
 
 - Criteri: 10-C01, 10-C08, 10-C10, 10-C36 (parte di libreria)
 - Dipende da: nessuno
