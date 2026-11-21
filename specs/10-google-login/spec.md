@@ -3,7 +3,7 @@
 Stato: approvata
 Branch: `m36_google_login`
 Requisiti del PRD: RF-026, RNF-012, RNF-001 (estensione ai segreti Google); toccati RF-002,
-RF-003, RF-015, RF-016, RF-017, RF-018, RF-019; §2 (riga "Utente Google"), §5 (righe "Google
+RF-003, RF-004, RF-015, RF-016, RF-017, RF-018, RF-019; §2 (riga "Utente Google"), §5 (righe "Google
 OAuth2" e "Portachiavi di sistema"), §6 e §7, riconfermati dal maintainer il 2026-11-21
 Dipende da: [ADR 0002](../adr/0002-server-mcp-locale-e-login-google-integrato.md) (decisioni 6
 e 7); spec 01 (chiusa): redazione di header e body. Lascia pronto per la spec 11 (server MCP):
@@ -32,6 +32,11 @@ server MCP (spec 11), ma vale da solo per la CLI e per chi usa la libreria da Py
   profilo, e dura un'ora (verificato sul tenant il 2026-11-20). Alla scadenza la libreria ripete
   lo scambio con lo stesso token Google, che nel frattempo è scaduto se era statico.
 - `auth logout` cancella solo la cache del token Interacta. Non esiste un comando di stato.
+- `auth login` senza `--profile` scrive nel profilo `default`, mentre gli altri comandi usano il
+  profilo corrente di `config.toml` (`current_profile`): se i due nomi differiscono, il login
+  configura un profilo che i comandi successivi non leggono. Allo stesso modo un
+  `InteractaClient` che risolve da sé il profilo, senza `profile_name`, usa `default` come nome
+  nella chiave della cache del token.
 - Il profilo non ha campi per il client OAuth. Gli extra del pacchetto sono `yaml`, `parquet`
   ed `export`.
 - `docs/authentication.md` e la docstring delle credenziali Google dicono che la libreria non
@@ -75,8 +80,15 @@ conserva nulla, nemmeno il client secret appena inserito.
 Un nuovo login su un profilo che ha già una sessione la sostituisce senza chiedere conferma e
 invalida il token Interacta in cache, così non resta in uso l'identità precedente.
 
-Con un token statico il comando si comporta come oggi, compresa la scrittura del profilo prima
-della validazione. I flag del login integrato (`--google-client-id`, `--client-secret-stdin`,
+Senza `--profile`, `auth login` lavora sul profilo corrente di `config.toml`, lo stesso che
+usano gli altri comandi: vale per il login integrato, per quello con token statico e per quello
+con service account (oggi scrivono in `default`). Così la sessione e la configurazione finiscono
+dove i comandi successivi le cercano. Per la stessa ragione un `InteractaClient` che risolve da
+sé il profilo, senza `profile_name`, usa il nome del profilo corrente per la sessione e per la
+cache del token.
+
+Con un token statico il comando si comporta per il resto come oggi, compresa la scrittura del
+profilo prima della validazione. I flag del login integrato (`--google-client-id`, `--client-secret-stdin`,
 `--replace-client-secret`, `--no-browser`, `--login-timeout`) insieme a un token statico sono un
 errore d'uso: codice `2`, con il motivo (per la variabile d'ambiente, l'invito a toglierla).
 
@@ -199,11 +211,13 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 | 10-C31 | Due profili con lo stesso `google_client_id`: dopo il login del primo, il login del secondo non chiede il client secret. | RF-026, RNF-012 |
 | 10-C32 | La funzione di login della libreria, chiamata su un profilo con il client secret come parametro e con Google simulato, salva la stessa sessione della CLI e restituisce l'identità senza scrivere sullo standard output; le funzioni di stato e di logout danno gli stessi esiti di `auth status` e `auth logout`. | RF-026 |
 | 10-C33 | Con audit log, `audit_log_bodies`, `audit_log_raw` e un hook attivi, durante login, rinnovo e revoca i valori di refresh token, authorization code, verificatore PKCE, id token, client secret e access token Google non compaiono in log applicativi, audit log, dati passati agli hook né messaggi di eccezione, nemmeno quando Google risponde con un errore. | RNF-001, RNF-012 |
-| 10-C34 | Le chiamate al token endpoint e all'endpoint di revoca di Google compaiono nell'audit log e arrivano agli hook con metodo, URL e stato, e senza corpo di richiesta né di risposta. | RNF-001, RF-017, RF-018 |
+| 10-C34 | Le chiamate al token endpoint, all'endpoint userinfo (da cui la libreria legge l'email dell'account) e all'endpoint di revoca di Google compaiono nell'audit log e arrivano agli hook con metodo, URL e stato, e senza corpo di richiesta né di risposta. | RNF-001, RF-017, RF-018 |
 | 10-C35 | L'email dell'account Google non compare nei log applicativi durante login, rinnovo, stato e logout. | RNF-012 |
 | 10-C36 | La pagina servita al browser dopo il redirect non contiene authorization code, `state` né token. | RNF-001 |
 | 10-C37 | `keyring` non è tra le dipendenze di base del pacchetto ed è nell'extra `google`; `import pynteracta` e i comandi che non usano il login integrato funzionano senza `keyring` installato. | RF-026 |
 | 10-C38 | `uv run mkdocs build --strict` passa, e `docs/authentication.md` non afferma più che la libreria non esegue il login Google. | RF-026 |
+| 10-C39 | Con `current_profile = "prod"` in `config.toml` e senza `--profile`, `auth login` (integrato, con token statico e con service account) scrive nel profilo `prod` e non crea il profilo `default`; con `--profile X` scrive in `X`, come oggi. | RF-016, RF-026 |
+| 10-C40 | Con `current_profile = "prod"`, un `InteractaClient` costruito senza argomenti di profilo usa la sessione Google e la chiave di cache del token del profilo `prod`, le stesse dei comandi della CLI. | RF-016, RF-003, RF-026 |
 
 ## Casi limite
 
@@ -232,6 +246,10 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 - Due processi (per esempio la CLI e, dalla spec 11, il server MCP) rinnovano insieme → ognuno
   ottiene il suo access token Google; il refresh token non cambia, o cambia per entrambi
   (10-C22).
+- `config.toml` con un profilo corrente diverso da `default` e login senza `--profile` → il login
+  lavora sul profilo corrente (10-C39).
+- L'endpoint userinfo non restituisce l'email → la sessione è salvata senza, e `auth status`
+  riporta l'account come sconosciuto (10-C03, 10-C24).
 - Linux senza sessione grafica → exit `2` con rimando al token statico (10-C06).
 - `auth logout` su un profilo `google_oauth2` senza `keyring` installato → elimina la cache del
   token e dice che il portachiavi non è leggibile (10-C25, 10-C27).
@@ -251,7 +269,7 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
   `auth status` (e nell'eventuale file di `--export` scelto dall'operatore), mai nei log
   applicativi.
 - **Id del client OAuth**: nel profilo, non è un segreto; negli esempi è finto e riconoscibile.
-- **Chiamate a Google**: registrate con metodo, URL e stato, senza corpi, anche con
+- **Chiamate a Google** (token, userinfo, revoca): registrate con metodo, URL e stato, senza corpi, anche con
   `audit_log_bodies` e `audit_log_raw`. L'indirizzo di consenso stampato a terminale contiene
   `state` e la challenge PKCE, che non sono segreti riutilizzabili.
 - **Token Interacta**: nella cache come oggi (RNF-002).
@@ -282,6 +300,9 @@ task di chiusura.
 - RF-026g. Extra `pynteracta[google]` (porta `keyring`); senza, il login integrato fallisce
   nominando l'extra.
 - RF-016a. Campo di profilo `google_client_id` (`PYNTERACTA_GOOGLE_CLIENT_ID`).
+- RF-016b. Senza `--profile`, `auth login` lavora sul profilo corrente di `config.toml`; un
+  `InteractaClient` che risolve da sé il profilo usa il nome del profilo corrente per la
+  sessione e per la chiave della cache del token.
 - RNF-012a. Sono accettati i portachiavi di sistema (macOS, Windows e, senza supporto
   dichiarato, Secret Service e KWallet su Linux); sono rifiutati quelli assenti o che conservano
   in chiaro su file. La voce della sessione contiene refresh token, email dell'account e data
@@ -319,6 +340,7 @@ Il §6 del PRD va inoltre precisato: tra i dati nel portachiavi c'è l'email del
 | Funzioni di libreria su un profilo; il client dal profilo usa la sessione da solo | Login anche senza profilo; solo un provider di token | Una sola via per identificare la sessione (profilo e tenant), e `InteractaClient` dal profilo funziona senza altro codice |
 | Account non collegato: non resta nulla, nemmeno il secret nuovo; il login integrato scrive solo a esito riuscito | Tenere secret e id del client | Un login fallito non lascia tracce; il flusso con token statico resta com'è per non cambiare un comportamento esistente |
 | Email dell'account salvata nel portachiavi e mostrata da `auth status` | Solo data e tenant | Con più account si vede a colpo d'occhio chi è collegato, senza rete; è un dato personale in più, tenuto fuori dai log (10-C35) |
+| Senza `--profile`, ogni login lavora sul profilo corrente; il client che risolve da sé il profilo usa quel nome | Profilo corrente solo per il login integrato; lasciare `default` | La sessione deve finire dove i comandi successivi la cercano; correggere tutti i login evita due regole diverse nello stesso comando. Cambia un comportamento esistente solo per chi ha un profilo corrente diverso da `default` |
 | Timeout del login 300 s, modificabile; `--no-browser`; pagina di esito in solo testo | Timeout fisso; nessun flag | Il consenso con verifica in due passaggi può richiedere minuti; `--no-browser` copre le sessioni senza browser predefinito |
 | Extra mancante con profilo `google_oauth2` senza token: `AuthenticationError` (exit `3`), come oggi; solo `auth login --google` esce `2` | Errore di configurazione in entrambi i casi | Chi non installa l'extra vede lo stesso tipo di errore di oggi, con un messaggio più utile |
 
@@ -334,6 +356,16 @@ provare a mano, perché dipendono dal browser e dal portachiavi reali della post
 - `auth logout --revoke` seguito da un comando, che deve chiedere di rifare il login.
 
 Gli esiti si riportano nella spec, senza token né segreti.
+
+## Revisioni
+
+- 2026-11-21, durante il piano: `auth login` senza `--profile` scriveva in `default` mentre gli
+  altri comandi usano il profilo corrente, quindi la sessione sarebbe finita sotto un nome che
+  nessun comando legge. Scelta del maintainer: profilo corrente per tutti i login e per il
+  client che risolve da sé il profilo; nuovi criteri 10-C39 e 10-C40, nuovo RF-016b.
+- 2026-11-21, durante il piano: l'email dell'account si legge dall'endpoint userinfo di Google
+  (scelta del maintainer, senza scope oltre `email`); 10-C34 e "Dati personali e segreti" citano
+  anche quella chiamata. Nessun comportamento nuovo per chi usa la funzione.
 
 ## Domande aperte
 
