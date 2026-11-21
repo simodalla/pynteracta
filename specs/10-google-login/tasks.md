@@ -278,7 +278,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(auth): stato e logout della sessione Google in libreria
      (10-T12)`.
 
-### [ ] T13 – `auth login --google` dal browser
+### [x] T13 – `auth login --google` dal browser
 
 - Criteri: 10-C01, 10-C02, 10-C03, 10-C04, 10-C05, 10-C06, 10-C07, 10-C08, 10-C09, 10-C11,
   10-C12, 10-C13, 10-C23, 10-C30, 10-C31, 10-C39 (login integrato)

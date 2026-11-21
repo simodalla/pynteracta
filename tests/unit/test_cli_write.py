@@ -286,6 +286,49 @@ class TestReadPassword:
         assert "--password-stdin: no password read from stdin." in capsys.readouterr().err
 
 
+class TestReadSecret:
+    # criterio: 10-C07
+    @pytest.mark.parametrize("confirm", [False, True])
+    def test_interactive_prompt(self, monkeypatch: pytest.MonkeyPatch, confirm: bool) -> None:
+        from pynteracta.cli import _common, _write  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        calls: list[dict[str, Any]] = []
+
+        def fake_prompt(text: str, **kwargs: Any) -> str:
+            calls.append({"text": text, **kwargs})
+            return "GOCSPX-example-not-a-secret"
+
+        monkeypatch.setattr(_write.typer, "prompt", fake_prompt)
+        value = _write.read_secret(prompt="Secret", option="--secret-stdin", confirm=confirm)
+        assert value == "GOCSPX-example-not-a-secret"
+        assert calls == [{"text": "Secret", "hide_input": True, "confirmation_prompt": confirm}]
+
+    # criterio: 10-C07
+    def test_stdin_only_ignores_terminal(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from pynteracta.cli import _common, _write  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: True)
+        monkeypatch.setattr("sys.stdin", io.StringIO("dal-pipe\n"))
+        value = _write.read_secret(
+            prompt="Secret", option="--secret-stdin", confirm=False, stdin_only=True
+        )
+        assert value == "dal-pipe"
+
+    # criterio: 10-C07
+    def test_empty_stdin_names_the_option(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pynteracta.cli import _common, _write  # noqa: PLC0415
+
+        monkeypatch.setattr(_common, "_stdin_is_interactive", lambda: False)
+        monkeypatch.setattr("sys.stdin", io.StringIO(""))
+        with pytest.raises(typer.Exit) as exc_info:
+            _write.read_secret(prompt="Secret", option="--secret-stdin", confirm=False)
+        assert exc_info.value.exit_code == _EXIT_CONFIG
+        assert "--secret-stdin: no secret read from stdin." in capsys.readouterr().err
+
+
 class TestParseLangMap:
     # criterio: 06-C10
     def test_pairs(self) -> None:

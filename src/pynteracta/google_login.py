@@ -132,7 +132,7 @@ class GoogleLoginResult:
     user_name: str
 
 
-_NO_CLIENT_ID = (
+NO_CLIENT_ID = (
     "No OAuth client configured: set google_client_id in the profile or pass --google-client-id."
 )
 _NO_SECRET = (
@@ -251,7 +251,7 @@ def login(  # noqa: PLR0913
     name, profile = _resolve(profile_name, config_file, overrides)
     client_id = client_id or profile.google_client_id
     if not client_id:
-        raise ConfigurationError(_NO_CLIENT_ID)
+        raise ConfigurationError(NO_CLIENT_ID)
     kc = keychain.open_keychain()
     secret_name = client_secret_entry(client_id)
     stored_secret = kc.get(secret_name)
