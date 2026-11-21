@@ -1498,3 +1498,123 @@ class TestAuthStatus:
             ["--config-file", str(_google_config_file(tmp_path)), "auth", "status", "--check"],
         )
         assert result.exit_code == EXIT_AUTH
+
+
+# ---------------------------------------------------------------------------
+# auth logout con sessione Google (spec 10)
+# ---------------------------------------------------------------------------
+
+
+def _two_profiles(tmp_path: Path) -> Path:
+    return _browser_config(
+        tmp_path,
+        extra=(
+            'auth_method = "google_oauth2"\n\n[profiles.cert]\n'
+            'base_url = "https://api.example.com"\nauth_method = "google_oauth2"\n'
+            f'google_client_id = "{CLIENT_ID}"\n'
+        ),
+    )
+
+
+def _cache_token(tmp_path: Path, profile_name: str) -> tuple[FileTokenCache, str]:
+    cache = FileTokenCache(tmp_path / "tokens", api_base=_API_BASE)
+    key = build_cache_key(_API_BASE, profile_name)
+    cache.save(
+        key,
+        CachedToken(
+            access_token="t",
+            expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+            obtained_at=datetime.now(tz=UTC),
+        ),
+    )
+    return cache, key
+
+
+class TestAuthLogoutGoogle:
+    def _logout(self, runner: CliRunner, config_file: Path, *args: str) -> Result:
+        return runner.invoke(app, ["--config-file", str(config_file), "auth", "logout", *args])
+
+    # criterio: 10-C27
+    @respx.mock
+    def test_removes_only_this_profile(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        config_file = _two_profiles(tmp_path)
+        mine = save_session(memory_keychain)
+        other = save_session(memory_keychain, "cert")
+        cache, key = _cache_token(tmp_path, "default")
+        result = self._logout(runner, config_file)
+        assert result.exit_code == 0, result.output
+        assert "✓ Token cache cleared for profile 'default'." in result.output
+        assert "✓ Google session removed for profile 'default'." in result.output
+        assert mine not in memory_keychain.entries
+        assert other in memory_keychain.entries
+        assert client_secret_entry(CLIENT_ID) in memory_keychain.entries
+        assert cache.load(key) is None
+        assert respx.calls.call_count == 0
+
+    # criterio: 10-C28
+    def test_forget_client_secret(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        result = self._logout(runner, _two_profiles(tmp_path), "--forget-client-secret")
+        assert result.exit_code == 0, result.output
+        assert "✓ Client secret removed." in result.output
+        assert client_secret_entry(CLIENT_ID) not in memory_keychain.entries
+
+    # criterio: 10-C29
+    @respx.mock
+    def test_revoke(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        entry = save_session(memory_keychain)
+        route = respx.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        result = self._logout(runner, _two_profiles(tmp_path), "--revoke")
+        assert result.exit_code == 0, result.output
+        assert "✓ Google session revoked." in result.output
+        form = dict(urllib.parse.parse_qsl(route.calls[0].request.content.decode()))
+        assert form == {"token": REFRESH_TOKEN}
+        assert entry not in memory_keychain.entries
+
+    # criterio: 10-C29
+    @respx.mock
+    def test_revoke_network_error_still_removes(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        entry = save_session(memory_keychain)
+        respx.post(google_oauth.REVOKE_URL).mock(side_effect=httpx.ConnectError("offline"))
+        result = self._logout(runner, _two_profiles(tmp_path), "--revoke")
+        assert result.exit_code == EXIT_TRANSPORT
+        assert "revocation failed" in result.output
+        assert entry not in memory_keychain.entries
+
+    # criterio: 10-C25, 10-C27
+    def test_google_profile_without_keyring(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setitem(sys.modules, "keyring", None)
+        config_file = _two_profiles(tmp_path)
+        cache, key = _cache_token(tmp_path, "default")
+        result = self._logout(runner, config_file)
+        assert result.exit_code == 0, result.output
+        assert cache.load(key) is None
+        assert "keychain" in result.output
+        assert "pynteracta[google]" in result.output
+
+    # criterio: 10-C27
+    def test_service_account_profile_output_unchanged(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _boom() -> None:
+            raise AssertionError("open_keychain must not be called")
+
+        monkeypatch.setattr(keychain, "open_keychain", _boom)
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            '[profiles.default]\nbase_url = "https://api.example.com"\ntoken_cache = "memory"\n',
+            encoding="utf-8",
+        )
+        result = self._logout(runner, config_file)
+        assert result.exit_code == 0
+        assert result.output == "✓ Token cache cleared for profile 'default'.\n"

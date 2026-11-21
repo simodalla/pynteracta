@@ -10,6 +10,7 @@ from typing import Annotated, Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pynteracta import google_login, keychain
 from pynteracta.auth import clear_cached_token
@@ -492,8 +493,31 @@ def status(  # noqa: PLR0913
 
 
 @app.command("logout")
-def logout(ctx: typer.Context) -> None:
-    """Clear the cached token for the current profile."""
+def logout(
+    ctx: typer.Context,
+    forget_client_secret: Annotated[
+        bool,
+        typer.Option(
+            "--forget-client-secret",
+            help="Also remove the saved OAuth client secret of the profile's client.",
+        ),
+    ] = False,
+    revoke: Annotated[
+        bool,
+        typer.Option(
+            "--revoke",
+            help=(
+                "Revoke the Google session at Google first (this also ends the sessions of the "
+                "same account for this OAuth client on other profiles and machines)."
+            ),
+        ),
+    ] = False,
+) -> None:
+    """Clear the cached token and the saved Google session of the current profile.
+
+    No network calls unless ``--revoke``. The OAuth client secret is kept unless
+    ``--forget-client-secret``.
+    """
     state: CliState = ctx.obj
     console = make_console(state)
 
@@ -509,9 +533,40 @@ def logout(ctx: typer.Context) -> None:
         raise typer.Exit(1) from exc
 
     profile_name = resolve_profile_name(state.profile, state.config_file)
-    api_base = build_api_base(
-        str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
-    )
-    clear_cached_token(profile_obj, profile_name, api_base)
+    if profile_obj.auth_method != "google_oauth2":
+        api_base = build_api_base(
+            str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
+        )
+        clear_cached_token(profile_obj, profile_name, api_base)
+        console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+        raise typer.Exit(EXIT_SUCCESS)
+
+    try:
+        result = google_login.logout(
+            state.profile,
+            config_file=state.config_file,
+            overrides=overrides,
+            forget_client_secret=forget_client_secret,
+            revoke=revoke,
+        )
+    except InteractaError as exc:
+        # La revoca è fallita: la sessione locale è comunque eliminata (10-C29).
+        console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+        console.print(
+            f"[green]✓[/green] Google session removed for profile '{profile_name}' "
+            "(revocation failed)."
+        )
+        raise handle_error(exc, console=console) from exc
     console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
+    if result.keychain_error is not None:
+        console.print(
+            "Note: system keychain not readable, no Google session removed. "
+            f"{escape(result.keychain_error)}"
+        )
+    if result.revoked:
+        console.print("[green]✓[/green] Google session revoked.")
+    if result.session_removed:
+        console.print(f"[green]✓[/green] Google session removed for profile '{profile_name}'.")
+    if result.client_secret_removed:
+        console.print("[green]✓[/green] Client secret removed.")
     raise typer.Exit(EXIT_SUCCESS)

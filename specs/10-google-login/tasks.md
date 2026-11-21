@@ -319,7 +319,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Generare e leggere gli snapshot; controlli bloccanti; commit `feat(cli): auth status
      (10-T14)`.
 
-### [ ] T15 – `auth logout` con sessione Google
+### [x] T15 – `auth logout` con sessione Google
 
 - Criteri: 10-C27, 10-C28, 10-C29
 - Dipende da: T12
