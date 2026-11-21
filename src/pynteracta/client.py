@@ -27,21 +27,19 @@ from pynteracta.auth import (
     TokenCache,
     TokenManager,
     TokenProvider,
+    default_token_cache_dir,
     load_service_account_key,
 )
-from pynteracta.config import Profile, _xdg_config_dir, resolve_profile, resolve_profile_name
+from pynteracta.config import Profile, resolve_profile, resolve_profile_name
 from pynteracta.exceptions import AuthenticationError, ConfigurationError
-from pynteracta.google_login import GoogleSessionTokenProvider
+from pynteracta.google_login import GOOGLE_OAUTH_BASE, GoogleSessionTokenProvider
 from pynteracta.hooks import ClientHooks
 from pynteracta.transport import HttpTransport
 from pynteracta.urls import WebUrls, build_api_base
 
-# Base del transport dedicato agli endpoint di Google: request_external usa URL assoluti.
-GOOGLE_OAUTH_BASE = "https://oauth2.googleapis.com"
-
 
 def _default_token_cache_dir() -> Path:
-    return _xdg_config_dir() / "tokens"
+    return default_token_cache_dir()
 
 
 def _build_token_cache(profile: Profile, api_base: str | None = None) -> TokenCache:

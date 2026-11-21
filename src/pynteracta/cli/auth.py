@@ -10,13 +10,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from pynteracta.auth import (
-    FileTokenCache,
-    MemoryTokenCache,
-    build_cache_key,
-    legacy_google_cache_key,
-    load_service_account_key,
-)
+from pynteracta.auth import clear_cached_token
 from pynteracta.cli._common import (
     EXIT_SUCCESS,
     CliState,
@@ -35,10 +29,9 @@ from pynteracta.cli._common import (
     validate_export_options,
     validate_full_fields,
 )
-from pynteracta.client import InteractaClient, _default_token_cache_dir
+from pynteracta.client import InteractaClient
 from pynteracta.config import (
     Profile,
-    load_config,
     resolve_profile,
     resolve_profile_name,
     write_profile_fields,
@@ -278,31 +271,10 @@ def logout(ctx: typer.Context) -> None:
         typer.echo(f"Cannot resolve profile: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    config = load_config(state.config_file)
-    profile_name = state.profile or config.current_profile
-
+    profile_name = resolve_profile_name(state.profile, state.config_file)
     api_base = build_api_base(
         str(profile_obj.base_url), profile_obj.base_path, profile_obj.api_version
     )
-
-    if profile_obj.token_cache == "memory":
-        cache: MemoryTokenCache | FileTokenCache = MemoryTokenCache()
-    else:
-        cache_dir = profile_obj.token_cache_dir or _default_token_cache_dir()
-        cache = FileTokenCache(cache_dir, api_base=api_base)
-
-    key_id = profile_name
-    if profile_obj.service_account_key is not None:
-        try:
-            sa = load_service_account_key(profile_obj.service_account_key)
-            key_id = str(sa.client_id)
-        except Exception:
-            pass
-
-    # Must match how the token managers derive the key, or logout silently clears nothing.
-    cache.clear(build_cache_key(api_base, key_id))
-    if profile_obj.auth_method == "google_oauth2":
-        # Chiave scritta dal client prima della spec 10 (10-C41).
-        cache.clear(legacy_google_cache_key(profile_obj, profile_name))
+    clear_cached_token(profile_obj, profile_name, api_base)
     console.print(f"[green]✓[/green] Token cache cleared for profile '{profile_name}'.")
     raise typer.Exit(EXIT_SUCCESS)

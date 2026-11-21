@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import keyring
@@ -12,7 +13,7 @@ from google_fakes import MemoryKeychain
 from keyring.backends import fail
 from typer.testing import CliRunner
 
-from pynteracta import google_login, google_oauth, keychain, transport
+from pynteracta import keychain
 
 
 @pytest.fixture(autouse=True)
@@ -73,13 +74,14 @@ def fresh_loggers(monkeypatch: pytest.MonkeyPatch) -> None:
     catena di processori e ``capture_logs`` non li vede più. Proxy nuovi, ripristinati alla fine
     del test, si legano alla configurazione di ``capture_logs``.
     """
-    for module, attr, name in (
-        (google_oauth, "_log", "pynteracta.google_oauth"),
-        (google_login, "_log", "pynteracta.google_login"),
-        (transport, "_log", "pynteracta.transport"),
-        (transport, "_audit_log", "pynteracta.audit"),
-    ):
-        monkeypatch.setattr(module, attr, structlog.get_logger(name))
+    for module_name, module in list(sys.modules.items()):
+        if module is None or not module_name.startswith("pynteracta."):
+            continue
+        for attr in ("_log", "_audit_log"):
+            proxy = getattr(module, attr, None)
+            args = getattr(proxy, "_logger_factory_args", None)
+            if args:
+                monkeypatch.setattr(module, attr, structlog.get_logger(*args))
 
 
 @pytest.fixture

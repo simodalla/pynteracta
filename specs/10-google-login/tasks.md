@@ -234,7 +234,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(auth): il client usa la sessione Google salvata
      (10-T10)`.
 
-### [ ] T11 – `google_login.login()`
+### [x] T11 – `google_login.login()`
 
 - Criteri: 10-C03, 10-C04, 10-C09, 10-C11, 10-C23, 10-C30, 10-C31, 10-C32 (parte di libreria)
 - Dipende da: T03, T09, T10, T20

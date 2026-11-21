@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import stat
@@ -13,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
 import jwt
@@ -22,6 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
+from pynteracta.config import Profile, _xdg_config_dir
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.models.facade.auth import (
     CreateAccessTokenByServiceAccountRequestDTO,
@@ -29,9 +31,6 @@ from pynteracta.models.facade.auth import (
     ServiceAccountTokenResponse,
 )
 from pynteracta.transport import HttpTransport
-
-if TYPE_CHECKING:
-    from pynteracta.config import Profile
 
 _log = structlog.get_logger("pynteracta.auth")
 
@@ -236,6 +235,35 @@ def legacy_google_cache_key(profile: Profile, profile_name: str) -> str:
     """
     base = f"{str(profile.base_url).rstrip('/')}/{profile.base_path.strip('/')}/api"
     return build_cache_key(base, profile_name)
+
+
+def default_token_cache_dir() -> Path:
+    """La cartella predefinita della cache su file dei token Interacta."""
+    return _xdg_config_dir() / "tokens"
+
+
+def clear_cached_token(profile: Profile, profile_name: str, api_base: str) -> None:
+    """Elimina il token Interacta in cache per il profilo (logout e login Google, spec 10).
+
+    La chiave deve coincidere con quella dei token manager, altrimenti il logout non elimina
+    nulla: identità del service account (``client_id`` della chiave) o nome del profilo, più
+    l'indirizzo dell'API. Per i profili ``google_oauth2`` elimina anche la chiave calcolata
+    prima della spec 10 (10-C41).
+    """
+    cache: TokenCache
+    if profile.token_cache == "memory":
+        cache = MemoryTokenCache()
+    else:
+        cache = FileTokenCache(
+            profile.token_cache_dir or default_token_cache_dir(), api_base=api_base
+        )
+    key_id = profile_name
+    if profile.service_account_key is not None:
+        with contextlib.suppress(AuthenticationError):
+            key_id = str(load_service_account_key(profile.service_account_key).client_id)
+    cache.clear(build_cache_key(api_base, key_id))
+    if profile.auth_method == "google_oauth2":
+        cache.clear(legacy_google_cache_key(profile, profile_name))
 
 
 class FileTokenCache:
