@@ -36,6 +36,26 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
   3. Controlli bloccanti; commit `test: caratterizzazione di login statico, logout e
      precedenza dei token (10-T01)`.
 
+### [ ] T20 – Chiave di cache del token Google sull'indirizzo dell'API
+
+Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito dopo T01.
+
+- Criteri: 10-C41
+- Dipende da: T01
+- Test: `tests/unit/test_cli_auth.py::TestAuthLogout::test_logout_google_removes_client_cache_file`
+  (`auth whoami` con token Google e cache su file, poi `auth logout` → nessun file rimasto) e
+  `::test_logout_google_removes_legacy_cache_file` (file scritto con la chiave vecchia →
+  eliminato); `tests/unit/test_auth.py`: `GoogleOAuth2TokenManager` con `cache_api_base` usa
+  `build_cache_key(cache_api_base, nome)`, senza resta la base del transport.
+- Passi:
+  1. Scrivere i test; rossi (il file resta; parametro inesistente).
+  2. `auth.py`: parametro `cache_api_base` di `GoogleOAuth2TokenManager`;
+     `legacy_google_cache_key(profile, profile_name)`.
+  3. `client.py`: passa `cache_api_base=api_base`. `cli/auth.py::logout`: per i profili
+     `google_oauth2` elimina anche la chiave vecchia.
+  4. Controlli bloccanti; commit `fix(auth): il logout elimina la cache del token Google
+     (10-T20)`.
+
 ### [ ] T02 – `ConfigurationError` e campo `google_client_id`
 
 - Criteri: prepara 10-C04 (RF-016a)
@@ -192,7 +212,7 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
 
 - Criteri: 10-C14, 10-C15, 10-C16, 10-C17, 10-C18, 10-C40 (sessione); exit code di 10-C19 e
   10-C21
-- Dipende da: T04, T09
+- Dipende da: T04, T09, T20
 - Test: `tests/unit/test_client.py::TestInteractaClientGoogleSession`: client dal profilo con
   sessione → token endpoint di Google (`grant_type=refresh_token`) poi scambio, browser mai
   chiamato; token in cache a 30 secondi dalla scadenza → rinnovo e richiesta con il token
@@ -217,7 +237,7 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
 ### [ ] T11 – `google_login.login()`
 
 - Criteri: 10-C03, 10-C04, 10-C09, 10-C11, 10-C23, 10-C30, 10-C31, 10-C32 (parte di libreria)
-- Dipende da: T03, T09, T10
+- Dipende da: T03, T09, T10, T20
 - Test: `tests/unit/test_google_login.py::TestLogin`: login completo con `client_secret` come
   parametro → `GoogleLoginResult`, voce della sessione (refresh token, email, `login_at`), voce
   del secret, profilo con `auth_method`, connessione e `google_client_id`, `capsys` vuoto,
@@ -232,7 +252,8 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
 - Passi:
   1. Scrivere i test; rossi (funzione inesistente).
   2. `auth.py`: `clear_cached_token(profile, profile_name, api_base)`, estratta da
-     `cli/auth.py::logout`, che passa a usarla (i test di T01 restano verdi).
+     `cli/auth.py::logout` con l'eliminazione della chiave vecchia di T20, che passa a usarla
+     (i test di T01 e T20 restano verdi).
   3. `google_login.py`: `GoogleLoginResult` e `login()` nell'ordine del piano, con scritture
      solo dopo `users.me()` e ripristino in caso di errore.
   4. Log `google.login_ok` con la sola chiave della sessione.
@@ -438,3 +459,4 @@ Valori finti dei test e dei docs: `000000000000-example.apps.googleusercontent.c
 | 10-C38 | T17 |
 | 10-C39 | T04, T13 |
 | 10-C40 | T04, T10 |
+| 10-C41 | T20 |

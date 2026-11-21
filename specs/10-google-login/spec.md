@@ -32,6 +32,10 @@ server MCP (spec 11), ma vale da solo per la CLI e per chi usa la libreria da Py
   profilo, e dura un'ora (verificato sul tenant il 2026-11-20). Alla scadenza la libreria ripete
   lo scambio con lo stesso token Google, che nel frattempo è scaduto se era statico.
 - `auth logout` cancella solo la cache del token Interacta. Non esiste un comando di stato.
+- Su un profilo `google_oauth2`, `auth logout` dice di aver svuotato la cache ma lascia il file
+  del token: il client calcola la chiave di cache sull'indirizzo dello scambio Google
+  (`…/portal/api`), il logout su quello dell'API (`…/portal/api/external/v2`). Con il service
+  account le due chiavi coincidono (verificato il 2026-11-21).
 - `auth login` senza `--profile` scrive nel profilo `default`, mentre gli altri comandi usano il
   profilo corrente di `config.toml` (`current_profile`): se i due nomi differiscono, il login
   configura un profilo che i comandi successivi non leggono. Allo stesso modo un
@@ -218,6 +222,7 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 | 10-C38 | `uv run mkdocs build --strict` passa, e `docs/authentication.md` non afferma più che la libreria non esegue il login Google. | RF-026 |
 | 10-C39 | Con `current_profile = "prod"` in `config.toml` e senza `--profile`, `auth login` (integrato, con token statico e con service account) scrive nel profilo `prod` e non crea il profilo `default`; con `--profile X` scrive in `X`, come oggi. | RF-016, RF-026 |
 | 10-C40 | Con `current_profile = "prod"`, un `InteractaClient` costruito senza argomenti di profilo usa la sessione Google e la chiave di cache del token del profilo `prod`, le stesse dei comandi della CLI. | RF-016, RF-003, RF-026 |
+| 10-C41 | Dopo che un comando ha messo in cache il token Interacta di un profilo `google_oauth2`, `auth logout` sullo stesso profilo elimina quel file di cache; lo elimina anche se è stato scritto con la chiave calcolata prima di questa spec. | RF-003, RNF-002 |
 
 ## Casi limite
 
@@ -366,6 +371,11 @@ Gli esiti si riportano nella spec, senza token né segreti.
 - 2026-11-21, durante il piano: l'email dell'account si legge dall'endpoint userinfo di Google
   (scelta del maintainer, senza scope oltre `email`); 10-C34 e "Dati personali e segreti" citano
   anche quella chiamata. Nessun comportamento nuovo per chi usa la funzione.
+- 2026-11-21, durante l'implementazione (T01): il logout di un profilo `google_oauth2` non
+  eliminava il file di cache, perché client e logout calcolavano la chiave su indirizzi diversi;
+  10-C23 e 10-C27 lo davano per scontato. Scelta del maintainer: correggerlo in questa spec;
+  nuovo criterio 10-C41, la chiave si calcola sull'indirizzo dell'API come per il service
+  account, e il logout elimina anche la chiave vecchia.
 
 ## Domande aperte
 

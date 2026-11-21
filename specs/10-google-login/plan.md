@@ -31,8 +31,8 @@ login statico, il logout e la precedenza dei token prima di toccarli.
 | `src/pynteracta/google_oauth.py` | nuovo | costanti degli endpoint (`AUTH_URL`, `TOKEN_URL`, `USERINFO_URL`, `REVOKE_URL`) e dello scope; `new_pkce()`, `build_auth_url(...)`; `LoopbackReceiver` (listener); `exchange_code(...)`, `refresh_access_token(...)`, `fetch_email(...)`, `revoke(...)` su `HttpTransport.request_external`; `_raise_for_google_error(response)` |
 | `src/pynteracta/google_login.py` | nuovo | superficie pubblica: `login()`, `logout()`, `status()`, i risultati `GoogleLoginResult` e `GoogleSessionStatus` (dataclass congelate), `GoogleSessionTokenProvider` (callable per `token_provider`) e `session_token_provider(profile, profile_name, transport)` usato dal client |
 | `src/pynteracta/transport.py` | modificato | `request_external(method, url, *, form=None, bearer_token=None) -> httpx.Response`: URL assoluto, solo `User-Agent` e, se dato, `Authorization: Bearer`; `_emit_request` ed `_emit_response` con corpo `None` e `capture_body=False`; restituisce la risposta con qualunque stato (la mappa il chiamante); timeout e rete → `TransportError` da `_send`. `notify_error(err)`: passa un errore a `hooks.on_error` |
-| `src/pynteracta/auth.py` | modificato | docstring di `GoogleOAuth2Credentials` (scope `email`, login integrato); `clear_cached_token(profile, profile_name, api_base)`, estratta da `auth logout`, usata dal logout e da `login()` |
-| `src/pynteracta/client.py` | modificato | nome effettivo del profilo con `resolve_profile_name` quando il client risolve da sé il profilo; in `_build_token_manager`, ramo `google_oauth2` senza token: `session_token_provider(...)` su un transport dedicato agli endpoint di Google, chiuso da `close()`; `ConfigurationError` del portachiavi → `AuthenticationError` con l'invito al login e il nome dell'extra |
+| `src/pynteracta/auth.py` | modificato | docstring di `GoogleOAuth2Credentials` (scope `email`, login integrato); `GoogleOAuth2TokenManager(..., cache_api_base=None)`: se dato, la chiave di cache si calcola su quell'indirizzo invece che sulla base del transport di scambio (10-C41); `legacy_google_cache_key(profile, profile_name)`, la chiave calcolata prima della spec; `clear_cached_token(profile, profile_name, api_base)`, estratta da `auth logout`, usata dal logout e da `login()`, che per i profili `google_oauth2` elimina anche la chiave vecchia |
+| `src/pynteracta/client.py` | modificato | passa `cache_api_base=api_base` al `GoogleOAuth2TokenManager`, così la chiave coincide con quella del logout e della voce della sessione; nome effettivo del profilo con `resolve_profile_name` quando il client risolve da sé il profilo; in `_build_token_manager`, ramo `google_oauth2` senza token: `session_token_provider(...)` su un transport dedicato agli endpoint di Google, chiuso da `close()`; `ConfigurationError` del portachiavi → `AuthenticationError` con l'invito al login e il nome dell'extra |
 | `src/pynteracta/cli/_common.py` | modificato | `ConfigurationError: EXIT_CONFIG` in `_EXIT_MAP`; `config_path_from_state` delega a `config.config_file_path` |
 | `src/pynteracta/cli/_write.py` | modificato | `read_secret(*, prompt, option, confirm)`, di cui `read_password` diventa un caso (`prompt="Password"`, `confirm=True`) |
 | `src/pynteracta/cli/auth.py` | modificato | `login`: flag nuovi, profilo corrente come predefinito, ramo integrato; `status` (nuovo); `logout`: sessione Google, `--forget-client-secret`, `--revoke` |
@@ -58,12 +58,15 @@ Nessun database. Dati nuovi:
 - **Profilo** (`config.toml`): `google_client_id`, stringa facoltativa. I profili esistenti
   restano validi.
 - **Portachiavi**, servizio `pynteracta`:
-  - voce `google-session:<chiave>`, dove `<chiave>` è `build_cache_key(api_base, profilo)`, la
-    stessa della cache del token: JSON `{"refresh_token": …, "email": … | null, "login_at":
+  - voce `google-session:<chiave>`, dove `<chiave>` è `build_cache_key(api_base, profilo)` con
+    `api_base` l'indirizzo dell'API (`…/api/external/v<n>`), la stessa della cache del token
+    dopo la correzione di 10-C41: JSON `{"refresh_token": …, "email": … | null, "login_at":
     <ISO 8601 UTC>}`;
   - voce `google-client-secret:<client_id>`: il client secret, come stringa.
 
-Nessuna migrazione: chi usa il token statico non ha voci nel portachiavi. Il cambio del nome
+Nessuna migrazione: chi usa il token statico non ha voci nel portachiavi. Un token Google in
+cache sotto la chiave vecchia non è più letto (alla prima chiamata si rifà lo scambio) ed è
+eliminato dal primo `auth logout` o login integrato. Il cambio del nome
 predefinito del profilo (10-C39, 10-C40) non sposta dati: chi ha `current_profile` diverso da
 `default` e un token in cache sotto `default` ottiene un token nuovo alla prima chiamata.
 
@@ -215,7 +218,7 @@ Scritti e verdi prima di modificare il codice che descrivono.
 |---|---|---|
 | `cli/auth.py::_login_google` | con token statico e scambio rifiutato (`401`), il profilo è già stato scritto con `auth_method` e connessione, exit `3` | `test_cli_auth.py::TestAuthLoginGoogle::test_static_login_writes_profile_before_validation` |
 | `cli/auth.py::login` | senza `--profile` e con `current_profile` assente o `default`, il login (statico e service account) scrive in `default` | `test_cli_auth.py::TestAuthLoginGoogle::test_static_login_without_profile_uses_default_when_current_is_default` |
-| `cli/auth.py::logout` | profilo non risolvibile → exit `1`; profilo `google_oauth2` → elimina la voce di cache con chiave tenant + nome del profilo | `test_cli_auth.py::TestAuthLogout::test_logout_unresolvable_profile_exits_1`, `::test_logout_google_profile_clears_profile_key` |
+| `cli/auth.py::logout` | profilo non risolvibile → exit `1`; profilo `google_oauth2` → elimina la voce di cache con chiave indirizzo dell'API + nome del profilo (che oggi non è quella scritta dal client: lo corregge 10-C41) | `test_cli_auth.py::TestAuthLogout::test_logout_unresolvable_profile_exits_1`, `::test_logout_google_profile_clears_profile_key` |
 | `client.py::_build_token_manager` | `google_token` esplicito vince su `profile.google_oauth2_token` (variabile d'ambiente); `google_token_provider` esplicito con token nel profilo solleva l'errore di `GoogleOAuth2Credentials` | `test_client.py::TestInteractaClientGoogleOAuth2::test_explicit_token_wins_over_profile_token`, `::test_explicit_provider_with_profile_token` |
 | `cli/_write.py::read_password` | prompt nascosto con conferma da terminale; prima riga di stdin altrimenti; stringa vuota → exit `2` | già coperto in `test_cli_write.py`; si verifica prima di estrarre `read_secret`, senza test nuovi |
 | `transport.py::post_multipart` | corpo assente in audit e hook | già coperto in `test_transport.py` (spec 04); nessun test nuovo |
@@ -275,6 +278,7 @@ temporaneamente il corpo a `_emit_request` e `_emit_response`, e si ripristina i
 | 10-C38 | `test_docs_snippets.py::test_google_login_pages`: `authentication.md` non contiene `does **not** run any Google sign-in` e cita `auth login --google`, `pynteracta[google]`, `auth status`; `cli.md` e `configuration.md` citano flag e campo nuovi; `uv run mkdocs build --strict` tra i controlli di verifica | unitario, più controllo di verifica |
 | 10-C39 | `test_cli_auth.py`, parametrizzato sui tre login: `current_profile = "prod"` senza `--profile` → scrive in `prod`, nessun profilo `default`; con `--profile X` scrive in `X` | unitario |
 | 10-C40 | `test_client.py`: `current_profile = "prod"`, `InteractaClient()` → voce di sessione e chiave di cache di `prod` | unitario |
+| 10-C41 | `test_cli_auth.py`: `auth whoami` con token Google e cache su file, poi `auth logout` → nessun file rimasto; file scritto con `legacy_google_cache_key` → eliminato; `test_auth.py`: `GoogleOAuth2TokenManager` con `cache_api_base` usa `build_cache_key(cache_api_base, nome)` | unitario |
 | Verifica manuale della spec | login reale su macOS e Windows contro il tenant, rinnovo dopo un'ora, `logout --revoke` | manuale |
 
 ## Scelte tecniche
