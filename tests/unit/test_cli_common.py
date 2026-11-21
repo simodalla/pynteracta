@@ -25,6 +25,7 @@ from pynteracta.cli._common import (
 from pynteracta.exceptions import (
     AuthenticationError,
     ConcurrencyError,
+    ConfigurationError,
     InteractaError,
     NotFoundError,
     ServerError,
@@ -199,3 +200,8 @@ class TestLoadJsonBody:
             _common.load_json_body(str(body), CreateTaskRequestDTO)
         assert exc_info.value.exit_code == EXIT_CONFIG
         assert "JSON object" in capsys.readouterr().err
+
+
+# criterio: 10-C04
+def test_configuration_error_maps_to_exit_config() -> None:
+    assert error_exit_code(ConfigurationError("missing google_client_id")) == EXIT_CONFIG

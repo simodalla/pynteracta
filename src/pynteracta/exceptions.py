@@ -31,6 +31,15 @@ class AuthenticationError(InteractaError):
     """401 or token-build failure."""
 
 
+class ConfigurationError(InteractaError):
+    """Configurazione locale insufficiente per l'operazione richiesta (spec 10).
+
+    Per esempio: id del client OAuth mancante, extra ``pynteracta[google]`` non installato,
+    portachiavi di sistema non disponibile, client secret non fornito. Non nasce da una risposta
+    HTTP: i campi della richiesta restano vuoti. In CLI esce con codice ``2``.
+    """
+
+
 class PermissionError(InteractaError):
     """403 -- use builtins.PermissionError for the stdlib one."""
 

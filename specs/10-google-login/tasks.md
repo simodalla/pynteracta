@@ -56,7 +56,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `fix(auth): il logout elimina la cache del token Google
      (10-T20)`.
 
-### [ ] T02 – `ConfigurationError` e campo `google_client_id`
+### [x] T02 – `ConfigurationError` e campo `google_client_id`
 
 - Criteri: prepara 10-C04 (RF-016a)
 - Dipende da: nessuno

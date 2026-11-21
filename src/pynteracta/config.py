@@ -29,6 +29,9 @@ class Profile(BaseModel):
     # Google OAuth2 access token; supplied per-session via env/flag, never persisted to
     # config.toml by the CLI (short-lived + sensitive).
     google_oauth2_token: str | None = None
+    # Id del client OAuth "Desktop" dell'ente per il login Google integrato (spec 10); non è un
+    # segreto. Il client secret sta solo nel portachiavi di sistema.
+    google_client_id: str | None = None
     token_cache: Literal["file", "memory"] = "file"
     token_cache_dir: Path | None = None
     timeout_seconds: float = 30.0
@@ -71,6 +74,7 @@ class _EnvSettings(BaseSettings):
     auth_method: Literal["service_account", "google_oauth2"] | None = None
     service_account_key: Path | None = None
     google_oauth2_token: str | None = None
+    google_client_id: str | None = None
     token_cache: Literal["file", "memory"] | None = None
     token_cache_dir: Path | None = None
     # Field name "timeout" → env var PYNTERACTA_TIMEOUT (matches the documented table).

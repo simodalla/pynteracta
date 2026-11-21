@@ -20,6 +20,7 @@ from pynteracta.config import _xdg_config_dir, load_config, resolve_profile
 from pynteracta.exceptions import (
     AuthenticationError,
     ConcurrencyError,
+    ConfigurationError,
     InteractaError,
     NotFoundError,
     ServerError,
@@ -101,6 +102,7 @@ _EXIT_MAP: dict[type[InteractaError], int] = {
     TransportError: EXIT_TRANSPORT,
     ServerError: EXIT_SERVER,
     ConcurrencyError: EXIT_CONFLICT,
+    ConfigurationError: EXIT_CONFIG,
 }
 
 

@@ -244,3 +244,24 @@ class TestPathExpansion:
         assert profile.service_account_key is None
         assert profile.token_cache_dir is None
         assert profile.audit_log_file is None
+
+
+class TestGoogleClientId:
+    _ID = "000000000000-example.apps.googleusercontent.com"
+
+    # criterio: 10-C04
+    def test_read_from_profile(self, tmp_path: Path) -> None:
+        cfg = _write(tmp_path, _MINIMAL_TOML + f'google_client_id = "{self._ID}"\n')
+        assert resolve_profile("dev", cfg).google_client_id == self._ID
+
+    # criterio: 10-C04
+    def test_env_overrides_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        cfg = _write(tmp_path, _MINIMAL_TOML + 'google_client_id = "file-id"\n')
+        monkeypatch.setenv("PYNTERACTA_GOOGLE_CLIENT_ID", self._ID)
+        assert resolve_profile("dev", cfg).google_client_id == self._ID
+
+    # criterio: 10-C04
+    def test_absent_is_none_and_existing_profiles_stay_valid(self, tmp_path: Path) -> None:
+        cfg = _write(tmp_path, _FULL_TOML)
+        assert resolve_profile("dev", cfg).google_client_id is None
+        assert load_config(cfg).profiles["dev"].google_client_id is None
