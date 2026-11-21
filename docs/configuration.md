@@ -31,7 +31,16 @@ log_level       = "INFO"
 [profiles.staging]
 base_url        = "https://staging.interacta.example.it"
 service_account_key = "~/.config/pynteracta/sa-staging.json"
+
+[profiles.personal]
+base_url         = "https://interacta.example.it"
+auth_method      = "google_oauth2"
+google_client_id = "000000000000-example.apps.googleusercontent.com"
 ```
+
+The `personal` profile signs in with a Google account from the browser
+(`pynteracta --profile personal auth login --google`): the session and the client secret are
+kept in the system keychain, never in this file. See [Authentication](authentication.md).
 
 ## Managing profiles
 
@@ -52,6 +61,7 @@ pynteracta config list
 | `PYNTERACTA_AUTH_METHOD` | `auth_method` (`service_account` or `google_oauth2`) |
 | `PYNTERACTA_SERVICE_ACCOUNT_KEY` | `service_account_key` |
 | `PYNTERACTA_GOOGLE_OAUTH2_TOKEN` | `google_oauth2_token` (not persisted to config) |
+| `PYNTERACTA_GOOGLE_CLIENT_ID` | `google_client_id` — OAuth client for the browser sign-in |
 | `PYNTERACTA_TOKEN_CACHE` | `token_cache` (`file` or `memory`) |
 | `PYNTERACTA_TOKEN_CACHE_DIR` | `token_cache_dir` |
 | `PYNTERACTA_TIMEOUT` | `timeout_seconds` |
@@ -74,6 +84,7 @@ pynteracta config list
 | `auth_method` | `"service_account"` or `"google_oauth2"` | `service_account` | Authentication method |
 | `service_account_key` | `Path` | `None` | Path to SA key JSON |
 | `google_oauth2_token` | `str` | `None` | Google access token; supply via env/flag, **not** persisted to config |
+| `google_client_id` | `str` | `None` | Id of the organization's "Desktop app" OAuth client used by `auth login --google`; not a secret (the client secret stays in the system keychain) |
 | `token_cache` | `"file"` or `"memory"` | `file` | Cache backend |
 | `token_cache_dir` | `Path` | `~/.config/pynteracta/tokens/` (XDG) | Override cache directory |
 | `timeout_seconds` | `float` | `30.0` | HTTP timeout |

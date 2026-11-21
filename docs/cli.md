@@ -48,7 +48,7 @@ pynteracta communities details 79 --output json
 pynteracta communities details 79 -o yaml
 ```
 
-Every data-emitting command (`auth whoami` and all sub-commands of `users`, `posts`,
+Every data-emitting command (`auth whoami`, `auth status` and all sub-commands of `users`, `posts`,
 `communities`, `catalogs`, `attachments`, `tasks`, `groups`, `hashtags`, `admin-manage`) accepts
 `--output` / `-o` directly, together with `--full`, `--fields`, `--export` and `--export-format`.
 Configuration meta-commands (`config set`, `config get`, etc.) do not; use the global form if you
@@ -162,8 +162,10 @@ Optional per-command flag to override the format inferred from the file extensio
 
 ### `auth login`
 
-Configures an authentication method for the active profile and validates it by fetching a
-token. Choose **one** of the two methods (they are mutually exclusive):
+Configures an authentication method for a profile and validates it by fetching a token.
+Without `--profile` it updates the **current profile** of `config.toml` (`current_profile`),
+the same one the other commands use; the result message names the profile written. Choose
+**one** of the two methods (they are mutually exclusive):
 
 **Service account** — stores the key path in the profile:
 
@@ -171,9 +173,22 @@ token. Choose **one** of the two methods (they are mutually exclusive):
 pynteracta --base-url https://interacta.example.it auth login --service-account-key sa.json
 ```
 
-**Google OAuth2** — persists only `auth_method = "google_oauth2"`; the Google access token is
-read from `--google-token` or `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN` and is **never written to
-disk**:
+**Google OAuth2, from the browser** — without a static token, `--google` runs the Google
+sign-in and saves the session in the system keychain (needs `pip install "pynteracta[google]"`
+and the organization's OAuth client id):
+
+```bash
+pynteracta --base-url https://interacta.example.it auth login --google \
+  --google-client-id 000000000000-example.apps.googleusercontent.com
+```
+
+The client secret is asked once with a hidden prompt (or read from stdin with
+`--client-secret-stdin`) and kept in the keychain; the profile and the keychain are written
+only after Interacta accepted the sign-in. Later commands renew the token on their own.
+
+**Google OAuth2, static token** — with `--google-token` or `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`
+the command persists only `auth_method = "google_oauth2"`; the token is **never written to
+disk** and the keychain is not used:
 
 ```bash
 export PYNTERACTA_GOOGLE_OAUTH2_TOKEN="ya29.<google-access-token>"
@@ -186,12 +201,23 @@ pynteracta --base-url https://interacta.example.it auth login --google-token "ya
 | Option | Description |
 |---|---|
 | `--service-account-key PATH` | Use service-account auth; persists the key path. |
-| `--google` | Use Google OAuth2 auth (token from `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`). |
-| `--google-token TOKEN` | Google access token (implies `--google`). |
-| `--profile NAME` | Profile to update (default: active profile). |
+| `--google` | Use Google OAuth2: browser sign-in, or the static token if one is set. |
+| `--google-token TOKEN` | Static Google access token (implies `--google`). |
+| `--profile NAME` | Profile to update (default: current profile). |
+| `--google-client-id ID` | OAuth client id for the browser sign-in; saved in the profile as `google_client_id`. |
+| `--client-secret-stdin` | Read the OAuth client secret from the first line of stdin (scripts). There is no option taking the secret as a value. |
+| `--replace-client-secret` | Ask for the client secret again even if one is saved; it replaces the old one only if the sign-in succeeds. |
+| `--no-browser` | Print the sign-in URL instead of opening the browser. |
+| `--login-timeout SECONDS` | How long to wait for the browser sign-in (default 300). |
 
-See [Authentication → Google OAuth2](authentication.md#google-oauth2) for how to obtain a
-Google access token and its prerequisites.
+The last five options belong to the browser sign-in: combined with a static token (flag or
+environment variable) they are a usage error (exit code `2`). Exit codes: `2` for missing
+configuration (no `google_client_id`, no `pynteracta[google]`, no system keychain, no client
+secret in a non-interactive run), `3` when the sign-in fails (consent denied, timeout, Google
+account not linked to an Interacta user), `7` for network errors.
+
+See [Authentication → Google OAuth2](authentication.md#google-oauth2) for the requirements,
+how to create the OAuth client and how the session is renewed.
 
 ### `auth whoami`
 
@@ -202,13 +228,38 @@ pynteracta auth whoami
 pynteracta auth whoami --output json
 ```
 
+### `auth status`
+
+Describes the active profile without network calls and without showing secrets: profile,
+tenant, authentication method, OAuth client id, whether the system keychain is readable,
+whether a Google session is saved, for which account and since when, and whether the client
+secret is saved. It always exits `0`; when the extra or the keychain is missing it says why.
+Output goes through the common formats (`--output`, `--full`, `--fields`, `--export`).
+
+```bash
+pynteracta auth status
+pynteracta auth status --output json
+pynteracta auth status --check
+```
+
+`auth status --check` also authenticates (for a Google session: renewal and exchange), adds
+the `check` and `authenticated_as` rows, and exits `3` if authentication fails.
+
 ### `auth logout`
 
-Purges the token cache for the current profile.
+Purges the token cache for the current profile and, for a `google_oauth2` profile, removes the
+saved Google session from the system keychain. No network calls; the client secret is kept.
 
 ```bash
 pynteracta auth logout
+pynteracta auth logout --forget-client-secret
+pynteracta auth logout --revoke
 ```
+
+| Option | Description |
+|---|---|
+| `--forget-client-secret` | Also remove the client secret of the profile's OAuth client. |
+| `--revoke` | Revoke the session at Google first. The revocation ends the consent to the OAuth client, so it also ends the sessions of the same account on other profiles and machines. If it fails, the local session is removed anyway and the command exits with the error's code. |
 
 ## config
 

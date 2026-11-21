@@ -360,7 +360,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `test: i segreti del login Google non compaiono in log, audit
      e hook (10-T16)`.
 
-### [ ] T17 – Documentazione pubblica
+### [x] T17 – Documentazione pubblica
 
 - Criteri: 10-C38
 - Dipende da: T13, T14, T15

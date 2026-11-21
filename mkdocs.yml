@@ -47,6 +47,7 @@ nav:
   - API Reference:
       - Client: api/client.md
       - Auth: api/auth.md
+      - Google login: api/google_login.md
       - Users: api/users.md
       - Posts: api/posts.md
       - Communities: api/communities.md

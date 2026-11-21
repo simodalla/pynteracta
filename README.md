@@ -24,6 +24,8 @@ uv pip install "pynteracta[yaml]"
 uv pip install "pynteracta[parquet]"
 # with all export formats (yaml + parquet):
 uv pip install "pynteracta[export]"
+# with the Google sign-in from the browser (system keychain support):
+uv pip install "pynteracta[google]"
 ```
 
 > **Upgrading from 0.4.x?** The API changed completely — see
@@ -95,7 +97,9 @@ pynteracta --version
 ## Features
 
 - **Authentication** — service-account RS512 JWT assertion with token lifecycle and file/memory
-  cache (POSIX `0o600`/`0o700` enforcement), or Google OAuth2 access-token exchange.
+  cache (POSIX `0o600`/`0o700` enforcement), or Google OAuth2: sign in once from the browser
+  (`auth login --google`, session kept in the system keychain and renewed automatically) or
+  exchange a Google access token you already hold.
 - **Read resources** — `auth`, `users`, `posts`, `communities`, `catalogs`, `attachments`,
   `tasks`, `groups`, `hashtags`, `admin_manage` (manage/edit forms). One facade per response with
   a `.raw` escape hatch to the generated DTO.

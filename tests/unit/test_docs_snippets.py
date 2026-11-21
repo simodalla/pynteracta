@@ -436,3 +436,29 @@ def test_swagger_alignment_pages() -> None:
     attachments = (_ROOT / "docs" / "api" / "attachments.md").read_text(encoding="utf-8")
     for needle in ("downloadable=False", "Unrecognized field", "comments and tasks"):
         assert needle in attachments, f"'{needle}' missing from docs/api/attachments.md"
+
+
+# criterio: 10-C38
+def test_google_login_pages() -> None:
+    """Le pagine pubbliche descrivono il login Google dal browser (spec 10)."""
+    auth = (_ROOT / "docs" / "authentication.md").read_text(encoding="utf-8")
+    assert "does **not** run any Google sign-in" not in auth
+    for needle in ("auth login --google", "pynteracta[google]", "auth status"):
+        assert needle in auth, f"'{needle}' missing from docs/authentication.md"
+    cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    for needle in (
+        "--google-client-id",
+        "--client-secret-stdin",
+        "--replace-client-secret",
+        "--no-browser",
+        "--login-timeout",
+        "auth status --check",
+        "--forget-client-secret",
+        "--revoke",
+    ):
+        assert needle in cli, f"'{needle}' missing from docs/cli.md"
+    configuration = (_ROOT / "docs" / "configuration.md").read_text(encoding="utf-8")
+    for needle in ("google_client_id", "PYNTERACTA_GOOGLE_CLIENT_ID"):
+        assert needle in configuration, f"'{needle}' missing from docs/configuration.md"
+    api = (_ROOT / "docs" / "api" / "google_login.md").read_text(encoding="utf-8")
+    assert "pynteracta.google_login" in api
