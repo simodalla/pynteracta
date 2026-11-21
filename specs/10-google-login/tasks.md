@@ -170,7 +170,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. Controlli bloccanti; commit `feat(auth): PKCE, indirizzo di consenso e listener su
      loopback (10-T07)`.
 
-### [ ] T08 – Chiamate a Google: token, userinfo, revoca
+### [x] T08 – Chiamate a Google: token, userinfo, revoca
 
 - Criteri: 10-C20, 10-C21 (parte di protocollo); prepara 10-C09, 10-C29
 - Dipende da: T06, T07

@@ -12,6 +12,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import httpx
+
 from pynteracta.keychain import Keychain
 
 # Valori finti e riconoscibili (regola "Segreti fuori dal repository").
@@ -56,6 +58,40 @@ class MemoryKeychain(Keychain):
 
 
 AUTH_CODE = "4/example-authorization-code"
+ID_TOKEN = "eyJexample.id-token.signature"
+
+
+def token_response(
+    *,
+    access_token: str = ACCESS_TOKEN,
+    refresh_token: str | None = REFRESH_TOKEN,
+    id_token: str | None = ID_TOKEN,
+) -> httpx.Response:
+    """Risposta ``200`` del token endpoint di Google."""
+    body: dict[str, object] = {
+        "access_token": access_token,
+        "expires_in": 3599,
+        "scope": "openid https://www.googleapis.com/auth/userinfo.email",
+        "token_type": "Bearer",
+    }
+    if refresh_token is not None:
+        body["refresh_token"] = refresh_token
+    if id_token is not None:
+        body["id_token"] = id_token
+    return httpx.Response(200, json=body)
+
+
+def error_response(error: str, *, status: int = 400, description: str = "") -> httpx.Response:
+    """Risposta d'errore OAuth di Google (``invalid_grant``, ``invalid_client``…)."""
+    return httpx.Response(status, json={"error": error, "error_description": description})
+
+
+def userinfo_response(email: str | None = EMAIL) -> httpx.Response:
+    """Risposta ``200`` dell'endpoint userinfo."""
+    body: dict[str, object] = {"sub": "123456789", "email_verified": True}
+    if email is not None:
+        body["email"] = email
+    return httpx.Response(200, json=body)
 
 
 class FakeBrowser:

@@ -7,12 +7,28 @@ import base64
 import hashlib
 import socket
 import urllib.parse
+from collections.abc import Iterator
 
+import httpx
 import pytest
-from google_fakes import AUTH_CODE, CLIENT_ID, FakeBrowser
+import respx
+from google_fakes import (
+    ACCESS_TOKEN,
+    AUTH_CODE,
+    CLIENT_ID,
+    CLIENT_SECRET,
+    EMAIL,
+    REFRESH_TOKEN,
+    FakeBrowser,
+    error_response,
+    token_response,
+    userinfo_response,
+)
+from structlog.testing import capture_logs
 
 from pynteracta import google_oauth
-from pynteracta.exceptions import AuthenticationError
+from pynteracta.exceptions import AuthenticationError, ServerError, TransportError
+from pynteracta.transport import HttpTransport
 
 _SHORT = 0.3
 
@@ -162,3 +178,239 @@ class TestLoopbackReceiver:
         out, err = capfd.readouterr()
         assert out == ""
         assert err == ""
+
+
+class _RecordingHooks:
+    def __init__(self) -> None:
+        self.errors: list[BaseException] = []
+
+    def on_request(self, req: object) -> None:
+        return
+
+    def on_response(self, resp: object) -> None:
+        return
+
+    def on_error(self, exc: BaseException) -> None:
+        self.errors.append(exc)
+
+
+@pytest.fixture
+def hooks() -> _RecordingHooks:
+    return _RecordingHooks()
+
+
+@pytest.fixture
+def transport(hooks: _RecordingHooks) -> Iterator[HttpTransport]:
+    with HttpTransport("https://oauth2.googleapis.com", hooks=hooks) as t:
+        yield t
+
+
+@pytest.fixture
+def google_mock() -> Iterator[respx.MockRouter]:
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as router:
+        yield router
+
+
+def _form(route: respx.Route) -> dict[str, str]:
+    return dict(urllib.parse.parse_qsl(route.calls[0].request.content.decode("ascii")))
+
+
+class TestExchangeCode:
+    # criterio: 10-C20
+    def test_sends_form_and_returns_tokens(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        route = google_mock.post(google_oauth.TOKEN_URL).mock(return_value=token_response())
+        tokens = google_oauth.exchange_code(
+            transport,
+            code=AUTH_CODE,
+            verifier="verificatore",
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            redirect_uri="http://127.0.0.1:5555",
+        )
+        assert tokens.access_token == ACCESS_TOKEN
+        assert tokens.refresh_token == REFRESH_TOKEN
+        assert _form(route) == {
+            "grant_type": "authorization_code",
+            "code": AUTH_CODE,
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "redirect_uri": "http://127.0.0.1:5555",
+            "code_verifier": "verificatore",
+        }
+        assert route.call_count == 1
+        assert ACCESS_TOKEN not in repr(tokens)
+        assert REFRESH_TOKEN not in repr(tokens)
+
+    # criterio: 10-C09
+    def test_missing_refresh_token(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=token_response(refresh_token=None)
+        )
+        with pytest.raises(AuthenticationError, match="refresh token"):
+            google_oauth.exchange_code(
+                transport,
+                code=AUTH_CODE,
+                verifier="v",
+                client_id=CLIENT_ID,
+                client_secret=CLIENT_SECRET,
+                redirect_uri="http://127.0.0.1:1",
+            )
+
+    # criterio: 10-C20
+    def test_invalid_client(
+        self, transport: HttpTransport, google_mock: respx.MockRouter, hooks: _RecordingHooks
+    ) -> None:
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=error_response("invalid_client", status=401)
+        )
+        with pytest.raises(AuthenticationError, match="--replace-client-secret") as info:
+            google_oauth.exchange_code(
+                transport,
+                code=AUTH_CODE,
+                verifier="v",
+                client_id=CLIENT_ID,
+                client_secret=CLIENT_SECRET,
+                redirect_uri="http://127.0.0.1:1",
+            )
+        assert hooks.errors == [info.value]
+
+
+class TestRefreshAccessToken:
+    # criterio: 10-C20
+    def test_sends_refresh_grant(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        route = google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=token_response(refresh_token=None)
+        )
+        tokens = google_oauth.refresh_access_token(
+            transport,
+            refresh_token=REFRESH_TOKEN,
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+        )
+        assert tokens.access_token == ACCESS_TOKEN
+        assert tokens.refresh_token is None
+        assert _form(route) == {
+            "grant_type": "refresh_token",
+            "refresh_token": REFRESH_TOKEN,
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+        }
+
+    # criterio: 10-C20, 10-C21
+    @pytest.mark.parametrize(
+        ("error", "status", "fragment"),
+        [
+            ("invalid_grant", 400, "auth login --google"),
+            ("invalid_client", 401, "--replace-client-secret"),
+            ("unsupported_grant_type", 400, "unsupported_grant_type"),
+        ],
+    )
+    def test_oauth_errors(  # noqa: PLR0913, PLR0917
+        self,
+        transport: HttpTransport,
+        google_mock: respx.MockRouter,
+        hooks: _RecordingHooks,
+        error: str,
+        status: int,
+        fragment: str,
+    ) -> None:
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=error_response(error, status=status, description="Bad Request")
+        )
+        with capture_logs() as logs, pytest.raises(AuthenticationError) as info:
+            google_oauth.refresh_access_token(
+                transport, refresh_token=REFRESH_TOKEN, client_id=CLIENT_ID, client_secret="s"
+            )
+        assert fragment in str(info.value)
+        assert error in str(info.value)
+        assert info.value.status_code == status
+        assert info.value.request_url == google_oauth.TOKEN_URL
+        assert info.value.response_body == {"error": error, "error_description": "Bad Request"}
+        assert hooks.errors == [info.value]
+        events = [e for e in logs if e["event"] == "google.token_error"]
+        assert events == [{"event": "google.token_error", "error": error, "log_level": "warning"}]
+
+    # criterio: 10-C21
+    def test_server_error_without_body(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=httpx.Response(500, json={"refresh_token": REFRESH_TOKEN})
+        )
+        with pytest.raises(ServerError) as info:
+            google_oauth.refresh_access_token(
+                transport, refresh_token=REFRESH_TOKEN, client_id=CLIENT_ID, client_secret="s"
+            )
+        assert info.value.response_body is None
+        assert REFRESH_TOKEN not in str(info.value)
+
+    # criterio: 10-C21
+    @pytest.mark.parametrize("status", [200, 400])
+    def test_non_json_body(
+        self, transport: HttpTransport, google_mock: respx.MockRouter, status: int
+    ) -> None:
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=httpx.Response(status, text=f"<html>{REFRESH_TOKEN}</html>")
+        )
+        with pytest.raises(AuthenticationError, match="Unexpected response") as info:
+            google_oauth.refresh_access_token(
+                transport, refresh_token=REFRESH_TOKEN, client_id=CLIENT_ID, client_secret="s"
+            )
+        assert info.value.response_body is None
+
+    # criterio: 10-C21
+    @pytest.mark.parametrize(
+        "exc", [httpx.ConnectTimeout("timeout"), httpx.ConnectError("refused")]
+    )
+    def test_network_error_single_request(
+        self, transport: HttpTransport, google_mock: respx.MockRouter, exc: Exception
+    ) -> None:
+        route = google_mock.post(google_oauth.TOKEN_URL).mock(side_effect=exc)
+        with pytest.raises(TransportError):
+            google_oauth.refresh_access_token(
+                transport, refresh_token=REFRESH_TOKEN, client_id=CLIENT_ID, client_secret="s"
+            )
+        assert route.call_count == 1
+
+
+class TestFetchEmail:
+    def test_bearer_and_email(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        route = google_mock.get(google_oauth.USERINFO_URL).mock(return_value=userinfo_response())
+        assert google_oauth.fetch_email(transport, ACCESS_TOKEN) == EMAIL
+        assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
+
+    @pytest.mark.parametrize(
+        "response",
+        [userinfo_response(None), httpx.Response(401, json={}), httpx.Response(200, text="x")],
+    )
+    def test_missing_email_is_none(
+        self, transport: HttpTransport, google_mock: respx.MockRouter, response: httpx.Response
+    ) -> None:
+        google_mock.get(google_oauth.USERINFO_URL).mock(return_value=response)
+        assert google_oauth.fetch_email(transport, ACCESS_TOKEN) is None
+
+
+class TestRevoke:
+    def test_sends_token(self, transport: HttpTransport, google_mock: respx.MockRouter) -> None:
+        route = google_mock.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        google_oauth.revoke(transport, REFRESH_TOKEN)
+        assert _form(route) == {"token": REFRESH_TOKEN}
+
+    def test_already_invalid_token_is_success(
+        self, transport: HttpTransport, google_mock: respx.MockRouter
+    ) -> None:
+        google_mock.post(google_oauth.REVOKE_URL).mock(return_value=error_response("invalid_token"))
+        google_oauth.revoke(transport, REFRESH_TOKEN)
+
+    def test_server_error(self, transport: HttpTransport, google_mock: respx.MockRouter) -> None:
+        google_mock.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(503))
+        with pytest.raises(ServerError):
+            google_oauth.revoke(transport, REFRESH_TOKEN)
