@@ -20,6 +20,8 @@ from click.testing import Result
 from google_fakes import (
     CLIENT_ID,
     CLIENT_SECRET,
+    EMAIL,
+    REFRESH_TOKEN,
     FakeBrowser,
     MemoryKeychain,
     error_response,
@@ -1326,3 +1328,173 @@ class TestAuthLoginGoogleBrowser:
         assert list(load_config(config_file).profiles) == ["prod"]
         assert session_entry(_API_BASE, "prod") in memory_keychain.entries
         assert "profile 'prod'" in result.output
+
+
+# ---------------------------------------------------------------------------
+# auth status (spec 10)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthStatus:
+    def _status(self, runner: CliRunner, config_file: Path, *args: str) -> Result:
+        return runner.invoke(app, ["--config-file", str(config_file), *args, "auth", "status"])
+
+    # criterio: 10-C24
+    @respx.mock
+    def test_table_with_session(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        snapshot: object,
+    ) -> None:
+        save_session(memory_keychain)
+        result = self._status(runner, _google_config_file(tmp_path))
+        assert result.exit_code == 0, result.output
+        assert result.output == snapshot
+        assert respx.calls.call_count == 0
+        assert REFRESH_TOKEN not in result.output
+        assert CLIENT_SECRET not in result.output
+
+    # criterio: 10-C24
+    @respx.mock
+    def test_json_with_session(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        snapshot: object,
+    ) -> None:
+        save_session(memory_keychain)
+        result = self._status(runner, _google_config_file(tmp_path), "--output", "json")
+        assert result.exit_code == 0, result.output
+        assert result.output == snapshot
+        data = json.loads(result.output)
+        assert data["google_session"] is True
+        assert data["google_account"] == EMAIL
+        assert data["client_secret_saved"] is True
+        assert respx.calls.call_count == 0
+
+    # criterio: 10-C24
+    def test_without_session_exits_0(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        result = self._status(runner, _google_config_file(tmp_path), "--output", "json")
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["google_session"] is False
+        assert data["google_account"] is None
+
+    # criterio: 10-C24
+    def test_session_without_email_reports_unknown_account(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain, email=None)
+        result = self._status(runner, _google_config_file(tmp_path), "--output", "json")
+        assert json.loads(result.output)["google_account"] == "unknown"
+
+    # criterio: 10-C25
+    def test_service_account_profile(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            '[profiles.default]\nbase_url = "https://api.example.com"\n', encoding="utf-8"
+        )
+        result = self._status(runner, config_file, "--output", "json")
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["auth_method"] == "service_account"
+        assert data["google_session"] is False
+
+    # criterio: 10-C25
+    @pytest.mark.parametrize("case", ["keyring_missing", "backend_rejected"])
+    def test_unreadable_keychain_exits_0_with_reason(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        case: str,
+    ) -> None:
+        if case == "keyring_missing":
+            monkeypatch.setitem(sys.modules, "keyring", None)
+        result = self._status(runner, _google_config_file(tmp_path), "--output", "json")
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        expected = "pynteracta[google]" if case == "keyring_missing" else "static Google token"
+        assert expected in data["keychain"]
+        assert data["google_session"] == "unreadable"
+        assert data["client_secret_saved"] == "unreadable"
+
+    # criterio: 10-C24
+    def test_fields_and_export(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        config_file = _google_config_file(tmp_path)
+        fields = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "--output",
+                "json",
+                "auth",
+                "status",
+                "--fields",
+                "profile,google_session",
+            ],
+        )
+        assert fields.exit_code == 0, fields.output
+        assert json.loads(fields.output) == {"profile": "default", "google_session": True}
+        target = tmp_path / "status.json"
+        export = runner.invoke(
+            app, ["--config-file", str(config_file), "auth", "status", "--export", str(target)]
+        )
+        assert export.exit_code == 0, export.output
+        exported = json.loads(target.read_text(encoding="utf-8"))
+        assert exported["google_account"] == EMAIL
+        assert REFRESH_TOKEN not in target.read_text(encoding="utf-8")
+
+    # criterio: 10-C26
+    @respx.mock
+    def test_check_with_valid_session(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        respx.post(google_oauth.TOKEN_URL).mock(return_value=token_response(refresh_token=None))
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _fake_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(_google_config_file(tmp_path)),
+                "--output",
+                "json",
+                "auth",
+                "status",
+                "--check",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.stdout)
+        assert data["check"] == "ok"
+        assert data["authenticated_as"] == "Maria Rossi"
+
+    # criterio: 10-C26
+    @respx.mock
+    def test_check_with_rejected_session_exits_3(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        respx.post(google_oauth.TOKEN_URL).mock(return_value=error_response("invalid_grant"))
+        result = runner.invoke(
+            app,
+            ["--config-file", str(_google_config_file(tmp_path)), "auth", "status", "--check"],
+        )
+        assert result.exit_code == EXIT_AUTH

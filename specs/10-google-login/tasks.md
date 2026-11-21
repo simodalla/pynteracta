@@ -301,7 +301,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
      l'indirizzo, messaggi di esito, `handle_error` per gli errori.
   5. Controlli bloccanti; commit `feat(cli): auth login --google dal browser (10-T13)`.
 
-### [ ] T14 – `auth status`
+### [x] T14 – `auth status`
 
 - Criteri: 10-C24, 10-C25, 10-C26
 - Dipende da: T12

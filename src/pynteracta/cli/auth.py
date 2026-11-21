@@ -414,6 +414,83 @@ def whoami(  # noqa: PLR0913
         raise handle_error(exc, console=console) from exc
 
 
+_UNREADABLE = "unreadable"
+
+
+def _status_record(st: google_login.GoogleSessionStatus) -> dict[str, Any]:
+    """Le righe di ``auth status``; con il portachiavi non leggibile le voci dicono il motivo."""
+    readable = st.keychain == google_login.KEYCHAIN_AVAILABLE
+    account: str | None = None
+    if st.google_session:
+        account = st.google_account or "unknown"
+    return {
+        "profile": st.profile,
+        "base_url": st.base_url,
+        "auth_method": st.auth_method,
+        "google_client_id": st.google_client_id,
+        "keychain": st.keychain,
+        "google_session": st.google_session if readable else _UNREADABLE,
+        "google_account": account,
+        "google_login_at": st.google_login_at,
+        "client_secret_saved": st.client_secret_saved if readable else _UNREADABLE,
+    }
+
+
+@app.command("status")
+def status(  # noqa: PLR0913
+    ctx: typer.Context,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="Also authenticate against the tenant and show the identity."),
+    ] = False,
+    output: OutputOption = None,
+    full: FullOption = False,
+    fields: FieldsOption = None,
+    export: ExportOption = None,
+    export_format: ExportFormatOption = None,
+) -> None:
+    """Show the active profile and its saved Google session, without network calls.
+
+    Never shows tokens or secrets. ``--check`` also signs in (for a Google session: refresh and
+    exchange) and exits 3 if authentication fails.
+    """
+    state: CliState = ctx.obj
+    console = make_console(state)
+    validate_full_fields(full, fields)
+    validate_export_options(export, export_format)
+    try:
+        record = _status_record(
+            google_login.status(
+                state.profile,
+                config_file=state.config_file,
+                overrides=_profile_overrides(state),
+            )
+        )
+        if check:
+            with build_client(state) as client:
+                me = client.users.me()
+            ud = me.user_data_typed
+            record["check"] = "ok"
+            record["authenticated_as"] = (
+                f"{ud.firstName or ''} {ud.lastName or ''}".strip() if ud is not None else None
+            )
+    except InteractaError as exc:
+        raise handle_error(exc, console=console) from exc
+    render_output(
+        resolve_output(state, output),
+        [record],
+        lambda r: r,
+        full=full,
+        fields=fields,
+        console=console,
+        title="Auth Status",
+        export_path=export,
+        export_format=export_format,
+        quiet=state.quiet,
+        single_command=True,
+    )
+
+
 @app.command("logout")
 def logout(ctx: typer.Context) -> None:
     """Clear the cached token for the current profile."""

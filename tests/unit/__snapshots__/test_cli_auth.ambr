@@ -1,4 +1,39 @@
 # serializer version: 1
+# name: TestAuthStatus.test_json_with_session
+  '''
+  {
+    "profile": "default",
+    "base_url": "https://api.example.com",
+    "auth_method": "google_oauth2",
+    "google_client_id": "000000000000-example.apps.googleusercontent.com",
+    "keychain": "available",
+    "google_session": true,
+    "google_account": "mario.rossi@example.org",
+    "google_login_at": "2026-11-21T09:00:00+00:00",
+    "client_secret_saved": true
+  }
+  
+  '''
+# ---
+# name: TestAuthStatus.test_table_with_session
+  '''
+                                 Auth Status                               
+  ┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Key                 ┃ Value                                           ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ profile             │ default                                         │
+  │ base_url            │ https://api.example.com                         │
+  │ auth_method         │ google_oauth2                                   │
+  │ google_client_id    │ 000000000000-example.apps.googleusercontent.com │
+  │ keychain            │ available                                       │
+  │ google_session      │ True                                            │
+  │ google_account      │ mario.rossi@example.org                         │
+  │ google_login_at     │ 2026-11-21T09:00:00+00:00                       │
+  │ client_secret_saved │ True                                            │
+  └─────────────────────┴─────────────────────────────────────────────────┘
+  
+  '''
+# ---
 # name: TestAuthWhoami.test_json_output
   '''
   {
