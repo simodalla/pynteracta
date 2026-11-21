@@ -2063,3 +2063,65 @@ Dalla code review del codice della spec 09. Solo lo script di rigenerazione e il
   `properties` di uno schema con oggetti annidati, i suffissi generati potrebbero ancora
   cambiare. Non osservato; il confronto AST dei nomi di classe dopo ogni rigenerazione lo
   mostrerebbe.
+
+## M36 — Login Google integrato con rinnovo automatico — completata 2026-11-21
+
+Decima spec del metodo: [`specs/10-google-login/`](specs/10-google-login/) (`spec.md`, `plan.md`,
+`tasks.md`, `verifica.md`). Realizza la decisione 6 e 7 dell'ADR 0002: login Google dal browser,
+sessione nel portachiavi di sistema, rinnovo senza browser. Prerequisito del server MCP (spec 11).
+Minor **0.16.0**.
+
+### Fatto
+
+- Login dal browser: `auth login --google` senza token statico esegue il flusso OAuth2 per
+  applicazioni installate (PKCE S256, listener su `127.0.0.1`, scope `email`), scambia il token
+  con Interacta e solo dopo scrive profilo (`google_client_id`) e portachiavi (sessione e client
+  secret). Flag `--google-client-id`, `--google-client-file`, `--client-secret-stdin`,
+  `--replace-client-secret`, `--no-browser`, `--login-timeout` (10-T07, T11, T13, T21).
+- Sessione e rinnovo: `InteractaClient(profile_name=...)` su un profilo `google_oauth2` usa da
+  solo la sessione salvata e rinnova l'access token Google quando serve; `invalid_grant`,
+  `invalid_client`, rete e timeout hanno errori dedicati, senza nuovi tentativi (10-T08, T09,
+  T10).
+- `auth status [--check]` e `auth logout [--forget-client-secret] [--revoke]`, con la nota quando
+  non c'è nulla da revocare o eliminare; funzioni pubbliche `google_login.login/status/logout`
+  (10-T12, T14, T15, T22).
+- Moduli nuovi `keychain.py` (allowlist dei backend, nessun ripiego su file), `google_oauth.py`,
+  `google_login.py`; `HttpTransport.request_external` per le chiamate a Google senza corpi in
+  log, audit e hook; extra `pynteracta[google]` con `keyring` (10-T05, T06).
+- Correzioni emerse: il logout di un profilo `google_oauth2` ora elimina davvero la cache del
+  token (chiave sull'indirizzo dell'API, più la chiave vecchia) (10-T20); `auth login` e il
+  client che risolve da sé il profilo usano il profilo corrente invece di `default` (10-T04).
+- Test di non divulgazione su tutto il flusso con valori sentinella, audit, hook e log attivi
+  (10-T16). Documentazione: `authentication.md`, `cli.md`, `configuration.md`,
+  `api/google_login.md`, `index.md`, `README.md` (10-T17); PRD con RF-026a…g, RF-016a/b,
+  RNF-012a, RNF-001c, `CLAUDE.md` (10-T19).
+- Prova reale su macOS e Windows (10-T18). 253 unit test nuovi (1616 → 1869); copertura totale
+  96,18 % → 96,51 %.
+
+### Decisioni oltre la spec
+
+- **Cache del token Google** (revisione `3b9199f`, scelta del maintainer): il test di
+  caratterizzazione di T01 ha mostrato che il logout non eliminava il file; corretto nella spec
+  con 10-C41 invece che in un bugfix separato.
+- **File JSON del client** (revisione `2df31fb`, richiesta del maintainer durante T18):
+  `--google-client-file` legge id e secret dal JSON della console, una volta, senza salvarne il
+  percorso; solo client "Desktop". Il messaggio d'errore non porta mai il contenuto del file,
+  nemmeno in `__context__`: con `raise … from None` dentro `except` l'eccezione JSON, che
+  contiene il documento, restava attaccata.
+- **Nota del logout** (revisione `56c1767`, richiesta del maintainer durante T18): `--revoke`
+  lanciato senza `--profile` era finito in silenzio sul profilo con service account.
+- Il primo comando dopo il login rinnova sempre l'access token Google: il login valida con una
+  cache in memoria e la sessione conserva solo il refresh token.
+- Il criterio "la funzione di login non scrive su stdout" è verificato sull'output della
+  funzione; structlog non configurato stampa su stdout per tutta la libreria (vedi follow-up).
+
+### Follow-up
+
+- Release **0.16.0** con la skill `release` dopo il merge; la riga in ROADMAP passa a ✅.
+- Logging della libreria senza configurazione: oggi structlog stampa su stdout; da decidere
+  prima del server MCP (spec 11, RNF-013).
+- La CLI non ha scritto righe di log nel file d'uscita di un comando in background: da capire
+  se dipende dalla configurazione quando l'output non è un terminale.
+- Il livello di log di `auth login --profile X` viene dal profilo corrente, non da `X`.
+- `auth status` in tabella tronca i valori lunghi nei terminali stretti.
+- Spec 11: `keyring` dentro `pynteracta[mcp]`.

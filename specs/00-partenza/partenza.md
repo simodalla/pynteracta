@@ -12,9 +12,9 @@ numeri; `/sddpa:verifica` li aggiorna quando migliorano. Non si modifica a mano.
 | Comando | Esito |
 |---|---|
 | `uv run ruff check .` | verde ("All checks passed!") |
-| `uv run ruff format --check .` | verde (136 file già formattati; 104 all'adozione) |
-| `uv run mypy src` | verde (64 file, nessun errore; 52 all'adozione) |
-| `uv run pytest -m "not integration and not contract"` | verde (1616 test, 104 snapshot; 717 all'adozione) |
+| `uv run ruff format --check .` | verde (143 file già formattati; 104 all'adozione) |
+| `uv run mypy src` | verde (67 file, nessun errore; 52 all'adozione) |
+| `uv run pytest -m "not integration and not contract"` | verde (1869 test, 106 snapshot; 717 all'adozione) |
 | `uv run pytest -m contract` | verde (238 test; 87 all'adozione) |
 
 Esclusi dai controlli del metodo: `uv run pytest -m integration` (20 test opt-in contro un tenant
@@ -33,16 +33,19 @@ sotto `src/pynteracta/`.
 
 | Ambito | Copertura |
 |---|---|
-| Totale | 96,18 % (6680/6945 righe; 93,15 % all'adozione) |
+| Totale | 96,51 % (7354/7620 righe; 93,15 % all'adozione) |
 | `api` | 98,45 % (96,02 % all'adozione) |
-| `cli` | 95,29 % (89,31 % all'adozione) |
+| `cli` | 95,79 % (89,31 % all'adozione) |
 | `models/facade` | 96,39 % (94,74 % all'adozione) |
-| `auth.py` | 94,01 % |
-| `client.py` | 96,70 % |
-| `config.py` | 98,86 % |
-| `logging.py` | 94,74 % (108/114; 93,41 % all'adozione) |
+| `auth.py` | 94,04 % |
+| `client.py` | 98,17 % |
+| `config.py` | 100 % |
+| `logging.py` | 97,64 % (124/127; 93,41 % all'adozione) |
 | `pagination.py` | 93,02 % |
-| `transport.py` | 98,73 % |
+| `transport.py` | 98,82 % |
+| `keychain.py` | 92,98 % (spec 10) |
+| `google_oauth.py` | 98,64 % (spec 10) |
+| `google_login.py` | 95,56 % (spec 10) |
 | `exceptions.py`, `hooks.py`, `urls.py`, `__init__.py` | 100 % |
 
 Il file meno coperto è `api/hashtags.py` (86 %); `cli/communities.py`, al 53 % all'adozione, è
@@ -65,6 +68,7 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 
 - Autenticazione con service account (JWT RS512 → access token) – `auth.py`, `client.py` – RF-001
 - Autenticazione Google OAuth2 (scambio di un access token Google) – `client.py`, `api/auth.py` – RF-002
+- Login Google dal browser con sessione nel portachiavi e rinnovo automatico, `auth status`, logout con revoca, id e secret dal JSON della console (spec 10) – `google_login.py`, `google_oauth.py`, `keychain.py`, `cli/auth.py` – RF-026
 - Cache del token su file o in memoria, con scadenza, refresh e chiave per tenant – `auth.py` – RF-003
 - Identità corrente (`auth whoami`, `users me`, `users profile`) – `api/auth.py`, `api/users.py` – RF-004
 - Utenti: elenco con filtri e ordinamento, iterazione, form di modifica – `api/users.py`, `cli/users.py` – RF-005
@@ -98,3 +102,4 @@ Indice delle funzioni esistenti, con il modulo e il requisito del PRD ([prd.md](
 | 2026-10-12 | 07 | Copertura totale 95,18 % stabile (5998/6302 → 6003/6307 righe), `logging.py` 94,50 % → 94,74 %; unit test 1350 → 1383 |
 | 2026-10-13 | 08 | Copertura totale 95,18 % → 95,40 %, `api` 98,19 % → 98,44 %, `cli` 93,11 % → 93,53 %, `models/facade` 96,33 % → 96,35 %; unit test 1383 → 1549, contract 201 → 229 |
 | 2026-10-13 | 09 | Copertura totale 95,40 % → 96,18 %, `api` 98,44 % → 98,45 %, `cli` 93,53 % → 95,29 %, `models/facade` 96,35 % → 96,39 %, `cli/communities.py` 53 % → 99 %; unit test 1549 → 1616, contract 229 → 238 |
+| 2026-11-21 | 10 | Copertura totale 96,18 % → 96,51 %, `cli` 95,29 % → 95,79 %, `client.py` 96,70 % → 98,17 %, `config.py` 98,86 % → 100 %, `auth.py` 94,01 % → 94,04 %, `transport.py` 98,73 % → 98,82 %; `logging.py` 94,74 % → 97,64 % (dal fix `3467a26`, fuori milestone, registrato qui); nuovi `keychain.py`, `google_oauth.py`, `google_login.py`; unit test 1616 → 1869, snapshot 104 → 106 |

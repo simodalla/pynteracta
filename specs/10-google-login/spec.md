@@ -1,6 +1,6 @@
 # 10 – Login Google integrato con rinnovo automatico
 
-Stato: approvata
+Stato: chiusa
 Branch: `m36_google_login`
 Requisiti del PRD: RF-026, RNF-012, RNF-001 (estensione ai segreti Google); toccati RF-002,
 RF-003, RF-004, RF-015, RF-016, RF-017, RF-018, RF-019; §2 (riga "Utente Google"), §5 (righe "Google
