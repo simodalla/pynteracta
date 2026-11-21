@@ -6,7 +6,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from google_fakes import MemoryKeychain
 from typer.testing import CliRunner
+
+from pynteracta import keychain
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +41,14 @@ def _no_forced_color(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.setenv("NO_COLOR", "1")
     monkeypatch.setenv("TERM", "dumb")
+
+
+@pytest.fixture
+def memory_keychain(monkeypatch: pytest.MonkeyPatch) -> MemoryKeychain:
+    """Sostituisce il portachiavi di sistema con uno in memoria (spec 10)."""
+    kc = MemoryKeychain()
+    monkeypatch.setattr(keychain, "open_keychain", lambda: kc)
+    return kc
 
 
 @pytest.fixture

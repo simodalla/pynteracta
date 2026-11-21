@@ -109,7 +109,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. Controlli bloccanti; commit `feat(auth): login e client usano il profilo corrente
      (10-T04)`.
 
-### [ ] T05 – Extra `google` e modulo `keychain`
+### [x] T05 – Extra `google` e modulo `keychain`
 
 - Criteri: 10-C05, 10-C06, 10-C37
 - Dipende da: T02
