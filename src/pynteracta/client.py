@@ -28,7 +28,7 @@ from pynteracta.auth import (
     TokenProvider,
     load_service_account_key,
 )
-from pynteracta.config import Profile, _xdg_config_dir, resolve_profile
+from pynteracta.config import Profile, _xdg_config_dir, resolve_profile, resolve_profile_name
 from pynteracta.exceptions import AuthenticationError
 from pynteracta.hooks import ClientHooks
 from pynteracta.transport import HttpTransport
@@ -72,6 +72,9 @@ class InteractaClient:
         audit_bodies: bool = False,
     ) -> None:
         if profile is None and base_url is None:
+            # Il nome effettivo serve alla chiave di cache e alla sessione: senza
+            # ``profile_name`` è il profilo corrente di ``config.toml`` (RF-016b).
+            profile_name = resolve_profile_name(profile_name, config_file)
             profile = resolve_profile(profile_name=profile_name, config_file=config_file)
 
         auth_method = "service_account"

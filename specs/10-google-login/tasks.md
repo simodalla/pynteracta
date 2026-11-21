@@ -89,7 +89,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `refactor(config): scrittura del profilo in config.py
      (10-T03)`.
 
-### [ ] T04 – Profilo corrente come predefinito dei login e del client
+### [x] T04 – Profilo corrente come predefinito dei login e del client
 
 - Criteri: 10-C39, 10-C40 (per la chiave di cache; la sessione arriva con T10)
 - Dipende da: T03

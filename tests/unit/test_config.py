@@ -12,6 +12,7 @@ from pynteracta.config import (
     config_file_path,
     load_config,
     resolve_profile,
+    resolve_profile_name,
     write_profile_fields,
 )
 
@@ -321,3 +322,17 @@ class TestWriteProfileFields:
         profile = load_config(path).profiles["dev"]
         assert str(profile.base_url).rstrip("/") == "https://interacta.example.it"
         assert profile.google_client_id == "id"
+
+
+class TestResolveProfileName:
+    # criterio: 10-C39
+    def test_given_name_wins(self, tmp_path: Path) -> None:
+        assert resolve_profile_name("x", _write(tmp_path, _FULL_TOML)) == "x"
+
+    # criterio: 10-C39
+    def test_current_profile(self, tmp_path: Path) -> None:
+        assert resolve_profile_name(None, _write(tmp_path, _FULL_TOML)) == "dev"
+
+    # criterio: 10-C39
+    def test_default_without_file(self, tmp_path: Path) -> None:
+        assert resolve_profile_name(None, tmp_path / "missing.toml") == "default"

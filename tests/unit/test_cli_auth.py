@@ -263,6 +263,71 @@ class TestAuthLoginGoogle:
         assert "Google access token" in result.output
 
 
+class TestAuthLoginCurrentProfile:
+    """Senza ``--profile`` il login lavora sul profilo corrente di ``config.toml``."""
+
+    _PROD = 'current_profile = "prod"\n\n[profiles.prod]\nbase_url = "https://api.example.com"\n'
+
+    def _mock_tenant(self) -> None:
+        token_payload = {"accessToken": _fake_token()}
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(return_value=httpx.Response(200, json=token_payload))
+        mock_json("POST", "core/auth/create-access-token-by-service-account", token_payload)
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+
+    @staticmethod
+    def _args(method: str) -> list[str]:
+        if method == "google":
+            return ["--google-token", "tok"]
+        return ["--service-account-key", str(_SA_KEY_PATH)]
+
+    # criterio: 10-C39
+    @pytest.mark.parametrize("method", ["google", "service_account"])
+    @respx.mock
+    def test_without_profile_writes_current_profile(
+        self, runner: CliRunner, tmp_path: Path, method: str
+    ) -> None:
+        self._mock_tenant()
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(self._PROD, encoding="utf-8")
+        result = runner.invoke(
+            app, ["--config-file", str(config_file), "auth", "login", *self._args(method)]
+        )
+        assert result.exit_code == 0, result.output
+        assert "'prod'" in result.output
+        profiles = load_config(config_file).profiles
+        assert list(profiles) == ["prod"]
+        expected = "google_oauth2" if method == "google" else "service_account"
+        assert profiles["prod"].auth_method == expected
+
+    # criterio: 10-C39
+    @pytest.mark.parametrize("method", ["google", "service_account"])
+    @respx.mock
+    def test_with_profile_writes_that_profile(
+        self, runner: CliRunner, tmp_path: Path, method: str
+    ) -> None:
+        self._mock_tenant()
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(self._PROD, encoding="utf-8")
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                *self._args(method),
+                "--profile",
+                "altro",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        profiles = load_config(config_file).profiles
+        assert set(profiles) == {"prod", "altro"}
+        assert profiles["prod"].auth_method == "service_account"
+
+
 class TestAuthLoginNewProfile:
     """Il login su un profilo che non esiste deve lasciare un ``config.toml`` valido."""
 

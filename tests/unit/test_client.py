@@ -14,7 +14,7 @@ from api_helpers import BASE_URL, load_payload, mock_json
 
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
-from pynteracta.auth import GoogleOAuth2TokenManager, load_service_account_key
+from pynteracta.auth import GoogleOAuth2TokenManager, build_cache_key, load_service_account_key
 from pynteracta.client import InteractaClient
 from pynteracta.config import Profile
 from pynteracta.exceptions import AuthenticationError
@@ -156,6 +156,24 @@ class TestInteractaClientGoogleOAuth2:
         )
         with pytest.raises(AuthenticationError, match="exactly one"):
             InteractaClient(profile=profile, google_token_provider=lambda: "p")
+
+    # criterio: 10-C40
+    def test_current_profile_names_the_cache_key(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            'current_profile = "prod"\n\n[profiles.prod]\n'
+            'base_url = "https://api.example.com"\nauth_method = "google_oauth2"\n'
+            'token_cache = "memory"\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("PYNTERACTA_CONFIG_FILE", str(config_file))
+        monkeypatch.setenv("PYNTERACTA_GOOGLE_OAUTH2_TOKEN", "g-tok")
+        with InteractaClient() as client:
+            manager = client._token_manager
+            assert isinstance(manager, GoogleOAuth2TokenManager)
+            assert manager._profile == build_cache_key(BASE_URL, "prod")
 
     def test_google_auth_method_without_token_raises(self) -> None:
         profile = Profile(

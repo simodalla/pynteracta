@@ -36,7 +36,13 @@ from pynteracta.cli._common import (
     validate_full_fields,
 )
 from pynteracta.client import InteractaClient, _default_token_cache_dir
-from pynteracta.config import Profile, load_config, resolve_profile, write_profile_fields
+from pynteracta.config import (
+    Profile,
+    load_config,
+    resolve_profile,
+    resolve_profile_name,
+    write_profile_fields,
+)
 from pynteracta.exceptions import InteractaError
 from pynteracta.urls import build_api_base
 
@@ -78,7 +84,7 @@ def login(
     state: CliState = ctx.obj
     console = make_console(state)
     config_path = config_path_from_state(state)
-    effective_profile = profile or state.profile or "default"
+    effective_profile = profile or resolve_profile_name(state.profile, state.config_file)
 
     use_google = google or google_token is not None
     if use_google and service_account_key is not None:

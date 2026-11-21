@@ -171,6 +171,16 @@ def load_config(config_file: Path | None = None) -> Config:
     return Config.model_validate(raw)
 
 
+def resolve_profile_name(profile_name: str | None, config_file: Path | None = None) -> str:
+    """Il nome del profilo su cui lavorare: quello dato, altrimenti ``current_profile``.
+
+    Senza ``config.toml`` il profilo corrente è ``default``. Lo usano i login e il client che
+    risolve da sé il profilo, così sessione e cache finiscono dove i comandi le cercano
+    (RF-016b).
+    """
+    return profile_name or load_config(config_file).current_profile
+
+
 def resolve_profile(
     profile_name: str | None = None,
     config_file: Path | None = None,
