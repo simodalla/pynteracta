@@ -443,11 +443,17 @@ def test_google_login_pages() -> None:
     """Le pagine pubbliche descrivono il login Google dal browser (spec 10)."""
     auth = (_ROOT / "docs" / "authentication.md").read_text(encoding="utf-8")
     assert "does **not** run any Google sign-in" not in auth
-    for needle in ("auth login --google", "pynteracta[google]", "auth status"):
+    for needle in (
+        "auth login --google",
+        "pynteracta[google]",
+        "auth status",
+        "--google-client-file",
+    ):
         assert needle in auth, f"'{needle}' missing from docs/authentication.md"
     cli = (_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
     for needle in (
         "--google-client-id",
+        "--google-client-file",
         "--client-secret-stdin",
         "--replace-client-secret",
         "--no-browser",

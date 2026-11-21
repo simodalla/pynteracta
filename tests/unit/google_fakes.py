@@ -12,6 +12,8 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -117,6 +119,34 @@ def userinfo_response(email: str | None = EMAIL) -> httpx.Response:
     if email is not None:
         body["email"] = email
     return httpx.Response(200, json=body)
+
+
+def client_file_data(
+    *,
+    section: str = "installed",
+    client_id: str | None = CLIENT_ID,
+    client_secret: str | None = CLIENT_SECRET,
+    project_id: str = "example-project",
+) -> dict[str, object]:
+    """Contenuto del JSON del client OAuth come lo fa scaricare la console Google."""
+    body: dict[str, object] = {
+        "project_id": project_id,
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "redirect_uris": ["http://localhost"],
+    }
+    if client_id is not None:
+        body["client_id"] = client_id
+    if client_secret is not None:
+        body["client_secret"] = client_secret
+    return {section: body}
+
+
+def write_client_file(path: Path, **kwargs: Any) -> Path:
+    """Scrive in ``path`` il JSON del client (argomenti di :func:`client_file_data`)."""
+    path.write_text(json.dumps(client_file_data(**kwargs)), encoding="utf-8")
+    return path
 
 
 class FakeBrowser:

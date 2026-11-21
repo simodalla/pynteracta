@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -83,6 +83,15 @@ def login(  # noqa: PLR0913
             help="OAuth client id for the browser sign-in (saved in the profile).",
         ),
     ] = None,
+    google_client_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--google-client-file",
+            metavar="PATH",
+            help="OAuth client JSON downloaded from the Google Cloud console (Desktop app): "
+            "client id and secret are read from it; the path is not saved.",
+        ),
+    ] = None,
     client_secret_stdin: Annotated[
         bool,
         typer.Option(
@@ -127,6 +136,7 @@ def login(  # noqa: PLR0913
         name
         for name, given in (
             ("--google-client-id", google_client_id is not None),
+            ("--google-client-file", google_client_file is not None),
             ("--client-secret-stdin", client_secret_stdin),
             ("--replace-client-secret", replace_client_secret),
             ("--no-browser", no_browser),
@@ -152,6 +162,9 @@ def login(  # noqa: PLR0913
             f"{', '.join(integrated)} cannot be combined with a static Google token; {hint}",
             err=True,
         )
+        raise typer.Exit(2)
+    if google_client_file is not None and client_secret_stdin:
+        typer.echo("--google-client-file cannot be combined with --client-secret-stdin.", err=True)
         raise typer.Exit(2)
 
     # Resolve connection info BEFORE writing the partial profile (load_config validates
@@ -183,6 +196,7 @@ def login(  # noqa: PLR0913
             base_profile=base_profile,
             options=_BrowserLoginOptions(
                 client_id=google_client_id,
+                client_file=google_client_file,
                 secret_from_stdin=client_secret_stdin,
                 replace_secret=replace_client_secret,
                 open_browser=not no_browser,
@@ -203,6 +217,7 @@ def login(  # noqa: PLR0913
 @dataclass(frozen=True)
 class _BrowserLoginOptions:
     client_id: str | None
+    client_file: Path | None
     secret_from_stdin: bool
     replace_secret: bool
     open_browser: bool
@@ -252,6 +267,17 @@ def _login_google_browser(
 ) -> None:
     """Login integrato: id del client, portachiavi e secret controllati prima del browser."""
     overrides = _browser_login_overrides(state, effective_profile, base_profile)
+    if options.client_file is not None:
+        # Id e secret dal file del client: li legge e li controlla login(), prima della rete.
+        _run_browser_login(
+            console,
+            state,
+            effective_profile,
+            overrides,
+            options,
+            client_id=options.client_id,
+            secret=None,
+        )
     try:
         target = resolve_profile(effective_profile, state.config_file, overrides=overrides)
         client_id = options.client_id or target.google_client_id
@@ -261,6 +287,21 @@ def _login_google_browser(
     except InteractaError as exc:
         raise handle_error(exc, console=console) from exc
     secret = _read_client_secret(options, stored)
+    _run_browser_login(
+        console, state, effective_profile, overrides, options, client_id=client_id, secret=secret
+    )
+
+
+def _run_browser_login(  # noqa: PLR0913
+    console: Console,
+    state: CliState,
+    effective_profile: str,
+    overrides: dict[str, Any],
+    options: _BrowserLoginOptions,
+    *,
+    client_id: str | None,
+    secret: str | None,
+) -> NoReturn:
     try:
         result = google_login.login(
             effective_profile,
@@ -268,6 +309,7 @@ def _login_google_browser(
             overrides=overrides,
             client_id=client_id,
             client_secret=secret,
+            client_file=options.client_file,
             replace_client_secret=options.replace_secret,
             open_browser=options.open_browser,
             timeout=options.timeout,

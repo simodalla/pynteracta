@@ -10,6 +10,7 @@ modulo scrive sullo standard output, e nessun log contiene token, segreti o l'em
 from __future__ import annotations
 
 import json
+import os
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -143,6 +144,8 @@ _NOT_LINKED = (
     "The Google account is not linked to an Interacta user: ask the tenant administrator "
     "to link it, then sign in again."
 )
+_FILE_WITH_SECRET = "client_file and client_secret cannot be used together."
+_FILE_ID_MISMATCH = "--google-client-id does not match the client_id in --google-client-file."
 _HTTP_401 = 401
 
 
@@ -222,6 +225,7 @@ def login(  # noqa: PLR0913
     overrides: dict[str, Any] | None = None,
     client_id: str | None = None,
     client_secret: str | None = None,
+    client_file: str | os.PathLike[str] | None = None,
     replace_client_secret: bool = False,
     open_browser: bool = True,
     timeout: float = 300.0,
@@ -233,6 +237,9 @@ def login(  # noqa: PLR0913
     Senza ``profile_name`` lavora sul profilo corrente di ``config.toml``. ``client_id``
     sostituisce quello del profilo; ``client_secret`` quello salvato, che è usato se il
     parametro manca (``replace_client_secret=True`` lo ignora e richiede il parametro).
+    ``client_file`` è il percorso del JSON del client "Desktop app" scaricato dalla console
+    Google: id e secret si leggono da lì, prima di ogni richiesta, e il secret vale come valore
+    nuovo; il percorso non è salvato e il file non è modificato.
     L'indirizzo di consenso è aperto nel browser; se il browser non si apre, o con
     ``open_browser=False``, è passato a ``on_auth_url``. La funzione non scrive sullo standard
     output.
@@ -243,12 +250,21 @@ def login(  # noqa: PLR0913
 
     Raises:
         ConfigurationError: id del client, client secret, extra ``pynteracta[google]`` o
-            portachiavi mancanti; profilo senza indirizzo del tenant. Nessuna richiesta di rete.
+            portachiavi mancanti; profilo senza indirizzo del tenant; file del client non valido,
+            insieme a ``client_secret`` o con un ``client_id`` diverso. Nessuna richiesta di rete.
         AuthenticationError: consenso negato, ``state`` diverso, timeout, risposta senza refresh
             token, client secret rifiutato, account non collegato a un utente Interacta.
         TransportError: timeout o errore di rete verso Google o Interacta.
     """
     name, profile = _resolve(profile_name, config_file, overrides)
+    if client_file is not None:
+        if client_secret is not None:
+            raise ConfigurationError(_FILE_WITH_SECRET)
+        oauth_client = google_oauth.read_client_file(client_file)
+        if client_id is not None and client_id != oauth_client.client_id:
+            raise ConfigurationError(_FILE_ID_MISMATCH)
+        client_id = oauth_client.client_id
+        client_secret = oauth_client.client_secret
     client_id = client_id or profile.google_client_id
     if not client_id:
         raise ConfigurationError(NO_CLIENT_ID)

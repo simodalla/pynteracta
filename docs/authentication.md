@@ -145,6 +145,24 @@ The command checks the client id, the extra and the keychain before any network 
    `google_client_id`; in the keychain the session (refresh token, the Google account email,
    the sign-in date) and the client secret.
 
+**Using the client JSON file**
+
+The Google Cloud console lets you download the OAuth client as a JSON file
+(`client_secret_<id>.json`). Pass it with `--google-client-file` instead of
+`--google-client-id` and the prompt:
+
+```bash
+pynteracta --base-url https://interacta.example.it auth login --google \
+  --google-client-file ~/Downloads/client_secret_000000000000-example.apps.googleusercontent.com.json
+```
+
+The client id goes in the profile and the client secret in the keychain, as above, and only if
+the sign-in succeeds; the secret from the file replaces a saved one. The path is not saved and
+`pynteracta` does not modify the file: **delete it after the sign-in**, since it holds the
+secret in plain text. Only "Desktop app" clients are accepted (a file with a `web` section is
+refused with exit code `2`); the file cannot be combined with `--client-secret-stdin` or with a
+different `--google-client-id`. From Python: `google_login.login("prod", client_file=path)`.
+
 If any step fails (consent denied, timeout, wrong client secret, account not linked to an
 Interacta user) nothing is saved. Without `--profile` the current profile of `config.toml` is
 used, the same one the other commands read. A new sign-in replaces the previous session of the
@@ -217,7 +235,8 @@ In the Google Cloud console of your Workspace organization:
    accounts of your domain can sign in; the only scope needed is `email`;
 2. create an OAuth client ID of type **Desktop app**;
 3. distribute the client id (it is not a secret) and the client secret to the people who sign
-   in; the secret is entered once and stays in each person's keychain.
+   in, or the downloaded JSON file for `--google-client-file`; the secret is entered once and
+   stays in each person's keychain.
 
 **Secrets**
 
@@ -259,9 +278,9 @@ pynteracta --base-url https://interacta.example.it auth login --google-token "ya
 With a static token `auth login --google` persists only `auth_method = "google_oauth2"` to the
 profile and does not touch the keychain; the **Google access token is never written to
 `config.toml`**. Supply it each session via `PYNTERACTA_GOOGLE_OAUTH2_TOKEN` or
-`--google-token`. The browser sign-in options (`--google-client-id`, `--client-secret-stdin`,
-`--replace-client-secret`, `--no-browser`, `--login-timeout`) cannot be combined with a static
-token.
+`--google-token`. The browser sign-in options (`--google-client-id`, `--google-client-file`,
+`--client-secret-stdin`, `--replace-client-secret`, `--no-browser`, `--login-timeout`) cannot
+be combined with a static token.
 
 Any standard Google OAuth2 mechanism can mint the token, as long as it includes the `email`
 scope and belongs to an Interacta-linked Google identity: the

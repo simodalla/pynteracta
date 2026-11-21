@@ -34,6 +34,7 @@ from google_fakes import (
     save_session,
     token_response,
     userinfo_response,
+    write_client_file,
 )
 from structlog.testing import capture_logs
 
@@ -909,3 +910,140 @@ class TestNoSecretsLeak:
             assert all("method" in e for e in requests)
             assert all("status" in e for e in responses)
         assert all(e.get("body") is None for e in google_events)
+
+
+FILE_CLIENT_ID = "111111111111-example-file.apps.googleusercontent.com"
+FILE_SECRET = "GOCSPX-example-from-file"
+
+
+class TestLoginClientFile:
+    # criterio: 10-C45, 10-C42
+    def test_login_with_client_file(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(
+            tmp_path / "client.json", client_id=FILE_CLIENT_ID, client_secret=FILE_SECRET
+        )
+        file_bytes = client_file.read_bytes()
+        memory_keychain.set(client_secret_entry(FILE_CLIENT_ID), "GOCSPX-example-A")
+        routes = mock_login_flow(google_mock)
+        config_file = write_config(tmp_path, client_id=None)
+        result = google_login.login(config_file=config_file, client_file=client_file)
+        browser.join()
+        assert result.user_name == "Maria Rossi"
+        assert f"client_id={FILE_CLIENT_ID}" in urllib.parse.unquote(browser.urls[0])
+        form = _form(routes["token"].calls[0])
+        assert (form["client_id"], form["client_secret"]) == (FILE_CLIENT_ID, FILE_SECRET)
+        assert memory_keychain.get(client_secret_entry(FILE_CLIENT_ID)) == FILE_SECRET
+        assert session_entry(API_BASE, "default") in memory_keychain.entries
+        assert load_config(config_file).profiles["default"].google_client_id == FILE_CLIENT_ID
+        assert str(client_file) not in config_file.read_text(encoding="utf-8")
+        assert "client.json" not in config_file.read_text(encoding="utf-8")
+        assert client_file.read_bytes() == file_bytes
+
+    # criterio: 10-C42
+    def test_file_wins_over_profile_client_id(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(
+            tmp_path / "client.json", client_id=FILE_CLIENT_ID, client_secret=FILE_SECRET
+        )
+        mock_login_flow(google_mock)
+        config_file = write_config(tmp_path)  # profilo con CLIENT_ID
+        google_login.login(config_file=config_file, client_file=client_file)
+        browser.join()
+        assert load_config(config_file).profiles["default"].google_client_id == FILE_CLIENT_ID
+
+    # criterio: 10-C42
+    def test_failed_login_leaves_everything_unchanged(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(
+            tmp_path / "client.json", client_id=FILE_CLIENT_ID, client_secret=FILE_SECRET
+        )
+        memory_keychain.set(client_secret_entry(FILE_CLIENT_ID), "GOCSPX-example-A")
+        config_file = write_config(tmp_path)
+        before = _state(config_file, memory_keychain)
+        google_mock.post(google_oauth.TOKEN_URL).mock(
+            return_value=error_response("invalid_client", status=401)
+        )
+        with pytest.raises(AuthenticationError):
+            google_login.login(config_file=config_file, client_file=client_file)
+        browser.join()
+        assert _state(config_file, memory_keychain) == before
+
+    # criterio: 10-C45, 10-C43
+    def test_invalid_file(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json", section="web")
+        with pytest.raises(ConfigurationError, match="Desktop app"):
+            google_login.login(config_file=write_config(tmp_path), client_file=client_file)
+        assert not browser.called
+        assert google_mock.calls.call_count == 0
+
+    # criterio: 10-C45, 10-C44
+    def test_file_and_secret_together(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json")
+        with pytest.raises(ConfigurationError, match="client_file"):
+            google_login.login(
+                config_file=write_config(tmp_path),
+                client_file=client_file,
+                client_secret=CLIENT_SECRET,
+            )
+        assert not browser.called
+        assert google_mock.calls.call_count == 0
+
+    # criterio: 10-C44
+    def test_mismatching_client_id(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json", client_id=FILE_CLIENT_ID)
+        with pytest.raises(ConfigurationError, match="does not match"):
+            google_login.login(
+                config_file=write_config(tmp_path), client_file=client_file, client_id=CLIENT_ID
+            )
+        assert not browser.called
+        assert google_mock.calls.call_count == 0
+
+    # criterio: 10-C44
+    def test_matching_client_id(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        browser: FakeBrowser,
+        google_mock: respx.MockRouter,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json")
+        mock_login_flow(google_mock)
+        google_login.login(
+            config_file=write_config(tmp_path), client_file=client_file, client_id=CLIENT_ID
+        )
+        browser.join()
+        assert memory_keychain.get(client_secret_entry(CLIENT_ID)) == CLIENT_SECRET

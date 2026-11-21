@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
+import os
 import re
 import secrets
 import socketserver
@@ -16,13 +18,19 @@ import time
 import urllib.parse
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from types import TracebackType
 from typing import Any
 
 import httpx
 import structlog
 
-from pynteracta.exceptions import AuthenticationError, InteractaError, ServerError
+from pynteracta.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    InteractaError,
+    ServerError,
+)
 from pynteracta.transport import HttpTransport
 
 _log = structlog.get_logger("pynteracta.google_oauth")
@@ -359,3 +367,62 @@ class LoopbackReceiver:
         tb: TracebackType | None,
     ) -> None:
         self.close()
+
+
+@dataclass(frozen=True)
+class OAuthClient:
+    """Id e secret di un client OAuth "Desktop app"; il secret resta fuori dal ``repr``."""
+
+    client_id: str
+    client_secret: str = field(repr=False)
+
+
+_FILE_NOT_JSON = "The OAuth client file is not valid JSON."
+_FILE_NOT_DESKTOP = (
+    'The OAuth client file is not for a "Desktop app" client: create one of that type in the '
+    "Google Cloud console."
+)
+
+
+def _parse_client_file(raw: bytes) -> OAuthClient | str:
+    """Il client contenuto nel file, oppure il messaggio d'errore (mai con il contenuto)."""
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return _FILE_NOT_JSON
+    installed = data.get("installed") if isinstance(data, dict) else None
+    if not isinstance(installed, dict):
+        return _FILE_NOT_DESKTOP
+    client_id = installed.get("client_id")
+    if not isinstance(client_id, str) or not client_id.strip():
+        return "The OAuth client file has no client_id."
+    client_secret = installed.get("client_secret")
+    if not isinstance(client_secret, str) or not client_secret.strip():
+        return "The OAuth client file has no client_secret."
+    return OAuthClient(client_id=client_id.strip(), client_secret=client_secret.strip())
+
+
+def read_client_file(path: str | os.PathLike[str]) -> OAuthClient:
+    """Legge id e secret dal JSON del client scaricato dalla console Google.
+
+    Accetta solo i client "Desktop app" (sezione ``installed``). Il file non è modificato e il
+    suo contenuto non compare mai nei messaggi d'errore né nella catena delle eccezioni.
+
+    Raises:
+        ConfigurationError: file illeggibile, non JSON, non di un client "Desktop app", senza
+            ``client_id`` o senza ``client_secret``.
+    """
+    # Gli errori si sollevano fuori dai blocchi ``except``: così né ``__cause__`` né
+    # ``__context__`` portano con sé il documento letto o l'eccezione del parser.
+    error: str | None = None
+    raw = b""
+    try:
+        raw = Path(path).read_bytes()
+    except OSError as exc:
+        error = f"Cannot read the OAuth client file: {type(exc).__name__}."
+    if error is None:
+        parsed = _parse_client_file(raw)
+        if isinstance(parsed, OAuthClient):
+            return parsed
+        error = parsed
+    raise ConfigurationError(error)

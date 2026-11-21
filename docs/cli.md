@@ -186,6 +186,15 @@ The client secret is asked once with a hidden prompt (or read from stdin with
 `--client-secret-stdin`) and kept in the keychain; the profile and the keychain are written
 only after Interacta accepted the sign-in. Later commands renew the token on their own.
 
+Instead of the id and the prompt you can pass the JSON file that the Google Cloud console lets
+you download for a "Desktop app" client; id and secret are read from it once, and the file can
+be deleted after the sign-in:
+
+```bash
+pynteracta --base-url https://interacta.example.it auth login --google \
+  --google-client-file ~/Downloads/client_secret_000000000000-example.apps.googleusercontent.com.json
+```
+
 **Google OAuth2, static token** — with `--google-token` or `$PYNTERACTA_GOOGLE_OAUTH2_TOKEN`
 the command persists only `auth_method = "google_oauth2"`; the token is **never written to
 disk** and the keychain is not used:
@@ -205,15 +214,16 @@ pynteracta --base-url https://interacta.example.it auth login --google-token "ya
 | `--google-token TOKEN` | Static Google access token (implies `--google`). |
 | `--profile NAME` | Profile to update (default: current profile). |
 | `--google-client-id ID` | OAuth client id for the browser sign-in; saved in the profile as `google_client_id`. |
+| `--google-client-file PATH` | Read the client id and secret from the JSON downloaded from the Google Cloud console ("Desktop app" clients only). The path is not saved and the file is left as it is. Not combinable with `--client-secret-stdin` or with a different `--google-client-id`. |
 | `--client-secret-stdin` | Read the OAuth client secret from the first line of stdin (scripts). There is no option taking the secret as a value. |
 | `--replace-client-secret` | Ask for the client secret again even if one is saved; it replaces the old one only if the sign-in succeeds. |
 | `--no-browser` | Print the sign-in URL instead of opening the browser. |
 | `--login-timeout SECONDS` | How long to wait for the browser sign-in (default 300). |
 
-The last five options belong to the browser sign-in: combined with a static token (flag or
+The last six options belong to the browser sign-in: combined with a static token (flag or
 environment variable) they are a usage error (exit code `2`). Exit codes: `2` for missing
 configuration (no `google_client_id`, no `pynteracta[google]`, no system keychain, no client
-secret in a non-interactive run), `3` when the sign-in fails (consent denied, timeout, Google
+secret in a non-interactive run, an unreadable or invalid client file), `3` when the sign-in fails (consent denied, timeout, Google
 account not linked to an Interacta user), `7` for network errors.
 
 See [Authentication → Google OAuth2](authentication.md#google-oauth2) for the requirements,

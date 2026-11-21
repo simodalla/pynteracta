@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
+import re
 import socket
 import urllib.parse
 from collections.abc import Iterator
+from pathlib import Path
 
 import httpx
 import pytest
@@ -23,11 +26,17 @@ from google_fakes import (
     error_response,
     token_response,
     userinfo_response,
+    write_client_file,
 )
 from structlog.testing import capture_logs
 
 from pynteracta import google_oauth
-from pynteracta.exceptions import AuthenticationError, ServerError, TransportError
+from pynteracta.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    ServerError,
+    TransportError,
+)
 from pynteracta.transport import HttpTransport
 
 _SHORT = 0.3
@@ -415,3 +424,86 @@ class TestRevoke:
         google_mock.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(503))
         with pytest.raises(ServerError):
             google_oauth.revoke(transport, REFRESH_TOKEN)
+
+
+S_FILE_SECRET = "GOCSPX-sentinel-file-secret"
+S_FILE_PROJECT = "sentinel-file-project"
+
+
+def _no_file_content(err: BaseException) -> None:
+    """Il messaggio e la catena dell'eccezione non portano il contenuto del file."""
+    assert err.__cause__ is None
+    assert err.__context__ is None
+    for text in (str(err), repr(err), repr(err.args)):
+        assert S_FILE_SECRET not in text
+        assert S_FILE_PROJECT not in text
+        assert CLIENT_ID not in text
+
+
+class TestReadClientFile:
+    # criterio: 10-C42
+    def test_desktop_client(self, tmp_path: Path) -> None:
+        path = write_client_file(tmp_path / "client.json")
+        client = google_oauth.read_client_file(path)
+        assert client.client_id == CLIENT_ID
+        assert client.client_secret == CLIENT_SECRET
+        assert CLIENT_SECRET not in repr(client)
+
+    # criterio: 10-C42
+    def test_accepts_str_path(self, tmp_path: Path) -> None:
+        path = write_client_file(tmp_path / "client.json")
+        assert google_oauth.read_client_file(str(path)).client_id == CLIENT_ID
+
+    # criterio: 10-C43
+    @pytest.mark.parametrize(
+        ("content", "reason"),
+        [
+            (None, "Cannot read the OAuth client file"),
+            ('{"installed": {"client_secret": "GOCSPX-sentinel-file-secret", ', "not valid JSON"),
+            ('["GOCSPX-sentinel-file-secret"]', '"Desktop app"'),
+            ("web", '"Desktop app"'),
+            ("no_id", "no client_id"),
+            ("no_secret", "no client_secret"),
+            ("empty_secret", "no client_secret"),
+            ('{"installed": "GOCSPX-sentinel-file-secret"}', '"Desktop app"'),
+        ],
+    )
+    def test_invalid_file(self, tmp_path: Path, content: str | None, reason: str) -> None:
+        path = tmp_path / "client.json"
+        cases = {
+            "web": {"section": "web"},
+            "no_id": {"client_id": None},
+            "no_secret": {"client_secret": None},
+            "empty_secret": {"client_secret": ""},
+        }
+        if content in cases:
+            kwargs: dict[str, object] = {
+                "client_secret": S_FILE_SECRET,
+                "project_id": S_FILE_PROJECT,
+            }
+            kwargs.update(cases[content])
+            write_client_file(path, **kwargs)
+        elif content is not None:
+            path.write_text(content, encoding="utf-8")
+        with pytest.raises(ConfigurationError, match=re.escape(reason)) as info:
+            google_oauth.read_client_file(path)
+        _no_file_content(info.value)
+
+    # criterio: 10-C43
+    def test_wrong_types_are_rejected(self, tmp_path: Path) -> None:
+        path = tmp_path / "client.json"
+        path.write_text(
+            json.dumps({"installed": {"client_id": 123, "client_secret": S_FILE_SECRET}}),
+            encoding="utf-8",
+        )
+        with pytest.raises(ConfigurationError, match="no client_id") as info:
+            google_oauth.read_client_file(path)
+        _no_file_content(info.value)
+
+    # criterio: 10-C43
+    def test_not_logged(self, tmp_path: Path) -> None:
+        path = tmp_path / "client.json"
+        write_client_file(path, section="web", client_secret=S_FILE_SECRET)
+        with capture_logs() as logs, pytest.raises(ConfigurationError):
+            google_oauth.read_client_file(path)
+        assert S_FILE_SECRET not in repr(logs)

@@ -28,6 +28,7 @@ from google_fakes import (
     save_session,
     token_response,
     userinfo_response,
+    write_client_file,
 )
 from typer.testing import CliRunner
 
@@ -797,6 +798,7 @@ class TestGlobalFlagPrecedence:
 
 _INTEGRATED_FLAGS = [
     ["--google-client-id", CLIENT_ID],
+    ["--google-client-file", "client.json"],
     ["--client-secret-stdin"],
     ["--replace-client-secret"],
     ["--no-browser"],
@@ -1618,3 +1620,174 @@ class TestAuthLogoutGoogle:
         result = self._logout(runner, config_file)
         assert result.exit_code == 0
         assert result.output == "✓ Token cache cleared for profile 'default'.\n"
+
+
+# ---------------------------------------------------------------------------
+# auth login --google-client-file (spec 10, T21)
+# ---------------------------------------------------------------------------
+
+_FILE_CLIENT_ID = "111111111111-example-file.apps.googleusercontent.com"
+_FILE_SECRET = "GOCSPX-sentinel-cli-file-secret"
+
+
+@pytest.mark.usefixtures("no_prompt")
+class TestAuthLoginClientFile:
+    # criterio: 10-C42
+    @respx.mock
+    def test_login_with_client_file(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+        no_prompt: list[str],
+    ) -> None:
+        routes = _mock_browser_login()
+        client_file = write_client_file(
+            tmp_path / "client_secret.json", client_id=_FILE_CLIENT_ID, client_secret=_FILE_SECRET
+        )
+        file_bytes = client_file.read_bytes()
+        memory_keychain.set(client_secret_entry(_FILE_CLIENT_ID), "GOCSPX-example-A")
+        config_file = _browser_config(tmp_path, client_id=None)
+        result = runner.invoke(
+            app,
+            [
+                "--config-file",
+                str(config_file),
+                "auth",
+                "login",
+                "--google-client-file",
+                str(client_file),
+            ],
+        )
+        fake_browser.join()
+        assert result.exit_code == 0, result.output
+        assert "✓ Authenticated as: Maria Rossi" in result.output
+        assert no_prompt == []
+        form = dict(urllib.parse.parse_qsl(routes["token"].calls[0].request.content.decode()))
+        assert (form["client_id"], form["client_secret"]) == (_FILE_CLIENT_ID, _FILE_SECRET)
+        assert load_config(config_file).profiles["default"].google_client_id == _FILE_CLIENT_ID
+        assert memory_keychain.get(client_secret_entry(_FILE_CLIENT_ID)) == _FILE_SECRET
+        assert "client_secret.json" not in config_file.read_text(encoding="utf-8")
+        assert client_file.read_bytes() == file_bytes
+        assert _FILE_SECRET not in result.output
+
+    # criterio: 10-C42
+    @respx.mock
+    def test_failed_login_leaves_everything_unchanged(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+    ) -> None:
+        respx.post(google_oauth.TOKEN_URL).mock(
+            return_value=error_response("invalid_client", status=401)
+        )
+        client_file = write_client_file(
+            tmp_path / "client.json", client_id=_FILE_CLIENT_ID, client_secret=_FILE_SECRET
+        )
+        memory_keychain.set(client_secret_entry(_FILE_CLIENT_ID), "GOCSPX-example-A")
+        config_file = _browser_config(tmp_path)
+        before = _snapshot(config_file, memory_keychain)
+        result = _login(runner, config_file, "--google-client-file", str(client_file))
+        fake_browser.join()
+        assert result.exit_code == EXIT_AUTH, result.output
+        assert _snapshot(config_file, memory_keychain) == before
+
+    # criterio: 10-C43
+    @respx.mock
+    @pytest.mark.parametrize("case", ["missing", "not_json", "web", "no_secret"])
+    def test_invalid_file_exits_2(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+        case: str,
+    ) -> None:
+        client_file = tmp_path / "client.json"
+        if case == "not_json":
+            client_file.write_text(f'{{"installed": {{"client_secret": "{_FILE_SECRET}"', "utf-8")
+        elif case == "web":
+            write_client_file(client_file, section="web", client_secret=_FILE_SECRET)
+        elif case == "no_secret":
+            write_client_file(client_file, client_secret=None)
+        config_file = _browser_config(tmp_path)
+        before = _snapshot(config_file, memory_keychain)
+        result = _login(runner, config_file, "--google-client-file", str(client_file))
+        assert result.exit_code == EXIT_CONFIG, result.output
+        assert "OAuth client file" in result.output
+        assert _FILE_SECRET not in result.output
+        assert not fake_browser.called
+        assert respx.calls.call_count == 0
+        assert _snapshot(config_file, memory_keychain) == before
+
+    # criterio: 10-C44
+    @respx.mock
+    def test_with_client_secret_stdin_exits_2(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json")
+        result = _login(
+            runner,
+            _browser_config(tmp_path),
+            "--google-client-file",
+            str(client_file),
+            "--client-secret-stdin",
+            stdin=CLIENT_SECRET + "\n",
+        )
+        assert result.exit_code == EXIT_CONFIG, result.output
+        assert "--google-client-file" in result.output
+        assert "--client-secret-stdin" in result.output
+        assert not fake_browser.called
+        assert respx.calls.call_count == 0
+
+    # criterio: 10-C44
+    @respx.mock
+    def test_with_different_client_id_exits_2(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+    ) -> None:
+        client_file = write_client_file(tmp_path / "client.json", client_id=_FILE_CLIENT_ID)
+        result = _login(
+            runner,
+            _browser_config(tmp_path),
+            "--google-client-file",
+            str(client_file),
+            "--google-client-id",
+            CLIENT_ID,
+        )
+        assert result.exit_code == EXIT_CONFIG, result.output
+        assert "does not match" in result.output
+        assert not fake_browser.called
+        assert respx.calls.call_count == 0
+
+    # criterio: 10-C44
+    @respx.mock
+    def test_with_same_client_id(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        fake_browser: FakeBrowser,
+    ) -> None:
+        _mock_browser_login()
+        client_file = write_client_file(tmp_path / "client.json")
+        result = _login(
+            runner,
+            _browser_config(tmp_path),
+            "--google-client-file",
+            str(client_file),
+            "--google-client-id",
+            CLIENT_ID,
+        )
+        fake_browser.join()
+        assert result.exit_code == 0, result.output

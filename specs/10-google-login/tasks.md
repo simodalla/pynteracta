@@ -381,7 +381,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. `uv run mkdocs build --strict`; controlli bloccanti; commit `docs: login Google dal
      browser (10-T17)`.
 
-### [ ] T21 – Id e secret del client dal file JSON della console
+### [x] T21 – Id e secret del client dal file JSON della console
 
 - Criteri: 10-C42, 10-C43, 10-C44, 10-C45
 - Dipende da: T13, T17
