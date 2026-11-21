@@ -7,6 +7,7 @@ tiene le voci in un dizionario, ``FakeBrowser`` segue il redirect verso il liste
 
 from __future__ import annotations
 
+import json
 import threading
 import urllib.error
 import urllib.parse
@@ -14,7 +15,8 @@ import urllib.request
 
 import httpx
 
-from pynteracta.keychain import Keychain
+from pynteracta.keychain import Keychain, client_secret_entry, session_entry
+from pynteracta.urls import build_api_base
 
 # Valori finti e riconoscibili (regola "Segreti fuori dal repository").
 CLIENT_ID = "000000000000-example.apps.googleusercontent.com"
@@ -59,6 +61,29 @@ class MemoryKeychain(Keychain):
 
 AUTH_CODE = "4/example-authorization-code"
 ID_TOKEN = "eyJexample.id-token.signature"
+BASE = "https://api.example.com"
+API_BASE = build_api_base(BASE, "/portal", 2)
+LOGIN_AT = "2026-11-21T09:00:00+00:00"
+
+
+def save_session(  # noqa: PLR0913
+    kc: MemoryKeychain,
+    profile_name: str = "default",
+    *,
+    refresh_token: str = REFRESH_TOKEN,
+    email: str | None = EMAIL,
+    api_base: str = API_BASE,
+    secret: str | None = CLIENT_SECRET,
+) -> str:
+    """Scrive nel portachiavi finto una sessione come la scrive ``login()``."""
+    entry = session_entry(api_base, profile_name)
+    kc.set(
+        entry,
+        json.dumps({"refresh_token": refresh_token, "email": email, "login_at": LOGIN_AT}),
+    )
+    if secret is not None:
+        kc.set(client_secret_entry(CLIENT_ID), secret)
+    return entry
 
 
 def token_response(

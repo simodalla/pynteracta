@@ -152,12 +152,14 @@ class GoogleOAuth2Credentials:
 
     Supply **exactly one** of:
 
-    - ``token``: a static Google OAuth2 access token (min scope ``profile``), or
-    - ``token_provider``: a callable returning a fresh Google access token on demand.
+    - ``token``: un access token Google statico (scope minimo ``email``), oppure
+    - ``token_provider``: una funzione che restituisce un access token Google aggiornato.
 
-    The library never runs a Google browser/PKCE flow; obtaining the Google access token is
-    the caller's responsibility (see ``docs/authentication.md``).  The Google identity must
-    already be linked to an Interacta user.
+    Il login dal browser (``pynteracta auth login --google`` o
+    :func:`pynteracta.google_login.login`) salva una sessione nel portachiavi di sistema;
+    ``InteractaClient`` costruito da quel profilo usa da solo
+    :class:`~pynteracta.google_login.GoogleSessionTokenProvider` come ``token_provider``.
+    L'identità Google deve essere già collegata a un utente Interacta.
     """
 
     token: str | None = None

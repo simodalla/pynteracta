@@ -12,25 +12,23 @@ import pytest
 import respx
 from google_fakes import (
     ACCESS_TOKEN,
+    BASE,
     CLIENT_ID,
     CLIENT_SECRET,
     EMAIL,
+    LOGIN_AT,
     REFRESH_TOKEN,
     MemoryKeychain,
     error_response,
+    save_session,
     token_response,
 )
 
 from pynteracta import google_login, google_oauth
 from pynteracta.config import Profile
 from pynteracta.exceptions import AuthenticationError, TransportError
-from pynteracta.keychain import client_secret_entry, session_entry
+from pynteracta.keychain import client_secret_entry
 from pynteracta.transport import HttpTransport
-from pynteracta.urls import build_api_base
-
-BASE = "https://api.example.com"
-API_BASE = build_api_base(BASE, "/portal", 2)
-LOGIN_AT = "2026-11-21T09:00:00+00:00"
 
 
 def _profile(**kwargs: object) -> Profile:
@@ -42,26 +40,6 @@ def _profile(**kwargs: object) -> Profile:
     }
     data.update(kwargs)
     return Profile.model_validate(data)
-
-
-def save_session(  # noqa: PLR0913
-    kc: MemoryKeychain,
-    profile_name: str = "default",
-    *,
-    refresh_token: str = REFRESH_TOKEN,
-    email: str | None = EMAIL,
-    api_base: str = API_BASE,
-    secret: str | None = CLIENT_SECRET,
-) -> str:
-    """Scrive nel portachiavi finto una sessione come la scrive ``login()``."""
-    entry = session_entry(api_base, profile_name)
-    kc.set(
-        entry,
-        json.dumps({"refresh_token": refresh_token, "email": email, "login_at": LOGIN_AT}),
-    )
-    if secret is not None:
-        kc.set(client_secret_entry(CLIENT_ID), secret)
-    return entry
 
 
 @pytest.fixture

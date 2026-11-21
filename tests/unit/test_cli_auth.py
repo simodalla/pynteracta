@@ -11,8 +11,10 @@ import jwt
 import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, mock_json
+from google_fakes import CLIENT_ID, MemoryKeychain, error_response, save_session, token_response
 from typer.testing import CliRunner
 
+from pynteracta import google_oauth
 from pynteracta.auth import CachedToken, FileTokenCache, MemoryTokenCache, build_cache_key
 from pynteracta.cli import app
 from pynteracta.cli._common import (
@@ -21,6 +23,7 @@ from pynteracta.cli._common import (
     EXIT_NOT_FOUND,
     EXIT_PERMISSION,
     EXIT_SERVER,
+    EXIT_TRANSPORT,
     EXIT_VALIDATION,
 )
 from pynteracta.config import load_config
@@ -615,6 +618,77 @@ class TestAuthLogout:
         result = runner.invoke(app, ["--config-file", str(config_file), "auth", "logout"])
         assert result.exit_code == 0
         assert list(cache_dir.glob("*.token.json")) == []
+
+
+def _google_config_file(tmp_path: Path, name: str = "default") -> Path:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        f'current_profile = "{name}"\n\n[profiles.{name}]\n'
+        'base_url = "https://api.example.com"\nauth_method = "google_oauth2"\n'
+        f'google_client_id = "{CLIENT_ID}"\ntoken_cache = "memory"\n',
+        encoding="utf-8",
+    )
+    return config_file
+
+
+class TestGoogleSessionCommands:
+    """Un comando qualunque usa la sessione salvata, senza variabili d'ambiente."""
+
+    # criterio: 10-C14
+    @respx.mock
+    def test_whoami_with_session(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        token_route = respx.post(google_oauth.TOKEN_URL).mock(
+            return_value=token_response(refresh_token=None)
+        )
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _fake_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        result = runner.invoke(
+            app, ["--config-file", str(_google_config_file(tmp_path)), "auth", "whoami"]
+        )
+        assert result.exit_code == 0, result.output
+        assert token_route.call_count == 1
+
+    # criterio: 10-C18
+    def test_whoami_without_session_exits_3(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        result = runner.invoke(
+            app, ["--config-file", str(_google_config_file(tmp_path)), "auth", "whoami"]
+        )
+        assert result.exit_code == EXIT_AUTH
+        assert "auth login --google" in result.output
+
+    # criterio: 10-C19
+    @respx.mock
+    def test_invalid_grant_exits_3(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        respx.post(google_oauth.TOKEN_URL).mock(return_value=error_response("invalid_grant"))
+        result = runner.invoke(
+            app, ["--config-file", str(_google_config_file(tmp_path)), "auth", "whoami"]
+        )
+        assert result.exit_code == EXIT_AUTH
+
+    # criterio: 10-C21
+    @respx.mock
+    def test_network_error_exits_7(
+        self, runner: CliRunner, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        route = respx.post(google_oauth.TOKEN_URL).mock(side_effect=httpx.ConnectError("x"))
+        result = runner.invoke(
+            app, ["--config-file", str(_google_config_file(tmp_path)), "auth", "whoami"]
+        )
+        assert result.exit_code == EXIT_TRANSPORT
+        assert route.call_count == 1
 
 
 class TestExitCodes:

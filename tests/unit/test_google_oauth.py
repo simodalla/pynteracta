@@ -311,6 +311,7 @@ class TestRefreshAccessToken:
             ("unsupported_grant_type", 400, "unsupported_grant_type"),
         ],
     )
+    @pytest.mark.usefixtures("fresh_loggers")
     def test_oauth_errors(  # noqa: PLR0913, PLR0917
         self,
         transport: HttpTransport,

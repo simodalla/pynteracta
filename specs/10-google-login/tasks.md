@@ -208,7 +208,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Controlli bloccanti; commit `feat(auth): rinnovo dell'access token Google dalla sessione
      salvata (10-T09)`.
 
-### [ ] T10 – `InteractaClient` usa la sessione salvata
+### [x] T10 – `InteractaClient` usa la sessione salvata
 
 - Criteri: 10-C14, 10-C15, 10-C16, 10-C17, 10-C18, 10-C40 (sessione); exit code di 10-C19 e
   10-C21

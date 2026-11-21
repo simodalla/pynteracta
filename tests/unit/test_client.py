@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import sys
+import urllib.parse
+import webbrowser
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -11,7 +14,17 @@ import jwt
 import pytest
 import respx
 from api_helpers import BASE_URL, load_payload, mock_json
+from google_fakes import (
+    ACCESS_TOKEN,
+    CLIENT_ID,
+    REFRESH_TOKEN,
+    MemoryKeychain,
+    error_response,
+    save_session,
+    token_response,
+)
 
+from pynteracta import google_oauth, keychain
 from pynteracta.api.catalogs import CatalogsAPI
 from pynteracta.api.communities import CommunitiesAPI
 from pynteracta.auth import GoogleOAuth2TokenManager, build_cache_key, load_service_account_key
@@ -175,13 +188,28 @@ class TestInteractaClientGoogleOAuth2:
             assert isinstance(manager, GoogleOAuth2TokenManager)
             assert manager._profile == build_cache_key(BASE_URL, "prod")
 
-    def test_google_auth_method_without_token_raises(self) -> None:
+    # criterio: 10-C18
+    def test_google_auth_method_without_token_raises(self, memory_keychain: MemoryKeychain) -> None:
+        profile = Profile(
+            base_url="https://api.example.com",  # type: ignore[arg-type]
+            auth_method="google_oauth2",
+            google_client_id=CLIENT_ID,
+        )
+        with pytest.raises(AuthenticationError, match="auth login --google") as info:
+            InteractaClient(profile=profile)
+        assert "pynteracta[google]" not in str(info.value)
+
+    # criterio: 10-C18
+    def test_google_without_keyring_names_the_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "keyring", None)
         profile = Profile(
             base_url="https://api.example.com",  # type: ignore[arg-type]
             auth_method="google_oauth2",
         )
-        with pytest.raises(AuthenticationError, match="no Google access token"):
+        with pytest.raises(AuthenticationError) as info:
             InteractaClient(profile=profile)
+        assert "auth login --google" in str(info.value)
+        assert "pynteracta[google]" in str(info.value)
 
     def test_communities_and_catalogs_wired(self) -> None:
         with InteractaClient("https://api.example.com") as client:
@@ -207,3 +235,190 @@ class TestInteractaClientGoogleOAuth2:
         with InteractaClient(profile=profile) as client:
             assert client._api_transport._audit is True
             assert client._api_transport._audit_bodies is True
+
+
+def _google_profile_file(
+    tmp_path: Path, *, current: str = "default", name: str = "default"
+) -> Path:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        f'current_profile = "{current}"\n\n[profiles.{name}]\n'
+        'base_url = "https://api.example.com"\nauth_method = "google_oauth2"\n'
+        f'google_client_id = "{CLIENT_ID}"\ntoken_cache = "memory"\n',
+        encoding="utf-8",
+    )
+    return config_file
+
+
+def _jwt_expiring_in(seconds: int) -> str:
+    exp = int((datetime.now(tz=UTC) + timedelta(seconds=seconds)).timestamp())
+    return jwt.encode({"sub": "user", "exp": exp, "n": seconds}, "secret", algorithm="HS256")
+
+
+@pytest.fixture
+def no_browser(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    opened: list[str] = []
+    monkeypatch.setattr(webbrowser, "open", lambda url, *a, **k: bool(opened.append(url)))
+    return opened
+
+
+class TestInteractaClientGoogleSession:
+    # criterio: 10-C14
+    @respx.mock
+    def test_session_refresh_then_exchange(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, no_browser: list[str]
+    ) -> None:
+        save_session(memory_keychain)
+        token_route = respx.post(google_oauth.TOKEN_URL).mock(
+            return_value=token_response(refresh_token=None)
+        )
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _access_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        with InteractaClient(
+            profile_name="default", config_file=_google_profile_file(tmp_path)
+        ) as client:
+            client.users.me()
+        form = dict(urllib.parse.parse_qsl(token_route.calls[0].request.content.decode()))
+        assert form["grant_type"] == "refresh_token"
+        assert form["refresh_token"] == REFRESH_TOKEN
+        assert ACCESS_TOKEN.encode() in exchange.calls[0].request.content
+        assert no_browser == []
+
+    # criterio: 10-C15
+    @respx.mock
+    def test_near_expiry_refreshes_and_uses_new_token(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        first, second = _jwt_expiring_in(30), _jwt_expiring_in(3600)
+        token_route = respx.post(google_oauth.TOKEN_URL).mock(
+            return_value=token_response(refresh_token=None)
+        )
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            side_effect=[
+                httpx.Response(200, json={"accessToken": first}),
+                httpx.Response(200, json={"accessToken": second}),
+            ]
+        )
+        me = mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        with InteractaClient(
+            profile_name="default", config_file=_google_profile_file(tmp_path)
+        ) as client:
+            client.users.me()
+            client.users.me()
+        assert token_route.call_count == 2  # noqa: PLR2004
+        assert me.calls[1].request.headers["Authorization"] == f"Bearer {second}"
+
+    # criterio: 10-C16
+    @pytest.mark.parametrize("source", ["explicit", "env"])
+    @respx.mock
+    def test_static_token_wins_over_session(
+        self,
+        tmp_path: Path,
+        memory_keychain: MemoryKeychain,
+        monkeypatch: pytest.MonkeyPatch,
+        source: str,
+    ) -> None:
+        save_session(memory_keychain)
+        token_route = respx.post(google_oauth.TOKEN_URL).mock(return_value=token_response())
+        exchange = respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _access_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        kwargs: dict[str, object] = {}
+        if source == "explicit":
+            kwargs["google_token"] = "static-tok"
+        else:
+            monkeypatch.setenv("PYNTERACTA_GOOGLE_OAUTH2_TOKEN", "static-tok")
+        with InteractaClient(
+            profile_name="default", config_file=_google_profile_file(tmp_path), **kwargs
+        ) as client:
+            client.users.me()
+        assert token_route.call_count == 0
+        assert b"static-tok" in exchange.calls[0].request.content
+
+    # criterio: 10-C17
+    def test_session_bound_to_tenant_and_profile(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        config_file = _google_profile_file(tmp_path)
+        with pytest.raises(AuthenticationError, match="auth login --google"):
+            InteractaClient(
+                profile=Profile(
+                    base_url="https://altro.example.com",  # type: ignore[arg-type]
+                    auth_method="google_oauth2",
+                    google_client_id=CLIENT_ID,
+                    token_cache="memory",
+                ),
+                profile_name="default",
+            )
+        other_dir = tmp_path / "altro"
+        other_dir.mkdir()
+        other = _google_profile_file(other_dir, name="altro", current="altro")
+        assert config_file.exists()
+        with pytest.raises(AuthenticationError, match="auth login --google"):
+            InteractaClient(profile_name="altro", config_file=other)
+
+    # criterio: 10-C17
+    def test_base_url_only_never_opens_keychain(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def _boom() -> None:
+            raise AssertionError("open_keychain must not be called")
+
+        monkeypatch.setattr(keychain, "open_keychain", _boom)
+        with InteractaClient("https://api.example.com") as client:
+            assert client._token_manager is None
+
+    # criterio: 10-C40
+    @respx.mock
+    def test_current_profile_session(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        save_session(memory_keychain, "prod")
+        config_file = _google_profile_file(tmp_path, current="prod", name="prod")
+        monkeypatch.setenv("PYNTERACTA_CONFIG_FILE", str(config_file))
+        respx.post(google_oauth.TOKEN_URL).mock(return_value=token_response(refresh_token=None))
+        respx.post(_GOOGLE_EXCHANGE_URL).mock(
+            return_value=httpx.Response(200, json={"accessToken": _access_token()})
+        )
+        mock_json(
+            "GET", "core/auth/current-user-data", load_payload("current_user_data_response.json")
+        )
+        with InteractaClient() as client:
+            client.users.me()
+            manager = client._token_manager
+            assert isinstance(manager, GoogleOAuth2TokenManager)
+            assert manager._profile == build_cache_key(BASE_URL, "prod")
+
+    def test_close_closes_google_transport(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        client = InteractaClient(profile_name="default", config_file=_google_profile_file(tmp_path))
+        google_transport = client._google_oauth_transport
+        assert google_transport is not None
+        client.close()
+        assert google_transport._client.is_closed
+
+    # criterio: 10-C19
+    @respx.mock
+    def test_invalid_grant_on_first_request(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain
+    ) -> None:
+        save_session(memory_keychain)
+        respx.post(google_oauth.TOKEN_URL).mock(return_value=error_response("invalid_grant"))
+        with (
+            InteractaClient(
+                profile_name="default", config_file=_google_profile_file(tmp_path)
+            ) as client,
+            pytest.raises(AuthenticationError, match="auth login --google"),
+        ):
+            client.users.me()

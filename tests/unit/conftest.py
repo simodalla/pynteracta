@@ -5,11 +5,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import keyring
 import pytest
+import structlog
 from google_fakes import MemoryKeychain
+from keyring.backends import fail
 from typer.testing import CliRunner
 
-from pynteracta import keychain
+from pynteracta import google_login, google_oauth, keychain, transport
 
 
 @pytest.fixture(autouse=True)
@@ -43,12 +46,40 @@ def _no_forced_color(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TERM", "dumb")
 
 
+@pytest.fixture(autouse=True)
+def _no_system_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nessun test unitario legge o scrive il portachiavi reale della postazione (spec 10).
+
+    ``keyring`` restituisce il backend ``fail``, che ``open_keychain`` rifiuta come un sistema
+    senza portachiavi. I test che servono un portachiavi usano ``memory_keychain``.
+    """
+    monkeypatch.setattr(keyring, "get_keyring", fail.Keyring)
+
+
 @pytest.fixture
 def memory_keychain(monkeypatch: pytest.MonkeyPatch) -> MemoryKeychain:
     """Sostituisce il portachiavi di sistema con uno in memoria (spec 10)."""
     kc = MemoryKeychain()
     monkeypatch.setattr(keychain, "open_keychain", lambda: kc)
     return kc
+
+
+@pytest.fixture
+def fresh_loggers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Proxy di log nuovi per i moduli del login Google, per i test con ``capture_logs``.
+
+    I comandi della CLI chiamano ``setup_default_logging``, che configura structlog con
+    ``cache_logger_on_first_use=True``: i proxy di modulo già usati restano legati a quella
+    catena di processori e ``capture_logs`` non li vede più. Proxy nuovi, ripristinati alla fine
+    del test, si legano alla configurazione di ``capture_logs``.
+    """
+    for module, attr, name in (
+        (google_oauth, "_log", "pynteracta.google_oauth"),
+        (google_login, "_log", "pynteracta.google_login"),
+        (transport, "_log", "pynteracta.transport"),
+        (transport, "_audit_log", "pynteracta.audit"),
+    ):
+        monkeypatch.setattr(module, attr, structlog.get_logger(name))
 
 
 @pytest.fixture
