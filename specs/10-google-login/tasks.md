@@ -401,6 +401,19 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   6. Controlli bloccanti e `mkdocs build --strict`; commit `feat(cli): id e secret del client
      Google dal file JSON della console (10-T21)`.
 
+### [ ] T22 – Nota di `auth logout` quando non c'è nulla da revocare o eliminare
+
+- Criteri: 10-C46
+- Dipende da: T15
+- Test: `test_cli_auth.py::TestAuthLogoutNothingToDo`.
+- Passi:
+  1. Scrivere i test; rossi.
+  2. `cli/auth.py::logout`: note per `--revoke` senza sessione e `--forget-client-secret` senza
+     secret, sui profili `google_oauth2` e con service account.
+  3. `docs/cli.md`: una riga sulla nota.
+  4. Controlli bloccanti e `mkdocs build --strict`; commit `feat(cli): auth logout segnala
+     quando non c'è nulla da revocare (10-T22)`.
+
 ### [ ] T18 – Prova reale su macOS e Windows (manuale)
 
 - Criteri: sezione "Verifica manuale" della spec (10-C03, 10-C14, 10-C15, 10-C29 sui sistemi
@@ -423,7 +436,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
 ### [ ] T19 – Chiusura: `CLAUDE.md` e PRD
 
 - Criteri: nessuno (documenti di governo; i "Requisiti nuovi" della spec)
-- Dipende da: T17, T18, T21
+- Dipende da: T17, T18, T21, T22
 - Test: nessuno; si verifica rileggendo il diff e con `uv run pre-commit run --all-files`.
 - Passi:
   1. `CLAUDE.md`: mappa dei moduli (`keychain.py`, `google_oauth.py`, `google_login.py`,
@@ -486,3 +499,4 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
 | 10-C43 | T21 |
 | 10-C44 | T21 |
 | 10-C45 | T21 |
+| 10-C46 | T22 |

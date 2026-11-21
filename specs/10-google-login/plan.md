@@ -168,7 +168,12 @@ CLI, testi in inglese (deroga del `CLAUDE.md`).
   singolo, come `auth whoami`), quindi `--output`, `--full`, `--fields` ed `--export` compongono.
 - `auth logout [--forget-client-secret] [--revoke]`: alla riga di oggi aggiunge `✓ Google
   session removed for profile '<nome>'.`, `✓ Client secret removed.`, `✓ Google session
-  revoked.`, o la nota che il portachiavi non è leggibile.
+  revoked.`, o la nota che il portachiavi non è leggibile. Con `--revoke` e nessuna sessione
+  salvata (anche su un profilo con service account): `Note: no Google session for profile
+  '<nome>', nothing to revoke.`; con `--forget-client-secret` e nessun secret salvato: `Note: no
+  client secret saved for profile '<nome>', nothing to remove.` (10-C46). Le note si stampano
+  solo se il portachiavi è leggibile; senza, resta la nota del portachiavi. Per il service
+  account la CLI legge lo stato con `google_login.status()`, senza rete.
 - Pagina dopo il redirect: `Sign-in complete. You can close this window.` oppure `Sign-in
   failed. Return to the terminal for details.`; testo semplice, leggibile da uno screen reader,
   senza script né dati della richiesta.
@@ -299,6 +304,7 @@ temporaneamente il corpo a `_emit_request` e `_emit_response`, e si ripristina i
 | 10-C43 | `test_google_oauth.py`: `read_client_file` con file assente, non JSON, sezione `web`, senza `client_id`, senza `client_secret` → `ConfigurationError` con il motivo, il cui testo (e `__cause__`/`__context__` nulli) non contiene il secret né altro valore del file; `test_cli_auth.py`: exit `2`, nessuna rotta chiamata, browser non invocato, secret assente da output e log | unitario |
 | 10-C44 | `test_cli_auth.py`: con `--client-secret-stdin` exit `2` nominando i due flag; con `--google-client-id` diverso exit `2`; uguale → login riuscito; nessuna rotta chiamata nei casi d'errore | unitario |
 | 10-C45 | `test_google_login.py`: `login(client_file=…)` salva la stessa voce, lo stesso profilo e lo stesso secret della CLI; file non valido → `ConfigurationError`; `client_file` con `client_secret` → `ConfigurationError` | unitario |
+| 10-C46 | `test_cli_auth.py`: `--revoke` su profilo con service account e su profilo `google_oauth2` senza sessione → nota con il nome del profilo, nessuna chiamata a `REVOKE_URL`, exit `0`; `--forget-client-secret` senza secret → nota; con sessione o secret presenti nessuna nota; senza flag output invariato | unitario |
 | Verifica manuale della spec | login reale su macOS e Windows contro il tenant, rinnovo dopo un'ora, `logout --revoke` | manuale |
 
 ## Scelte tecniche

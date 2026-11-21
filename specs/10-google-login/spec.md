@@ -167,7 +167,11 @@ secret resta.
   postazioni, e la documentazione lo dice. Se la revoca fallisce, la sessione locale è eliminata
   comunque; il comando lo segnala ed esce con il codice dell'errore.
 
-Su un profilo senza sessione Google il comando si comporta come oggi.
+Su un profilo senza sessione Google il comando si comporta come oggi, salvo una nota quando
+sono chiesti `--revoke` o `--forget-client-secret` e non c'è nulla su cui agire: senza sessione
+Google `--revoke` non revoca nulla e lo dice; senza client secret salvato
+`--forget-client-secret` non elimina nulla e lo dice. Vale anche per i profili con service
+account, dove l'utente può aver dimenticato `--profile`. L'uscita resta `0`.
 
 ### Da Python
 
@@ -240,6 +244,7 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 | 10-C43 | Un file illeggibile o inesistente, non JSON, senza sezione `installed` (anche quando ha la sezione `web`), o senza `client_id` o `client_secret`, fa uscire il comando con `2` e un messaggio che nomina il problema, senza richieste di rete e senza aprire il browser; né il messaggio, né i log, né l'eccezione contengono il valore del client secret o altro contenuto del file. | RF-026, RNF-001, RNF-012 |
 | 10-C44 | `--google-client-file` insieme a `--client-secret-stdin`, o a un `--google-client-id` diverso dall'id del file, fa uscire il comando con `2` nominando il conflitto, prima di qualunque richiesta; con un `--google-client-id` uguale il login prosegue. | RF-026 |
 | 10-C45 | La funzione di login della libreria, chiamata con il percorso del file del client, salva la stessa sessione, lo stesso id e lo stesso secret della CLI; con un file non valido solleva `ConfigurationError`; con il file e il client secret insieme solleva `ConfigurationError`. | RF-026 |
+| 10-C46 | `auth logout --revoke` su un profilo senza sessione Google salvata (con service account o `google_oauth2` senza sessione) stampa una nota che nomina il profilo e dice che non c'è nessuna sessione da revocare, non chiama l'endpoint di revoca ed esce `0`; `--forget-client-secret` senza client secret salvato stampa una nota analoga. Senza questi flag l'output resta quello di oggi. | RF-026, RF-015 |
 
 ## Casi limite
 
@@ -407,6 +412,10 @@ Gli esiti si riportano nella spec, senza token né segreti.
   (`--google-client-file`, parametro corrispondente in libreria). Compatibile con l'ADR 0002: il
   secret non passa come argomento e resta solo nel portachiavi. Nuovi criteri 10-C42–10-C45,
   nuovo task T21.
+- 2026-11-21, durante la prova manuale (T18): `auth logout --revoke` lanciato senza `--profile`
+  ha agito sul profilo corrente, con service account, e non ha detto che non c'era nulla da
+  revocare. Su richiesta del maintainer il logout lo segnala con una nota; nuovo criterio
+  10-C46, nuovo task T22.
 
 ## Domande aperte
 
