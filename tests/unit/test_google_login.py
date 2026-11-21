@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import urllib.parse
 import webbrowser
 from collections.abc import Iterator
@@ -550,3 +551,140 @@ class TestLogin:
             google_login.login(config_file=write_config(tmp_path), client_secret=CLIENT_SECRET)
         browser.join()
         assert memory_keychain.entries == {}
+
+
+# ---------------------------------------------------------------------------
+# status() e logout()
+# ---------------------------------------------------------------------------
+
+
+def _google_config(tmp_path: Path, extra: str = "") -> Path:
+    return write_config(tmp_path, extra='auth_method = "google_oauth2"\n' + extra)
+
+
+class TestStatus:
+    # criterio: 10-C24, 10-C32
+    def test_with_session(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, google_mock: respx.MockRouter
+    ) -> None:
+        save_session(memory_keychain)
+        st = google_login.status(config_file=_google_config(tmp_path))
+        assert st.profile == "default"
+        assert st.base_url == BASE
+        assert st.auth_method == "google_oauth2"
+        assert st.google_client_id == CLIENT_ID
+        assert st.keychain == "available"
+        assert st.google_session is True
+        assert st.google_account == EMAIL
+        assert st.google_login_at == LOGIN_AT
+        assert st.client_secret_saved is True
+        assert google_mock.calls.call_count == 0
+        for secret in (REFRESH_TOKEN, CLIENT_SECRET, EMAIL):
+            assert secret not in repr(st)
+
+    # criterio: 10-C24
+    def test_without_session(self, tmp_path: Path, memory_keychain: MemoryKeychain) -> None:
+        st = google_login.status(config_file=_google_config(tmp_path))
+        assert st.google_session is False
+        assert st.google_account is None
+        assert st.google_login_at is None
+        assert st.client_secret_saved is False
+
+    # criterio: 10-C25
+    def test_service_account_profile(self, tmp_path: Path, memory_keychain: MemoryKeychain) -> None:
+        st = google_login.status(config_file=write_config(tmp_path, client_id=None))
+        assert st.auth_method == "service_account"
+        assert st.google_client_id is None
+        assert st.google_session is False
+        assert st.client_secret_saved is False
+
+    # criterio: 10-C25
+    def test_keyring_missing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "keyring", None)
+        st = google_login.status(config_file=_google_config(tmp_path))
+        assert "pynteracta[google]" in st.keychain
+        assert st.google_session is None
+        assert st.client_secret_saved is None
+
+    # criterio: 10-C25
+    def test_backend_rejected(self, tmp_path: Path) -> None:
+        # Il fixture automatico _no_system_keychain dà il backend "fail".
+        st = google_login.status(config_file=_google_config(tmp_path))
+        assert "static Google token" in st.keychain
+        assert st.google_session is None
+
+
+class TestLogout:
+    # criterio: 10-C27, 10-C32
+    def test_removes_session_and_cache_only_of_this_profile(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, google_mock: respx.MockRouter
+    ) -> None:
+        config_file = _google_config(tmp_path)
+        mine = save_session(memory_keychain)
+        other = save_session(memory_keychain, "cert")
+        cache = FileTokenCache(tmp_path / "tokens", api_base=API_BASE)
+        key = build_cache_key(API_BASE, "default")
+        cache.save(
+            key,
+            CachedToken(
+                access_token="t",
+                expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+                obtained_at=datetime.now(tz=UTC),
+            ),
+        )
+        result = google_login.logout(config_file=config_file)
+        assert result.session_removed is True
+        assert result.client_secret_removed is False
+        assert result.revoked is False
+        assert result.keychain_error is None
+        assert mine not in memory_keychain.entries
+        assert other in memory_keychain.entries
+        assert client_secret_entry(CLIENT_ID) in memory_keychain.entries
+        assert cache.load(key) is None
+        assert google_mock.calls.call_count == 0
+
+    # criterio: 10-C27
+    def test_without_session(self, tmp_path: Path, memory_keychain: MemoryKeychain) -> None:
+        result = google_login.logout(config_file=_google_config(tmp_path))
+        assert result.session_removed is False
+
+    # criterio: 10-C28
+    def test_forget_client_secret(self, tmp_path: Path, memory_keychain: MemoryKeychain) -> None:
+        save_session(memory_keychain)
+        result = google_login.logout(
+            config_file=_google_config(tmp_path), forget_client_secret=True
+        )
+        assert result.client_secret_removed is True
+        assert memory_keychain.entries == {}
+
+    # criterio: 10-C29
+    def test_revoke_then_delete(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, google_mock: respx.MockRouter
+    ) -> None:
+        entry = save_session(memory_keychain)
+        route = google_mock.post(google_oauth.REVOKE_URL).mock(return_value=httpx.Response(200))
+        result = google_login.logout(config_file=_google_config(tmp_path), revoke=True)
+        assert result.revoked is True
+        assert _form(route.calls[0]) == {"token": REFRESH_TOKEN}
+        assert entry not in memory_keychain.entries
+
+    # criterio: 10-C29
+    def test_revoke_failure_still_deletes(
+        self, tmp_path: Path, memory_keychain: MemoryKeychain, google_mock: respx.MockRouter
+    ) -> None:
+        entry = save_session(memory_keychain)
+        google_mock.post(google_oauth.REVOKE_URL).mock(side_effect=httpx.ConnectError("x"))
+        with pytest.raises(TransportError):
+            google_login.logout(config_file=_google_config(tmp_path), revoke=True)
+        assert entry not in memory_keychain.entries
+
+    # criterio: 10-C25, 10-C27
+    def test_without_keychain_clears_cache_and_reports(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setitem(sys.modules, "keyring", None)
+        result = google_login.logout(config_file=_google_config(tmp_path))
+        assert result.cache_cleared is True
+        assert result.session_removed is False
+        assert result.keychain_error is not None
+        assert "pynteracta[google]" in result.keychain_error

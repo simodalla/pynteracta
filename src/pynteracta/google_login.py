@@ -323,6 +323,138 @@ def login(  # noqa: PLR0913
     )
 
 
+KEYCHAIN_AVAILABLE = "available"
+
+
+@dataclass(frozen=True)
+class GoogleSessionStatus:
+    """Stato del profilo e della sessione Google, letto senza rete (``auth status``).
+
+    ``keychain`` vale ``"available"`` oppure il motivo per cui il portachiavi non è leggibile;
+    in quel caso ``google_session`` e ``client_secret_saved`` sono ``None``. Nessun segreto tra
+    i campi; l'email non compare in ``repr``.
+    """
+
+    profile: str
+    base_url: str
+    auth_method: str
+    google_client_id: str | None
+    keychain: str
+    google_session: bool | None
+    google_account: str | None = field(repr=False)
+    google_login_at: str | None
+    client_secret_saved: bool | None
+
+
+def status(
+    profile_name: str | None = None,
+    *,
+    config_file: Path | None = None,
+    overrides: dict[str, Any] | None = None,
+) -> GoogleSessionStatus:
+    """Lo stato del profilo (corrente, se ``profile_name`` manca) senza richieste di rete."""
+    name, profile = _resolve(profile_name, config_file, overrides)
+    client_id = profile.google_client_id
+    keychain_state = KEYCHAIN_AVAILABLE
+    session: _Session | None = None
+    has_session: bool | None = None
+    secret_saved: bool | None = None
+    try:
+        kc = keychain.open_keychain()
+        session = _read_session(kc, session_entry(_api_base(profile), name))
+        has_session = session is not None
+        secret_saved = client_id is not None and kc.get(client_secret_entry(client_id)) is not None
+    except ConfigurationError as exc:
+        keychain_state = str(exc)
+    return GoogleSessionStatus(
+        profile=name,
+        base_url=str(profile.base_url).rstrip("/"),
+        auth_method=profile.auth_method,
+        google_client_id=client_id,
+        keychain=keychain_state,
+        google_session=has_session,
+        google_account=session.email if session is not None else None,
+        google_login_at=(session.login_at or None) if session is not None else None,
+        client_secret_saved=secret_saved,
+    )
+
+
+@dataclass(frozen=True)
+class GoogleLogoutResult:
+    """Esito di :func:`logout`; ``keychain_error`` è il motivo se il portachiavi non è leggibile."""
+
+    profile_name: str
+    cache_cleared: bool
+    session_removed: bool
+    client_secret_removed: bool
+    revoked: bool
+    keychain_error: str | None = None
+
+
+def logout(
+    profile_name: str | None = None,
+    *,
+    config_file: Path | None = None,
+    overrides: dict[str, Any] | None = None,
+    forget_client_secret: bool = False,
+    revoke: bool = False,
+) -> GoogleLogoutResult:
+    """Elimina la cache del token Interacta e la sessione Google del profilo.
+
+    Senza rete, salvo ``revoke=True``: prima chiede a Google di revocare il refresh token (la
+    revoca fa decadere il consenso a quel client anche per le altre sessioni dello stesso
+    account), poi elimina comunque la sessione locale e rilancia l'eventuale errore della
+    revoca. Il client secret resta, salvo ``forget_client_secret=True``. Senza portachiavi
+    elimina solo la cache e lo riporta in ``keychain_error``.
+    """
+    name, profile = _resolve(profile_name, config_file, overrides)
+    api_base = _api_base(profile)
+    clear_cached_token(profile, name, api_base)
+    try:
+        kc = keychain.open_keychain()
+    except ConfigurationError as exc:
+        return GoogleLogoutResult(
+            profile_name=name,
+            cache_cleared=True,
+            session_removed=False,
+            client_secret_removed=False,
+            revoked=False,
+            keychain_error=str(exc),
+        )
+    entry = session_entry(api_base, name)
+    had_session = kc.get(entry) is not None
+    session = _read_session(kc, entry)
+    secret_name = (
+        client_secret_entry(profile.google_client_id) if profile.google_client_id else None
+    )
+    secret_removed = False
+    revoked = False
+    try:
+        if revoke and session is not None:
+            with HttpTransport(
+                GOOGLE_OAUTH_BASE,
+                timeout=profile.timeout_seconds,
+                audit=profile.audit_log,
+                audit_bodies=profile.audit_log_bodies,
+            ) as transport:
+                google_oauth.revoke(transport, session.refresh_token)
+            revoked = True
+    finally:
+        if had_session:
+            kc.delete(entry)
+            _log.info("google.session_removed", session=entry)
+        if forget_client_secret and secret_name is not None and kc.get(secret_name) is not None:
+            kc.delete(secret_name)
+            secret_removed = True
+    return GoogleLogoutResult(
+        profile_name=name,
+        cache_cleared=True,
+        session_removed=had_session,
+        client_secret_removed=secret_removed,
+        revoked=revoked,
+    )
+
+
 def session_token_provider(
     profile: Profile, profile_name: str, transport: HttpTransport
 ) -> GoogleSessionTokenProvider:

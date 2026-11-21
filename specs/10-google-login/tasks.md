@@ -259,7 +259,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   4. Log `google.login_ok` con la sola chiave della sessione.
   5. Controlli bloccanti; commit `feat(auth): login Google dal browser in libreria (10-T11)`.
 
-### [ ] T12 – `google_login.status()` e `logout()`
+### [x] T12 – `google_login.status()` e `logout()`
 
 - Criteri: 10-C24, 10-C25, 10-C27, 10-C28, 10-C29, 10-C32 (parte di libreria)
 - Dipende da: T11
