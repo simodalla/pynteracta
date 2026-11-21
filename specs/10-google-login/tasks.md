@@ -381,6 +381,26 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   5. `uv run mkdocs build --strict`; controlli bloccanti; commit `docs: login Google dal
      browser (10-T17)`.
 
+### [ ] T21 – Id e secret del client dal file JSON della console
+
+- Criteri: 10-C42, 10-C43, 10-C44, 10-C45
+- Dipende da: T13, T17
+- Test: `test_google_oauth.py::TestReadClientFile`, `test_google_login.py::TestLoginClientFile`,
+  `test_cli_auth.py::TestAuthLoginClientFile`; in `test_docs_snippets.py::test_google_login_pages`
+  `cli.md` e `authentication.md` citano `--google-client-file`.
+- Passi:
+  1. Scrivere i test; rossi. Per 10-C43 provare che il test di non divulgazione fallisce
+     riportando il contenuto del file nel messaggio d'errore, poi togliere la regressione.
+  2. `google_oauth.read_client_file` e `OAuthClient`.
+  3. `google_login.login(client_file=…)`: lettura prima di ogni richiesta, controlli dei
+     conflitti, secret del file come valore nuovo.
+  4. `cli/auth.py`: opzione `--google-client-file`, tra i flag del login integrato; conflitto
+     con `--client-secret-stdin`.
+  5. `docs/cli.md`, `docs/authentication.md` (il file si scarica dalla console e va cancellato
+     dopo il login).
+  6. Controlli bloccanti e `mkdocs build --strict`; commit `feat(cli): id e secret del client
+     Google dal file JSON della console (10-T21)`.
+
 ### [ ] T18 – Prova reale su macOS e Windows (manuale)
 
 - Criteri: sezione "Verifica manuale" della spec (10-C03, 10-C14, 10-C15, 10-C29 sui sistemi
@@ -395,13 +415,15 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
   3. Dopo più di un'ora, di nuovo `auth whoami`: deve riuscire senza browser.
   4. `pynteracta auth logout --revoke`, poi `auth whoami`: deve chiedere di rifare il login
      (exit `3`).
+  5. Su una delle due postazioni, un nuovo login con `--google-client-file` sul JSON scaricato
+     dalla console (dopo T21).
   Riportare qui gli esiti, senza token né segreti.
 - Esito: <compilato a mano>
 
 ### [ ] T19 – Chiusura: `CLAUDE.md` e PRD
 
 - Criteri: nessuno (documenti di governo; i "Requisiti nuovi" della spec)
-- Dipende da: T17, T18
+- Dipende da: T17, T18, T21
 - Test: nessuno; si verifica rileggendo il diff e con `uv run pre-commit run --all-files`.
 - Passi:
   1. `CLAUDE.md`: mappa dei moduli (`keychain.py`, `google_oauth.py`, `google_login.py`,
@@ -460,3 +482,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
 | 10-C39 | T04, T13 |
 | 10-C40 | T04, T10 |
 | 10-C41 | T20 |
+| 10-C42 | T21 |
+| 10-C43 | T21 |
+| 10-C44 | T21 |
+| 10-C45 | T21 |

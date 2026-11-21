@@ -65,6 +65,17 @@ variabile d'ambiente), esegue il login integrato:
    terminale interattivo e senza quel flag esce con codice `2`. Il secret non si passa mai come
    argomento. `--replace-client-secret` lo chiede di nuovo anche se è già salvato;
    `--client-secret-stdin` usa sempre il valore letto.
+
+   In alternativa `--google-client-file PERCORSO` legge id e secret dal file JSON che la console
+   Google fa scaricare per un client "Desktop app" (sezione `installed`). Il file è letto una
+   volta, prima di qualunque richiesta di rete: l'id prende il posto di `--google-client-id`, il
+   secret quello del prompt, e vale come valore nuovo (come con `--client-secret-stdin`). Il
+   percorso non è salvato da nessuna parte e il file non è modificato né eliminato: la
+   documentazione consiglia di cancellarlo dopo il login. Un file illeggibile, non JSON, di un
+   client diverso da "Desktop" (per esempio la sezione `web`) o senza id o secret fa uscire il
+   comando con `2`, con il motivo e senza mai riportare il contenuto del file. Il flag non si
+   combina con `--client-secret-stdin`, né con un `--google-client-id` diverso da quello del
+   file.
 3. Apre il browser sul consenso Google con lo scope `email`, e stampa comunque l'indirizzo se il
    browser non si apre; con `--no-browser` stampa solo l'indirizzo. Attende la risposta su un
    indirizzo di loopback per al più 300 secondi (`--login-timeout SECONDI` per cambiarli).
@@ -92,8 +103,9 @@ sé il profilo, senza `profile_name`, usa il nome del profilo corrente per la se
 cache del token.
 
 Con un token statico il comando si comporta per il resto come oggi, compresa la scrittura del
-profilo prima della validazione. I flag del login integrato (`--google-client-id`, `--client-secret-stdin`,
-`--replace-client-secret`, `--no-browser`, `--login-timeout`) insieme a un token statico sono un
+profilo prima della validazione. I flag del login integrato (`--google-client-id`,
+`--google-client-file`, `--client-secret-stdin`, `--replace-client-secret`, `--no-browser`,
+`--login-timeout`) insieme a un token statico sono un
 errore d'uso: codice `2`, con il motivo (per la variabile d'ambiente, l'invito a toglierla).
 
 ### Sessione e rinnovo
@@ -161,7 +173,8 @@ Su un profilo senza sessione Google il comando si comporta come oggi.
 
 Chi non usa la CLI ha funzioni pubbliche e documentate che lavorano su un profilo (per nome, o
 un `Profile` con il suo nome): una avvia il login, con il client secret come parametro
-facoltativo (se manca, usa quello nel portachiavi) e la possibilità di non aprire il browser;
+facoltativo (se manca, usa quello nel portachiavi) o in alternativa il percorso del file JSON
+del client, e la possibilità di non aprire il browser;
 le altre eliminano la sessione e ne leggono lo stato. `InteractaClient(profile_name=...)` usa da
 solo la sessione salvata. Nessuna di queste funzioni scrive sullo standard output.
 
@@ -223,6 +236,10 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 | 10-C39 | Con `current_profile = "prod"` in `config.toml` e senza `--profile`, `auth login` (integrato, con token statico e con service account) scrive nel profilo `prod` e non crea il profilo `default`; con `--profile X` scrive in `X`, come oggi. | RF-016, RF-026 |
 | 10-C40 | Con `current_profile = "prod"`, un `InteractaClient` costruito senza argomenti di profilo usa la sessione Google e la chiave di cache del token del profilo `prod`, le stesse dei comandi della CLI. | RF-016, RF-003, RF-026 |
 | 10-C41 | Dopo che un comando ha messo in cache il token Interacta di un profilo `google_oauth2`, `auth logout` sullo stesso profilo elimina quel file di cache; lo elimina anche se è stato scritto con la chiave calcolata prima di questa spec. | RF-003, RNF-002 |
+| 10-C42 | Con `--google-client-file` su un file JSON con sezione `installed`, `auth login --google` usa `client_id` e `client_secret` del file per il consenso e lo scambio del codice; a login riuscito il profilo contiene il `google_client_id` del file e il portachiavi il secret del file, al posto di quello eventualmente salvato; se il login fallisce profilo e portachiavi sono identici a prima. Il percorso del file non compare nel profilo, e il file resta identico. | RF-026, RNF-012 |
+| 10-C43 | Un file illeggibile o inesistente, non JSON, senza sezione `installed` (anche quando ha la sezione `web`), o senza `client_id` o `client_secret`, fa uscire il comando con `2` e un messaggio che nomina il problema, senza richieste di rete e senza aprire il browser; né il messaggio, né i log, né l'eccezione contengono il valore del client secret o altro contenuto del file. | RF-026, RNF-001, RNF-012 |
+| 10-C44 | `--google-client-file` insieme a `--client-secret-stdin`, o a un `--google-client-id` diverso dall'id del file, fa uscire il comando con `2` nominando il conflitto, prima di qualunque richiesta; con un `--google-client-id` uguale il login prosegue. | RF-026 |
+| 10-C45 | La funzione di login della libreria, chiamata con il percorso del file del client, salva la stessa sessione, lo stesso id e lo stesso secret della CLI; con un file non valido solleva `ConfigurationError`; con il file e il client secret insieme solleva `ConfigurationError`. | RF-026 |
 
 ## Casi limite
 
@@ -260,6 +277,10 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
   token e dice che il portachiavi non è leggibile (10-C25, 10-C27).
 - `logout --revoke` senza rete → la sessione locale è eliminata, il comando esce con errore
   (10-C29).
+- File del client di tipo "Applicazione web" (sezione `web`) → exit `2` con l'indicazione di
+  creare un client "Desktop app" (10-C43).
+- File del client con un secret sbagliato o ruotato → Google risponde `invalid_client`, nulla di
+  salvato (10-C20, 10-C42).
 
 ## Dati personali e segreti
 
@@ -274,6 +295,9 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
   `auth status` (e nell'eventuale file di `--export` scelto dall'operatore), mai nei log
   applicativi.
 - **Id del client OAuth**: nel profilo, non è un segreto; negli esempi è finto e riconoscibile.
+- **File JSON del client** (`--google-client-file`): appartiene alla persona, che l'ha scaricato;
+  la libreria lo legge una volta e non lo copia, non lo modifica e non ne salva il percorso. Il
+  suo contenuto non compare in messaggi d'errore, log o eccezioni.
 - **Chiamate a Google** (token, userinfo, revoca): registrate con metodo, URL e stato, senza corpi, anche con
   `audit_log_bodies` e `audit_log_raw`. L'indirizzo di consenso stampato a terminale contiene
   `state` e la challenge PKCE, che non sono segreti riutilizzabili.
@@ -285,7 +309,8 @@ Sottorequisiti di RF-026, RF-016, RNF-012 e RNF-001, con id provvisori; entrano 
 task di chiusura.
 
 - RF-026a. Il login integrato si avvia con `auth login --google` senza token statico; flag
-  `--google-client-id`, `--client-secret-stdin`, `--replace-client-secret`, `--no-browser`,
+  `--google-client-id`, `--google-client-file` (id e secret dal JSON del client "Desktop"
+  scaricato dalla console), `--client-secret-stdin`, `--replace-client-secret`, `--no-browser`,
   `--login-timeout` (predefinito 300 s); profilo e portachiavi sono scritti solo dopo lo scambio
   riuscito con Interacta; i flag del login integrato insieme a un token statico sono un errore
   d'uso (exit `2`).
@@ -348,6 +373,7 @@ Il §6 del PRD va inoltre precisato: tra i dati nel portachiavi c'è l'email del
 | Senza `--profile`, ogni login lavora sul profilo corrente; il client che risolve da sé il profilo usa quel nome | Profilo corrente solo per il login integrato; lasciare `default` | La sessione deve finire dove i comandi successivi la cercano; correggere tutti i login evita due regole diverse nello stesso comando. Cambia un comportamento esistente solo per chi ha un profilo corrente diverso da `default` |
 | Timeout del login 300 s, modificabile; `--no-browser`; pagina di esito in solo testo | Timeout fisso; nessun flag | Il consenso con verifica in due passaggi può richiedere minuti; `--no-browser` copre le sessioni senza browser predefinito |
 | Extra mancante con profilo `google_oauth2` senza token: `AuthenticationError` (exit `3`), come oggi; solo `auth login --google` esce `2` | Errore di configurazione in entrambi i casi | Chi non installa l'extra vede lo stesso tipo di errore di oggi, con un messaggio più utile |
+| `--google-client-file` legge id e secret dal JSON della console, una volta, senza salvarne il percorso; solo client "Desktop" (`installed`) | Ricordare il percorso nel profilo; accettare anche i client `web` | Il secret resta solo nel portachiavi e il file si può cancellare dopo il login; un client `web` non accetta il redirect su loopback con porta casuale, quindi fallirebbe più tardi e in modo meno chiaro |
 
 ## Verifica manuale
 
@@ -376,6 +402,11 @@ Gli esiti si riportano nella spec, senza token né segreti.
   10-C23 e 10-C27 lo davano per scontato. Scelta del maintainer: correggerlo in questa spec;
   nuovo criterio 10-C41, la chiave si calcola sull'indirizzo dell'API come per il service
   account, e il logout elimina anche la chiave vecchia.
+- 2026-11-21, durante la prova manuale (T18): su richiesta del maintainer, id e secret del
+  client si possono leggere dal file JSON scaricato dalla console Google
+  (`--google-client-file`, parametro corrispondente in libreria). Compatibile con l'ADR 0002: il
+  secret non passa come argomento e resta solo nel portachiavi. Nuovi criteri 10-C42–10-C45,
+  nuovo task T21.
 
 ## Domande aperte
 

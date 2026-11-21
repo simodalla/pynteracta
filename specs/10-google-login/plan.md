@@ -142,6 +142,20 @@ CLI, testi in inglese (deroga del `CLAUDE.md`).
   senza `--client-secret-stdin` exit `2` con `Client secret required: run interactively or pass
   --client-secret-stdin.` L'indirizzo di consenso è stampato con `Open this URL to sign in:`.
   Esito: `✓ Authenticated as: <nome>` e `✓ Google session saved for profile '<nome>'`.
+- `auth login --google-client-file PATH` (10-C42–10-C44): implica `--google`, come gli altri
+  flag del login integrato. La CLI passa il percorso a `login(client_file=…)` senza leggerlo; il
+  file si legge con `google_oauth.read_client_file(path) -> OAuthClient` (dataclass `client_id`,
+  `client_secret` con `repr=False`), prima di qualunque richiesta. Errori (`ConfigurationError`,
+  exit `2`, messaggi senza contenuto del file e sollevati `from None`): `Cannot read the OAuth
+  client file: <nome dell'eccezione OS>.`, `The OAuth client file is not valid JSON.`, `The
+  OAuth client file is not for a "Desktop app" client: create one of that type in the Google
+  Cloud console.` (manca `installed`, anche con `web`), `The OAuth client file has no
+  client_id.` / `… no client_secret.`. Conflitti: con `--client-secret-stdin` `--google-client-file
+  cannot be combined with --client-secret-stdin.`; con un `--google-client-id` diverso
+  `--google-client-id does not match the client_id in --google-client-file.` (controllo fatto in
+  `login()`, dopo la lettura del file). Il secret del file vale come valore nuovo
+  (`replace_client_secret` implicito); `--replace-client-secret` insieme al file non cambia
+  nulla.
 - Errori d'uso (exit `2`): flag del login integrato insieme a `--google-token` o alla variabile
   d'ambiente (`… cannot be combined with a static Google token; unset
   $PYNTERACTA_GOOGLE_OAUTH2_TOKEN to sign in from the browser.`); `google_client_id` mancante
@@ -163,14 +177,16 @@ Libreria (`pynteracta.google_login`):
 
 ```python
 login(profile_name=None, *, config_file=None, overrides=None, client_id=None,
-      client_secret=None, replace_client_secret=False, open_browser=True, timeout=300.0,
-      on_auth_url=None, hooks=None) -> GoogleLoginResult
+      client_secret=None, client_file=None, replace_client_secret=False, open_browser=True,
+      timeout=300.0, on_auth_url=None, hooks=None) -> GoogleLoginResult
 logout(profile_name=None, *, config_file=None, overrides=None,
        forget_client_secret=False, revoke=False) -> GoogleLogoutResult
 status(profile_name=None, *, config_file=None, overrides=None) -> GoogleSessionStatus
 ```
 
 `overrides` è lo stesso dizionario di `resolve_profile` (la CLI vi passa i flag globali).
+`client_file` (percorso del JSON del client) e `client_secret` insieme sollevano
+`ConfigurationError`; `client_file` e un `client_id` diverso da quello del file pure.
 Nessuna funzione scrive sullo standard output: l'indirizzo di consenso arriva a `on_auth_url`.
 
 ## Configurazione
@@ -279,6 +295,10 @@ temporaneamente il corpo a `_emit_request` e `_emit_response`, e si ripristina i
 | 10-C39 | `test_cli_auth.py`, parametrizzato sui tre login: `current_profile = "prod"` senza `--profile` → scrive in `prod`, nessun profilo `default`; con `--profile X` scrive in `X` | unitario |
 | 10-C40 | `test_client.py`: `current_profile = "prod"`, `InteractaClient()` → voce di sessione e chiave di cache di `prod` | unitario |
 | 10-C41 | `test_cli_auth.py`: `auth whoami` con token Google e cache su file, poi `auth logout` → nessun file rimasto; file scritto con `legacy_google_cache_key` → eliminato; `test_auth.py`: `GoogleOAuth2TokenManager` con `cache_api_base` usa `build_cache_key(cache_api_base, nome)` | unitario |
+| 10-C42 | `test_cli_auth.py`: file `installed` in `tmp_path` con id e secret finti, secret `A` già salvato → la rotta del token riceve id e secret del file, il profilo ha il `google_client_id` del file, la voce diventa quella del file, il profilo non contiene il percorso, il file ha gli stessi byte di prima; con login fallito restano `A` e il profilo di prima | unitario |
+| 10-C43 | `test_google_oauth.py`: `read_client_file` con file assente, non JSON, sezione `web`, senza `client_id`, senza `client_secret` → `ConfigurationError` con il motivo, il cui testo (e `__cause__`/`__context__` nulli) non contiene il secret né altro valore del file; `test_cli_auth.py`: exit `2`, nessuna rotta chiamata, browser non invocato, secret assente da output e log | unitario |
+| 10-C44 | `test_cli_auth.py`: con `--client-secret-stdin` exit `2` nominando i due flag; con `--google-client-id` diverso exit `2`; uguale → login riuscito; nessuna rotta chiamata nei casi d'errore | unitario |
+| 10-C45 | `test_google_login.py`: `login(client_file=…)` salva la stessa voce, lo stesso profilo e lo stesso secret della CLI; file non valido → `ConfigurationError`; `client_file` con `client_secret` → `ConfigurationError` | unitario |
 | Verifica manuale della spec | login reale su macOS e Windows contro il tenant, rinnovo dopo un'ora, `logout --revoke` | manuale |
 
 ## Scelte tecniche
