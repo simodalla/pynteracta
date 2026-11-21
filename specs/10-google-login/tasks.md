@@ -455,7 +455,7 @@ Aggiunto il 2026-11-21 dopo T01 (vedi "Revisioni" della spec); si esegue subito 
     console (10-C42–10-C45, T21). Senza `--profile` dopo `auth login`, il livello di log viene
     dal profilo corrente: comportamento precedente alla spec, non cambiato.
 
-### [ ] T19 – Chiusura: `CLAUDE.md` e PRD
+### [x] T19 – Chiusura: `CLAUDE.md` e PRD
 
 - Criteri: nessuno (documenti di governo; i "Requisiti nuovi" della spec)
 - Dipende da: T17, T18, T21, T22

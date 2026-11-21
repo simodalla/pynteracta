@@ -310,8 +310,8 @@ Nel `CLAUDE.md` si aggiornano la mappa dei moduli e lo "Stack".
 
 ## Requisiti nuovi
 
-Sottorequisiti di RF-026, RF-016, RNF-012 e RNF-001, con id provvisori; entrano nel PRD con il
-task di chiusura.
+Sottorequisiti di RF-026, RF-016, RNF-012 e RNF-001; entrati nel PRD con il task di chiusura
+(T19, 2026-11-21).
 
 - RF-026a. Il login integrato si avvia con `auth login --google` senza token statico; flag
   `--google-client-id`, `--google-client-file` (id e secret dal JSON del client "Desktop"
@@ -330,7 +330,8 @@ task di chiusura.
   `0`; `--check` prova l'autenticazione ed esce `3` se fallisce.
 - RF-026e. `auth logout` elimina la sessione Google del profilo senza rete;
   `--forget-client-secret` elimina il secret; `--revoke` revoca presso Google ed elimina
-  comunque in locale.
+  comunque in locale; quando non c'è nulla da revocare o da eliminare lo dice in una nota,
+  con exit `0`.
 - RF-026f. Funzioni pubbliche di libreria per login, logout e stato su un profilo.
 - RF-026g. Extra `pynteracta[google]` (porta `keyring`); senza, il login integrato fallisce
   nominando l'extra.
@@ -392,6 +393,21 @@ provare a mano, perché dipendono dal browser e dal portachiavi reali della post
 - `auth logout --revoke` seguito da un comando, che deve chiedere di rifare il login.
 
 Gli esiti si riportano nella spec, senza token né segreti.
+
+Esiti (2026-11-21, maintainer, tenant dell'ente, client "Desktop" dell'ente; dettaglio in T18):
+
+- macOS (Portachiavi): login, `auth status` e `auth whoami` riusciti; il comando dopo la
+  scadenza del token Interacta (un'ora) ne ottiene uno nuovo senza browser; login con
+  `--google-client-file` riuscito senza chiedere il secret; dopo `auth logout --revoke`,
+  `auth whoami` esce `3` con l'invito al login.
+- Windows (Gestione credenziali): login, `auth status` e `auth whoami` riusciti, con rinnovo
+  dell'access token Google senza browser e l'avviso previsto sui permessi della cache; dopo la
+  revoca fatta dal Mac `auth whoami` esce `3`, quindi la revoca vale anche sull'altra
+  postazione. Il rinnovo dopo la scadenza non è stato ripetuto con esito positivo su Windows,
+  perché la revoca è arrivata prima; il percorso del rinnovo è lo stesso del primo comando
+  dopo il login, riuscito.
+- Nei log comparsi durante la prova ci sono solo metodo, URL, stato e nome della voce del
+  portachiavi: nessun token, secret o email.
 
 ## Revisioni
 
